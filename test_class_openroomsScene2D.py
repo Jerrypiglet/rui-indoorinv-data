@@ -55,7 +55,7 @@ openrooms_scene = openroomsScene2D(
         'im_sdr', 'im_hdr', 'seg', 'poses', 
         'albedo', 'roughness', 
         'depth', 'normal',
-        'matseg', 
+        'matseg', 'semseg', 
         # 'lighting_SG', 'lighting_envmap'
         ], 
     # modality_list = ['im_sdr', 'poses', 'depth', 'normal', 'lighting_SG'], 
@@ -66,8 +66,9 @@ if opt.vis_2d:
     vis_2D = visualizer_openroomsScene_2D(
         openrooms_scene, 
         modality_list=[
-            'depth', 'normal', 'albedo', 'roughness', 
-            'matseg', # images/demo_all_2D.png
+            'depth', 'normal', 'albedo', 'roughness', # images/demo_all_2D.png
+            'matseg', # images/demo_semseg_matseg_2D.png
+            'semseg', # images/demo_semseg_matseg_2D.png
             ], 
         frame_idx_list=[0, 1, 2, 3, 4], # 0-based indexing of all selected frames
     )

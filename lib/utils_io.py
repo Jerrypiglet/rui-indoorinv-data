@@ -36,17 +36,21 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
     '''
     if not Path(path).exists():
         raise FileNotFoundError(path)
-    assert ext in ['png', 'jpg', 'hdr']
+        
+    assert path.suffix[1:] == ext
+    assert ext in ['png', 'jpg', 'hdr', 'npy']
     if ext in ['png', 'jpg']:
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     elif ext in ['hdr']:
         im = cv2.imread(str(path), -1)
+    elif ext in ['npy']:
+        im = np.load(str(path))
 
     # cv2.imread returns None when it cannot read the file
     if im is None:
         raise RuntimeError(f"Failed to load {path}")
 
-    if len(im.shape) == 3 and im.shape[2] == 3:
+    if len(im.shape) == 3 and im.shape[2] == 3 and ext in ['png', 'jpg', 'hdr']:
         # Color image, convert BGR to RGB
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 

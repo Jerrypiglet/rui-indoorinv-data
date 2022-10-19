@@ -440,31 +440,17 @@ class openroomsScene2D(object):
 
     def load_semseg(self):
         '''
-        semseg, in camera coordinates (OpenGL convention: right-up-backward);
+        semseg, image space
         (H, W, 3), [-1., 1.]
         '''
-
-        assert False
-
-        # semseg_label = np.load(semseg_label_path).astype(np.uint8)
-        # semseg_label_ori = cv2.resize(semseg_label, (self.im_width, self.im_height), interpolation=cv2.INTER_NEAREST)
-        # # Transform images
-        # im_semseg_transformed_trainval, semseg_label = self.transforms_semseg(im_fixedscale_SDR_uint8, semseg_label) # augmented
-        # # semseg_label[semseg_label==0] = 31
-        # if self.opt.cfg.MODEL_SEMSEG.wallseg_only:
-        #     wallseg_mask = torch.logical_or(torch.logical_or(semseg_label==43, semseg_label==44), semseg_label==44)
-        #     semseg_label[torch.logical_not(wallseg_mask)] = 0
-        #     semseg_label[wallseg_mask] = 1
-
-        # return {'semseg_label_ori': torch.from_numpy(semseg_label_ori), 'semseg_label': semseg_label.long(), 'im_semseg_transformed_trainval': im_semseg_transformed_trainval}
-
         if hasattr(self, 'semseg_list'): return
 
         print(white_blue('[openroomsScene] load_semseg for %d frames...'%len(self.frame_id_list)))
 
-        semseg_files = [self.scene_rendering_path / ('imsemseg_%d.png'%i) for i in self.frame_id_list]
-        self.semseg_list = [load_img(semseg_file, (self.im_H_load, self.im_W_load, 3), ext='png', target_HW=self.im_target_HW).astype(np.float32)/255.*2.-1. for semseg_file in semseg_files] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_semsegs.jpg)
-        self.semseg_list = [semseg / np.sqrt(np.maximum(np.sum(semseg**2, axis=2, keepdims=True), 1e-5)) for semseg in self.semseg_list]
+        semseg_files = [self.scene_rendering_path / ('imsemLabel_%d.npy'%i) for i in self.frame_id_list]
+        self.semseg_list = [
+            load_img(semseg_file, (self.im_H_load, self.im_W_load), ext='npy', target_HW=self.im_target_HW, resize_method='nearest')
+            for semseg_file in semseg_files]
         
         print(blue_text('[openroomsScene] DONE. load_semseg'))
 

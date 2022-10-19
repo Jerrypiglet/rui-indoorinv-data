@@ -4,4 +4,4 @@
 *.npz
 *.dat
 data
-data/*
+data/openrooms_public*

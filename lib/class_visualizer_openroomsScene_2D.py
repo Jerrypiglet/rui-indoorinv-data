@@ -6,7 +6,7 @@ from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 import matplotlib.pyplot as plt
 from lib.utils_OR.utils_OR_cam import project_3d_line
-from lib.utils_vis import vis_index_map
+from lib.utils_vis import vis_index_map, colorize
 class visualizer_openroomsScene_2D(object):
     '''
     A class used to **visualize** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties / semantics).
@@ -31,6 +31,8 @@ class visualizer_openroomsScene_2D(object):
         self.N_cols = self.N_frames
         assert self.N_cols <= 6 # max 6 images due to space in a row
         self.N_rows = len(self.modality_list) + 1
+
+        self.semseg_colors = np.loadtxt('data/colors/openrooms_colors.txt').astype('uint8')
 
     def create_im_row_ax_list(self, subfig, start_idx: int=1, if_show_im: bool=False, title: str=''):
         assert self.openrooms_scene.if_has_im_sdr
@@ -113,6 +115,9 @@ class visualizer_openroomsScene_2D(object):
                _im = _im ** (1./2.2) 
             if modality == 'matseg':
                 _im = vis_index_map(_im['mat_aggre_map'])
+            if modality == 'semseg':
+                _im = np.array(colorize(_im, self.semseg_colors).convert('RGB'))
+
             ax.imshow(_im)
 
     def vis_2d_layout(self, ax_list):
