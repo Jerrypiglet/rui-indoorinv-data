@@ -12,7 +12,7 @@ import torch
 from pathlib import Path
 import copy
 
-from lib.class_openroomsScene import openroomsScene
+from lib.class_openroomsScene2D import openroomsScene
 from lib.class_openroomsScene3D import openroomsScene3D
 
 from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, check_list_of_tensors_size

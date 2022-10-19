@@ -124,9 +124,9 @@ def scale_HDR(hdr, seg, fixed_scale=True, scale_input=None, if_return_scale_only
 
     return hdr, scale 
 
-def load_depth_binary(path: Path, expected_shape: tuple=(), channels: int=1, dtype=np.float32, target_HW: Tuple[int, int]=(), resize_method: str='area') -> np.ndarray:
+def load_binary(path: Path, expected_shape: tuple=(), target_HW: Tuple[int, int]=(), resize_method: str='area', channels: int=1, dtype: np.dtype=np.float32) -> np.ndarray:
     '''
-    return depth map of (H, W)
+    return depth/seg map of (H, W, (channels))
     '''
     assert dtype in [np.float32, np.int32], 'Invalid binary type outside (np.float32, np.int32)!'
     if not Path(path).exists():
@@ -141,18 +141,22 @@ def load_depth_binary(path: Path, expected_shape: tuple=(), channels: int=1, dty
             decode_char = 'f'
         elif dtype == np.int32:
             decode_char = 'i'
-        depth = np.asarray(struct.unpack(decode_char * channels * height * width, dBuffer), dtype=dtype)
+        im = np.asarray(struct.unpack(decode_char * channels * height * width, dBuffer), dtype=dtype)
 
-    depth = depth.reshape([height, width, channels] )
-    depth = np.squeeze(depth)
+    im = im.reshape([height, width, channels] )
+    im = np.squeeze(im)
 
     if expected_shape != ():
-        assert tuple(depth.shape) == expected_shape
+        assert tuple(im.shape[:2]) == expected_shape
 
     if target_HW != ():
-        depth = resize_img(depth, target_HW, resize_method)
+        if dtype == np.int32:
+            assert resize_method == 'nearest'
+        if resize_method == 'area':
+            assert dtype == np.float32
+        im = resize_img(im, target_HW, resize_method)
 
-    return depth
+    return im
 
 def load_h5(path: Path) -> np.ndarray:
     if not Path(path).exists():

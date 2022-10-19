@@ -2,11 +2,11 @@ from webbrowser import BackgroundBrowser
 import numpy as np
 import open3d as o3d
 from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, check_list_of_tensors_size
-from lib.class_openroomsScene import openroomsScene
+from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 import matplotlib.pyplot as plt
 from lib.utils_OR.utils_OR_cam import project_3d_line
-
+from lib.utils_vis import vis_index_map
 class visualizer_openroomsScene_2D(object):
     '''
     A class used to **visualize** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties / semantics).
@@ -18,54 +18,102 @@ class visualizer_openroomsScene_2D(object):
         frame_idx_list: list=[0], 
     ):
 
-        assert type(openrooms_scene) in [openroomsScene, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
+        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
 
         self.openrooms_scene = openrooms_scene
 
         self.modality_list = modality_list
-        for _ in self.modality_list:
-            assert _ in ['layout']
 
         self.frame_idx_list = frame_idx_list
         self.N_frames = len(self.frame_idx_list)
         assert self.N_frames >= 1
 
-        self.N_cols = 4
-        self.N_rows = self.N_frames // self.N_cols + 1 # max 4 images / row
+        self.N_cols = self.N_frames
+        assert self.N_cols <= 6 # max 6 images due to space in a row
+        self.N_rows = len(self.modality_list) + 1
 
-    def create_im_ax_list(self):
+    def create_im_row_ax_list(self, subfig, start_idx: int=1, if_show_im: bool=False, title: str=''):
         assert self.openrooms_scene.if_has_im_sdr
 
-        plt.figure(figsize=(6*self.N_cols, 4*self.N_rows))
-        ax_list = []
-        for frame_idx in self.frame_idx_list:
-            ax = plt.subplot(self.N_rows, self.N_cols, frame_idx+1)
-            im = self.openrooms_scene.im_sdr_list[frame_idx]
-            ax.imshow(im)
-            ax_list.append(ax)
+        ax_list = subfig.subplots(1, self.N_cols)
+        assert len(self.frame_idx_list) == len(ax_list)
+        for ax, frame_idx in zip(ax_list, self.frame_idx_list):
+            if if_show_im:
+                im = self.openrooms_scene.im_sdr_list[frame_idx]
+                ax.imshow(im)
 
-        return ax_list
+        start_idx += len(self.frame_idx_list)
 
-    def vis_2d_with_plt(self, ax_list=None):
+        return ax_list, start_idx
+
+    def vis_2d_with_plt(self):
         '''
         visualize verything indicated in modality_list for the frame_idx-st frame (0-based)
         '''
-        if ax_list is None:
-            ax_list = self.create_im_ax_list()
-
-        if 'layout' in self.modality_list:
-            self.vis_2d_layout(ax_list)
-
-        for frame_idx, ax in zip(self.frame_idx_list, ax_list):
+        height_width_list = []
+        for frame_idx in self.frame_idx_list:
             im = self.openrooms_scene.im_sdr_list[frame_idx]
             height, width = im.shape[:2]
-            ax.set_xlim(-width*0.5, width*1.5)
-            ax.set_ylim(height*1.5, -height*.5)
+            height_width_list.append((height, width))
+
+        start_idx = 1
+        # plt.figure(figsize=(6*self.N_cols, 4*self.N_rows))
+        fig = plt.figure(constrained_layout=True)
+        subfigs = fig.subfigures(nrows=self.N_rows, ncols=1) # https://stackoverflow.com/questions/27426668/row-titles-for-matplotlib-subplot
+
+        modality_list_show = [_ for _ in ['im', 'albedo', 'roughness', 'depth', 'normal', 'semseg', 'matseg'] if _ in ['im']+self.modality_list]
+        for subfig in subfigs:
+            modality = modality_list_show.pop(0)
+            modality_title_appendix = ''
+
+            if modality == 'im':
+                _, start_idx = self.create_im_row_ax_list(subfig, start_idx, if_show_im=True)
+            else:
+                if_show_im = False
+                if modality == 'layout':
+                    if_show_im = True
+
+                ax_list, start_idx = self.create_im_row_ax_list(subfig, start_idx, if_show_im=if_show_im)
+
+                if modality == 'layout':
+                    self.vis_2d_layout(ax_list)
+                    for frame_idx, ax, (height, width) in zip(self.frame_idx_list, ax_list, height_width_list):
+                        ax.set_xlim(-width*0.5, width*1.5)
+                        ax.set_ylim(height*1.5, -height*.5)
+                else:
+                    # other modalities
+                    self.vis_2d_modality(ax_list, modality)
+
+                    if modality == 'matseg':
+                        modality_title_appendix = '(red for invalid areas (e.g. emitters)'
+
+            subfig.suptitle(modality+' '+modality_title_appendix)
 
         plt.show()
 
+    def vis_2d_modality(self, ax_list, modality):
+        '''
+        visualize 2D map for the modality the frame_idx-st frame (0-based)
 
-    def vis_2d_layout(self, ax_list=None):
+        '''
+        assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_cameras
+        if modality in ['depth', 'normal']: assert self.openrooms_scene.if_has_dense_geo
+        if modality in ['albedo', 'roughness']: assert self.openrooms_scene.if_has_BRDF
+
+        _list = self.openrooms_scene.get_modality(modality)
+        for frame_idx, ax in zip(self.frame_idx_list, ax_list):
+            _im = _list[frame_idx]
+
+            if modality == 'normal':
+               _im = (_im + 1.) / 2. 
+            if modality == 'albedo':
+                # convert albedo to SDR for better vis
+               _im = _im ** (1./2.2) 
+            if modality == 'matseg':
+                _im = vis_index_map(_im['mat_aggre_map'])
+            ax.imshow(_im)
+
+    def vis_2d_layout(self, ax_list):
         '''
         visualize projected layout for the frame_idx-st frame (0-based)
 
@@ -73,9 +121,7 @@ class visualizer_openroomsScene_2D(object):
 
         '''
         assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_cameras
-
-        if ax_list is None:
-            ax_list = self.create_im_ax_list()
+        assert self.openrooms_scene.if_has_layout
 
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
             R_c2w, t_c2w = self.openrooms_scene.pose_list[frame_idx][:3, :3], self.openrooms_scene.pose_list[frame_idx][:3, 3:4]

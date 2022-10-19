@@ -10,7 +10,7 @@ import trimesh
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_misc import blue_text, get_list_of_keys, white_blue
 
-from .class_openroomsScene import openroomsScene
+from .class_openroomsScene2D import openroomsScene2D
 
 from lib.utils_OR.utils_OR_vis_3D import vis_cube_plt, vis_axis, vis_axis_xyz, set_axes_equal, Arrow3D
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, v_pairs_from_v3d_e, v_pairs_from_v2d_e, mesh_to_skeleton, transform_v
@@ -19,7 +19,7 @@ from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world, render_3SG_envmap, vis_envmap_plt
 
-class openroomsScene3D(openroomsScene):
+class openroomsScene3D(openroomsScene2D):
     '''
     A class used to visualize OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties for inverse rendering).
     For high-level semantic properties (e.g. layout, objects, emitters, use class: openroomsScene3D)
@@ -71,10 +71,6 @@ class openroomsScene3D(openroomsScene):
     @property
     def valid_modalities_3D_vis(self):
         return ['layout', 'shapes', 'emitters', 'emitter_envs']
-
-    @property
-    def if_has_layout(self):
-        return all([_ in self.modality_list for _ in ['layout']])
 
     @property
     def if_has_shapes(self): # objs + emitters

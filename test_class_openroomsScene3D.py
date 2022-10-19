@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import imageio.v2 as imageio
 import numpy as np
 np.set_printoptions(suppress=True)
-from lib.utils_io import load_matrix, load_img, load_depth_binary, load_h5
+from lib.utils_io import load_matrix, load_img, load_binary, load_h5
 
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_visualizer_openroomsScene_o3d import visualizer_openroomsScene_o3d
