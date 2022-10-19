@@ -84,6 +84,8 @@ class visualizer_openroomsScene_2D(object):
                     # other modalities
                     self.vis_2d_modality(ax_list, modality)
 
+                    if modality == 'albedo':
+                        modality_title_appendix = '(in SDR space)'
                     if modality == 'matseg':
                         modality_title_appendix = '(red for invalid areas (e.g. emitters)'
 

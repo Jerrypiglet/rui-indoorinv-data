@@ -64,7 +64,18 @@ Hopefully that was everything.
         - imenv_%d.hdr # per-pixel lighting envmaps in 2D -->
 
 
-## Usage: demo dataloader and visualizer
+## Usage
+
+### 2D dataloader and visualizer
+
+``` bash
+python test_class_openroomsScene2D.py --vis_2d
+```
+
+This will load per-pixel modalities in 2D, and visualize them in a Matplotlib plot like this:
+![](images/demo_all_2D.png)
+
+### 3D dataloader and visualizer
 
 ```bash
 python test_class_openroomsScene3D.py
