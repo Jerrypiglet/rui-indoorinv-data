@@ -2,15 +2,15 @@
 <scene version="0.6.0">
     <integrator type="path"/>
     <shape id="scene0552_00_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/layoutMesh/scene0552_00/uv_mapped.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/layoutMesh/scene0552_00/uv_mapped.obj"/>
         <transform name="toWorld">
             <scale x="1.000000" y="1.000000" z="1.000000"/>
             <rotate angle="90.000000" x="-1.000000" y="0.000000" z="0.000000"/>
             <translate x="-3.196167" y="-1.013438" z="3.049284"/>
         </transform>
     </shape>
-    <shape id="scene0552_00_objectTTFXN" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/layoutMesh/scene0552_00/container.obj"/>
+    <shape id="scene0552_00_object674VE" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/layoutMesh/scene0552_00/container.obj"/>
         <transform name="toWorld">
             <scale x="1.000000" y="1.000000" z="1.000000"/>
             <rotate angle="90.000000" x="-1.000000" y="0.000000" z="0.000000"/>
@@ -18,7 +18,7 @@
         </transform>
     </shape>
     <shape id="02933112_a3a6f9e80956ec6f4035f93ab9531db_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/02933112/a3a6f9e80956ec6f4035f93ab9531db/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02933112/a3a6f9e80956ec6f4035f93ab9531db/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="1.709988" y="1.592203" z="1.627907"/>
             <rotate angle="36.914182" x="0.000000" y="-1.000000" z="0.000000"/>
@@ -29,7 +29,7 @@
         </transform>
     </shape>
     <shape id="04379243_3b64bf8731a6a2a63c5e1addd9922bf2_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/04379243/3b64bf8731a6a2a63c5e1addd9922bf2/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04379243/3b64bf8731a6a2a63c5e1addd9922bf2/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="1.249620" y="2.305992" z="1.343305"/>
             <rotate angle="35.139617" x="0.000000" y="-1.000000" z="0.000000"/>
@@ -38,7 +38,7 @@
         </transform>
     </shape>
     <shape id="03337140_2cc64133d27c1946ce5d6e9371bb5c33_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03337140/2cc64133d27c1946ce5d6e9371bb5c33/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03337140/2cc64133d27c1946ce5d6e9371bb5c33/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="1.299957" y="1.216284" z="1.157164"/>
             <rotate angle="139.048589" x="0.000000" y="1.000000" z="0.000000"/>
@@ -47,7 +47,7 @@
         </transform>
     </shape>
     <shape id="03001627_be38dc611c4bdef7f1cdfc0a8f38f2e_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/be38dc611c4bdef7f1cdfc0a8f38f2e/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/be38dc611c4bdef7f1cdfc0a8f38f2e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="1.381415" y="0.962629" z="0.938376"/>
             <rotate angle="41.909261" x="0.000000" y="-1.000000" z="0.000000"/>
@@ -55,8 +55,8 @@
             <translate x="0.000000" y="-0.046762" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_be38dc611c4bdef7f1cdfc0a8f38f2e_objectY14O4" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/be38dc611c4bdef7f1cdfc0a8f38f2e/alignedNew.obj"/>
+    <shape id="03001627_be38dc611c4bdef7f1cdfc0a8f38f2e_objectLKK03" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/be38dc611c4bdef7f1cdfc0a8f38f2e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="1.349137" y="0.973959" z="0.952795"/>
             <rotate angle="144.812585" x="0.000000" y="1.000000" z="0.000000"/>
@@ -65,7 +65,7 @@
         </transform>
     </shape>
     <shape id="02933112_225905a8841620d7f6fe1e625c287cfa_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/02933112/225905a8841620d7f6fe1e625c287cfa/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02933112/225905a8841620d7f6fe1e625c287cfa/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="2.038376" y="1.908020" z="1.989331"/>
             <rotate angle="142.917941" x="0.000000" y="1.000000" z="0.000000"/>
@@ -74,7 +74,7 @@
         </transform>
     </shape>
     <shape id="04379243_899f815eaad62b56d8cad143689f8b51_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/04379243/899f815eaad62b56d8cad143689f8b51/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04379243/899f815eaad62b56d8cad143689f8b51/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="1.642363" y="2.301462" z="1.887870"/>
             <rotate angle="34.989646" x="0.000000" y="-1.000000" z="0.000000"/>
@@ -84,7 +84,7 @@
         </transform>
     </shape>
     <shape id="02747177_8a50955facbac20ecf19858fd1963d10_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/02747177/8a50955facbac20ecf19858fd1963d10/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02747177/8a50955facbac20ecf19858fd1963d10/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.557506" y="0.522457" z="0.553402"/>
             <rotate angle="53.567697" x="0.000000" y="-1.000000" z="0.000000"/>
@@ -92,8 +92,8 @@
             <translate x="0.000000" y="-0.079283" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="02747177_8a50955facbac20ecf19858fd1963d10_objectVC91T" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/02747177/8a50955facbac20ecf19858fd1963d10/alignedNew.obj"/>
+    <shape id="02747177_8a50955facbac20ecf19858fd1963d10_object9EV4Z" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02747177/8a50955facbac20ecf19858fd1963d10/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.572865" y="0.420008" z="0.490357"/>
             <rotate angle="30.664908" x="0.000000" y="-1.000000" z="0.000000"/>
@@ -102,7 +102,7 @@
         </transform>
     </shape>
     <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.908744" y="1.183988" z="1.095952"/>
             <rotate angle="44.947431" x="0.000000" y="-1.000000" z="0.000000"/>
@@ -110,8 +110,8 @@
             <translate x="0.000000" y="-0.048854" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_object46O3B" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectCZHS8" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.760968" y="1.193927" z="1.064034"/>
             <rotate angle="43.548839" x="0.000000" y="-1.000000" z="0.000000"/>
@@ -119,8 +119,8 @@
             <translate x="0.000000" y="-0.042356" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectXS7Z9" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectD1OS5" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.899074" y="1.183664" z="0.932599"/>
             <rotate angle="68.511758" x="0.000000" y="1.000000" z="0.000000"/>
@@ -128,8 +128,8 @@
             <translate x="0.000000" y="-0.019394" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_object1JRBI" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_object1KCDA" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.935129" y="1.179101" z="1.000203"/>
             <rotate angle="143.380695" x="0.000000" y="1.000000" z="0.000000"/>
@@ -137,8 +137,8 @@
             <translate x="0.000000" y="-0.056229" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectM86LW" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectADOG7" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.955887" y="1.169743" z="1.160345"/>
             <rotate angle="119.334888" x="0.000000" y="-1.000000" z="0.000000"/>
@@ -147,7 +147,7 @@
         </transform>
     </shape>
     <shape id="04004475_1d2a6082238f011c22d3f170937c6a0b_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/04004475/1d2a6082238f011c22d3f170937c6a0b/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04004475/1d2a6082238f011c22d3f170937c6a0b/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="2.096160" y="1.964713" z="1.858918"/>
             <rotate angle="61.270665" x="0.000000" y="1.000000" z="0.000000"/>
@@ -156,7 +156,7 @@
         </transform>
     </shape>
     <shape id="02933112_1c898677c5b4291c847857e42f50ec6e_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/02933112/1c898677c5b4291c847857e42f50ec6e/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02933112/1c898677c5b4291c847857e42f50ec6e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="1.278060" y="1.296550" z="1.497647"/>
             <rotate angle="138.349871" x="0.000000" y="1.000000" z="0.000000"/>
@@ -165,7 +165,7 @@
         </transform>
     </shape>
     <shape id="02747177_85d8a1ad55fa646878725384d6baf445_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/02747177/85d8a1ad55fa646878725384d6baf445/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02747177/85d8a1ad55fa646878725384d6baf445/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.835432" y="0.924063" z="0.661532"/>
             <rotate angle="55.258352" x="0.000000" y="1.000000" z="0.000000"/>
@@ -175,7 +175,7 @@
         </transform>
     </shape>
     <shape id="ceiling_lamp_15367_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/ceiling_lamp/15367/aligned_shape.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/ceiling_lamp/15367/aligned_shape.obj"/>
         <transform name="toWorld">
             <scale x="1.336898" y="0.500000" z="1.336898"/>
             <rotate angle="90.000000" x="1.000000" y="-0.000000" z="0.000000"/>
@@ -185,8 +185,8 @@
             <translate x="-3.196167" y="-1.013438" z="3.049284"/>
         </transform>
     </shape>
-    <shape id="ceiling_lamp_15367_objectDY7HA" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/ceiling_lamp/15367/aligned_light.obj"/>
+    <shape id="ceiling_lamp_15367_objectGKGQT" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/ceiling_lamp/15367/aligned_light.obj"/>
         <transform name="toWorld">
             <scale x="1.336898" y="0.500000" z="1.336898"/>
             <rotate angle="90.000000" x="1.000000" y="-0.000000" z="0.000000"/>
@@ -197,7 +197,7 @@
         </transform>
     </shape>
     <shape id="window_3_object" type="obj">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/window/3/alignedNew.obj"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/window/3/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.558993" y="0.771791" z="1.647002"/>
             <rotate angle="142.261406" x="0.341778" y="-0.664525" z="-0.664525"/>
@@ -218,11 +218,11 @@
             <integer name="sampleCount" value="1024"/>
         </sampler>
         <transform name="toWorld">
-            <lookat origin="2.6820, 0.2730, -0.0890" target="1.6820, 0.2780, -0.0960" up="0.0050, 1.0000, 0.0000"/>
+            <lookat origin="2.1180, 0.2060, -0.4810" target="1.1520, 0.2060, -0.7410" up="0.0000, 1.0000, 0.0000"/>
         </transform>
     </sensor>
     <emitter type="envmap">
-        <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/EnvDataset/1611L.hdr"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/EnvDataset/1611L.hdr"/>
         <float name="scale" value="164.1757"/>
     </emitter>
 </scene>
