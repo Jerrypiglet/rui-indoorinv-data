@@ -1,24 +1,26 @@
 numpy
-scipy
-matplotlib==3.5.3
+# scipy
+matplotlib
 tqdm
-lpips
-mmcv
+# lpips
+# mmcv
 imageio
-imageio-ffmpeg
+# imageio-ffmpeg
 opencv-python
-torch_efficient_distloss
-Ninja
+# torch_efficient_distloss
+# Ninja
 open3d
-tensorboard
-tensorboardX
+# tensorboard
+# tensorboardX
 termcolor
-pathlib3x
-pymcubes
+# pathlib3x
+# pymcubes
 scikit-image
-ipympl
+# ipympl
 icecream
 trimesh
 numpy-quaternion
-sympy
+# sympy
 h5py
+sympy
+pyquaternion
