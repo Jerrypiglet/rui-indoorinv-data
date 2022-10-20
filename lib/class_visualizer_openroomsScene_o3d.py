@@ -12,7 +12,7 @@ import torch
 from pathlib import Path
 import copy
 
-from lib.class_openroomsScene2D import openroomsScene
+from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 
 from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, check_list_of_tensors_size
@@ -41,7 +41,7 @@ class visualizer_openroomsScene_o3d(object):
         modality_list: list, 
     ):
 
-        assert type(openrooms_scene) in [openroomsScene, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
+        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
 
         self.openrooms_scene = openrooms_scene
 
@@ -338,7 +338,7 @@ class visualizer_openroomsScene_o3d(object):
         if_normal = dense_geo_params.get('if_normal', False)
         subsample_normal_rate_x = dense_geo_params.get('subsample_normal_rate_x', 5) # subsample_normal_rate_x is multiplicative to subsample_pcd_rate
 
-        geo_fused_dict, _ = self.openrooms_scene._fuse_3D_geometry(subsample_rate=subsample_pcd_rate)
+        geo_fused_dict, _, _ = self.openrooms_scene._fuse_3D_geometry(subsample_rate=subsample_pcd_rate)
 
         xyz_pcd, rgb_pcd, normal_pcd = get_list_of_keys(geo_fused_dict, ['X', 'rgb', 'normal'])
         # N_pcd = xyz_pcd.shape[0]

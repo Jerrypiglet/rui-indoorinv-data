@@ -66,7 +66,8 @@ if opt.vis_2d:
     vis_2D = visualizer_openroomsScene_2D(
         openrooms_scene, 
         modality_list=[
-            'depth', 'normal', 'albedo', 'roughness', # images/demo_all_2D.png
+            # 'depth', 'normal', 'albedo', 'roughness', # images/demo_all_2D.png
+            'seg_area', 'seg_env', 'seg_obj', 
             'matseg', # images/demo_semseg_matseg_2D.png
             'semseg', # images/demo_semseg_matseg_2D.png
             ], 

@@ -63,7 +63,8 @@ class visualizer_openroomsScene_2D(object):
         fig = plt.figure(constrained_layout=True)
         subfigs = fig.subfigures(nrows=self.N_rows, ncols=1) # https://stackoverflow.com/questions/27426668/row-titles-for-matplotlib-subplot
 
-        modality_list_show = [_ for _ in ['im', 'albedo', 'roughness', 'depth', 'normal', 'semseg', 'matseg'] if _ in ['im']+self.modality_list]
+        modality_list_show = [_ for _ in ['im', 'albedo', 'roughness', 'depth', 'normal', 'semseg', 'matseg', 'seg_area', 'seg_env', 'seg_obj'] if _ in ['im']+self.modality_list]
+
         for subfig in subfigs:
             modality = modality_list_show.pop(0)
             modality_title_appendix = ''
@@ -103,6 +104,7 @@ class visualizer_openroomsScene_2D(object):
         assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_cameras
         if modality in ['depth', 'normal']: assert self.openrooms_scene.if_has_dense_geo
         if modality in ['albedo', 'roughness']: assert self.openrooms_scene.if_has_BRDF
+        if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.openrooms_scene.if_has_seg
 
         _list = self.openrooms_scene.get_modality(modality)
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):

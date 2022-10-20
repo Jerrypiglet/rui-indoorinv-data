@@ -24,7 +24,7 @@ from lib.class_visualizer_openroomsScene_2D import visualizer_openroomsScene_2D
 from lib.utils_misc import str2bool
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize 3D with plt for debugging')
+parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
 parser.add_argument('--vis_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to render in open3D')
 parser.add_argument('--vis_2d_proj', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=True, help='')
@@ -56,16 +56,16 @@ openrooms_scene = openroomsScene3D(
     scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'im_sdr', 'poses', 
+        'im_sdr', 'poses', 'seg', 
         'depth', 'normal', 
-        'lighting_SG', 
+        # 'lighting_SG', 
         # 'lighting_envmap', 
         'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
     im_params_dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 240, 'im_W_resize': 320}, 
     shape_params_dict={
-        'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
+        'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default set to True to load emitter meshes, because not too many emitters
         },
     emitter_params_dict={'N_ambient_rep': '3SG-SkyGrd'},

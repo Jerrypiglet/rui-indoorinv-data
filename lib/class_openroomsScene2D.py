@@ -134,6 +134,10 @@ class openroomsScene2D(object):
         return all([_ in self.modality_list for _ in ['im_hdr']]) and self.if_scale_HDR
 
     @property
+    def if_has_seg(self):
+        return all([_ in self.modality_list for _ in ['seg']])
+
+    @property
     def if_has_dense_geo(self):
         return all([_ in self.modality_list for _ in ['depth', 'normal']])
 
@@ -179,6 +183,12 @@ class openroomsScene2D(object):
             return self.semseg_list
         elif modality == 'matseg': 
             return self.matseg_list
+        elif modality == 'seg_area': 
+            return self.seg_dict_of_lists['area']
+        elif modality == 'seg_env': 
+            return self.seg_dict_of_lists['env']
+        elif modality == 'seg_obj': 
+            return self.seg_dict_of_lists['obj']
         else:
             assert False, 'Unsupported modality: ' + modality
 
@@ -521,42 +531,53 @@ class openroomsScene2D(object):
         rgb_global_list = []
         normal_global_list = []
         X_flatten_mask_list = []
+        X_lighting_flatten_mask_list = []
 
-        for idx in tqdm(range(len(self.frame_id_list))):
+        for frame_idx in tqdm(range(len(self.frame_id_list))):
             H_color, W_color = self.im_H_resize, self.im_W_resize
             uu, vv = np.meshgrid(range(W_color), range(H_color))
-            x_ = (uu - self.K[0][2]) * self.depth_list[idx] / self.K[0][0]
-            y_ = (vv - self.K[1][2]) * self.depth_list[idx] / self.K[1][1]
-            z_ = self.depth_list[idx]
+            x_ = (uu - self.K[0][2]) * self.depth_list[frame_idx] / self.K[0][0]
+            y_ = (vv - self.K[1][2]) * self.depth_list[frame_idx] / self.K[1][1]
+            z_ = self.depth_list[frame_idx]
+
+            obj_mask = self.seg_dict_of_lists['obj'][frame_idx] + self.seg_dict_of_lists['area'][frame_idx] # geometry is defined for objects + emitters
+            assert obj_mask.shape[:2] == (H_color, W_color)
+            lighting_mask = self.seg_dict_of_lists['obj'][frame_idx] # lighting is defined for non-emitter objects only
+            assert lighting_mask.shape[:2] == (H_color, W_color)
 
             if subsample_HW_rates != (1, 1):
                 x_ = x_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
                 y_ = y_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
                 z_ = z_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
                 H_color, W_color = H_color//subsample_HW_rates[0], W_color//subsample_HW_rates[1]
-                  
+                obj_mask = obj_mask[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
+                lighting_mask = lighting_mask[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
+                
             z_ = z_.flatten()
-            X_flatten_mask = z_ > 0
+            X_flatten_mask = np.logical_and(z_ > 0, obj_mask.flatten() > 0)
+            X_lighting_flatten_mask = np.logical_and(z_ > 0, lighting_mask.flatten() > 0)
+            
             z_ = z_[X_flatten_mask]
             x_ = x_.flatten()[X_flatten_mask]
             y_ = y_.flatten()[X_flatten_mask]
             print('Valid pixels percentage: %.4f'%(sum(X_flatten_mask)/float(H_color*W_color)))
             X_flatten_mask_list.append(X_flatten_mask)
+            X_lighting_flatten_mask_list.append(X_lighting_flatten_mask)
 
             X_ = np.stack([x_, y_, z_], axis=-1)
-            t = self.pose_list[idx][:3, -1].reshape((3, 1))
-            R = self.pose_list[idx][:3, :3]
+            t = self.pose_list[frame_idx][:3, -1].reshape((3, 1))
+            R = self.pose_list[frame_idx][:3, :3]
 
             X_global = (R @ X_.T + t).T
             X_global_list.append(X_global)
 
-            rgb_global = self.im_sdr_list[idx]
+            rgb_global = self.im_sdr_list[frame_idx]
             if subsample_HW_rates != ():
                 rgb_global = rgb_global[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
             rgb_global = rgb_global.reshape(-1, 3)[X_flatten_mask]
             rgb_global_list.append(rgb_global)
             
-            normal = self.normal_list[idx]
+            normal = self.normal_list[frame_idx]
             if subsample_HW_rates != ():
                 normal = normal[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
             normal = normal.reshape(-1, 3)[X_flatten_mask]
@@ -574,7 +595,7 @@ class openroomsScene2D(object):
 
         geo_fused_dict = {'X': X_global, 'rgb': rgb_global, 'normal': normal_global}
 
-        return geo_fused_dict, X_flatten_mask_list
+        return geo_fused_dict, X_flatten_mask_list, X_lighting_flatten_mask_list
 
         # return geo_fused_dict
 
@@ -607,7 +628,7 @@ class openroomsScene2D(object):
 
         print(white_blue('[openroomsScene] fuse_3D_lighting_SG for %d frames... subsample_rate: %d'%(len(self.frame_id_list), subsample_rate)))
 
-        geo_fused_SG_dict, X_flatten_mask_list = self._fuse_3D_geometry(subsample_rate=subsample_rate, subsample_HW_rates=self.im_lighting_HW_ratios)
+        geo_fused_SG_dict, _, X_lighting_flatten_mask_list = self._fuse_3D_geometry(subsample_rate=subsample_rate, subsample_HW_rates=self.im_lighting_HW_ratios)
         X_global_SG, normal_global_SG = geo_fused_SG_dict['X'], geo_fused_SG_dict['normal']
 
         # assert all([_ in self.modalities for _ in ['lighting_SG']])
@@ -659,8 +680,7 @@ class openroomsScene2D(object):
             weight_SG_np = weight_torch.cpu().squeeze().numpy().reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 3)
             lamb_SG_np = lamb_torch.cpu().squeeze().numpy().reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 1)
 
-            # print(X_flatten_mask_list[idx].shape, axis_SG_np_global.shape)
-            X_flatten_mask = X_flatten_mask_list[idx]
+            X_flatten_mask = X_lighting_flatten_mask_list[idx]
             axis_SG_np_global = axis_SG_np_global[X_flatten_mask]
             weight_SG_np = weight_SG_np[X_flatten_mask]
             lamb_SG_np = lamb_SG_np[X_flatten_mask]
