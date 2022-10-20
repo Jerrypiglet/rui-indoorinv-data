@@ -6,6 +6,8 @@ from pathlib import Path
 import copy
 import random
 import string
+import xml.etree.ElementTree as et
+from xml.dom import minidom
 
 import xml.etree.ElementTree as et
 from xml.dom import minidom
@@ -22,6 +24,14 @@ def get_XML_root(main_xml_file):
     root = tree.getroot()
     return root
 
+def transformToXml(root):
+    rstring = et.tostring(root, 'utf-8')
+    pstring = minidom.parseString(rstring)
+    xmlString = pstring.toprettyxml(indent="    ")
+    xmlString= xmlString.split('\n')
+    xmlString = [x for x in xmlString if len(x.strip()) != 0 ]
+    xmlString = '\n'.join(xmlString)
+    return xmlString
 
 def parse_XML_for_intrinsics(root):
     sensors = root.findall('sensor')

@@ -5,4 +5,6 @@
 *.dat
 data
 data/openrooms_public*
-mitsuba3
+*.exr
+mitsuba/my_first_render.png
+mitsuba/scene.xml
