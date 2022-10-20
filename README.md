@@ -98,4 +98,9 @@ Use ``--vis_o3d True`` to use the Matplotlib visualizer. The result is something
 
 ![](images/demo_all_o3d.png)
 
+### Mitsuba 3 based inference
 
+On Mac, install Mitsuba 3 via:
+``` bash
+brew install llvm
+```
