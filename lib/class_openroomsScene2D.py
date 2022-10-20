@@ -65,14 +65,15 @@ class openroomsScene2D(object):
         '''
 
         self.root_path_dict = root_path_dict
-        self.rendering_root, self.xml_scene_root, self.semantic_labels_root, self.K_path = get_list_of_keys(
+        self.rendering_root, self.xml_scene_root, self.semantic_labels_root = get_list_of_keys(
             self.root_path_dict, 
-            ['rendering_root', 'xml_scene_root', 'semantic_labels_root', 'intrinsics_path'], 
-            [PosixPath, PosixPath, PosixPath, PosixPath]
+            ['rendering_root', 'xml_scene_root', 'semantic_labels_root'], 
+            [PosixPath, PosixPath, PosixPath]
             )
 
         self.scene_rendering_path = self.rendering_root / self.meta_split / self.scene_name
         self.scene_xml_path = self.xml_scene_root / (self.meta_split.split('_')[1]) / self.scene_name
+        self.intrinsic_path = self.scene_rendering_path / 'intrinsic.txt'
 
         '''
         im properties
@@ -212,7 +213,7 @@ class openroomsScene2D(object):
         '''
         -> K: (3, 3)
         '''
-        self.K = load_matrix(self.K_path)
+        self.K = load_matrix(self.intrinsic_path)
         assert self.K.shape == (3, 3)
         assert self.K[0][2] == float(self.im_W_load) / 2.
         assert self.K[1][2] == float(self.im_H_load) / 2.

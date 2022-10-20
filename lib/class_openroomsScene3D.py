@@ -134,7 +134,9 @@ class openroomsScene3D(openroomsScene2D):
         # self.num_vertices = 0
         obj_path_list = []
         self.shape_list_valid = []
-
+        self.window_list = []
+        self.lamp_list = []
+        
         print(blue_text('[openroomsScene3D] loading %d shapes and %d emitters...'%(len(self.shape_list_ori), len(self.emitter_list[1:]))))
 
         self.emitter_env = self.emitter_list[0] # e.g. {'if_emitter': True, 'emitter_prop': {'emitter_type': 'envmap', 'if_env': True, 'emitter_filename': '.../EnvDataset/1611L.hdr', 'emitter_scale': 164.1757}}
@@ -153,19 +155,25 @@ class openroomsScene3D(openroomsScene2D):
             else:
                 obj_path = shape['filename']
 
-            bbox_file_path = obj_path.replace('.obj', 'pickle')
+            bbox_file_path = obj_path.replace('.obj', '.pickle')
+            if 'layoutMesh' in bbox_file_path:
+                bbox_file_path = Path('layoutMesh') / Path(bbox_file_path).relative_to(self.root_path_dict['layout_root'])
+            elif 'uv_mapped' in bbox_file_path:
+                bbox_file_path = Path('uv_mapped') / Path(bbox_file_path).relative_to(self.root_path_dict['shapes_root'])
+            bbox_file_path = self.root_path_dict['shape_pickles_root'] / bbox_file_path
+
+            #  Path(bbox_file_path).exists(), 'Rerun once first with if_load_mesh=True, to dump pickle files for shapes to %s'%bbox_file_path
             
             if_load_mesh = if_load_obj_mesh if not if_emitter else if_load_emitter_mesh
 
-            if if_load_mesh:
+            if if_load_mesh or (not Path(bbox_file_path).exists()):
                 vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
                 bverts, bfaces = computeBox(vertices)
                 if not Path(bbox_file_path).exists():
+                    Path(bbox_file_path).parent.mkdir(parents=True, exist_ok=True)
                     with open(bbox_file_path, "wb") as f:
                         pickle.dump(dict(bverts=bverts, bfaces=bfaces), f)
-
             else:
-                assert Path(bbox_file_path).exists(), 'Need to run once with if_load_mesh=True to dump pickle files for shapes'
                 with open(bbox_file_path, "rb") as f:
                     bbox_dict = pickle.load(f)
                 bverts, bfaces = bbox_dict['bverts'], bbox_dict['bfaces']
@@ -192,12 +200,21 @@ class openroomsScene3D(openroomsScene2D):
             else:
                 self.vertices_list.append(None)
                 self.faces_list.append(None)
-
             self.bverts_list.append(bverts_transformed)
             
             self.shape_list_valid.append(shape)
 
-        print(blue_text('[openroomsScene3D] DONE. load_shapes'),len(self.shape_list_valid))
+            if if_emitter:
+                if shape['emitter_prop']['obj_type'] == 'window':
+                    self.window_list.append(shape)
+                elif shape['emitter_prop']['obj_type'] == 'lamp':
+                    self.lamp_list.append(shape)
+
+        print(blue_text('[openroomsScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d lamps lit'%(
+            len(self.shape_list_valid), 
+            len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
+            len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
+            )))
 
         if self.if_vis_debug_with_plt:
             ax = None
@@ -381,6 +398,13 @@ class openroomsScene3D(openroomsScene2D):
         return ax
 
     def vis_emitters(self, ax=None):
+        '''
+        visualize in 3D:
+            - SGs representation of emitters
+
+        - images/demo_emitters_3D_re1.png # note the X_w, Y_w, Z_w, as also appeared in the GLOBAL envmaps
+        - images/demo_emitters_3D_re2.png # another viewpoint; note the X_env, Y_env, Z_env, as also appeared in the LOCAL envmaps
+        '''
 
         if ax is None:
             fig = plt.figure(figsize=(10, 10))
@@ -437,11 +461,12 @@ class openroomsScene3D(openroomsScene2D):
 
     def vis_emitter_envs(self):
         '''
-        visualize 
+        visualize in 2D:
             (1) emitter_env 
-            (2) envmaps (SGs) converted from all windows ()
+            (2) envmaps (SGs) converted from all windows
         
         images/demo_emitter_envs_3D.png
+
         compare with:
         - images/demo_emitters_3D_re1.png # note the X_w, Y_w, Z_w, as also appeared in the GLOBAL envmaps
         - images/demo_emitters_3D_re2.png # another viewpoint; note the X_env, Y_env, Z_env, as also appeared in the LOCAL envmaps
@@ -451,7 +476,6 @@ class openroomsScene3D(openroomsScene2D):
         env_map_path = self.emitter_env['emitter_prop']['emitter_filename']
         im_envmap_ori = load_HDR(Path(env_map_path))
         im_envmap_ori_SDR, _ = to_nonHDR(im_envmap_ori)
-
 
         self.window_3SG_list_of_dicts = []
 
@@ -507,8 +531,6 @@ class openroomsScene3D(openroomsScene2D):
 
         plt.show()
 
-
-            
     def load_colors(self):
         '''
         load mapping from obj cat id to RGB

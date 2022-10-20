@@ -69,7 +69,7 @@ Hopefully that was everything.
 ### 2D dataloader and visualizer
 
 ``` bash
-python test_class_openroomsScene2D.py --vis_2d
+python test_class_openroomsScene2D.py --vis_2d True
 ```
 
 This will load per-pixel modalities in 2D, and visualize them in a Matplotlib plot like this:
@@ -78,7 +78,7 @@ This will load per-pixel modalities in 2D, and visualize them in a Matplotlib pl
 ### 3D dataloader and visualizer
 
 ```bash
-python test_class_openroomsScene3D.py
+python test_class_openroomsScene3D.py --vis_o3d True
 ```
 
 See the help info of the argparse arguments and comments for usage of flags.

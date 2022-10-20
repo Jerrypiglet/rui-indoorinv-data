@@ -1,11 +1,15 @@
 import sys
 
-device = 'local'
+device = 'mm1'
 PATH_HOME = {
-    'local': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
+    'mbp': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
+    'mm1': '/home/ruizhu/Documents/Projects/OpenRooms_RAW_loader', 
+    'qc': '/usr2/rzh/Documents/Projects/directvoxgorui'
 }[device]
 OR_RAW_ROOT = {
-    'local': '/Users/jerrypiglet/Documents/Projects/data', 
+    'mbp': '/Users/jerrypiglet/Documents/Projects/data', 
+    'mm1': '/newfoundland2/ruizhu/siggraphasia20dataset', 
+    'qc': ''
 }[device]
 
 sys.path.insert(0, PATH_HOME)
@@ -30,13 +34,16 @@ parser.add_argument('--vis_2d_proj', type=str2bool, nargs='?', const=True, defau
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=True, help='')
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/openrooms_public'
-xml_root = Path(PATH_HOME) / 'data/openrooms_public/scenes'
-intrinsics_path = Path(PATH_HOME) / 'data/intrinsic.txt'
-semantic_labels_root = Path(PATH_HOME) / 'data'
+base_root = Path(PATH_HOME) / 'data/openrooms_public_re_2'
+xml_root = Path(PATH_HOME) / 'data/openrooms_public_re_2/scenes'
+# intrinsics_path = Path(PATH_HOME) / 'data/intrinsic.txt'
+semantic_labels_root = Path(PATH_HOME) / 'files_openrooms'
 layout_root = Path(OR_RAW_ROOT) / 'layoutMesh'
 shapes_root = Path(OR_RAW_ROOT) / 'uv_mapped'
 envmaps_root = Path(OR_RAW_ROOT) / 'EnvDataset' # not publicly availale
+shape_pickles_root = Path(PATH_HOME) / 'data/openrooms_shape_pickles' # for caching shape bboxes so that we do not need to load meshes very time if only bboxes are wanted
+if not shape_pickles_root.exists():
+    shape_pickles_root.mkdir()
 
 '''
 The classroom scene: one lamp (lit up) + one window (less sun)
@@ -44,15 +51,13 @@ The classroom scene: one lamp (lit up) + one window (less sun)
 data/openrooms_public_re_2/main_xml1/scene0552_00_more/im_1.png
 '''
 
-base_root = Path(PATH_HOME) / 'data/openrooms_public_re_2'
-xml_root = Path(PATH_HOME) / 'data/openrooms_public_re_2/scenes'
 meta_split = 'main_xml1'
 scene_name = 'scene0552_00_more'
 frame_ids = list(range(0, 87, 10))
 
 openrooms_scene = openroomsScene3D(
-    root_path_dict = {'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 
-        'intrinsics_path': intrinsics_path, 'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root}, 
+    root_path_dict = {'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
+        'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root}, 
     scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
@@ -65,7 +70,7 @@ openrooms_scene = openroomsScene3D(
         ], 
     im_params_dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 240, 'im_W_resize': 320}, 
     shape_params_dict={
-        'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
+        'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default set to True to load emitter meshes, because not too many emitters
         },
     emitter_params_dict={'N_ambient_rep': '3SG-SkyGrd'},
