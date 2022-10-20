@@ -9,7 +9,7 @@
             <translate x="-3.196167" y="-1.013438" z="3.049284"/>
         </transform>
     </shape>
-    <shape id="scene0552_00_objectLGC4R" type="obj">
+    <shape id="scene0552_00_objectTTFXN" type="obj">
         <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/layoutMesh/scene0552_00/container.obj"/>
         <transform name="toWorld">
             <scale x="1.000000" y="1.000000" z="1.000000"/>
@@ -55,7 +55,7 @@
             <translate x="0.000000" y="-0.046762" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_be38dc611c4bdef7f1cdfc0a8f38f2e_objectJX5YB" type="obj">
+    <shape id="03001627_be38dc611c4bdef7f1cdfc0a8f38f2e_objectY14O4" type="obj">
         <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/be38dc611c4bdef7f1cdfc0a8f38f2e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="1.349137" y="0.973959" z="0.952795"/>
@@ -92,7 +92,7 @@
             <translate x="0.000000" y="-0.079283" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="02747177_8a50955facbac20ecf19858fd1963d10_objectEGA7V" type="obj">
+    <shape id="02747177_8a50955facbac20ecf19858fd1963d10_objectVC91T" type="obj">
         <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/02747177/8a50955facbac20ecf19858fd1963d10/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.572865" y="0.420008" z="0.490357"/>
@@ -110,7 +110,7 @@
             <translate x="0.000000" y="-0.048854" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectSQDO6" type="obj">
+    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_object46O3B" type="obj">
         <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.760968" y="1.193927" z="1.064034"/>
@@ -119,7 +119,7 @@
             <translate x="0.000000" y="-0.042356" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectD2HXD" type="obj">
+    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectXS7Z9" type="obj">
         <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.899074" y="1.183664" z="0.932599"/>
@@ -128,7 +128,7 @@
             <translate x="0.000000" y="-0.019394" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_object7TSKH" type="obj">
+    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_object1JRBI" type="obj">
         <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.935129" y="1.179101" z="1.000203"/>
@@ -137,7 +137,7 @@
             <translate x="0.000000" y="-0.056229" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectA3OE7" type="obj">
+    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectM86LW" type="obj">
         <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
         <transform name="toWorld">
             <scale x="0.955887" y="1.169743" z="1.160345"/>
@@ -185,7 +185,7 @@
             <translate x="-3.196167" y="-1.013438" z="3.049284"/>
         </transform>
     </shape>
-    <shape id="ceiling_lamp_15367_objectU0K5U" type="obj">
+    <shape id="ceiling_lamp_15367_objectDY7HA" type="obj">
         <string name="filename" value="/home/ruizhu/Documents/Projects/renderOpenRooms/data/openrooms_raw/uv_mapped/ceiling_lamp/15367/aligned_light.obj"/>
         <transform name="toWorld">
             <scale x="1.336898" y="0.500000" z="1.336898"/>
