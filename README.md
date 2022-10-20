@@ -98,9 +98,17 @@ Use ``--vis_o3d True`` to use the Matplotlib visualizer. The result is something
 
 ![](images/demo_all_o3d.png)
 
-### Mitsuba 3 based inference
+### Mitsuba 3 based inference, and notes on installation on Arm64 Mac
+On Mac, make sure you are using a arm64 Python binary, installed with arm64 conda for example. Check your python binary type via:
 
-On Mac, install Mitsuba 3 via:
+``` bash
+file /Users/jerrypiglet/miniconda3/envs/dvgo-py38/bin/python
+```
+
+Then install llvm via:
+
 ``` bash
 brew install llvm
 ```
+For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-on-apple-m1-chip-with-gpu-acceleration-3351dc44d67c
+

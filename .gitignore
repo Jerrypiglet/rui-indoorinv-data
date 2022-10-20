@@ -7,3 +7,5 @@ data
 data/openrooms_public*
 *.exr
 mitsuba/my_first_render.png
+lib/utils_OR/__pycache__
+lib/__pycache__
