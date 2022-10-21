@@ -12,6 +12,12 @@ import torch
 from pathlib import Path
 import copy
 
+# Import the library using the alias "mi"
+import mitsuba as mi
+# Set the variant of the renderer
+# mi.set_variant('cuda_ad_rgb') # Linux + GPU
+mi.set_variant('llvm_ad_rgb') # Mac
+
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 
@@ -20,7 +26,7 @@ from lib.utils_o3d import text_3d, get_arrow_o3d
 from lib.utils_OR.utils_OR_xml import gen_random_str
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_OR.utils_OR_mesh import writeMesh
-
+from lib.utils_vis import color_map_color
 
 aabb_01 = np.array([[0, 0, 0],
                     [0, 0, 1],
@@ -258,6 +264,51 @@ class visualizer_openroomsScene_o3d(object):
             )
 
         return o3d_geometry_list
+
+    def get_pcd_color(self, pcd_color_mode: str):
+        assert pcd_color_mode in ['rgb', 'normal', 'dist_emitter0', 'mi_visibility_emitter0']
+        self.pcd_color = None
+
+        if pcd_color_mode == 'rgb':
+            assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo
+            self.pcd_color = self.geo_fused_dict['rgb']
+        
+        elif pcd_color_mode == 'normal': # images/demo_pcd_color_normal.png
+            assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo
+            self.pcd_color = (self.geo_fused_dict['normal'] + 1.) / 2.
+        
+        elif pcd_color_mode == 'dist_emitter0': # images/demo_pcd_color_dist.png
+            assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo and self.openrooms_scene.if_has_shapes
+            emitter_0 = (self.openrooms_scene.lamp_list + self.openrooms_scene.window_list)[0]
+            emitter_0_center = emitter_0['emitter_prop']['box3D_world']['center'].reshape((1, 3))
+            dist_to_emitter_0 = np.linalg.norm(emitter_0_center - self.geo_fused_dict['X'], axis=1, keepdims=False)
+            self.pcd_color = color_map_color(dist_to_emitter_0, vmin=np.amin(dist_to_emitter_0), vmax=np.amax(dist_to_emitter_0))
+        
+        elif pcd_color_mode == 'mi_visibility_emitter0': # images/demo_pcd_color_mi_visibility_emitter0.png
+            assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo and self.openrooms_scene.if_has_shapes
+            assert self.openrooms_scene.if_has_mitsuba_scene
+            emitter_0 = (self.openrooms_scene.lamp_list + self.openrooms_scene.window_list)[0]
+            emitter_0_center = emitter_0['emitter_prop']['box3D_world']['center'].reshape((1, 3))
+            X_to_emitter_0 = emitter_0_center - self.geo_fused_dict['X']
+            xs = self.geo_fused_dict['X']
+            xs_mi = mi.Point3f(xs)
+            ds = X_to_emitter_0 / (np.linalg.norm(X_to_emitter_0, axis=1, keepdims=1)+1e-6)
+            ds_mi = mi.Vector3f(ds)
+            # ray origin, direction, t_max
+            rays_mi = mi.Ray3f(xs_mi, ds_mi)
+            ret = self.openrooms_scene.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+            # returned structure contains intersection location, nomral, ray step, ...
+            # positions = mi2torch(ret.p.torch())
+            # normals = mi2torch(ret.n.torch())
+            ts = ret.t.numpy()
+            visibility = ts < np.linalg.norm(X_to_emitter_0, axis=1, keepdims=False)
+            visibility = np.logical_and(ts > 1e-2, visibility)
+            visibility = 1. - visibility.astype(np.float32)
+            self.pcd_color = color_map_color(visibility)
+            # self.pcd_color = color_map_color(ts, vmin=np.amin(ts), vmax=np.amax(ts[ts<np.inf]))
+            # self.pcd_color = np.ones((visibility.shape[0], 3)) * 0.5
+
+            return xs, ds, ts, visibility
         
     def collect_cameras(self, cam_params: dict={}):
         assert self.openrooms_scene.if_has_cameras
@@ -332,28 +383,51 @@ class visualizer_openroomsScene_o3d(object):
 
         assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo
 
+        geometry_list = []
+
         subsample_pcd_rate = dense_geo_params.get('subsample_pcd_rate', 10)
         if_ceiling = dense_geo_params.get('if_ceiling', False)
         if_walls = dense_geo_params.get('if_walls', False)
         if_normal = dense_geo_params.get('if_normal', False)
         subsample_normal_rate_x = dense_geo_params.get('subsample_normal_rate_x', 5) # subsample_normal_rate_x is multiplicative to subsample_pcd_rate
 
-        geo_fused_dict, _, _ = self.openrooms_scene._fuse_3D_geometry(subsample_rate=subsample_pcd_rate)
+        self.geo_fused_dict, _, _ = self.openrooms_scene._fuse_3D_geometry(subsample_rate=subsample_pcd_rate)
 
-        xyz_pcd, rgb_pcd, normal_pcd = get_list_of_keys(geo_fused_dict, ['X', 'rgb', 'normal'])
+        xyz_pcd, rgb_pcd, normal_pcd = get_list_of_keys(self.geo_fused_dict, ['X', 'rgb', 'normal'])
         # N_pcd = xyz_pcd.shape[0]
+
+        pcd_color_mode = dense_geo_params.get('pcd_color_mode', 'rgb')
+        _ = self.get_pcd_color(pcd_color_mode)
+
+        if pcd_color_mode == 'mi_visibility_emitter0': # show all occluded rays
+            xs, ds, ts, visibility = _
+            xs_end = xs + ds * ts[:, np.newaxis]
+
+            xs = xs[visibility==0.]; xs_end = xs_end[visibility==0.]; visibility = visibility[visibility==0.]
+            _subsample_rate = 100
+            xs = xs[::_subsample_rate]; xs_end = xs_end[::_subsample_rate]; visibility = visibility[::_subsample_rate]
+
+            dirs = o3d.geometry.LineSet()
+            dirs.points = o3d.utility.Vector3dVector(np.vstack((xs, xs_end)))
+            # dirs.colors = o3d.utility.Vector3dVector([[1., 0., 0.] if vis == 1 else [0., 0., 1.] for vis in visibility]) # red: visible; blue: not visible
+            dirs.colors = o3d.utility.Vector3dVector([[1., 0., 0.] if vis == 1 else [0.8, 0.8, 0.8] for vis in visibility]) # red: visible; blue: not visible
+            dirs.lines = o3d.utility.Vector2iVector([[_, _+xs.shape[0]] for _ in range(xs.shape[0])])
+
+            geometry_list.append(dirs)
 
         xyz_pcd_max = np.amax(xyz_pcd, axis=0)
         xyz_pcd_min = np.amin(xyz_pcd, axis=0)
 
         pcd_mask = None
+        pcd_color = copy.deepcopy(self.pcd_color)
+        assert pcd_color.shape[0] == xyz_pcd.shape[0]
 
         if not if_ceiling:
             # remove ceiling points
             ceiling_y = np.amax(xyz_pcd[:, 1]) # y axis is up
             pcd_mask = xyz_pcd[:, 1] < (ceiling_y*0.95)
             xyz_pcd = xyz_pcd[pcd_mask]
-            rgb_pcd = rgb_pcd[pcd_mask]
+            pcd_color = pcd_color[pcd_mask]
             print('Removed points close to ceiling... percentage: %.2f'%(np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
 
         if not if_walls:
@@ -375,19 +449,19 @@ class visualizer_openroomsScene_o3d(object):
 
             pcd_mask = dists_all > np.amin(layout_dimensions)*0.05 # threshold is 5% of the shortest room dimension
             xyz_pcd = xyz_pcd[pcd_mask]
-            rgb_pcd = rgb_pcd[pcd_mask]
+            pcd_color = pcd_color[pcd_mask]
             print('Removed points close to walls... percentage: %.2f'%(np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
 
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(xyz_pcd)
-        pcd.colors = o3d.utility.Vector3dVector(rgb_pcd)
+        pcd.colors = o3d.utility.Vector3dVector(pcd_color)
 
         out_bbox_pcd = o3d.geometry.LineSet()
         out_bbox_pcd.points = o3d.utility.Vector3dVector(xyz_pcd_min + aabb_01 * (xyz_pcd_max - xyz_pcd_min))
         out_bbox_pcd.colors = o3d.utility.Vector3dVector([[1,0,0] for i in range(12)])
         out_bbox_pcd.lines = o3d.utility.Vector2iVector([[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])
 
-        geometry_list = [pcd]
+        geometry_list += [pcd]
 
         if if_normal:
 

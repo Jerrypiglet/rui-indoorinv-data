@@ -65,10 +65,10 @@ class openroomsScene2D(object):
         '''
 
         self.root_path_dict = root_path_dict
-        self.rendering_root, self.xml_scene_root, self.semantic_labels_root = get_list_of_keys(
+        self.PATH_HOME, self.rendering_root, self.xml_scene_root, self.semantic_labels_root = get_list_of_keys(
             self.root_path_dict, 
-            ['rendering_root', 'xml_scene_root', 'semantic_labels_root'], 
-            [PosixPath, PosixPath, PosixPath]
+            ['PATH_HOME', 'rendering_root', 'xml_scene_root', 'semantic_labels_root'], 
+            [PosixPath, PosixPath, PosixPath, PosixPath]
             )
 
         self.scene_rendering_path = self.rendering_root / self.meta_split / self.scene_name

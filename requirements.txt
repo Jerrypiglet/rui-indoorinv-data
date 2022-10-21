@@ -25,3 +25,4 @@ h5py
 sympy
 pyquaternion
 ipdb
+jupyterlab

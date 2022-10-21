@@ -98,6 +98,20 @@ Use ``--vis_o3d True`` to use the Matplotlib visualizer. The result is something
 
 ![](images/demo_all_o3d.png)
 
+Set ``--pcd_color_mode`` to one of 'rgb' (default), 'normal', etc., to colorize point cloud. Meanwhile set ``--if_shader=False`` so that the colors are free from Open3D shader.
+
+For example, colorize points with 3D normals:
+
+![](images/demo_pcd_color_normal.png)
+
+``` bash
+python test_class_openroomsScene3D.py --vis_o3d True --pcd_color_mode normal --if_shader=False
+```
+
+Or with visibility to emitter_0 (`--pcd_color_mode mi_visibility_emitter0 --if_shader=False`):
+
+![](images/demo_pcd_color_mi_visibility_emitter0.png)
+
 ### Mitsuba 3 based inference, and notes on installation on Arm64 Mac
 On Mac, make sure you are using a arm64 Python binary, installed with arm64 conda for example. Check your python binary type via:
 

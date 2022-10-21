@@ -6,9 +6,17 @@ np.set_printoptions(suppress=True)
 from tqdm import tqdm
 import pickle
 import trimesh
+import shutil
+
+# Import the library using the alias "mi"
+import mitsuba as mi
+# Set the variant of the renderer
+# mi.set_variant('cuda_ad_rgb') # Linux + GPU
+mi.set_variant('llvm_ad_rgb') # Mac
 
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_misc import blue_text, get_list_of_keys, white_blue
+from lib.utils_mitsuba import dump_OR_xml_for_mi
 
 from .class_openroomsScene2D import openroomsScene2D
 
@@ -18,7 +26,6 @@ from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world, render_3SG_envmap, vis_envmap_plt
-
 class openroomsScene3D(openroomsScene2D):
     '''
     A class used to visualize OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties for inverse rendering).
@@ -35,6 +42,7 @@ class openroomsScene3D(openroomsScene2D):
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
         shape_params_dict: dict={'if_load_mesh': True}, 
         emitter_params_dict: dict={'N_ambient_rep': '3SG-SkyGrd'},
+        mi_params_dict: dict={}, 
         if_vis_debug_with_plt: bool=False
     ):
 
@@ -46,9 +54,11 @@ class openroomsScene3D(openroomsScene2D):
         for _ in modality_list_vis:
             assert _ in super().valid_modalities + self.valid_modalities_3D_vis, 'Invalid modality_vis: %s'%_
 
+        self.if_loaded_colors = False
+
         self.shape_params_dict = shape_params_dict
         self.emitter_params_dict = emitter_params_dict
-        self.if_loaded_colors = False
+        self.mi_params_dict = mi_params_dict
 
         super().__init__(
             root_path_dict = root_path_dict, 
@@ -58,15 +68,19 @@ class openroomsScene3D(openroomsScene2D):
             BRDF_params_dict = BRDF_params_dict, 
             lighting_params_dict = lighting_params_dict, 
     )
+        self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
 
         '''
         load everything
         '''
         self.load_modalities_3D()
 
+        self.pcd_color = None
+
+
     @property
     def valid_modalities_3D(self):
-        return ['layout', 'shapes']
+        return ['layout', 'shapes', 'mi']
 
     @property
     def valid_modalities_3D_vis(self):
@@ -77,6 +91,10 @@ class openroomsScene3D(openroomsScene2D):
         return all([_ in self.modality_list for _ in ['shapes']])
 
     @property
+    def if_has_mitsuba_scene(self):
+        return all([_ in self.modality_list for _ in ['mi']])
+
+    @property
     def if_has_colors(self):
         return self.if_loaded_colors
 
@@ -84,10 +102,54 @@ class openroomsScene3D(openroomsScene2D):
         for _ in self.modality_list:
             if _ == 'layout': self.load_layout()
             if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
+            if _ == 'mi': self.load_mi(self.mi_params_dict)
 
         if self.if_vis_debug_with_plt:
             # plt.draw()
             plt.show()
+
+
+    def load_mi(self, mi_params_dict={}):
+        '''
+        load scene representation into Mitsuba 3
+        '''
+        xml_dump_path = str(self.PATH_HOME / 'mitsuba' / 'tmp.xml')
+        dump_OR_xml_for_mi(
+            str(self.xml_file), 
+            shapes_root=self.shapes_root, 
+            layout_root=self.layout_root, 
+            envmaps_root=self.envmaps_root, 
+            xml_out_path=xml_dump_path, 
+            origin_lookat_up_tuple=self.origin_lookat_up_list[0], 
+            if_no_emitter_shape=True, 
+            )
+        print(blue_text('XML for Mitsuba dumped to: %s')%xml_dump_path)
+
+        self.mi_scene = mi.load_file(xml_dump_path)
+
+        if_dump_mesh = mi_params_dict.get('if_dump_mesh', False)
+        if if_dump_mesh:
+            '''
+            images/demo_mitsuba_dump_meshes.png
+            '''
+            mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
+            if mesh_dump_root.exists():
+                shutil.rmtree(str(mesh_dump_root))
+            mesh_dump_root.mkdir()
+
+            for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
+                shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
+
+        if_render_test_image = mi_params_dict.get('if_render_test_image', False)
+        if if_render_test_image:
+            '''
+            mitsuba/tmp_render.png
+            '''
+            print(blue_text('Rendering... test frame by Mitsuba: %s')%str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'))
+            image = mi.render(self.mi_scene, spp=64)
+            mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'), image)
+            mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
+            print(blue_text('DONE.'))
 
 
     def load_shapes(self, shape_params_dict={}):
@@ -107,9 +169,8 @@ class openroomsScene3D(openroomsScene2D):
 
         # load general shapes and emitters, and fuse with previous emitter properties
         self.shapes_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'envmaps_root'], [PosixPath, PosixPath])
-        main_xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
         # print(main_xml_file)
-        root = get_XML_root(main_xml_file)
+        root = get_XML_root(self.xml_file)
 
         self.shape_list_ori, self.emitter_list = parse_XML_for_shapes_global(
             root=root, 
@@ -207,7 +268,7 @@ class openroomsScene3D(openroomsScene2D):
             if if_emitter:
                 if shape['emitter_prop']['obj_type'] == 'window':
                     self.window_list.append(shape)
-                elif shape['emitter_prop']['obj_type'] == 'lamp':
+                elif shape['emitter_prop']['obj_type'] == 'obj':
                     self.lamp_list.append(shape)
 
         print(blue_text('[openroomsScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d lamps lit'%(

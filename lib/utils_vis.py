@@ -1,5 +1,7 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import colorsys
 from PIL import Image
 
@@ -79,3 +81,10 @@ def colorize(gray, palette):
     color = Image.fromarray(gray.astype(np.uint8)).convert('P')
     color.putpalette(palette)
     return color
+
+def color_map_color(values, vmin=0, vmax=1, cmap_name='jet', ):
+    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    cmap = cm.get_cmap(cmap_name)  # PiYG
+    colors = cmap(norm(abs(values)))[:, :3]  # will return rgba, we take only first 3 so we get rgb
+    # colors = matplotlib.colors.rgb2hex(colors)
+    return colors

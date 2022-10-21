@@ -7,5 +7,8 @@ data
 data/openrooms_public*
 *.exr
 mitsuba/my_first_render.png
+mitsuba/meshes_dump
+mitsuba/tmp.xml
+
 lib/utils_OR/__pycache__
 lib/__pycache__
