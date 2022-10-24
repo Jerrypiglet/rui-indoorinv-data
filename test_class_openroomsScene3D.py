@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
 parser.add_argument('--vis_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to render in open3D')
 parser.add_argument('--vis_2d_proj', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
-parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=True, help='')
+parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
 parser.add_argument('--pcd_color_mode', type=str, default='rgb', help='if create color map for all points')
 opt = parser.parse_args()
 
@@ -91,6 +91,7 @@ openrooms_scene = openroomsScene3D(
     mi_params_dict={
         'if_dump_mesh': True, # set to True to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_render_test_image': False, # set to True to render an image with first camera, usig Mitsuba: mitsuba/tmp_render.png
+        'if_sample_rays_pts': True, # set to True to sample camera rays and intersection pts given input mesh and camera poses
         },
 )
 
@@ -114,7 +115,8 @@ if opt.vis_o3d:
             # 'lighting_SG', 
             'layout', 
             'shapes', # bbox and meshs of shapes (objs + emitters)
-            'emitters' # emitter properties (e.g. SGs, half envmaps)
+            'emitters', # emitter properties (e.g. SGs, half envmaps)
+            'mi', #mitsuba rays, pts
             ], 
     )
 
@@ -148,7 +150,11 @@ if opt.vis_o3d:
             'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
             'scale_SG_length': 2., 
         },
-
+        mi_params={
+            'if_cam_rays': True, 
+            'cam_rays_if_pts': True, # if cam rays end in surface intersections
+            'cam_rays_subsample': 10, 
+        }, 
     )
 
 # dump_path = Path(PATH_HOME) / ('logs/pickles/OR_public_re_gt_%s_#MOD_openrooms.pickle'%scene_name[5:])

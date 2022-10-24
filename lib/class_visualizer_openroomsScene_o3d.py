@@ -22,7 +22,7 @@ from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 
 from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, check_list_of_tensors_size
-from lib.utils_o3d import text_3d, get_arrow_o3d
+from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere
 from lib.utils_OR.utils_OR_xml import gen_random_str
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_OR.utils_OR_mesh import writeMesh
@@ -53,7 +53,7 @@ class visualizer_openroomsScene_o3d(object):
 
         self.modality_list = modality_list
         for _ in self.modality_list:
-            assert _ in ['dense_geo', 'cameras', 'lighting_SG', 'layout', 'shapes', 'emitters']
+            assert _ in ['dense_geo', 'cameras', 'lighting_SG', 'layout', 'shapes', 'emitters', 'mi']
 
     def run_demo(self, extra_geometry_list=[]):
 
@@ -86,53 +86,6 @@ class visualizer_openroomsScene_o3d(object):
         geoms += [{'name': 'sphere', 'geometry': sphere, 'material': mat_sphere},
                 {'name': 'box', 'geometry': box, 'material': mat_box}]
         vis.draw(geoms)
-
-
-    def get_sphere(self, scale=5., resolution=200, hemisphere_normal=None, envmap=None):
-        sphere = o3d.geometry.TriangleMesh.create_sphere(scale, resolution=resolution)
-        sphere.compute_vertex_normals()
-        sphere.compute_triangle_normals()
-        sphere.normalize_normals()
-
-        if hemisphere_normal is not None:
-            assert hemisphere_normal.shape==(3,)
-            triangles = np.asarray(sphere.triangles).copy()
-            triangle_normals = np.asarray(sphere.triangle_normals).copy()
-            vertices = np.asarray(sphere.vertices).copy()
-            mask = np.sum(triangle_normals * hemisphere_normal.reshape(1, 3), axis=1) > 0
-            triangles_new = triangles[mask]
-
-            sphere = deepcopy(sphere)
-            sphere.triangles = o3d.utility.Vector3iVector(triangles_new)
-            sphere.vertices = o3d.utility.Vector3dVector(vertices)
-            sphere.compute_vertex_normals()
-            sphere.compute_triangle_normals()
-
-            if envmap is None:
-                sphere.vertex_colors = o3d.utility.Vector3dVector(np.random.rand(vertices.shape[0], 3))
-            else:
-                '''
-                sample global envmap with sphere normals
-                '''
-                vertex_normals = np.asarray(sphere.vertex_normals).copy()
-                # /home/ruizhu/Documents/Projects/semanticInverse/train/models_def/models_layout_emitter_lightAccu.py -> sample_envmap()
-                vertex_normals_SG = np.stack((vertex_normals[:, 2], -vertex_normals[:, 0], vertex_normals[:, 1]), axis=-1)
-                cos_theta = vertex_normals_SG[:, 2]
-                theta_SG = np.arccos(cos_theta) # [0, pi]
-                cos_phi = vertex_normals_SG[:, 0] / np.sin(theta_SG)
-                sin_phi = vertex_normals_SG[:, 1] / np.sin(theta_SG)
-                phi_SG = np.arctan2(sin_phi, cos_phi)
-                uu_normalized = phi_SG / np.pi # pixel center when align_corners = False; -pi~pi -> -1~1; (N,)
-                vv_normalized = theta_SG * 2. / np.pi -1. # pixel center when align_corners = False; 0~pi -> -1~1; (N,)
-                uv_normalized = np.stack([uu_normalized, vv_normalized], axis=-1) # (N, 2)
-                uv_normalized_torch = torch.from_numpy(uv_normalized).unsqueeze(0).unsqueeze(0).float() # (1, 1, N, 2)
-                envmap_torch = torch.from_numpy(envmap).permute(2, 0, 1).unsqueeze(0).float() # (1, 3, H, W)
-                sampled_envmap_torch = torch.nn.functional.grid_sample(envmap_torch, uv_normalized_torch, mode='bilinear', align_corners=True) # (1, 3, 1, N)
-                sampled_envmap = sampled_envmap_torch.squeeze().numpy().transpose() # (N, 3)
-                sphere.vertex_colors = o3d.utility.Vector3dVector(sampled_envmap) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-
-        # self.vis.add_geometry(sphere)
-        return sphere
 
     def run_o3d_shader(
         self, 
@@ -228,6 +181,7 @@ class visualizer_openroomsScene_o3d(object):
         layout_params: dict = {}, 
         shapes_params: dict = {}, 
         emitters_params: dict = {}, 
+        mi_params: dict = {}, 
     ):
         
         o3d_geometry_list = [o3d.geometry.TriangleMesh.create_coordinate_frame()]
@@ -261,6 +215,11 @@ class visualizer_openroomsScene_o3d(object):
         if 'emitters' in modality_list:
             o3d_geometry_list += self.collect_emitters(
                 emitters_params
+            )
+
+        if 'mi' in modality_list:
+            o3d_geometry_list += self.collect_mi(
+                mi_params
             )
 
         return o3d_geometry_list
@@ -314,32 +273,38 @@ class visualizer_openroomsScene_o3d(object):
         assert self.openrooms_scene.if_has_cameras
 
         subsample_cam_rate = cam_params.get('subsample_cam_rate', 1)
+        near, far = self.openrooms_scene.near, self.openrooms_scene.far
 
         pose_list = self.openrooms_scene.pose_list
         origin_lookat_up_list = self.openrooms_scene.origin_lookat_up_list
         cam_frustrm_list = []
         cam_axes_list = []
         cam_center_list = []
-        cam_o_d_list = []
-        cam_list = []
+        # cam_o_d_list = []
 
-        for cam_idx, (pose, origin_lookat_up) in enumerate(zip(pose_list, origin_lookat_up_list)):
-            origin, lookat, up = origin_lookat_up[0].flatten(), origin_lookat_up[1].flatten(), origin_lookat_up[2].flatten()
+        # for cam_idx, (pose, origin_lookat_up) in enumerate(zip(pose_list, origin_lookat_up_list)):
+        #     origin, lookat, up = origin_lookat_up[0].flatten(), origin_lookat_up[1].flatten(), origin_lookat_up[2].flatten()
             
-            cam_o = origin.flatten()
-            cam_d = lookat.flatten()
-            cam_d = cam_d / np.linalg.norm(cam_d)
-            cam_o_d_list.append((cam_o, cam_d))
+        #     cam_o = origin.flatten()
+        #     cam_d = lookat.flatten()
+        #     cam_d = cam_d / np.linalg.norm(cam_d)
+        #     cam_o_d_list.append((cam_o, cam_d))
 
-            right = np.cross(lookat, up).flatten()
-            cam = [cam_o]
-            frustum_scale = 0.5
-            cam += [cam_o + cam_d * frustum_scale + up * 0.5 * frustum_scale - right * 0.5 * frustum_scale]
-            cam += [cam_o + cam_d * frustum_scale + up * 0.5 * frustum_scale + right * 0.5 * frustum_scale]
-            cam += [cam_o + cam_d * frustum_scale - up * 0.5 * frustum_scale - right * 0.5 * frustum_scale]
-            cam += [cam_o + cam_d * frustum_scale - up * 0.5 * frustum_scale + right * 0.5 * frustum_scale]
-            cam = np.array(cam)
-            cam_list.append(cam)
+        #     right = np.cross(lookat, up).flatten()
+        #     cam = [cam_o]
+        #     frustum_scale = 0.5
+        #     cam += [cam_o + cam_d * frustum_scale + up * 0.5 * frustum_scale - right * 0.5 * frustum_scale]
+        #     cam += [cam_o + cam_d * frustum_scale + up * 0.5 * frustum_scale + right * 0.5 * frustum_scale]
+        #     cam += [cam_o + cam_d * frustum_scale - up * 0.5 * frustum_scale - right * 0.5 * frustum_scale]
+        #     cam += [cam_o + cam_d * frustum_scale - up * 0.5 * frustum_scale + right * 0.5 * frustum_scale]
+        #     cam = np.array(cam)
+        #     cam_list.append(cam)
+
+        cam_list = []
+        for (rays_o, rays_d) in self.openrooms_scene.cam_rays_list:
+            cam_o = rays_o[0,0] # (3,)
+            cam_d = rays_d[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
+            cam_list.append(np.array([cam_o, *(cam_o+cam_d*max(near, far*0.05))]))
 
         c2w_list = pose_list
 
@@ -644,7 +609,7 @@ class visualizer_openroomsScene_o3d(object):
                 shape_mesh.compute_triangle_normals()
                 geometry_list.append([shape_mesh, 'shape_emitter_'+shape['random_id'] if if_emitter else 'shape_obj_'+shape['random_id']])
 
-            print('--', if_emitter, cat_name, shape_idx, cat_id, obj_path)
+            print('[collect_shapes] --', if_emitter, cat_name, shape_idx, cat_id, obj_path)
 
             # shape_label = o3d.visualization.gui.Label3D([0., 0., 0.], np.mean(bverts, axis=0).reshape((3, 1)), cat_name)
             # geometry_list.append(shape_label)
@@ -732,10 +697,49 @@ class visualizer_openroomsScene_o3d(object):
                     im_envmap_ori = load_HDR(Path(env_map_path))
                     im_envmap_ori_SDR, im_envmap_ori_scale = to_nonHDR(im_envmap_ori)
 
-                    sphere_envmap = self.get_sphere(hemisphere_normal=shape['emitter_prop']['box3D_world']['zAxis'].reshape((3,)), envmap=im_envmap_ori_SDR)
+                    sphere_envmap = get_sphere(hemisphere_normal=shape['emitter_prop']['box3D_world']['zAxis'].reshape((3,)), envmap=im_envmap_ori_SDR)
                     geometry_list.append([sphere_envmap, 'envmap'])
 
         return geometry_list
 
+    def collect_mi(self, mi_params: dict={}):
+        '''
+        images/demo_mi_o3d_1.png
+        images/demo_mi_o3d_2.png
+        '''
+        assert self.openrooms_scene.if_has_mitsuba_scene
+
+        geometry_list = []
+
+        if_cam_rays = mi_params.get('if_cam_rays', True) # if show per-pixel rays
+        cam_rays_if_pts = mi_params.get('cam_rays_if_pts', True) # if cam rays end in surface intersections
+        if cam_rays_if_pts:
+            assert self.openrooms_scene.if_has_mitsuba_rays_pts
+        cam_rays_subsample = mi_params.get('cam_rays_subsample', 10)
+
+        if if_cam_rays: 
+            for frame_idx, (rays_o, rays_d) in enumerate(self.openrooms_scene.cam_rays_list[0:1]): # show only first frame
+                rays_of_a_view = o3d.geometry.LineSet()
+
+                if cam_rays_if_pts:
+                    ret = self.openrooms_scene.mi_rays_ret_list[frame_idx]
+                    rays_t_flatten = ret.t.numpy()[::cam_rays_subsample][:, np.newaxis]
+                    rays_t_flatten[rays_t_flatten==np.inf] = 0.
+                else:
+                    rays_t_flatten = np.ones((rays_o.shape[0], 1), dtype=np.float32)
+
+                rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3)[::cam_rays_subsample], rays_d.reshape(-1, 3)[::cam_rays_subsample]
+
+                rays_end_flatten = rays_o_flatten + rays_d_flatten * rays_t_flatten
+                rays_of_a_view.points = o3d.utility.Vector3dVector(np.vstack((rays_o_flatten, rays_end_flatten)))
+                rays_of_a_view.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*rays_o_flatten.shape[0])
+                rays_of_a_view.lines = o3d.utility.Vector2iVector([[_, _+rays_o_flatten.shape[0]] for _ in range(rays_o_flatten.shape[0])])
+                geometry_list.append(rays_of_a_view)
+
+                pcd_rays_end = o3d.geometry.PointCloud()
+                pcd_rays_end.points = o3d.utility.Vector3dVector(rays_end_flatten)
+                pcd_rays_end.colors = o3d.utility.Vector3dVector([[0., 0., 0.]]*rays_o_flatten.shape[0])
+                geometry_list.append(pcd_rays_end)
 
 
+        return geometry_list

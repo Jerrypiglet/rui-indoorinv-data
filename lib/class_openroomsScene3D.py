@@ -26,6 +26,7 @@ from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world, render_3SG_envmap, vis_envmap_plt
+from lib.utils_dvgo import get_rays_np
 class openroomsScene3D(openroomsScene2D):
     '''
     A class used to visualize OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties for inverse rendering).
@@ -40,10 +41,11 @@ class openroomsScene3D(openroomsScene2D):
         im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640}, 
         BRDF_params_dict: dict={}, 
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
+        cam_params_dict: dict={'near': 0.1, 'far': 7.}, 
         shape_params_dict: dict={'if_load_mesh': True}, 
         emitter_params_dict: dict={'N_ambient_rep': '3SG-SkyGrd'},
-        mi_params_dict: dict={}, 
-        if_vis_debug_with_plt: bool=False
+        mi_params_dict: dict={'if_sample_rays_pts': True}, 
+        if_vis_debug_with_plt: bool=False, 
     ):
 
         for _ in modality_list:
@@ -56,6 +58,7 @@ class openroomsScene3D(openroomsScene2D):
 
         self.if_loaded_colors = False
 
+        self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
         self.emitter_params_dict = emitter_params_dict
         self.mi_params_dict = mi_params_dict
@@ -73,6 +76,7 @@ class openroomsScene3D(openroomsScene2D):
         '''
         load everything
         '''
+        self.load_cam_rays(self.cam_params_dict)
         self.load_modalities_3D()
 
         self.pcd_color = None
@@ -95,6 +99,10 @@ class openroomsScene3D(openroomsScene2D):
         return all([_ in self.modality_list for _ in ['mi']])
 
     @property
+    def if_has_mitsuba_rays_pts(self):
+        return 'mi' in self.modality_list and self.mi_params_dict['if_sample_rays_pts']
+
+    @property
     def if_has_colors(self):
         return self.if_loaded_colors
 
@@ -107,7 +115,6 @@ class openroomsScene3D(openroomsScene2D):
         if self.if_vis_debug_with_plt:
             # plt.draw()
             plt.show()
-
 
     def load_mi(self, mi_params_dict={}):
         '''
@@ -150,6 +157,43 @@ class openroomsScene3D(openroomsScene2D):
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'), image)
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
             print(blue_text('DONE.'))
+
+        if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', False)
+        if if_sample_rays_pts:
+            self.mi_sample_rays_pts()
+
+    def load_cam_rays(self, cam_params_dict={}):
+        H, W = self.im_H_resize, self.im_W_resize
+        K = self.K
+        self.near = cam_params_dict.get('near', 0.1)
+        self.far = cam_params_dict.get('far', 7.)
+        
+        self.cam_rays_list = []
+        for frame_idx in range(self.num_frames):
+            rays_o, rays_d = get_rays_np(H, W, K, self.pose_list[frame_idx], inverse_y=True)
+            self.cam_rays_list.append((rays_o, rays_d))
+
+    def mi_sample_rays_pts(self):
+        '''
+        sample per-pixel rays in NeRF/DVGO setting
+        '''
+        assert self.if_has_mitsuba_scene
+
+        self.mi_rays_ret_list = []
+        for frame_idx, (rays_o, rays_d) in enumerate(self.cam_rays_list):
+            rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
+
+            xs_mi = mi.Point3f(rays_o_flatten)
+            ds_mi = mi.Vector3f(rays_d_flatten)
+            # ray origin, direction, t_max
+            rays_mi = mi.Ray3f(xs_mi, ds_mi)
+            ret = self.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+            # returned structure contains intersection location, nomral, ray step, ...
+            # positions = mi2torch(ret.p.torch())
+            # normals = mi2torch(ret.n.torch())
+            self.mi_rays_ret_list.append(ret)
+            # rays_t_flatten = ret.t.numpy()[:, np.newaxis]
+            # rays_t_flatten[rays_t_flatten==np.inf] = 0.
 
 
     def load_shapes(self, shape_params_dict={}):

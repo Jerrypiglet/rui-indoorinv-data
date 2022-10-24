@@ -49,7 +49,6 @@ class openroomsScene2D(object):
         assert self.indexing_based in [0, 1], 'indexing of frame names (indexing_based) has to be either 0-based or 1-based! got: indexing_based = %d'%self.indexing_based
         assert self.indexing_based == {'public_re': 0, 'public': 1}[self.openrooms_version]
 
-
         if scene_params_dict.get('frame_id_list', []) != []: 
             self.frame_id_list = scene_params_dict.get('frame_id_list')
         else:
@@ -59,6 +58,8 @@ class openroomsScene2D(object):
             # self.frame_id_list = sorted([int(_.split('.')[0].replace('im_', '')) for _ in im_hdr_list])
             self.frame_id_list = sorted([int(Path(_).stem.replace('im_', '')) for _ in im_hdr_list])
             print(white_blue('... got frame_id_list: [%s]'%(', '.join([str(_) for _ in self.frame_id_list]))))
+        
+        self.num_frames = len(self.frame_id_list)
 
         '''
         paths

@@ -4,6 +4,7 @@ import numpy as np
 import open3d as o3d
 import matplotlib
 import matplotlib.pyplot as plt
+from copy import deepcopy
 
 def text_3d(text, pos, direction=None, degree=0.0, density=10, font='/usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf', font_size=10, text_color=(0, 0, 0)):
     """
@@ -135,3 +136,49 @@ def get_arrow_o3d(origin: np.array=np.zeros(3, dtype=np.float32), end=None, vec=
     mesh.compute_vertex_normals()
 
     return(mesh)
+
+def get_sphere(scale=5., resolution=200, hemisphere_normal=None, envmap=None):
+    sphere = o3d.geometry.TriangleMesh.create_sphere(scale, resolution=resolution)
+    sphere.compute_vertex_normals()
+    sphere.compute_triangle_normals()
+    sphere.normalize_normals()
+
+    if hemisphere_normal is not None:
+        assert hemisphere_normal.shape==(3,)
+        triangles = np.asarray(sphere.triangles).copy()
+        triangle_normals = np.asarray(sphere.triangle_normals).copy()
+        vertices = np.asarray(sphere.vertices).copy()
+        mask = np.sum(triangle_normals * hemisphere_normal.reshape(1, 3), axis=1) > 0
+        triangles_new = triangles[mask]
+
+        sphere = deepcopy(sphere)
+        sphere.triangles = o3d.utility.Vector3iVector(triangles_new)
+        sphere.vertices = o3d.utility.Vector3dVector(vertices)
+        sphere.compute_vertex_normals()
+        sphere.compute_triangle_normals()
+
+        if envmap is None:
+            sphere.vertex_colors = o3d.utility.Vector3dVector(np.random.rand(vertices.shape[0], 3))
+        else:
+            '''
+            sample global envmap with sphere normals
+            '''
+            vertex_normals = np.asarray(sphere.vertex_normals).copy()
+            # /home/ruizhu/Documents/Projects/semanticInverse/train/models_def/models_layout_emitter_lightAccu.py -> sample_envmap()
+            vertex_normals_SG = np.stack((vertex_normals[:, 2], -vertex_normals[:, 0], vertex_normals[:, 1]), axis=-1)
+            cos_theta = vertex_normals_SG[:, 2]
+            theta_SG = np.arccos(cos_theta) # [0, pi]
+            cos_phi = vertex_normals_SG[:, 0] / np.sin(theta_SG)
+            sin_phi = vertex_normals_SG[:, 1] / np.sin(theta_SG)
+            phi_SG = np.arctan2(sin_phi, cos_phi)
+            uu_normalized = phi_SG / np.pi # pixel center when align_corners = False; -pi~pi -> -1~1; (N,)
+            vv_normalized = theta_SG * 2. / np.pi -1. # pixel center when align_corners = False; 0~pi -> -1~1; (N,)
+            uv_normalized = np.stack([uu_normalized, vv_normalized], axis=-1) # (N, 2)
+            uv_normalized_torch = torch.from_numpy(uv_normalized).unsqueeze(0).unsqueeze(0).float() # (1, 1, N, 2)
+            envmap_torch = torch.from_numpy(envmap).permute(2, 0, 1).unsqueeze(0).float() # (1, 3, H, W)
+            sampled_envmap_torch = torch.nn.functional.grid_sample(envmap_torch, uv_normalized_torch, mode='bilinear', align_corners=True) # (1, 3, 1, N)
+            sampled_envmap = sampled_envmap_torch.squeeze().numpy().transpose() # (N, 3)
+            sphere.vertex_colors = o3d.utility.Vector3dVector(sampled_envmap) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+
+    # self.vis.add_geometry(sphere)
+    return sphere
