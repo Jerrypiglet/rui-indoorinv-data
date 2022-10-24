@@ -162,6 +162,21 @@ class openroomsScene3D(openroomsScene2D):
         if if_sample_rays_pts:
             self.mi_sample_rays_pts()
 
+            # images/demo_mitsuba_ret_depth.png
+            debug_show_mi_depth = mi_params_dict.get('debug_show_mi_depth', False)
+            if debug_show_mi_depth:
+                plt.figure()
+                N_rows = min(self.num_frames, 4)
+                for frame_idx in range(N_rows):
+                    plt.subplot(2, N_rows, 1+frame_idx)
+                    plt.imshow(self.depth_list[frame_idx], cmap='jet')
+                    vmin, vmax = np.amin(self.depth_list[frame_idx]), np.amax(self.depth_list[frame_idx])
+                    plt.colorbar()
+                    plt.subplot(2, N_rows, 1+N_rows+frame_idx)
+                    plt.imshow(self.mi_depth_list[frame_idx], vmin=vmin, vmax=vmax, cmap='jet')
+                    plt.colorbar()
+                plt.show()
+
     def load_cam_rays(self, cam_params_dict={}):
         H, W = self.im_H_resize, self.im_W_resize
         K = self.K
@@ -170,8 +185,8 @@ class openroomsScene3D(openroomsScene2D):
         
         self.cam_rays_list = []
         for frame_idx in range(self.num_frames):
-            rays_o, rays_d = get_rays_np(H, W, K, self.pose_list[frame_idx], inverse_y=True)
-            self.cam_rays_list.append((rays_o, rays_d))
+            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, self.pose_list[frame_idx], inverse_y=True)
+            self.cam_rays_list.append((rays_o, rays_d, ray_d_center))
 
     def mi_sample_rays_pts(self):
         '''
@@ -180,7 +195,10 @@ class openroomsScene3D(openroomsScene2D):
         assert self.if_has_mitsuba_scene
 
         self.mi_rays_ret_list = []
-        for frame_idx, (rays_o, rays_d) in enumerate(self.cam_rays_list):
+        self.mi_depth_list = []
+        self.mi_pts_list = []
+
+        for frame_idx, (rays_o, rays_d, ray_d_center) in enumerate(self.cam_rays_list):
             rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
 
             xs_mi = mi.Point3f(rays_o_flatten)
@@ -194,7 +212,12 @@ class openroomsScene3D(openroomsScene2D):
             self.mi_rays_ret_list.append(ret)
             # rays_t_flatten = ret.t.numpy()[:, np.newaxis]
             # rays_t_flatten[rays_t_flatten==np.inf] = 0.
+            rays_v_flatten = ret.p.numpy() - rays_o_flatten
+            mi_depth = np.sum(rays_v_flatten.reshape(self.im_H_resize, self.im_W_resize, 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
+            self.mi_depth_list.append(mi_depth)
 
+            mi_pts = ret.p.numpy().reshape(self.im_H_resize, self.im_W_resize, 3)
+            self.mi_pts_list.append(mi_pts)
 
     def load_shapes(self, shape_params_dict={}):
         '''

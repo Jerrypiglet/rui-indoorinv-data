@@ -92,6 +92,7 @@ openrooms_scene = openroomsScene3D(
         'if_dump_mesh': True, # set to True to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_render_test_image': False, # set to True to render an image with first camera, usig Mitsuba: mitsuba/tmp_render.png
         'if_sample_rays_pts': True, # set to True to sample camera rays and intersection pts given input mesh and camera poses
+        'debug_show_mi_depth': False, # [DEBUG] set to True to show depth maps from ray-scene intersections: images/demo_mitsuba_ret_depth.png
         },
 )
 

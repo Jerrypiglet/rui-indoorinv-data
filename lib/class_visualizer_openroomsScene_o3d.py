@@ -301,7 +301,7 @@ class visualizer_openroomsScene_o3d(object):
         #     cam_list.append(cam)
 
         cam_list = []
-        for (rays_o, rays_d) in self.openrooms_scene.cam_rays_list:
+        for (rays_o, rays_d, _) in self.openrooms_scene.cam_rays_list:
             cam_o = rays_o[0,0] # (3,)
             cam_d = rays_d[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
             cam_list.append(np.array([cam_o, *(cam_o+cam_d*max(near, far*0.05))]))
@@ -718,7 +718,7 @@ class visualizer_openroomsScene_o3d(object):
         cam_rays_subsample = mi_params.get('cam_rays_subsample', 10)
 
         if if_cam_rays: 
-            for frame_idx, (rays_o, rays_d) in enumerate(self.openrooms_scene.cam_rays_list[0:1]): # show only first frame
+            for frame_idx, (rays_o, rays_d, _) in enumerate(self.openrooms_scene.cam_rays_list[0:1]): # show only first frame
                 rays_of_a_view = o3d.geometry.LineSet()
 
                 if cam_rays_if_pts:

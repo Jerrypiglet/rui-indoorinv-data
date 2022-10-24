@@ -42,6 +42,7 @@ frame_ids = list(range(0, 87, 10))
 
 openrooms_scene = openroomsScene2D(
     root_path_dict = {
+        'PATH_HOME': Path(PATH_HOME), 
         'rendering_root': Path(base_root), 
         'xml_scene_root': Path(xml_root), 
         'semantic_labels_root': semantic_labels_root, 
