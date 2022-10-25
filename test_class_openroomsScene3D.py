@@ -51,12 +51,13 @@ if not shape_pickles_root.exists():
 '''
 The classroom scene: one lamp (lit up) + one window (less sun)
 
-data/public_re_3/main_xml1/scene0552_00_more/im_1.png
+data/public_re_3/main_xml1/scene0552_00_more/im_4.png
 '''
 
 meta_split = 'main_xml1'
 scene_name = 'scene0552_00_more'
-frame_ids = list(range(0, 87, 10))
+frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
+# frame_ids = [0]
 
 openrooms_scene = openroomsScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
@@ -77,15 +78,17 @@ openrooms_scene = openroomsScene3D(
         }, 
     shape_params_dict={
         'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
-        'if_load_emitter_mesh': True,  # default set to True to load emitter meshes, because not too many emitters
+        'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
         },
     emitter_params_dict={
         'N_ambient_rep': '3SG-SkyGrd'
         },
     mi_params_dict={
-        'if_dump_mesh': True, # set to True to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
-        'debug_render_test_image': False, # [DEBUG] set to True to render an image with first camera, usig Mitsuba: mitsuba/tmp_render.png
-        'if_sample_rays_pts': True, # set to True to sample camera rays and intersection pts given input mesh and camera poses
+        'if_also_dump_lit_lamps': True,  # True: to dump a second file containing lit-up lamps only
+        'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
+        'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
+        'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
+        'if_get_segs': True, # True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
 )
 
@@ -110,6 +113,7 @@ if opt.vis_3d_plt:
             'emitters', # emitter properties
             'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
             'mi_depth_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            'mi_seg', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
     )
     visualizer_3D_plt.vis_3d_with_plt()
@@ -119,11 +123,11 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
         openrooms_scene, 
         modality_list_vis=[
-            'dense_geo', 
+            # 'dense_geo', 
             'cameras', 
             # 'lighting_SG', 
             'layout', 
-            'shapes', # bbox and meshs of shapes (objs + emitters)
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', #mitsuba sampled rays, pts
             ], 
@@ -160,11 +164,16 @@ if opt.vis_3d_o3d:
             'scale_SG_length': 2., 
         },
         mi_params={
-            'if_cam_rays': False, 
             'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
+            'if_pts_colorize_rgb': True, 
+            'pts_subsample': 1,
+
+            'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
-            'pts_subsample': 100, 
+            
+            'if_normal': False, 
+            'normal_subsample': 50, 
             'normal_scale': 0.2, 
         }, 
     )

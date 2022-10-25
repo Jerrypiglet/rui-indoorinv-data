@@ -1,4 +1,3 @@
-import sys
 from tqdm import tqdm
 import xml.etree.ElementTree as et
 import numpy as np
@@ -11,8 +10,6 @@ from xml.dom import minidom
 
 import xml.etree.ElementTree as et
 from xml.dom import minidom
-
-from icecream import ic
 
 from .utils_OR_mesh import loadMesh, computeBox, computeTransform, writeMesh
 from .utils_OR_transform import transform_with_transforms_xml_list
@@ -545,9 +542,6 @@ def parse_XML_for_shapes_global(root, root_uv_mapped, root_layoutMesh, scene_xml
         return shapes_list, emitters_list
     else:
         return shapes_list
-
-def gen_random_str(length=5):
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 def transformToXml(root):
     rstring = et.tostring(root, 'utf-8')

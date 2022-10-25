@@ -112,6 +112,7 @@ class openroomsScene2D(object):
         flags to set
         '''
         self.pts_from = {'mi': False, 'depth': False}
+        self.seg_from = {'mi': False, 'seg': False}
 
         '''
         load everything
@@ -311,6 +312,8 @@ class openroomsScene2D(object):
 
         print(blue_text('[openroomsScene] DONE. load_seg'))
 
+        self.seg_from['seg'] = True
+
     def load_transforms(self):
         # load transformations # writeShapeToXML.py L588
         transform_file = self.scene_xml_path / 'transform.dat'
@@ -331,7 +334,7 @@ class openroomsScene2D(object):
         if not hasattr(self, 'transforms'):
             self.load_transforms()
 
-        self.pose_list, self.origin_lookat_up_list = load_OR_public_poses_to_Rt(self.transforms, self.scene_xml_path, self.frame_id_list, False, if_1_based=self.indexing_based==1)
+        self.pose_list, self.origin_lookatvector_up_list = load_OR_public_poses_to_Rt(self.transforms, self.scene_xml_path, self.frame_id_list, False, if_1_based=self.indexing_based==1)
 
         if self.if_resize_im:
             pass # IMPORTANT! do nothing; keep the 3D scene (cameras and geometry), but instead resize intrinsics to account for the smaller image
@@ -622,7 +625,7 @@ class openroomsScene2D(object):
         #     with open(cam_dump_path, 'wb') as f:
         #         pickle.dump({
         #             'pose_list': self.pose_list, 
-        #             'origin_lookat_up_list': self.origin_lookat_up_list
+        #             'origin_lookatvector_up_list': self.origin_lookatvector_up_list
         #             }, f)
 
         #     print(green('[openroomsScene] DUMPED to %s. fuse_3D_geometry')%(str(dump_path).replace('#MOD', '{pcd,cam}')))

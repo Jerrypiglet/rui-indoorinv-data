@@ -5,6 +5,8 @@ import logging
 from PIL import Image
 import matplotlib.pyplot as plt
 import argparse
+import random
+import string
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -99,6 +101,9 @@ def get_datetime():
     d1 = now.strftime("%Y%m%d-%H%M%S")
     return d1
     return not any(l)
+
+def gen_random_str(length=5):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 def vis_disp_colormap(disp_array_, file=None, normalize=True, min_and_scale=None, valid_mask=None, cmap_name='jet'):
     disp_array = disp_array_.copy()

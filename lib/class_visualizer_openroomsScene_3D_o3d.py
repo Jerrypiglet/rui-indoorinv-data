@@ -21,9 +21,8 @@ mi.set_variant(mi_variant)
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 
-from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, check_list_of_tensors_size
+from lib.utils_misc import get_list_of_keys, gen_random_str
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere
-from lib.utils_OR.utils_OR_xml import gen_random_str
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_OR.utils_OR_mesh import writeMesh
 from lib.utils_vis import color_map_color
@@ -276,14 +275,14 @@ class visualizer_openroomsScene_3D_o3d(object):
         near, far = self.os.near, self.os.far
 
         pose_list = self.os.pose_list
-        origin_lookat_up_list = self.os.origin_lookat_up_list
+        origin_lookatvector_up_list = self.os.origin_lookatvector_up_list
         cam_frustrm_list = []
         cam_axes_list = []
         cam_center_list = []
         # cam_o_d_list = []
 
-        # for cam_idx, (pose, origin_lookat_up) in enumerate(zip(pose_list, origin_lookat_up_list)):
-        #     origin, lookat, up = origin_lookat_up[0].flatten(), origin_lookat_up[1].flatten(), origin_lookat_up[2].flatten()
+        # for cam_idx, (pose, origin_lookatvector_up) in enumerate(zip(pose_list, origin_lookatvector_up_list)):
+        #     origin, lookat, up = origin_lookatvector_up[0].flatten(), origin_lookatvector_up[1].flatten(), origin_lookatvector_up[2].flatten()
             
         #     cam_o = origin.flatten()
         #     cam_d = lookat.flatten()
@@ -744,27 +743,39 @@ class visualizer_openroomsScene_3D_o3d(object):
 
         '''
         if show per-pixel pts (see: no floating points): 
+        images/demo_mitsuba_ret_normals.png
         images/demo_mitsuba_ret_pts_1.png
         images/demo_mitsuba_ret_pts_2.png
-        images/demo_mitsuba_ret_normals.png
         '''
         if_pts = mi_params.get('if_pts', True)
         pts_subsample = mi_params.get('pts_subsample', 10)
+        if_pts_colorize_rgb = mi_params.get('if_pts_colorize_rgb', 0.2)
+
+        if_normal = mi_params.get('if_normal', True)
+        normal_subsample = mi_params.get('normal_subsample', 10)
         normal_scale = mi_params.get('normal_scale', 0.2)
+
         if if_pts:
             for frame_idx, (mi_depth, mi_normals, mi_pts) in enumerate(zip(self.os.mi_depth_list, self.os.mi_normal_global_list, self.os.mi_pts_list)):
-                mi_pts = mi_pts[mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
+                # assert np.sum(mi_depth==np.inf)==0
+                mi_pts_ = mi_pts[mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
                 pcd_pts = o3d.geometry.PointCloud()
-                pcd_pts.points = o3d.utility.Vector3dVector(mi_pts)
-                pcd_pts.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*mi_pts.shape[0])
+                pcd_pts.points = o3d.utility.Vector3dVector(mi_pts_)
+                if if_pts_colorize_rgb:
+                    mi_rgb = self.os.im_sdr_list[frame_idx][mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
+                    pcd_pts.colors = o3d.utility.Vector3dVector(mi_rgb)
+                else:
+                    pcd_pts.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*mi_pts_.shape[0])
                 geometry_list.append(pcd_pts)
 
-                pcd_normals = o3d.geometry.LineSet()
-                mi_normals_end = mi_pts + normal_scale * mi_normals[mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
-                pcd_normals.points = o3d.utility.Vector3dVector(np.vstack((mi_pts, mi_normals_end)))
-                pcd_normals.colors = o3d.utility.Vector3dVector([[0., 0., 0.] for _ in range(mi_normals_end.shape[0])])
-                pcd_normals.lines = o3d.utility.Vector2iVector([[_, _+mi_normals_end.shape[0]] for _ in range(mi_normals_end.shape[0])])
-                geometry_list.append(pcd_normals)
+                if if_normal:
+                    pcd_normals = o3d.geometry.LineSet()
+                    mi_pts_ = mi_pts[mi_depth!=np.inf, :][::normal_subsample] # [H, W, 3] -> [N', 3]
+                    mi_normals_end = mi_pts_ + normal_scale * mi_normals[mi_depth!=np.inf, :][::normal_subsample] # [H, W, 3] -> [N', 3]
+                    pcd_normals.points = o3d.utility.Vector3dVector(np.vstack((mi_pts_, mi_normals_end)))
+                    pcd_normals.colors = o3d.utility.Vector3dVector([[0., 0., 0.] for _ in range(mi_normals_end.shape[0])])
+                    pcd_normals.lines = o3d.utility.Vector2iVector([[_, _+mi_normals_end.shape[0]] for _ in range(mi_normals_end.shape[0])])
+                    geometry_list.append(pcd_normals)
 
 
         return geometry_list

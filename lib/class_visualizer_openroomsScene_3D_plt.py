@@ -51,7 +51,7 @@ class visualizer_openroomsScene_3D_plt(object):
 
     @property
     def valid_modalities_3D_vis(self):
-        return ['layout', 'shapes', 'emitters', 'emitter_envs', 'mi_depth_normal']
+        return ['layout', 'shapes', 'emitters', 'emitter_envs', 'mi_depth_normal', 'mi_seg']
 
     def vis_3d_with_plt(self):
         ax = None
@@ -63,6 +63,8 @@ class visualizer_openroomsScene_3D_plt(object):
             self.vis_emitter_envs()
         if 'mi_depth_normal' in self.modality_list_vis:
             self.vis_mi_depth_normal()
+        if 'mi_seg' in self.modality_list_vis:
+            self.vis_mi_seg()
         plt.show()
 
     def vis_layout(self):
@@ -328,32 +330,57 @@ class visualizer_openroomsScene_3D_plt(object):
         '''
         assert self.os.pts_from['mi']
         fig=plt.figure()
-        N_rows = min(self.os.num_frames, 4)
-        # subfigs = fig.subfigures(nrows=N_rows, ncols=1) # https://stackoverflow.com/questions/27426668/row-titles-for-matplotlib-subplot
+        N_cols = min(self.os.num_frames, 4)
+        # subfigs = fig.subfigures(nrows=N_cols, ncols=1) # https://stackoverflow.com/questions/27426668/row-titles-for-matplotlib-subplot
 
-        for frame_idx in range(N_rows):
-            ax = plt.subplot(4, N_rows, 1+frame_idx)
-            plt.imshow(self.os.depth_list[frame_idx], cmap='jet')
+        for frame_idx in range(N_cols):
+            ax = plt.subplot(4, N_cols, 1+frame_idx)
+            plt.imshow(self.os.depth_list[frame_idx], cmap='jet', vmin=0.)
             vmin, vmax = np.amin(self.os.depth_list[frame_idx]), np.amax(self.os.depth_list[frame_idx])
             plt.colorbar()
-            ax.set_title('depth from OptixRenderer')
+            if frame_idx == 0: ax.set_title('depth from OptixRenderer')
 
-            ax = plt.subplot(4, N_rows, 1+N_rows+frame_idx)
-            plt.imshow(self.os.mi_depth_list[frame_idx], vmin=vmin, vmax=vmax, cmap='jet')
+            ax = plt.subplot(4, N_cols, 1+N_cols+frame_idx)
+            mi_depth_vis = self.os.mi_depth_list[frame_idx]
+            mi_depth_vis[mi_depth_vis==np.inf] = 0.
+            plt.imshow(mi_depth_vis, vmin=0., vmax=vmax, cmap='jet')
             plt.colorbar()
-            ax.set_title('depth from Mitsuba')
+            if frame_idx == 0: ax.set_title('depth from Mitsuba')
 
-            ax = plt.subplot(4, N_rows, 1+2*N_rows+frame_idx)
+            ax = plt.subplot(4, N_cols, 1+2*N_cols+frame_idx)
             plt.imshow(np.clip((self.os.normal_list[frame_idx]+1.)/2., 0., 1.))
-            ax.set_title('normals from OptixRenderer')
+            if frame_idx == 0: ax.set_title('normals from OptixRenderer')
 
-            ax = plt.subplot(4, N_rows, 1+3*N_rows+frame_idx)
+            ax = plt.subplot(4, N_cols, 1+3*N_cols+frame_idx)
             R = self.os.pose_list[frame_idx][:3, :3]
-            normals_global = self.os.mi_normal_global_list[frame_idx]
-            normals_cam = (R.T @ normals_global.reshape(-1, 3).T).T.reshape(self.os.im_H_resize, self.os.im_W_resize, 3)
-            # transform normals from OpenCV (right-down-forward) to OpenGL convention (right-up-backward)
-            normals_cam = np.stack([normals_cam[:, :, 0], -normals_cam[:, :, 1], -normals_cam[:, :, 2]], axis=-1)
-            plt.imshow(np.clip((normals_cam+1.)/2., 0., 1.))
-            ax.set_title('normals from Mitsuba')
+            mi_normal_global = self.os.mi_normal_global_list[frame_idx]
+            mi_normal_cam = (R.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.im_H_resize, self.os.im_W_resize, 3)
+            # transform mi_normal from OpenCV (right-down-forward) to OpenGL convention (right-up-backward)
+            mi_normal_cam = np.stack([mi_normal_cam[:, :, 0], -mi_normal_cam[:, :, 1], -mi_normal_cam[:, :, 2]], axis=-1)
+            mi_normal_vis = np.clip((mi_normal_cam+1.)/2., 0., 1.)
+            mi_normal_vis[mi_normal_global==np.inf] = 0.
+            plt.imshow(mi_normal_vis)
+            if frame_idx == 0: ax.set_title('normals from Mitsuba')
 
+        plt.show(block=False)
+
+    def vis_mi_seg(self):
+        '''
+        images/demo_mitsuba_ret_seg_2D.png
+        '''
+        assert self.os.pts_from['mi']
+        fig=plt.figure()
+        N_cols = min(self.os.num_frames, 6)
+
+        for frame_idx in range(N_cols):
+            for seg_index, seg_key in enumerate(['area', 'env', 'obj']):
+                ax = plt.subplot(6, N_cols, 1+frame_idx+N_cols*seg_index*2)
+                plt.imshow(self.os.seg_dict_of_lists[seg_key][frame_idx])
+                if frame_idx == 0: ax.set_title('seg-%s from OptixRenderer'%seg_key)   
+
+                if seg_key in self.os.mi_seg_dict_of_lists:
+                    ax = plt.subplot(6, N_cols, 1+frame_idx+N_cols*(seg_index*2+1))
+                    plt.imshow(self.os.mi_seg_dict_of_lists[seg_key][frame_idx].astype(np.float32))
+                    if frame_idx == 0: ax.set_title('seg-%s from Mitsuba'%seg_key)
+        
         plt.show(block=False)

@@ -136,7 +136,7 @@ class visualizer_openroomsScene_2D(object):
             R_c2w, t_c2w = self.os.pose_list[frame_idx][:3, :3], self.os.pose_list[frame_idx][:3, 3:4]
             R_w2c = np.linalg.inv(R_c2w)
             t_w2c = - R_w2c @ t_c2w
-            (origin, zaxis, _) = self.os.origin_lookat_up_list[frame_idx]
+            (origin, zaxis, _) = self.os.origin_lookatvector_up_list[frame_idx]
             
             for idx_list in [[0, 1, 2, 3, 0], [4, 5, 6, 7, 4], [0, 4], [1, 5], [2, 6], [3, 7]]:
             # for idx_list in [[6, 7]]:

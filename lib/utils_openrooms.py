@@ -61,7 +61,7 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
     cam_params = read_cam_params(cam_file)
 
     pose_list = []
-    origin_lookat_up_list = []
+    origin_lookatvector_up_list = []
 
     for frame_id in frame_id_list:
         if if_1_based:
@@ -89,9 +89,9 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
         # R = R @ np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]])
         
         pose_list.append(np.hstack((R, t)))
-        origin_lookat_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+        origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
 
-    return pose_list, origin_lookat_up_list
+    return pose_list, origin_lookatvector_up_list
 
 from lib.utils_rendering_openrooms import renderingLayer
 def convert_SG_axis_local_global(lighting_params, split_lighting_SG_list_split, split_pose_list_split, split_normal_list):

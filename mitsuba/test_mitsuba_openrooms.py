@@ -11,7 +11,7 @@ from lib.global_vars import mi_variant
 mi.set_variant(mi_variant)
 
 import xml.etree.ElementTree as et
-from utils_OR.utils_OR_xml import gen_random_str, transformToXml
+from utils_misc import gen_random_str, transformToXml
 from utils_io import read_cam_params
 
 '''

@@ -75,12 +75,11 @@ For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-
         - imnormal_%d.png # normals in 2D
         - imroughness_%d.png # roughness in 2D
         - imbaseColor_%d.png # albedo in 2D
-        <!-- - box{light_id}.dat # emitter info in 3D
         - light_%d # per-frame emitter source info; should not be useful
           - ...
+        - box{light_id}.dat # emitter info in 3D
         - imcadmatobj_%d.dat # instance/material segmentation in 2D
-        - imenv_%d.hdr # per-pixel lighting envmaps in 2D -->
-
+        - imenv_%d.hdr # per-pixel lighting envmaps in 2D
 
 # Notes on coordinate systems
 This will help clarifying the usage of camera poses ([$R$|$t$] for **camera-to-world** transformation) and camera intrinsics.
@@ -130,11 +129,15 @@ The Open3D visualizer is based on Open3D, supporting meshes and more beautiful v
 - emitters # emitter properties (e.g. SGs approximation for windows)
 - emitter_envs # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
 
-Also, results from differentiable rendering by Mitsuba 3
+Also, results from differentiable rendering by Mitsuba 3:
 
-- mi_depth_normal # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**
+- mi_depth_normal # same format as depth & normal from OptixRenderer
+- mi_seg # same format as seg_area, seg_env, seg_obj from OptixRenderer
+
+Comparing depth, normal maps, and segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**.
 
 ![](images/demo_mitsuba_ret_depth_normals_2D.png)
+![](images/demo_mitsuba_ret_seg_2D.png)
 
 ### Open3D viewer
 ```bash

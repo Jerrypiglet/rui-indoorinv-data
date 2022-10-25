@@ -7,6 +7,7 @@ from tqdm import tqdm
 import pickle
 import trimesh
 import shutil
+from collections import defaultdict
 
 # Import the library using the alias "mi"
 import mitsuba as mi
@@ -15,7 +16,7 @@ from lib.global_vars import mi_variant
 mi.set_variant(mi_variant)
 
 from lib.utils_io import load_HDR, to_nonHDR
-from lib.utils_misc import blue_text, get_list_of_keys, white_blue
+from lib.utils_misc import blue_text, get_list_of_keys, white_blue, get_datetime, gen_random_str
 from lib.utils_mitsuba import dump_OR_xml_for_mi
 
 from .class_openroomsScene2D import openroomsScene2D
@@ -103,22 +104,28 @@ class openroomsScene3D(openroomsScene2D):
         '''
         load scene representation into Mitsuba 3
         '''
-        xml_dump_path = str(self.PATH_HOME / 'mitsuba' / 'tmp.xml')
-        dump_OR_xml_for_mi(
+        xml_dump_dir = self.PATH_HOME / 'mitsuba'
+
+        if_also_dump_lit_lamps = mi_params_dict.get('if_also_dump_lit_lamps', True)
+
+        xml_dump_path = dump_OR_xml_for_mi(
             str(self.xml_file), 
             shapes_root=self.shapes_root, 
             layout_root=self.layout_root, 
             envmaps_root=self.envmaps_root, 
-            xml_out_path=xml_dump_path, 
-            origin_lookat_up_tuple=self.origin_lookat_up_list[0], 
+            xml_dump_dir=xml_dump_dir, 
+            origin_lookatvector_up_tuple=self.origin_lookatvector_up_list[0], # [debug] set to any frame_idx
             if_no_emitter_shape=False, 
+            if_also_dump_lit_lamps=if_also_dump_lit_lamps, 
             )
-        print(blue_text('XML for Mitsuba dumped to: %s')%xml_dump_path)
+        print(blue_text('XML for Mitsuba dumped to: %s')%str(xml_dump_path))
 
-        self.mi_scene = mi.load_file(xml_dump_path)
+        self.mi_scene = mi.load_file(str(xml_dump_path))
+        if if_also_dump_lit_lamps:
+            self.mi_scene_lit_up_lamps_only = mi.load_file(str(xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
 
-        if_dump_mesh = mi_params_dict.get('if_dump_mesh', False)
-        if if_dump_mesh:
+        debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
+        if debug_dump_mesh:
             '''
             images/demo_mitsuba_dump_meshes.png
             '''
@@ -133,17 +140,26 @@ class openroomsScene3D(openroomsScene2D):
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
             '''
-            mitsuba/tmp_render.png
+            images/demo_mitsuba_render.png
             '''
             print(blue_text('Rendering... test frame by Mitsuba: %s')%str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'))
             image = mi.render(self.mi_scene, spp=64)
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'), image)
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
+            if if_also_dump_lit_lamps:
+                image = mi.render(self.mi_scene_lit_up_lamps_only, spp=64)
+                mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render_lit_up_lamps_only.exr'), image)
+
             print(blue_text('DONE.'))
 
         if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
         if if_sample_rays_pts:
             self.mi_sample_rays_pts()
+        
+        if_get_segs = mi_params_dict.get('if_get_segs', True)
+        if if_get_segs:
+            assert if_sample_rays_pts
+            self.mi_get_segs(if_also_dump_lit_lamps=if_also_dump_lit_lamps)
 
     def load_cam_rays(self, cam_params_dict={}):
         H, W = self.im_H_resize, self.im_W_resize
@@ -169,6 +185,7 @@ class openroomsScene3D(openroomsScene2D):
 
         self.mi_rays_ret_list = []
         self.mi_depth_list = []
+        self.mi_invalid_depth_mask_list = []
         self.mi_normal_global_list = []
         self.mi_pts_list = []
 
@@ -183,22 +200,56 @@ class openroomsScene3D(openroomsScene2D):
             # returned structure contains intersection location, nomral, ray step, ...
             # positions = mi2torch(ret.p.torch())
             self.mi_rays_ret_list.append(ret)
-            # rays_t_flatten = ret.t.numpy()[:, np.newaxis]
-            # rays_t_flatten[rays_t_flatten==np.inf] = 0.
-            rays_v_flatten = ret.p.numpy() - rays_o_flatten
+
+            # rays_v_flatten = ret.p.numpy() - rays_o_flatten
+            rays_v_flatten = ret.t.numpy()[:, np.newaxis] * rays_d_flatten
             mi_depth = np.sum(rays_v_flatten.reshape(self.im_H_resize, self.im_W_resize, 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
+            invalid_depth_mask = np.logical_or(np.isnan(mi_depth), np.isinf(mi_depth))
+            self.mi_invalid_depth_mask_list.append(invalid_depth_mask)
+            mi_depth[invalid_depth_mask] = np.inf
             self.mi_depth_list.append(mi_depth)
 
             mi_normals = ret.n.numpy().reshape(self.im_H_resize, self.im_W_resize, 3)
             normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normals, axis=-1) > 0, np.any(mi_normals != np.inf, axis=-1))
             mi_normals[normals_flip_mask] = -mi_normals[normals_flip_mask]
+            mi_normals[invalid_depth_mask, :] = np.inf
             self.mi_normal_global_list.append(mi_normals)
 
-            mi_pts = ret.p.numpy().reshape(self.im_H_resize, self.im_W_resize, 3)
+            # mi_pts = ret.p.numpy().reshape(self.im_H_resize, self.im_W_resize, 3)
+            mi_pts = ret.t.numpy()[:, np.newaxis] * rays_d_flatten + rays_o_flatten
+            assert np.amax(np.abs((mi_pts - ret.p.numpy())[ret.t.numpy()!=np.inf, :])) < 1e-3 # except in window areas
+            mi_pts = mi_pts.reshape(self.im_H_resize, self.im_W_resize, 3)
+            mi_pts[invalid_depth_mask, :] = np.inf
+
             self.mi_pts_list.append(mi_pts)
-        
+
         self.pts_from['mi'] = True
 
+    def mi_get_segs(self, if_also_dump_lit_lamps=True):
+        self.mi_seg_dict_of_lists = defaultdict(list)
+
+        for frame_idx, mi_depth in enumerate(self.mi_depth_list):
+            # self.mi_seg_dict_of_lists['area'].append(seg_area)
+            mi_seg_env = self.mi_invalid_depth_mask_list[frame_idx]
+            self.mi_seg_dict_of_lists['env'].append(mi_seg_env) # shine-through area of windows
+            print(np.sum(mi_seg_env), np.amax(mi_depth), np.amin(mi_depth))
+
+            if if_also_dump_lit_lamps:
+                rays_o, rays_d, ray_d_center = self.cam_rays_list[frame_idx]
+                rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
+                rays_mi = mi.Ray3f(mi.Point3f(rays_o_flatten), mi.Vector3f(rays_d_flatten))
+                ret = self.mi_scene_lit_up_lamps_only.ray_intersect(rays_mi)
+                
+                ret_t = ret.t.numpy().reshape(self.im_H_resize, self.im_W_resize)
+                invalid_depth_mask = np.logical_or(np.isnan(ret_t), np.isinf(ret_t))
+                mi_seg_area = np.logical_not(invalid_depth_mask)
+                self.mi_seg_dict_of_lists['area'].append(mi_seg_area) # lit-up lamps
+
+                mi_seg_obj = np.logical_and(np.logical_not(mi_seg_area), np.logical_not(mi_seg_env))
+                self.mi_seg_dict_of_lists['obj'].append(mi_seg_obj) # non-emitter objects
+
+        self.seg_from['mi'] = True
+        
     def load_shapes(self, shape_params_dict={}):
         '''
         load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 

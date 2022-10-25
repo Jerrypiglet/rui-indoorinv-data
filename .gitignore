@@ -9,6 +9,8 @@ data/openrooms_public*
 mitsuba/my_first_render.png
 mitsuba/meshes_dump
 mitsuba/tmp.xml
+mitsuba/tmp_scene_*
 
 lib/utils_OR/__pycache__
 lib/__pycache__
+ScreenCamera_*.json
