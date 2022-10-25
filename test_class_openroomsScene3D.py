@@ -86,7 +86,6 @@ openrooms_scene = openroomsScene3D(
         'if_dump_mesh': True, # set to True to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'debug_render_test_image': False, # [DEBUG] set to True to render an image with first camera, usig Mitsuba: mitsuba/tmp_render.png
         'if_sample_rays_pts': True, # set to True to sample camera rays and intersection pts given input mesh and camera poses
-        'debug_show_ret_depth': False, # [DEBUG] set to True to show depth maps from ray-scene **intersections**: images/demo_mitsuba_ret_depth.png
         },
 )
 
@@ -110,6 +109,7 @@ if opt.vis_3d_plt:
             'shapes', # boxes and labels (no meshes in plt visualization)
             'emitters', # emitter properties
             'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
+            'mi_depth_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**
             ], 
     )
     visualizer_3D_plt.vis_3d_with_plt()
@@ -164,6 +164,8 @@ if opt.vis_3d_o3d:
             'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
+            'pts_subsample': 100, 
+            'normal_scale': 0.2, 
         }, 
     )
 

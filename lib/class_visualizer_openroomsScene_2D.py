@@ -20,7 +20,7 @@ class visualizer_openroomsScene_2D(object):
 
         assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
 
-        self.openrooms_scene = openrooms_scene
+        self.os = openrooms_scene
 
         self.modality_list_vis = modality_list_vis
 
@@ -35,13 +35,13 @@ class visualizer_openroomsScene_2D(object):
         self.semseg_colors = np.loadtxt('data/colors/openrooms_colors.txt').astype('uint8')
 
     def create_im_row_ax_list(self, subfig, start_idx: int=1, if_show_im: bool=False, title: str=''):
-        assert self.openrooms_scene.if_has_im_sdr
+        assert self.os.if_has_im_sdr
 
         ax_list = subfig.subplots(1, self.N_cols)
         assert len(self.frame_idx_list) == len(ax_list)
         for ax, frame_idx in zip(ax_list, self.frame_idx_list):
             if if_show_im:
-                im = self.openrooms_scene.im_sdr_list[frame_idx]
+                im = self.os.im_sdr_list[frame_idx]
                 ax.imshow(im)
 
         start_idx += len(self.frame_idx_list)
@@ -54,7 +54,7 @@ class visualizer_openroomsScene_2D(object):
         '''
         height_width_list = []
         for frame_idx in self.frame_idx_list:
-            im = self.openrooms_scene.im_sdr_list[frame_idx]
+            im = self.os.im_sdr_list[frame_idx]
             height, width = im.shape[:2]
             height_width_list.append((height, width))
 
@@ -101,12 +101,12 @@ class visualizer_openroomsScene_2D(object):
         visualize 2D map for the modality the frame_idx-st frame (0-based)
 
         '''
-        assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_cameras
-        if modality in ['depth', 'normal']: assert self.openrooms_scene.if_has_dense_geo
-        if modality in ['albedo', 'roughness']: assert self.openrooms_scene.if_has_BRDF
-        if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.openrooms_scene.if_has_seg
+        assert self.os.if_has_im_sdr and self.os.if_has_cameras
+        if modality in ['depth', 'normal']: assert self.os.if_has_dense_geo
+        if modality in ['albedo', 'roughness']: assert self.os.if_has_BRDF
+        if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.os.if_has_seg
 
-        _list = self.openrooms_scene.get_modality(modality)
+        _list = self.os.get_modality(modality)
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
             _im = _list[frame_idx]
 
@@ -129,23 +129,23 @@ class visualizer_openroomsScene_2D(object):
         images/demo_layout_3D_proj.png
 
         '''
-        assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_cameras
-        assert self.openrooms_scene.if_has_layout
+        assert self.os.if_has_im_sdr and self.os.if_has_cameras
+        assert self.os.if_has_layout
 
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
-            R_c2w, t_c2w = self.openrooms_scene.pose_list[frame_idx][:3, :3], self.openrooms_scene.pose_list[frame_idx][:3, 3:4]
+            R_c2w, t_c2w = self.os.pose_list[frame_idx][:3, :3], self.os.pose_list[frame_idx][:3, 3:4]
             R_w2c = np.linalg.inv(R_c2w)
             t_w2c = - R_w2c @ t_c2w
-            (origin, zaxis, _) = self.openrooms_scene.origin_lookat_up_list[frame_idx]
+            (origin, zaxis, _) = self.os.origin_lookat_up_list[frame_idx]
             
             for idx_list in [[0, 1, 2, 3, 0], [4, 5, 6, 7, 4], [0, 4], [1, 5], [2, 6], [3, 7]]:
             # for idx_list in [[6, 7]]:
-                v3d_array = self.openrooms_scene.layout_box_3d_transformed
+                v3d_array = self.os.layout_box_3d_transformed
 
                 for i in range(len(idx_list)-1):
                     # print(idx_list[i], idx_list[i+1])
                     x1x2 = np.vstack((v3d_array[idx_list[i]], v3d_array[idx_list[i+1]]))
-                    x1x2_proj = project_3d_line(x1x2, R_w2c, t_w2c, self.openrooms_scene.K, origin, zaxis, dist_cam_plane=0., if_debug=False)
+                    x1x2_proj = project_3d_line(x1x2, R_w2c, t_w2c, self.os.K, origin, zaxis, dist_cam_plane=0., if_debug=False)
                     if x1x2_proj is not None:
                         ax.plot([x1x2_proj[0][0], x1x2_proj[1][0]], [x1x2_proj[0][1], x1x2_proj[1][1]], color='r', linewidth=1)   
                         ax.text(x1x2_proj[0][0], x1x2_proj[0][1], str(idx_list[i]), backgroundcolor='w')

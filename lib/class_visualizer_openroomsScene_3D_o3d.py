@@ -15,8 +15,8 @@ import copy
 # Import the library using the alias "mi"
 import mitsuba as mi
 # Set the variant of the renderer
-# mi.set_variant('cuda_ad_rgb') # Linux + GPU
-mi.set_variant('llvm_ad_rgb') # Mac
+from lib.global_vars import mi_variant
+mi.set_variant(mi_variant)
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
@@ -49,7 +49,7 @@ class visualizer_openroomsScene_3D_o3d(object):
 
         assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
 
-        self.openrooms_scene = openrooms_scene
+        self.os = openrooms_scene
 
         self.modality_list_vis = modality_list_vis
         for _ in self.modality_list_vis:
@@ -229,24 +229,24 @@ class visualizer_openroomsScene_3D_o3d(object):
         self.pcd_color = None
 
         if pcd_color_mode == 'rgb':
-            assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo
+            assert self.os.if_has_im_sdr and self.os.if_has_dense_geo
             self.pcd_color = self.geo_fused_dict['rgb']
         
         elif pcd_color_mode == 'normal': # images/demo_pcd_color_normal.png
-            assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo
+            assert self.os.if_has_im_sdr and self.os.if_has_dense_geo
             self.pcd_color = (self.geo_fused_dict['normal'] + 1.) / 2.
         
         elif pcd_color_mode == 'dist_emitter0': # images/demo_pcd_color_dist.png
-            assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo and self.openrooms_scene.if_has_shapes
-            emitter_0 = (self.openrooms_scene.lamp_list + self.openrooms_scene.window_list)[0]
+            assert self.os.if_has_im_sdr and self.os.if_has_dense_geo and self.os.if_has_shapes
+            emitter_0 = (self.os.lamp_list + self.os.window_list)[0]
             emitter_0_center = emitter_0['emitter_prop']['box3D_world']['center'].reshape((1, 3))
             dist_to_emitter_0 = np.linalg.norm(emitter_0_center - self.geo_fused_dict['X'], axis=1, keepdims=False)
             self.pcd_color = color_map_color(dist_to_emitter_0, vmin=np.amin(dist_to_emitter_0), vmax=np.amax(dist_to_emitter_0))
         
         elif pcd_color_mode == 'mi_visibility_emitter0': # images/demo_pcd_color_mi_visibility_emitter0.png
-            assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo and self.openrooms_scene.if_has_shapes
-            assert self.openrooms_scene.if_has_mitsuba_scene
-            emitter_0 = (self.openrooms_scene.lamp_list + self.openrooms_scene.window_list)[0]
+            assert self.os.if_has_im_sdr and self.os.if_has_dense_geo and self.os.if_has_shapes
+            assert self.os.if_has_mitsuba_scene
+            emitter_0 = (self.os.lamp_list + self.os.window_list)[0]
             emitter_0_center = emitter_0['emitter_prop']['box3D_world']['center'].reshape((1, 3))
             X_to_emitter_0 = emitter_0_center - self.geo_fused_dict['X']
             xs = self.geo_fused_dict['X']
@@ -255,7 +255,7 @@ class visualizer_openroomsScene_3D_o3d(object):
             ds_mi = mi.Vector3f(ds)
             # ray origin, direction, t_max
             rays_mi = mi.Ray3f(xs_mi, ds_mi)
-            ret = self.openrooms_scene.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+            ret = self.os.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
             # returned structure contains intersection location, nomral, ray step, ...
             # positions = mi2torch(ret.p.torch())
             # normals = mi2torch(ret.n.torch())
@@ -270,13 +270,13 @@ class visualizer_openroomsScene_3D_o3d(object):
             return xs, ds, ts, visibility
         
     def collect_cameras(self, cam_params: dict={}):
-        assert self.openrooms_scene.if_has_cameras
+        assert self.os.if_has_cameras
 
         subsample_cam_rate = cam_params.get('subsample_cam_rate', 1)
-        near, far = self.openrooms_scene.near, self.openrooms_scene.far
+        near, far = self.os.near, self.os.far
 
-        pose_list = self.openrooms_scene.pose_list
-        origin_lookat_up_list = self.openrooms_scene.origin_lookat_up_list
+        pose_list = self.os.pose_list
+        origin_lookat_up_list = self.os.origin_lookat_up_list
         cam_frustrm_list = []
         cam_axes_list = []
         cam_center_list = []
@@ -301,7 +301,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         #     cam_list.append(cam)
 
         cam_list = []
-        for (rays_o, rays_d, _) in self.openrooms_scene.cam_rays_list:
+        for (rays_o, rays_d, _) in self.os.cam_rays_list:
             cam_o = rays_o[0,0] # (3,)
             cam_d = rays_d[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
             cam_list.append(np.array([cam_o, *(cam_o+cam_d*max(near, far*0.05))]))
@@ -346,7 +346,7 @@ class visualizer_openroomsScene_3D_o3d(object):
 
     def collect_dense_geo(self, dense_geo_params: dict={}):
 
-        assert self.openrooms_scene.if_has_im_sdr and self.openrooms_scene.if_has_dense_geo
+        assert self.os.if_has_im_sdr and self.os.if_has_dense_geo
 
         geometry_list = []
 
@@ -356,7 +356,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         if_normal = dense_geo_params.get('if_normal', False)
         subsample_normal_rate_x = dense_geo_params.get('subsample_normal_rate_x', 5) # subsample_normal_rate_x is multiplicative to subsample_pcd_rate
 
-        self.geo_fused_dict, _, _ = self.openrooms_scene._fuse_3D_geometry(subsample_rate=subsample_pcd_rate)
+        self.geo_fused_dict, _, _ = self.os._fuse_3D_geometry(subsample_rate=subsample_pcd_rate)
 
         xyz_pcd, rgb_pcd, normal_pcd = get_list_of_keys(self.geo_fused_dict, ['X', 'rgb', 'normal'])
         # N_pcd = xyz_pcd.shape[0]
@@ -396,8 +396,8 @@ class visualizer_openroomsScene_3D_o3d(object):
             print('Removed points close to ceiling... percentage: %.2f'%(np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
 
         if not if_walls:
-            assert self.openrooms_scene.if_has_layout
-            layout_bbox_3d = self.openrooms_scene.layout_box_3d_transformed
+            assert self.os.if_has_layout
+            layout_bbox_3d = self.os.layout_box_3d_transformed
             dists_all = np.zeros((xyz_pcd.shape[0]), dtype=np.float32) + np.inf
 
             for wall_v_idxes in [(4, 0, 5), (6, 5, 2), (7, 6, 3), (7, 3, 4)]:
@@ -446,7 +446,7 @@ class visualizer_openroomsScene_3D_o3d(object):
 
     def collect_lighting_SG(self, lighting_SG_params: dict={}):
 
-        assert self.openrooms_scene.if_has_lighting_SG
+        assert self.os.if_has_lighting_SG
 
         subsample_lighting_SG_rate = lighting_SG_params.get('subsample_lighting_SG_rate', 1)
         SG_scale = lighting_SG_params.get('SG_scale', 1.) # if autoscale, act as extra scale
@@ -456,7 +456,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         # if SG_autoscale:
         #     SG_scale = 1.
 
-        lighting_SG_fused_dict = self.openrooms_scene._fuse_3D_lighting_SG(subsample_rate=subsample_lighting_SG_rate)
+        lighting_SG_fused_dict = self.os._fuse_3D_lighting_SG(subsample_rate=subsample_lighting_SG_rate)
 
         xyz_SG_pcd, normal_SG_pcd, axis_SG_pcd, weight_SG_pcd, lamb_SG_pcd = get_list_of_keys(lighting_SG_fused_dict, ['X_global_SG', 'normal_global_SG', 'axis_SG', 'weight_SG', 'lamb_SG'])
 
@@ -511,12 +511,12 @@ class visualizer_openroomsScene_3D_o3d(object):
         '''
         images/demo_layout_o3d.png
         '''
-        assert self.openrooms_scene.if_has_layout
+        assert self.os.if_has_layout
 
-        layout_mesh = self.openrooms_scene.layout_mesh_transformed.as_open3d
+        layout_mesh = self.os.layout_mesh_transformed.as_open3d
         layout_mesh.compute_vertex_normals()
 
-        layout_bbox_3d = self.openrooms_scene.layout_box_3d_transformed
+        layout_bbox_3d = self.os.layout_box_3d_transformed
         layout_bbox_pcd = o3d.geometry.LineSet()
         layout_bbox_pcd.points = o3d.utility.Vector3dVector(layout_bbox_3d)
         layout_bbox_pcd.colors = o3d.utility.Vector3dVector([[1,0,0] for i in range(12)])
@@ -535,23 +535,23 @@ class visualizer_openroomsScene_3D_o3d(object):
 
         images/demo_shapes_emitter_o3d.png
         '''
-        assert self.openrooms_scene.if_has_shapes
+        assert self.os.if_has_shapes
 
-        if_obj_meshes = shapes_params.get('if_meshes', True) and self.openrooms_scene.shape_params_dict.get('if_load_obj_mesh', False)
-        if_emitter_meshes = shapes_params.get('if_meshes', True) and self.openrooms_scene.shape_params_dict.get('if_load_emitter_mesh', False)
+        if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_obj_mesh', False)
+        if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_emitter_mesh', False)
         if_labels = shapes_params.get('if_labels', True)
 
-        self.openrooms_scene.load_colors()
+        self.os.load_colors()
 
         geometry_list = []
 
-        emitters_obj_random_id_list = [shape['filename'] for shape in self.openrooms_scene.shape_list_valid if shape['if_in_emitter_dict']]
+        emitters_obj_random_id_list = [shape['filename'] for shape in self.os.shape_list_valid if shape['if_in_emitter_dict']]
 
         for shape_idx, (shape, vertices, faces, bverts) in enumerate(zip(
-            self.openrooms_scene.shape_list_valid, 
-            self.openrooms_scene.vertices_list, 
-            self.openrooms_scene.faces_list, 
-            self.openrooms_scene.bverts_list, 
+            self.os.shape_list_valid, 
+            self.os.vertices_list, 
+            self.os.faces_list, 
+            self.os.bverts_list, 
         )):
 
             if_emitter = shape['if_in_emitter_dict']
@@ -567,9 +567,9 @@ class visualizer_openroomsScene_3D_o3d(object):
                 if shape['random_id'] in emitters_obj_random_id_list and not if_emitter:
                     continue # skip shape if it is also in the list as an emitter (so that we don't create two shapes for one emitters)
                 cat_id_str = str(obj_path).split('/')[-3]
-                assert cat_id_str in self.openrooms_scene.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
-                cat_id, cat_name = self.openrooms_scene.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
-                obj_color = self.openrooms_scene.OR_mapping_id_to_color_dict[cat_id]
+                assert cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
+                cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
+                obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
                 obj_color = [float(x)/255. for x in obj_color]
                 linestyle = '-'
                 linewidth = 1
@@ -638,13 +638,13 @@ class visualizer_openroomsScene_3D_o3d(object):
         if if_dump_mesh:
             num_vertices = 0
             f_list = []
-            for vertices, faces in zip(self.openrooms_scene.vertices_list, self.openrooms_scene.faces_list):
+            for vertices, faces in zip(self.os.vertices_list, self.os.faces_list):
                 f_list.append(copy.deepcopy(faces + num_vertices))
                 num_vertices += vertices.shape[0]
-            f = np.array(self.openrooms_scene.layout_mesh_ori.faces)
+            f = np.array(self.os.layout_mesh_ori.faces)
             f_list.append(f+num_vertices)
-            v = np.array(self.openrooms_scene.layout_mesh_ori.vertices)
-            v_list = copy.deepcopy(self.openrooms_scene.vertices_list) + [v]
+            v = np.array(self.os.layout_mesh_ori.vertices)
+            v_list = copy.deepcopy(self.os.vertices_list) + [v]
             writeMesh('./tmp_mesh.obj', np.vstack(v_list), np.vstack(f_list))
 
         return geometry_list
@@ -654,18 +654,18 @@ class visualizer_openroomsScene_3D_o3d(object):
         images/demo_emitters_o3d.png
         images/demo_envmap_o3d.png # added envmap hemisphere
         '''
-        assert self.openrooms_scene.if_has_shapes
+        assert self.os.if_has_shapes
 
         if_half_envmap = emitters_params.get('if_half_envmap', True)
         scale_SG_length = emitters_params.get('scale_SG_length', 2.)
 
-        self.openrooms_scene.load_colors()
+        self.os.load_colors()
 
         geometry_list = []
 
         for shape_idx, (shape, bverts) in enumerate(zip(
-            self.openrooms_scene.shape_list_valid, 
-            self.openrooms_scene.bverts_list, 
+            self.os.shape_list_valid, 
+            self.os.bverts_list, 
         )):
 
             if not shape['if_in_emitter_dict']:
@@ -707,22 +707,22 @@ class visualizer_openroomsScene_3D_o3d(object):
         images/demo_mi_o3d_1.png
         images/demo_mi_o3d_2.png
         '''
-        assert self.openrooms_scene.if_has_mitsuba_scene
+        assert self.os.if_has_mitsuba_scene
 
         geometry_list = []
 
         if_cam_rays = mi_params.get('if_cam_rays', True) # if show per-pixel rays
         cam_rays_if_pts = mi_params.get('cam_rays_if_pts', True) # if cam rays end in surface intersections
         if cam_rays_if_pts:
-            assert self.openrooms_scene.if_has_mitsuba_rays_pts
+            assert self.os.if_has_mitsuba_rays_pts
         cam_rays_subsample = mi_params.get('cam_rays_subsample', 10)
 
         if if_cam_rays: 
-            for frame_idx, (rays_o, rays_d, _) in enumerate(self.openrooms_scene.cam_rays_list[0:1]): # show only first frame
+            for frame_idx, (rays_o, rays_d, _) in enumerate(self.os.cam_rays_list[0:1]): # show only first frame
                 rays_of_a_view = o3d.geometry.LineSet()
 
                 if cam_rays_if_pts:
-                    ret = self.openrooms_scene.mi_rays_ret_list[frame_idx]
+                    ret = self.os.mi_rays_ret_list[frame_idx]
                     rays_t_flatten = ret.t.numpy()[::cam_rays_subsample][:, np.newaxis]
                     rays_t_flatten[rays_t_flatten==np.inf] = 0.
                 else:
@@ -742,17 +742,29 @@ class visualizer_openroomsScene_3D_o3d(object):
 
                 geometry_list.append(pcd_rays_end)
 
-        if_pts = mi_params.get('if_pts', True)
         '''
         if show per-pixel pts (see: no floating points): 
         images/demo_mitsuba_ret_pts_1.png
         images/demo_mitsuba_ret_pts_2.png
+        images/demo_mitsuba_ret_normals.png
         '''
+        if_pts = mi_params.get('if_pts', True)
+        pts_subsample = mi_params.get('pts_subsample', 10)
+        normal_scale = mi_params.get('normal_scale', 0.2)
         if if_pts:
-            for frame_idx, mi_pts in enumerate(self.openrooms_scene.mi_pts_list):
+            for frame_idx, (mi_depth, mi_normals, mi_pts) in enumerate(zip(self.os.mi_depth_list, self.os.mi_normal_global_list, self.os.mi_pts_list)):
+                mi_pts = mi_pts[mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
                 pcd_pts = o3d.geometry.PointCloud()
                 pcd_pts.points = o3d.utility.Vector3dVector(mi_pts)
                 pcd_pts.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*mi_pts.shape[0])
                 geometry_list.append(pcd_pts)
+
+                pcd_normals = o3d.geometry.LineSet()
+                mi_normals_end = mi_pts + normal_scale * mi_normals[mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
+                pcd_normals.points = o3d.utility.Vector3dVector(np.vstack((mi_pts, mi_normals_end)))
+                pcd_normals.colors = o3d.utility.Vector3dVector([[0., 0., 0.] for _ in range(mi_normals_end.shape[0])])
+                pcd_normals.lines = o3d.utility.Vector2iVector([[_, _+mi_normals_end.shape[0]] for _ in range(mi_normals_end.shape[0])])
+                geometry_list.append(pcd_normals)
+
 
         return geometry_list

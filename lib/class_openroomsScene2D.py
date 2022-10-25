@@ -108,6 +108,11 @@ class openroomsScene2D(object):
         if 'im_hdr' in self.modality_list and self.if_scale_HDR:
             assert 'seg' in modality_list
 
+        ''''
+        flags to set
+        '''
+        self.pts_from = {'mi': False, 'depth': False}
+
         '''
         load everything
         '''
@@ -158,6 +163,10 @@ class openroomsScene2D(object):
     @property
     def if_has_layout(self):
         return all([_ in self.modality_list for _ in ['layout']])
+
+    @property
+    def frame_num(self):
+        return len(self.frame_id_list)
 
     def get_modality(self, modality):
         
@@ -372,6 +381,9 @@ class openroomsScene2D(object):
         
         print(blue_text('[openroomsScene] DONE. load_depth'))
 
+        self.pts_from['depth'] = True
+        
+
     def load_normal(self):
         '''
         normal, in camera coordinates (OpenGL convention: right-up-backward);
@@ -393,7 +405,7 @@ class openroomsScene2D(object):
         self.if_load_lighting_SG_if_axis_global = False: 
             (H', W', SG_num, 6(theta, phi, lamb, weight: 1, 1, 1, 3)), in camera-and-normal-dependent local coordinates
         self.if_load_lighting_SG_if_axis_global = True: 
-            (H', W', SG_num, 7(axis, lamb, weight: 3, 1, 3), in global coordinates (OpenCV convention: right-down-forward)
+            (H', W', SG_num, 7(axis, lamb, weight: 3, 1, 3)), in global coordinates (OpenCV convention: right-down-forward)
         '''
         if hasattr(self, 'lighting_SG_list'): return
 
@@ -583,7 +595,7 @@ class openroomsScene2D(object):
             if subsample_HW_rates != ():
                 normal = normal[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
             normal = normal.reshape(-1, 3)[X_flatten_mask]
-            normal = np.stack([normal[:, 0], -normal[:, 1], -normal[:, 2]], axis=-1) # transform axis from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
+            normal = np.stack([normal[:, 0], -normal[:, 1], -normal[:, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
             normal_global = (R @ normal.T).T
             normal_global_list.append(normal_global)
 

@@ -19,8 +19,8 @@ import copy
 # Import the library using the alias "mi"
 import mitsuba as mi
 # Set the variant of the renderer
-# mi.set_variant('cuda_ad_rgb') # Linux + GPU
-mi.set_variant('llvm_ad_rgb') # Mac
+from lib.global_vars import mi_variant
+mi.set_variant(mi_variant)
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
@@ -43,7 +43,7 @@ class visualizer_openroomsScene_3D_plt(object):
 
         assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
 
-        self.openrooms_scene = openrooms_scene
+        self.os = openrooms_scene
 
         self.modality_list_vis = modality_list_vis
         for _ in self.modality_list_vis:
@@ -51,7 +51,7 @@ class visualizer_openroomsScene_3D_plt(object):
 
     @property
     def valid_modalities_3D_vis(self):
-        return ['layout', 'shapes', 'emitters', 'emitter_envs']
+        return ['layout', 'shapes', 'emitters', 'emitter_envs', 'mi_depth_normal']
 
     def vis_3d_with_plt(self):
         ax = None
@@ -61,6 +61,8 @@ class visualizer_openroomsScene_3D_plt(object):
             self.vis_emitters(ax)
         if 'emitter_envs' in self.modality_list_vis:
             self.vis_emitter_envs()
+        if 'mi_depth_normal' in self.modality_list_vis:
+            self.vis_mi_depth_normal()
         plt.show()
 
     def vis_layout(self):
@@ -121,8 +123,8 @@ class visualizer_openroomsScene_3D_plt(object):
         
     def vis_shapes(self):
         
-        if not self.openrooms_scene.if_has_colors:
-            self.openrooms_scene.load_colors()
+        if not self.os.if_has_colors:
+            self.os.load_colors()
 
         fig = plt.figure(figsize=(10, 10))
         ax = plt.subplot(111, projection='3d')
@@ -133,11 +135,11 @@ class visualizer_openroomsScene_3D_plt(object):
         ax.view_init(elev=-36, azim=89)
         vis_axis(ax)
 
-        for shape_idx, shape in enumerate(self.openrooms_scene.shape_list_valid):
+        for shape_idx, shape in enumerate(self.os.shape_list_valid):
             if 'scene' in shape['filename']:
                 continue
 
-            bverts_transformed = self.openrooms_scene.bverts_list[shape_idx]
+            bverts_transformed = self.os.bverts_list[shape_idx]
             if_emitter = shape['if_in_emitter_dict']
             
             if np.amax(bverts_transformed[:, 1]) <= np.amin(bverts_transformed[:, 1]):
@@ -148,9 +150,9 @@ class visualizer_openroomsScene_3D_plt(object):
                 # obj_color = 'r'
                 obj_path = shape['filename']
                 cat_id_str = str(obj_path).split('/')[-3]
-                assert cat_id_str in self.openrooms_scene.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
-                cat_id, cat_name = self.openrooms_scene.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
-                obj_color = self.openrooms_scene.OR_mapping_id_to_color_dict[cat_id]
+                assert cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
+                cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
+                obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
                 obj_color = [float(x)/255. for x in obj_color]
                 linestyle = '-'
                 linewidth = 1
@@ -159,13 +161,13 @@ class visualizer_openroomsScene_3D_plt(object):
                     linestyle = '--'
 
             vis_cube_plt(bverts_transformed, ax, color=obj_color, linestyle=linestyle, linewidth=linewidth, label=cat_name)
-            print(if_emitter, shape_idx, shape['id'], cat_id, cat_name, Path(obj_path).relative_to(self.openrooms_scene.shapes_root))
+            print(if_emitter, shape_idx, shape['id'], cat_id, cat_name, Path(obj_path).relative_to(self.os.shapes_root))
 
             
         if_layout = 'layout' in self.modality_list_vis
 
         if if_layout:
-            vis_cube_plt(self.openrooms_scene.layout_box_3d_transformed, ax, 'b', '--')
+            vis_cube_plt(self.os.layout_box_3d_transformed, ax, 'b', '--')
         
         # ===== cameras
         # vis_axis_xyz(ax, xaxis.flatten(), yaxis.flatten(), zaxis.flatten(), origin.flatten(), suffix='_c') # cameras
@@ -205,7 +207,7 @@ class visualizer_openroomsScene_3D_plt(object):
             ax.view_init(elev=-36, azim=89)
             vis_axis(ax)
 
-        for shape_idx, shape in enumerate(self.openrooms_scene.shape_list_valid):
+        for shape_idx, shape in enumerate(self.os.shape_list_valid):
             if not shape['if_in_emitter_dict']:
                 continue
 
@@ -216,7 +218,7 @@ class visualizer_openroomsScene_3D_plt(object):
             else:
                 vis_cube_plt(coords, ax, 'gray', '--')
 
-            bverts_transformed = self.openrooms_scene.bverts_list[shape_idx]
+            bverts_transformed = self.os.bverts_list[shape_idx]
             light_center = np.mean(bverts_transformed, 0).flatten()
 
             # if 'axis_world' in shape['emitter_prop']:
@@ -262,15 +264,15 @@ class visualizer_openroomsScene_3D_plt(object):
         
         note that in (2), when approxing renderer half envmaps with 3SGs, the half envmaps are renderer **with envScale -> 1.** (see [renderOpenRooms] code/utils_OR/func_render_emitter_N_ambient -> scale.set('value', str(1.)))
         '''
-        env_map_path = self.openrooms_scene.emitter_env['emitter_prop']['emitter_filename']
+        env_map_path = self.os.emitter_env['emitter_prop']['emitter_filename']
         im_envmap_ori = load_HDR(Path(env_map_path))
         im_envmap_ori_SDR, _ = to_nonHDR(im_envmap_ori)
 
-        self.openrooms_scene.window_3SG_list_of_dicts = []
+        self.os.window_3SG_list_of_dicts = []
 
-        self.openrooms_scene.global_env_scale = self.openrooms_scene.emitter_env['emitter_prop']['emitter_scale']
+        self.os.global_env_scale = self.os.emitter_env['emitter_prop']['emitter_scale']
 
-        for shape_idx, shape in enumerate(self.openrooms_scene.shape_list_valid):
+        for shape_idx, shape in enumerate(self.os.shape_list_valid):
             if not shape['if_in_emitter_dict']:
                 continue
             if shape['emitter_prop']['obj_type'] == 'window':
@@ -288,9 +290,9 @@ class visualizer_openroomsScene_3D_plt(object):
                 window_3SG_dict['imHalfEnvName'] = shape['emitter_prop']['imHalfEnvName']
                 window_3SG_dict['recHalfEnvName'] = shape['emitter_prop']['recHalfEnvName']
 
-                self.openrooms_scene.window_3SG_list_of_dicts.append(window_3SG_dict)
+                self.os.window_3SG_list_of_dicts.append(window_3SG_dict)
 
-        num_windows = len(self.openrooms_scene.window_3SG_list_of_dicts)
+        num_windows = len(self.os.window_3SG_list_of_dicts)
         total_rows = 1 + num_windows * 2
 
         fig = plt.figure(figsize=(15, total_rows*4))
@@ -299,7 +301,7 @@ class visualizer_openroomsScene_3D_plt(object):
 
         vis_envmap_plt(ax, im_envmap_ori_SDR, ['Z_w-', 'X_w+', 'Z_w+', 'X_w-'])
 
-        for window_idx, self.openrooms_scene.window_3SG_list_of_dicts in enumerate(self.openrooms_scene.window_3SG_list_of_dicts):
+        for window_idx, self.os.window_3SG_list_of_dicts in enumerate(self.os.window_3SG_list_of_dicts):
             ax = plt.subplot(total_rows, 2, window_idx*4+3)
             ax.set_title('[window %d] 3SG - GLOBAL envmap (world coords; Y_w+: up)'%window_idx)
             _3SG_envmap = render_3SG_envmap(window_3SG_dict, intensity_scale=1.) # [IMPORTANT] intensity_scale=1. because half envmaps were rendered with envScale->1.
@@ -318,4 +320,40 @@ class visualizer_openroomsScene_3D_plt(object):
             im_half_env_SDR, _ = to_nonHDR(im_half_env)
             vis_envmap_plt(ax, im_half_env_SDR, ['X_env-', 'Y_env-', 'X_env+', 'Y_env+'])
 
-        plt.show()
+        plt.show(block=False)
+
+    def vis_mi_depth_normal(self):
+        '''
+        images/demo_mitsuba_ret_depth_normals_2D.png
+        '''
+        assert self.os.pts_from['mi']
+        fig=plt.figure()
+        N_rows = min(self.os.num_frames, 4)
+        # subfigs = fig.subfigures(nrows=N_rows, ncols=1) # https://stackoverflow.com/questions/27426668/row-titles-for-matplotlib-subplot
+
+        for frame_idx in range(N_rows):
+            ax = plt.subplot(4, N_rows, 1+frame_idx)
+            plt.imshow(self.os.depth_list[frame_idx], cmap='jet')
+            vmin, vmax = np.amin(self.os.depth_list[frame_idx]), np.amax(self.os.depth_list[frame_idx])
+            plt.colorbar()
+            ax.set_title('depth from OptixRenderer')
+
+            ax = plt.subplot(4, N_rows, 1+N_rows+frame_idx)
+            plt.imshow(self.os.mi_depth_list[frame_idx], vmin=vmin, vmax=vmax, cmap='jet')
+            plt.colorbar()
+            ax.set_title('depth from Mitsuba')
+
+            ax = plt.subplot(4, N_rows, 1+2*N_rows+frame_idx)
+            plt.imshow(np.clip((self.os.normal_list[frame_idx]+1.)/2., 0., 1.))
+            ax.set_title('normals from OptixRenderer')
+
+            ax = plt.subplot(4, N_rows, 1+3*N_rows+frame_idx)
+            R = self.os.pose_list[frame_idx][:3, :3]
+            normals_global = self.os.mi_normal_global_list[frame_idx]
+            normals_cam = (R.T @ normals_global.reshape(-1, 3).T).T.reshape(self.os.im_H_resize, self.os.im_W_resize, 3)
+            # transform normals from OpenCV (right-down-forward) to OpenGL convention (right-up-backward)
+            normals_cam = np.stack([normals_cam[:, :, 0], -normals_cam[:, :, 1], -normals_cam[:, :, 2]], axis=-1)
+            plt.imshow(np.clip((normals_cam+1.)/2., 0., 1.))
+            ax.set_title('normals from Mitsuba')
+
+        plt.show(block=False)

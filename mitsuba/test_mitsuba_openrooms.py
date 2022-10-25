@@ -7,8 +7,8 @@ import copy
 # Import the library using the alias "mi"
 import mitsuba as mi
 # Set the variant of the renderer
-# mi.set_variant('cuda_ad_rgb') # Linux + GPU
-mi.set_variant('llvm_ad_rgb') # Mac
+from lib.global_vars import mi_variant
+mi.set_variant(mi_variant)
 
 import xml.etree.ElementTree as et
 from utils_OR.utils_OR_xml import gen_random_str, transformToXml

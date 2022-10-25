@@ -11,8 +11,8 @@ import shutil
 # Import the library using the alias "mi"
 import mitsuba as mi
 # Set the variant of the renderer
-# mi.set_variant('cuda_ad_rgb') # Linux + GPU
-mi.set_variant('llvm_ad_rgb') # Mac
+from lib.global_vars import mi_variant
+mi.set_variant(mi_variant)
 
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_misc import blue_text, get_list_of_keys, white_blue
@@ -65,14 +65,12 @@ class openroomsScene3D(openroomsScene2D):
     )
         self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
 
+        self.pcd_color = None
         '''
         load everything
         '''
         self.load_cam_rays(self.cam_params_dict)
         self.load_modalities_3D()
-
-        self.pcd_color = None
-
 
     @property
     def valid_modalities_3D(self):
@@ -147,21 +145,6 @@ class openroomsScene3D(openroomsScene2D):
         if if_sample_rays_pts:
             self.mi_sample_rays_pts()
 
-            # images/demo_mitsuba_ret_depth.png
-            debug_show_ret_depth = mi_params_dict.get('debug_show_ret_depth', False)
-            if debug_show_ret_depth:
-                plt.figure()
-                N_rows = min(self.num_frames, 4)
-                for frame_idx in range(N_rows):
-                    plt.subplot(2, N_rows, 1+frame_idx)
-                    plt.imshow(self.depth_list[frame_idx], cmap='jet')
-                    vmin, vmax = np.amin(self.depth_list[frame_idx]), np.amax(self.depth_list[frame_idx])
-                    plt.colorbar()
-                    plt.subplot(2, N_rows, 1+N_rows+frame_idx)
-                    plt.imshow(self.mi_depth_list[frame_idx], vmin=vmin, vmax=vmax, cmap='jet')
-                    plt.colorbar()
-                plt.show()
-
     def load_cam_rays(self, cam_params_dict={}):
         H, W = self.im_H_resize, self.im_W_resize
         K = self.K
@@ -176,11 +159,17 @@ class openroomsScene3D(openroomsScene2D):
     def mi_sample_rays_pts(self):
         '''
         sample per-pixel rays in NeRF/DVGO setting
+        -> populate: 
+            - self.mi_pts_list: [(H, W, 3), ], (-1. 1.)
+            - self.mi_depth_list: [(H, W), ], (-1. 1.)
+        [!] note:
+            - in both self.mi_pts_list and self.mi_depth_list, np.inf values exist for pixels of infinite depth
         '''
         assert self.if_has_mitsuba_scene
 
         self.mi_rays_ret_list = []
         self.mi_depth_list = []
+        self.mi_normal_global_list = []
         self.mi_pts_list = []
 
         for frame_idx, (rays_o, rays_d, ray_d_center) in enumerate(self.cam_rays_list):
@@ -193,7 +182,6 @@ class openroomsScene3D(openroomsScene2D):
             ret = self.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
             # returned structure contains intersection location, nomral, ray step, ...
             # positions = mi2torch(ret.p.torch())
-            # normals = mi2torch(ret.n.torch())
             self.mi_rays_ret_list.append(ret)
             # rays_t_flatten = ret.t.numpy()[:, np.newaxis]
             # rays_t_flatten[rays_t_flatten==np.inf] = 0.
@@ -201,9 +189,15 @@ class openroomsScene3D(openroomsScene2D):
             mi_depth = np.sum(rays_v_flatten.reshape(self.im_H_resize, self.im_W_resize, 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
             self.mi_depth_list.append(mi_depth)
 
+            mi_normals = ret.n.numpy().reshape(self.im_H_resize, self.im_W_resize, 3)
+            normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normals, axis=-1) > 0, np.any(mi_normals != np.inf, axis=-1))
+            mi_normals[normals_flip_mask] = -mi_normals[normals_flip_mask]
+            self.mi_normal_global_list.append(mi_normals)
+
             mi_pts = ret.p.numpy().reshape(self.im_H_resize, self.im_W_resize, 3)
-            mi_pts = mi_pts[mi_depth!=np.inf, :]
             self.mi_pts_list.append(mi_pts)
+        
+        self.pts_from['mi'] = True
 
     def load_shapes(self, shape_params_dict={}):
         '''
