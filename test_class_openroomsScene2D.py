@@ -21,8 +21,8 @@ parser.add_argument('--vis_2d', type=str2bool, nargs='?', const=True, default=Tr
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=True, help='')
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/openrooms_public_re_2'
-xml_root = Path(PATH_HOME) / 'data/openrooms_public_re_2/scenes'
+base_root = Path(PATH_HOME) / 'data/public_re_3'
+xml_root = Path(PATH_HOME) / 'data/public_re_3/scenes'
 intrinsics_path = Path(PATH_HOME) / 'data/intrinsic.txt'
 semantic_labels_root = Path(PATH_HOME) / 'data'
 
@@ -38,7 +38,7 @@ semantic_labels_root = Path(PATH_HOME) / 'data'
 
 meta_split = 'main_xml1'
 scene_name = 'scene0552_00_more'
-frame_ids = list(range(0, 87, 10))
+frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
 
 openrooms_scene = openroomsScene2D(
     root_path_dict = {
@@ -67,8 +67,8 @@ if opt.vis_2d:
     vis_2D = visualizer_openroomsScene_2D(
         openrooms_scene, 
         modality_list_vis=[
-            'depth', 'normal', 'albedo', 'roughness', # images/demo_all_2D.png
-            # 'seg_area', 'seg_env', 'seg_obj', 
+            # 'depth', 'normal', 'albedo', 'roughness', # images/demo_all_2D.png
+            'seg_area', 'seg_env', 'seg_obj', 
             # 'matseg', # images/demo_semseg_matseg_2D.png
             # 'semseg', # images/demo_semseg_matseg_2D.png
             ], 

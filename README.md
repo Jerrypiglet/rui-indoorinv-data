@@ -1,28 +1,32 @@
 # OpenRooms_RAW_loader
 
 A dataloader and visualizer for OpenRooms modalities. Given one scene of multi-view observation, the following modalities are supported:
-- 2D per-pixel properties:
-  - geometry
-    - depth map
-    - normals
-  - BRDF
-    - roughness map
-    - albedo map
-  - lighting
+- 2D Per-pixel Properties:
+  - **geometry** # from OptixRenderer & Mitsuba 3 renderer: images/demo_mitsuba_ret_depth_normals_2D.png
+    - *depth map*
+    - *normals*
+  - **Microfacet BRDF**
+    - *roughness map*
+    - *albedo map*
+  - **per-pixel lighting**
     - incoming radiance as envmaps (8x16)
     - incoming radiance approximated using Spherical Gaussian (SG) mixture
-- per-frame properties:
-  - camera pose
-- full 3D properties:
-  - per-object
-    - semantic label
-    - mesh
-    - emitter properties (for lamps and windows only)
+- Per-frame Properties:
+  - **camera poses**
+- Full 3D Properties:
+  - **per-object**
+    - *semantic label*
+    - *triangle mesh*
+    - *emitter properties* (for lamps and windows only)
       - intensity
-      - (windows) SGs approximation of directional lighting (see Li et al. - 2022 - Physically-Based Editing of Indoor Scene Lighting... -> Sec. 3.1)
-  - global environment (outdoor lighting)
+      - (windows) SGs approximation of directional lighting # see Li et al. - 2022 - Physically-Based Editing of Indoor Scene Lighting... -> Sec. 3.1
+  - **global environment map** (outdoor lighting)
+  - **NeRF-related**
+    - *camera rays* for all viewpoints and all pixels
+    - ground truth 3D scene and differentiable rendering via Mitsuba 3:
+      - *camera-ray-scene intersections* (surface points, ray travel length $t$, surface normals)
 
-## Dependencies
+# Dependencies
 
 ``` bash
 conda create --name or-py38 python=3.8 pip
@@ -32,8 +36,22 @@ pip install -r requirements.txt
 ```
 
 Hopefully that was everything. 
+## Mitsuba 3 based inference, and notes on installation on ARM64 Mac
+On Mac, make sure you are using a arm64 Python binary, installed with arm64 conda for example. Check your python binary type via:
 
-## Data structure
+``` bash
+file /Users/jerrypiglet/miniconda3/envs/dvgo-py38/bin/python
+```
+
+Then install llvm via:
+
+``` bash
+brew install llvm
+```
+For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-on-apple-m1-chip-with-gpu-acceleration-3351dc44d67c
+
+
+# Dataset structure
 
 - {OR_RAW_ROOT} # assets for OpenRooms; for access, request from Zhengqin Li or Rui Zhu
   - layoutMesh # mesh files for room layout (i.e. walls, ceiling and floor)
@@ -64,28 +82,40 @@ Hopefully that was everything.
         - imenv_%d.hdr # per-pixel lighting envmaps in 2D -->
 
 
-## Usage
+# Notes on coordinate systems
+This will help clarifying the usage of camera poses ([$R$|$t$] for **camera-to-world** transformation) and camera intrinsics.
 
-### 2D dataloader and visualizer
+The camera coordinates is in OpenCV convention (right-down-forward). The loaded GT normal maps are in OpenGL convention (right-up-backward). See openroomsScene2D._fuse_3D_geometry(): normal<->normal_global
+# Usage
+## 2D dataloader and visualizer
 
 ``` bash
 python test_class_openroomsScene2D.py --vis_2d True
 ```
 
 This will load per-pixel modalities in 2D, and visualize them in a Matplotlib plot like this:
+
 ![](images/demo_all_2D.png)
+![](images/demo_segs_2D.png)
 
-### 3D dataloader and visualizer
+Supported modalities (all in pixel/camera space): 
+- depth
+- normal # camera coordinates in OpenGL convention (right-up-backward)
+- albedo
+- roughness
+- seg_area # emitter: area lights (i.e. lamps): images/demo_segs_2D.png
+- seg_env # emitter: windows shine-through areas: images/demo_segs_2D.png
+- seg_obj # non-emitter objects: images/demo_segs_2D.png
+- matseg # images/demo_semseg_matseg_2D.png
+- semseg # images/demo_semseg_matseg_2D.png
 
-```bash
-python test_class_openroomsScene3D.py --vis_o3d True
-```
-
-See the help info of the argparse arguments and comments for usage of flags.
+## 3D dataloader and visualizer
 
 Note that there are two visualizer implemented: based on Matplotlib and Open3D respectively.
 
-The Matplotlib visualizer supports basic visualization of 3D properties inclucing boundinb boxes and camera axes, but not meshes. 
+### Matplotlib viewer
+
+The Matplotlib visualizer supports basic visualization of 3D properties inclucing bounding boxes and camera axes, but not meshes. 
 
 Use ``--vis_3d_plt True`` to use the Matplotlib visualizer. The result is something like this:
 
@@ -93,12 +123,59 @@ Use ``--vis_3d_plt True`` to use the Matplotlib visualizer. The result is someth
 
 The Open3D visualizer is based on Open3D, supporting meshes and more beautiful visualization. If you are on a remote machine, make sure you have a X serssion with OpenGL supported (tested with TurboVNC on Ubuntu 18). Alternatively it is recommended to run everything locally (tested on Mac and Window), with the data transferred to your local device.
 
+**Supported modalities:** (all in global coordinates, see $X_w$-$Y_w$-$Z_w$): 
 
-Use ``--vis_o3d True`` to use the Matplotlib visualizer. The result is something like this:
+- layout # walls, ceiling and floor, as bounding box or mesh
+- shapes # boxes and labels (no meshes in plt visualization)
+- emitters # emitter properties (e.g. SGs approximation for windows)
+- emitter_envs # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
+
+Also, results from differentiable rendering by Mitsuba 3
+
+- mi_depth_normal # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**
+
+![](images/demo_mitsuba_ret_depth_normals_2D.png)
+
+### Open3D viewer
+```bash
+python test_class_openroomsScene3D.py --vis_3d_o3d True
+```
+
+See the help info of the argparse arguments and comments for usage of flags.
+
+Use ``--vis_3d_o3d True`` to use the Open3D visualizer. The result is something like this:
 
 ![](images/demo_all_o3d.png)
 
-Set ``--pcd_color_mode`` to one of 'rgb' (default), 'normal', etc., to colorize point cloud. Meanwhile set ``--if_shader=False`` so that the colors are free from Open3D shader.
+**Supported modalities:** 
+
+- dense_geo # point clouds, normals, and RGB, fused from OptixRenderer renderings
+- cameras # frustums
+- lighting_SG # as arrows emitted from surface points
+- layout # as bbox
+- shapes # bbox and meshs of shapes (objs + emitters)
+- emitters # emitter properties (e.g. SGs, half envmaps)
+- mi # Mitsuba sampled rays, pts, normals, acquired via Mitsuba ray-scene intersections (more accurate with no floating points)
+
+Examples:
+
+dense_geo:
+![](images/demo_pcd_color.png)
+
+lighting_SG:
+![](images/demo_lighting_SG_o3d.png)
+
+shapes:
+![](images/demo_shapes_o3d.png)
+
+mi:
+![](images/demo_mitsuba_ret_pts_1.png)
+![](images/demo_mitsuba_ret_normals.png)
+![](images/demo_mi_o3d_1.png)
+
+**Shader options**
+
+Set ``--pcd_color_mode`` to one of 'rgb' (default), 'normal', etc., to colorize point cloud. Meanwhile set ``--if_shader=False`` so that the colors are free from Open3D shader, and visualizer runs much faster.
 
 For example, colorize points with 3D normals:
 
@@ -112,17 +189,7 @@ Or with visibility to emitter_0 (`--pcd_color_mode mi_visibility_emitter0 --if_s
 
 ![](images/demo_pcd_color_mi_visibility_emitter0.png)
 
-### Mitsuba 3 based inference, and notes on installation on Arm64 Mac
-On Mac, make sure you are using a arm64 Python binary, installed with arm64 conda for example. Check your python binary type via:
 
-``` bash
-file /Users/jerrypiglet/miniconda3/envs/dvgo-py38/bin/python
-```
-
-Then install llvm via:
-
-``` bash
-brew install llvm
-```
-For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-on-apple-m1-chip-with-gpu-acceleration-3351dc44d67c
-
+# Todolist
+- [ ] **Interactive mode**: map keys to load/offload modalities on-the-go without having to change the flags and restart the viewer
+- [ ] **Mitsuba scene**: enabling emitters and materials -> differentiable RGB rendering 

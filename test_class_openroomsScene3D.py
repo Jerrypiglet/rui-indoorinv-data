@@ -109,7 +109,7 @@ if opt.vis_3d_plt:
             'shapes', # boxes and labels (no meshes in plt visualization)
             'emitters', # emitter properties
             'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
-            'mi_depth_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**
+            'mi_depth_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             ], 
     )
     visualizer_3D_plt.vis_3d_with_plt()
