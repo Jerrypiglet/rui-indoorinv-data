@@ -14,7 +14,7 @@ class visualizer_openroomsScene_2D(object):
     def __init__(
         self, 
         openrooms_scene, 
-        modality_list: list, 
+        modality_list_vis: list, 
         frame_idx_list: list=[0], 
     ):
 
@@ -22,7 +22,7 @@ class visualizer_openroomsScene_2D(object):
 
         self.openrooms_scene = openrooms_scene
 
-        self.modality_list = modality_list
+        self.modality_list_vis = modality_list_vis
 
         self.frame_idx_list = frame_idx_list
         self.N_frames = len(self.frame_idx_list)
@@ -30,7 +30,7 @@ class visualizer_openroomsScene_2D(object):
 
         self.N_cols = self.N_frames
         assert self.N_cols <= 6 # max 6 images due to space in a row
-        self.N_rows = len(self.modality_list) + 1
+        self.N_rows = len(self.modality_list_vis) + 1
 
         self.semseg_colors = np.loadtxt('data/colors/openrooms_colors.txt').astype('uint8')
 
@@ -63,7 +63,7 @@ class visualizer_openroomsScene_2D(object):
         fig = plt.figure(constrained_layout=True)
         subfigs = fig.subfigures(nrows=self.N_rows, ncols=1) # https://stackoverflow.com/questions/27426668/row-titles-for-matplotlib-subplot
 
-        modality_list_show = [_ for _ in ['im', 'albedo', 'roughness', 'depth', 'normal', 'semseg', 'matseg', 'seg_area', 'seg_env', 'seg_obj'] if _ in ['im']+self.modality_list]
+        modality_list_show = [_ for _ in ['im', 'albedo', 'roughness', 'depth', 'normal', 'semseg', 'matseg', 'seg_area', 'seg_env', 'seg_obj'] if _ in ['im']+self.modality_list_vis]
 
         for subfig in subfigs:
             modality = modality_list_show.pop(0)

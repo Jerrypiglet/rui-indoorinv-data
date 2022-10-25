@@ -23,14 +23,15 @@ np.set_printoptions(suppress=True)
 from lib.utils_io import load_matrix, load_img, load_binary, load_h5
 
 from lib.class_openroomsScene3D import openroomsScene3D
-from lib.class_visualizer_openroomsScene_o3d import visualizer_openroomsScene_o3d
 from lib.class_visualizer_openroomsScene_2D import visualizer_openroomsScene_2D
+from lib.class_visualizer_openroomsScene_3D_o3d import visualizer_openroomsScene_3D_o3d
+from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
 
 from lib.utils_misc import str2bool
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
-parser.add_argument('--vis_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to render in open3D')
+parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to render in open3D')
 parser.add_argument('--vis_2d_proj', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
 parser.add_argument('--pcd_color_mode', type=str, default='rgb', help='if create color map for all points')
@@ -71,13 +72,6 @@ openrooms_scene = openroomsScene3D(
         'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
-    modality_list_vis = [
-        'layout', 
-        'shapes', # boxes and labels (no meshes in plt visualization)
-        'emitters', # emitter properties
-        'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
-        ], 
-    if_vis_debug_with_plt=opt.vis_3d_plt, 
     im_params_dict={
         'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 240, 'im_W_resize': 320
         }, 
@@ -96,21 +90,35 @@ openrooms_scene = openroomsScene3D(
         },
 )
 
+
 if opt.vis_2d_proj:
-    vis_2D = visualizer_openroomsScene_2D(
+    visualizer_2D = visualizer_openroomsScene_2D(
         openrooms_scene, 
-        modality_list=[
+        modality_list_vis=[
             'layout', 
             # 'shapes', 
             ], 
         frame_idx_list=[0, 1, 2, 3, 4], 
     )
-    vis_2D.vis_2d_with_plt()
+    visualizer_2D.vis_2d_with_plt()
 
-if opt.vis_o3d:
-    vis_o3d = visualizer_openroomsScene_o3d(
+if opt.vis_3d_plt:
+    visualizer_3D_plt = visualizer_openroomsScene_3D_plt(
         openrooms_scene, 
-        modality_list=[
+        modality_list_vis = [
+            'layout', 
+            'shapes', # boxes and labels (no meshes in plt visualization)
+            'emitters', # emitter properties
+            'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
+            ], 
+    )
+    visualizer_3D_plt.vis_3d_with_plt()
+
+
+if opt.vis_3d_o3d:
+    visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
+        openrooms_scene, 
+        modality_list_vis=[
             'dense_geo', 
             'cameras', 
             # 'lighting_SG', 
@@ -121,7 +129,7 @@ if opt.vis_o3d:
             ], 
     )
 
-    vis_o3d.run_o3d(
+    visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={}, 
         dense_geo_params={

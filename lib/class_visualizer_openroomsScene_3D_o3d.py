@@ -37,22 +37,22 @@ aabb_01 = np.array([[0, 0, 0],
                     [1, 1, 1],
                     [1, 1, 0]])
 
-class visualizer_openroomsScene_o3d(object):
+class visualizer_openroomsScene_3D_o3d(object):
     '''
     A class used to **visualize** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties for inverse rendering + 3D semantics).
     '''
     def __init__(
         self, 
         openrooms_scene, 
-        modality_list: list, 
+        modality_list_vis: list, 
     ):
 
         assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
 
         self.openrooms_scene = openrooms_scene
 
-        self.modality_list = modality_list
-        for _ in self.modality_list:
+        self.modality_list_vis = modality_list_vis
+        for _ in self.modality_list_vis:
             assert _ in ['dense_geo', 'cameras', 'lighting_SG', 'layout', 'shapes', 'emitters', 'mi']
 
     def run_demo(self, extra_geometry_list=[]):
@@ -150,7 +150,7 @@ class visualizer_openroomsScene_o3d(object):
     ):
 
         self.o3d_geometry_list = self.load_o3d_geometry_list(
-            self.modality_list, 
+            self.modality_list_vis, 
             **kwargs
             )
 
