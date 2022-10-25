@@ -128,7 +128,7 @@ class openroomsScene3D(openroomsScene2D):
             envmaps_root=self.envmaps_root, 
             xml_out_path=xml_dump_path, 
             origin_lookat_up_tuple=self.origin_lookat_up_list[0], 
-            if_no_emitter_shape=True, 
+            if_no_emitter_shape=False, 
             )
         print(blue_text('XML for Mitsuba dumped to: %s')%xml_dump_path)
 
@@ -147,8 +147,8 @@ class openroomsScene3D(openroomsScene2D):
             for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
                 shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
 
-        if_render_test_image = mi_params_dict.get('if_render_test_image', False)
-        if if_render_test_image:
+        debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
+        if debug_render_test_image:
             '''
             mitsuba/tmp_render.png
             '''
@@ -158,13 +158,13 @@ class openroomsScene3D(openroomsScene2D):
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
             print(blue_text('DONE.'))
 
-        if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', False)
+        if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
         if if_sample_rays_pts:
             self.mi_sample_rays_pts()
 
             # images/demo_mitsuba_ret_depth.png
-            debug_show_mi_depth = mi_params_dict.get('debug_show_mi_depth', False)
-            if debug_show_mi_depth:
+            debug_show_ret_depth = mi_params_dict.get('debug_show_ret_depth', False)
+            if debug_show_ret_depth:
                 plt.figure()
                 N_rows = min(self.num_frames, 4)
                 for frame_idx in range(N_rows):
@@ -217,6 +217,7 @@ class openroomsScene3D(openroomsScene2D):
             self.mi_depth_list.append(mi_depth)
 
             mi_pts = ret.p.numpy().reshape(self.im_H_resize, self.im_W_resize, 3)
+            mi_pts = mi_pts[mi_depth!=np.inf, :]
             self.mi_pts_list.append(mi_pts)
 
     def load_shapes(self, shape_params_dict={}):

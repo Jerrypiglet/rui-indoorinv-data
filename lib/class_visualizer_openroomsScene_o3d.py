@@ -739,7 +739,20 @@ class visualizer_openroomsScene_o3d(object):
                 pcd_rays_end = o3d.geometry.PointCloud()
                 pcd_rays_end.points = o3d.utility.Vector3dVector(rays_end_flatten)
                 pcd_rays_end.colors = o3d.utility.Vector3dVector([[0., 0., 0.]]*rays_o_flatten.shape[0])
+
                 geometry_list.append(pcd_rays_end)
 
+        if_pts = mi_params.get('if_pts', True)
+        '''
+        if show per-pixel pts (see: no floating points): 
+        images/demo_mitsuba_ret_pts_1.png
+        images/demo_mitsuba_ret_pts_2.png
+        '''
+        if if_pts:
+            for frame_idx, mi_pts in enumerate(self.openrooms_scene.mi_pts_list):
+                pcd_pts = o3d.geometry.PointCloud()
+                pcd_pts.points = o3d.utility.Vector3dVector(mi_pts)
+                pcd_pts.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*mi_pts.shape[0])
+                geometry_list.append(pcd_pts)
 
         return geometry_list
