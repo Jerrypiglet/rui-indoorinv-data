@@ -78,8 +78,7 @@ For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-
         - light_%d # per-frame emitter source info; should not be useful
           - ...
         - box{light_id}.dat # emitter info in 3D
-        - imcadmatobj_%d.dat # instance/material segmentation in 2D
-        - imenv_%d.hdr # per-pixel lighting envmaps in 2D
+cc        - imenv_%d.hdr # per-pixel lighting envmaps in 2D
 
 # Notes on coordinate systems
 This will help clarifying the usage of camera poses ([$R$|$t$] for **camera-to-world** transformation) and camera intrinsics.
