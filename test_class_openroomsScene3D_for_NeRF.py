@@ -1,16 +1,4 @@
-
-# host = 'mm1'
-host = 'apple'
-PATH_HOME = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
-    'mm1': '/home/ruizhu/Documents/Projects/OpenRooms_RAW_loader', 
-    'qc': '/usr2/rzh/Documents/Projects/directvoxgorui', 
-}[host]
-OR_RAW_ROOT = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/data', 
-    'mm1': '/newfoundland2/ruizhu/siggraphasia20dataset', 
-    'qc': '', 
-}[host]
+from lib.global_vars import PATH_HOME, OR_RAW_ROOT, host, mi_variant
 
 import sys
 sys.path.insert(0, PATH_HOME)
@@ -133,3 +121,11 @@ for vertices, faces in zip(openrooms_scene.vertices_list, openrooms_scene.faces_
     num_vertices += vertices.shape[0]
 v_list = copy.deepcopy(openrooms_scene.vertices_list)
 writeMesh('./tmp_mesh.obj', np.vstack(v_list), np.vstack(f_list))
+
+'''
+scene file for Mitsuba; see lib/class_openroomsScene3D.py->load_mi() for more usage
+'''
+import mitsuba as mi
+from lib.global_vars import mi_variant
+mi.set_variant(mi_variant)
+mi_scene = mi.load_file(str(openrooms_scene.mi_xml_dump_path))

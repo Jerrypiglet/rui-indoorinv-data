@@ -112,7 +112,7 @@ class openroomsScene3D(openroomsScene2D):
 
         if_also_dump_lit_lamps = mi_params_dict.get('if_also_dump_lit_lamps', True)
 
-        xml_dump_path = dump_OR_xml_for_mi(
+        self.mi_xml_dump_path = dump_OR_xml_for_mi(
             str(self.xml_file), 
             shapes_root=self.shapes_root, 
             layout_root=self.layout_root, 
@@ -122,11 +122,11 @@ class openroomsScene3D(openroomsScene2D):
             if_no_emitter_shape=False, 
             if_also_dump_lit_lamps=if_also_dump_lit_lamps, 
             )
-        print(blue_text('XML for Mitsuba dumped to: %s')%str(xml_dump_path))
+        print(blue_text('XML for Mitsuba dumped to: %s')%str(self.mi_xml_dump_path))
 
-        self.mi_scene = mi.load_file(str(xml_dump_path))
+        self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
         if if_also_dump_lit_lamps:
-            self.mi_scene_lit_up_lamps_only = mi.load_file(str(xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
+            self.mi_scene_lit_up_lamps_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
 
         debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
         if debug_dump_mesh:
@@ -236,7 +236,6 @@ class openroomsScene3D(openroomsScene2D):
             # self.mi_seg_dict_of_lists['area'].append(seg_area)
             mi_seg_env = self.mi_invalid_depth_mask_list[frame_idx]
             self.mi_seg_dict_of_lists['env'].append(mi_seg_env) # shine-through area of windows
-            print(np.sum(mi_seg_env), np.amax(mi_depth), np.amin(mi_depth))
 
             if if_also_dump_lit_lamps:
                 rays_o, rays_d, ray_d_center = self.cam_rays_list[frame_idx]
