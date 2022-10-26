@@ -6,6 +6,7 @@ from lib.global_vars import mi_variant
 mi.set_variant(mi_variant)
 import torch
 import matplotlib.pyplot as plt
+import time
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
@@ -54,6 +55,7 @@ class renderer_openroomsScene_3D(object):
         else:
             if torch.cuda.is_available():
                 self.device = 'cuda'
+        # self.device = 'cpu'
         if self.device == 'cpu':
             print(yellow('[WARNING] rendering could be slow because device is cpu at %s'%host))
 
@@ -112,6 +114,7 @@ class renderer_openroomsScene_3D(object):
         _, rays_d, _ = self.os.cam_rays_list[frame_idx]
         viewdirs = -torch.from_numpy(rays_d).to(self.device).flatten(0, 1)
 
+        tic = time.time()
         ret_dict_PhySG = render_with_sg(
             lgtSGs = lighting_SG_global, 
             specular_reflectance = torch.tensor([0.05, 0.05, 0.05]).reshape(1, 3).to(self.device),
@@ -120,6 +123,7 @@ class renderer_openroomsScene_3D(object):
             normal = normal, 
             viewdirs = viewdirs,
             )
+        print('Rendering done. Took %.2f ms.'%((time.time()-tic)*1000.))
         return_dict = {
             'viewdirs_PhySG': -viewdirs, 
             'rgb_marched': ret_dict_PhySG['sg_rgb'], 

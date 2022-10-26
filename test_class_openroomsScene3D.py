@@ -72,10 +72,10 @@ frame_ids = [2]
 The lounge with very specular floor and 3 lamps
 data/public_re_3/main_xml/scene0008_00_more/im_58.png
 '''
-meta_split = 'main_xml'
-scene_name = 'scene0008_00_more'
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-frame_ids = [102]
+# meta_split = 'main_xml'
+# scene_name = 'scene0008_00_more'
+# # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
+# frame_ids = [102]
 
 openrooms_scene = openroomsScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
