@@ -27,6 +27,7 @@ from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world
 from lib.utils_dvgo import get_rays_np
+
 class openroomsScene3D(openroomsScene2D):
     '''
     A class used to visualize OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties for inverse rendering).
@@ -56,6 +57,7 @@ class openroomsScene3D(openroomsScene2D):
         self.emitter_params_dict = emitter_params_dict
         self.mi_params_dict = mi_params_dict
 
+
         super().__init__(
             root_path_dict = root_path_dict, 
             scene_params_dict = scene_params_dict, 
@@ -63,10 +65,12 @@ class openroomsScene3D(openroomsScene2D):
             im_params_dict = im_params_dict, 
             BRDF_params_dict = BRDF_params_dict, 
             lighting_params_dict = lighting_params_dict, 
-    )
-        self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
+        )
 
+        self.shapes_root, self.layout_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'layout_root', 'envmaps_root'], [PosixPath, PosixPath, PosixPath])
+        self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
         self.pcd_color = None
+
         '''
         load everything
         '''
@@ -266,7 +270,6 @@ class openroomsScene3D(openroomsScene2D):
         self.emitter_dict_of_lists_world = load_emitter_dat_world(light_dir=self.scene_rendering_path, N_ambient_rep=self.emitter_params_dict['N_ambient_rep'], if_save_storage=self.if_save_storage)
 
         # load general shapes and emitters, and fuse with previous emitter properties
-        self.shapes_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'envmaps_root'], [PosixPath, PosixPath])
         # print(main_xml_file)
         root = get_XML_root(self.xml_file)
 
@@ -386,7 +389,6 @@ class openroomsScene3D(openroomsScene2D):
 
         print(white_blue('[openroomsScene3D] load_layout for scene...'))
 
-        self.layout_root = get_list_of_keys(self.root_path_dict, ['layout_root'], [PosixPath])[0]
         self.layout_obj_file = self.layout_root / self.scene_name_short / 'uv_mapped.obj'
         self.layout_mesh_ori = load_trimesh(self.layout_obj_file) # returns a Trimesh object
         # mesh = mesh.dump()[0]

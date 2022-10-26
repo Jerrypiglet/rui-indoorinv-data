@@ -96,7 +96,7 @@ class openroomsScene2D(object):
         '''
         self.clip_roughness_min_to = BRDF_params_dict.get('clip_roughness_min_to', 0.)
         assert self.clip_roughness_min_to >= 0. and self.clip_roughness_min_to <= 1.
-        self.if_load_lighting_SG_if_axis_global = lighting_params_dict.get('if_load_lighting_SG_if_axis_global', False)
+        self.if_convert_lighting_SG_to_global = lighting_params_dict.get('if_convert_lighting_SG_to_global', False)
         self.lighting_params_dict = lighting_params_dict
         self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
 
@@ -405,9 +405,9 @@ class openroomsScene2D(object):
     def load_lighting_SG(self):
         '''
         lighting in SG;
-        self.if_load_lighting_SG_if_axis_global = False: 
+        self.if_convert_lighting_SG_to_global = False: 
             (H', W', SG_num, 6(theta, phi, lamb, weight: 1, 1, 1, 3)), in camera-and-normal-dependent local coordinates
-        self.if_load_lighting_SG_if_axis_global = True: 
+        self.if_convert_lighting_SG_to_global = True: 
             (H', W', SG_num, 7(axis, lamb, weight: 3, 1, 3)), in global coordinates (OpenCV convention: right-down-forward)
         '''
         if hasattr(self, 'lighting_SG_list'): return
@@ -418,7 +418,6 @@ class openroomsScene2D(object):
         lighting_SG_files = [self.scene_rendering_path / ('imsgEnv_%d.h5'%i) for i in self.frame_id_list]
 
         self.lighting_SG_list = []
-        SG_channels = 7 if self.if_load_lighting_SG_if_axis_global else 6
 
         for idx, lighting_SG_file in enumerate(tqdm(lighting_SG_files)):
             lighting_SG = load_h5(lighting_SG_file)
@@ -427,11 +426,12 @@ class openroomsScene2D(object):
                 lighting_SG[:, :, :, 3:6] = lighting_SG[:, :, :, 3:6] * hdr_scale # (120, 160, 12(SG_num), 6); theta, phi, lamb, weight: 1, 1, 1, 3
             self.lighting_SG_list.append(lighting_SG)
 
-        if self.if_load_lighting_SG_if_axis_global:
-            self.lighting_SG_list = convert_SG_axis_local_global(self.lighting_params_dict, self.lighting_SG_list, self.pose_list, self.normal_list)
-
         env_row, env_col = self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col']
-        assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], SG_channels) for _ in self.lighting_SG_list])
+        assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 6) for _ in self.lighting_SG_list])
+
+        if self.if_convert_lighting_SG_to_global:
+            self.lighting_SG_global_list = convert_SG_axis_local_global(self.lighting_params_dict, self.lighting_SG_list, self.pose_list, self.normal_list)
+            assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 7) for _ in self.lighting_SG_global_list])
 
         print(blue_text('[openroomsScene] DONE. load_lighting_SG'))
 

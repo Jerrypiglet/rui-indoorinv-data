@@ -84,8 +84,8 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
         at_vector = normalize_v(lookat - origin)
         assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
 
-        t = origin.reshape((3, 1))
-        R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1)
+        t = origin.reshape((3, 1)).astype(np.float32)
+        R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
         # R = R @ np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]])
         
         pose_list.append(np.hstack((R, t)))

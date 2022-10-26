@@ -459,7 +459,6 @@ class visualizer_openroomsScene_3D_o3d(object):
 
         xyz_SG_pcd, normal_SG_pcd, axis_SG_pcd, weight_SG_pcd, lamb_SG_pcd = get_list_of_keys(lighting_SG_fused_dict, ['X_global_SG', 'normal_global_SG', 'axis_SG', 'weight_SG', 'lamb_SG'])
 
-
         N_pts = xyz_SG_pcd.shape[0]
         SG_num = axis_SG_pcd.shape[1]
 

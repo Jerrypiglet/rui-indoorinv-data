@@ -79,6 +79,8 @@ def dump_OR_xml_for_mi(
                     for emitter in lamp.findall('emitter'):
                         lamp.remove(emitter)
                     replace_str_xml(lamp.findall('string')[0], lookup_dict)
+                    if lamp.get('id') in [_.get('id') for _ in lit_up_lamp_list]:
+                        lamp.set('id', lamp.get('id')+'_'+gen_random_str())
                     lit_up_lamp_list.append(lamp)
             if if_no_emitter_shape:
                 root.remove(shape)

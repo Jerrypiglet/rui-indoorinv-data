@@ -192,6 +192,17 @@ Or with visibility to emitter_0 (`--pcd_color_mode mi_visibility_emitter0 --if_s
 
 ![](images/demo_pcd_color_mi_visibility_emitter0.png)
 
+## 3D differentiable renderer
+
+Supported 3D differentiable renderers (using GT labels):
+- Zhengqin's surface renderer (Li et al., 2020, Inverse Rendering for Complex Indoor Scenes)
+- PhySG surface renderer (Zhang et al., 2021, PhySG)
+
+![](images/demo_render_PhySG_1.png)
+
+``` bash
+PYTORCH_ENABLE_MPS_FALLBACK=1 python test_class_openroomsScene3D.py --vis_3d_o3d False --render_3d True
+```
 
 # Todolist
 - [ ] **Interactive mode**: map keys to load/offload modalities on-the-go without having to change the flags and restart the viewer

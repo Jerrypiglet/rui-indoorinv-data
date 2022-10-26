@@ -1,17 +1,17 @@
 import sys
 
-# device = 'mm1'
-device = 'mbp'
+# host = 'mm1'
+host = 'apple'
 PATH_HOME = {
-    'mbp': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
+    'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
     'mm1': '/home/ruizhu/Documents/Projects/OpenRooms_RAW_loader', 
-    'qc': '/usr2/rzh/Documents/Projects/directvoxgorui'
-}[device]
+    'qc': '/usr2/rzh/Documents/Projects/directvoxgorui', 
+}[host]
 OR_RAW_ROOT = {
-    'mbp': '/Users/jerrypiglet/Documents/Projects/data', 
+    'apple': '/Users/jerrypiglet/Documents/Projects/data', 
     'mm1': '/newfoundland2/ruizhu/siggraphasia20dataset', 
-    'qc': ''
-}[device]
+    'qc': '', 
+}[host]
 
 sys.path.insert(0, PATH_HOME)
 from pathlib import Path
@@ -26,15 +26,18 @@ from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_visualizer_openroomsScene_2D import visualizer_openroomsScene_2D
 from lib.class_visualizer_openroomsScene_3D_o3d import visualizer_openroomsScene_3D_o3d
 from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
+from lib.class_renderer_openroomsScene_3D import renderer_openroomsScene_3D
 
 from lib.utils_misc import str2bool
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
-parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to render in open3D')
+parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize in open3D')
 parser.add_argument('--vis_2d_proj', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
 parser.add_argument('--pcd_color_mode', type=str, default='rgb', help='if create color map for all points')
+parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
+parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
 opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/public_re_3'
@@ -50,14 +53,29 @@ if not shape_pickles_root.exists():
 
 '''
 The classroom scene: one lamp (lit up) + one window (less sun)
-
 data/public_re_3/main_xml1/scene0552_00_more/im_4.png
 '''
+# meta_split = 'main_xml1'
+# scene_name = 'scene0552_00_more'
+# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
 
-meta_split = 'main_xml1'
+'''
+The classroom scene: one lamp (dark) + one window (directional sun)
+data/public_re_3/mainDiffLight_xml1/scene0552_00_more/im_4.png
+'''
+meta_split = 'mainDiffLight_xml1'
 scene_name = 'scene0552_00_more'
-frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
-# frame_ids = [0]
+# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
+frame_ids = [2]
+
+'''
+The lounge with very specular floor and 3 lamps
+data/public_re_3/main_xml/scene0008_00_more/im_58.png
+'''
+meta_split = 'main_xml'
+scene_name = 'scene0008_00_more'
+# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
+frame_ids = [102]
 
 openrooms_scene = openroomsScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
@@ -66,16 +84,23 @@ openrooms_scene = openroomsScene3D(
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'im_sdr', 'poses', 'seg', 
+        'im_hdr', 'albedo', 'roughness', 
         'depth', 'normal', 
-        # 'lighting_SG', 
-        # 'lighting_envmap', 
-        'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
+        'lighting_SG', 
+        'lighting_envmap', 
+        # 'layout', 
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
     im_params_dict={
-        'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 240, 'im_W_resize': 320
+        'im_H_load': 480, 'im_W_load': 640, 
+        # 'im_H_resize': 240, 'im_W_resize': 320
+        'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
         }, 
+    lighting_params_dict={
+        'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32, 
+        'if_convert_lighting_SG_to_global': True, 
+    }, 
     shape_params_dict={
         'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
@@ -91,7 +116,6 @@ openrooms_scene = openroomsScene3D(
         'if_get_segs': True, # True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
 )
-
 
 if opt.vis_2d_proj:
     visualizer_2D = visualizer_openroomsScene_2D(
@@ -117,7 +141,6 @@ if opt.vis_3d_plt:
             ], 
     )
     visualizer_3D_plt.vis_3d_with_plt()
-
 
 if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
@@ -178,6 +201,14 @@ if opt.vis_3d_o3d:
         }, 
     )
 
+if opt.render_3d:
+    renderer_3D = renderer_openroomsScene_3D(
+        openrooms_scene, 
+        renderer_option=opt.renderer_option, 
+        host=host, 
+        pts_from='mi')
+    
+    renderer_3D.render(frame_idx=0)
 # dump_path = Path(PATH_HOME) / ('logs/pickles/OR_public_re_gt_%s_#MOD_openrooms.pickle'%scene_name[5:])
 # OR.fuse_3D_geometry(dump_path=dump_path)
 
