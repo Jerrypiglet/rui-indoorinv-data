@@ -110,7 +110,7 @@ class openroomsScene3D(openroomsScene2D):
         '''
         xml_dump_dir = self.PATH_HOME / 'mitsuba'
 
-        if_also_dump_lit_lamps = mi_params_dict.get('if_also_dump_lit_lamps', True)
+        if_also_dump_xml_with_lit_lamps_only = mi_params_dict.get('if_also_dump_xml_with_lit_lamps_only', True)
 
         self.mi_xml_dump_path = dump_OR_xml_for_mi(
             str(self.xml_file), 
@@ -120,12 +120,12 @@ class openroomsScene3D(openroomsScene2D):
             xml_dump_dir=xml_dump_dir, 
             origin_lookatvector_up_tuple=self.origin_lookatvector_up_list[0], # [debug] set to any frame_idx
             if_no_emitter_shape=False, 
-            if_also_dump_lit_lamps=if_also_dump_lit_lamps, 
+            if_also_dump_xml_with_lit_lamps_only=if_also_dump_xml_with_lit_lamps_only, 
             )
         print(blue_text('XML for Mitsuba dumped to: %s')%str(self.mi_xml_dump_path))
 
         self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
-        if if_also_dump_lit_lamps:
+        if if_also_dump_xml_with_lit_lamps_only:
             self.mi_scene_lit_up_lamps_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
 
         debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
@@ -150,7 +150,7 @@ class openroomsScene3D(openroomsScene2D):
             image = mi.render(self.mi_scene, spp=64)
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'), image)
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
-            if if_also_dump_lit_lamps:
+            if if_also_dump_xml_with_lit_lamps_only:
                 image = mi.render(self.mi_scene_lit_up_lamps_only, spp=64)
                 mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render_lit_up_lamps_only.exr'), image)
 
@@ -163,7 +163,7 @@ class openroomsScene3D(openroomsScene2D):
         if_get_segs = mi_params_dict.get('if_get_segs', True)
         if if_get_segs:
             assert if_sample_rays_pts
-            self.mi_get_segs(if_also_dump_lit_lamps=if_also_dump_lit_lamps)
+            self.mi_get_segs(if_also_dump_xml_with_lit_lamps_only=if_also_dump_xml_with_lit_lamps_only)
 
     def load_cam_rays(self, cam_params_dict={}):
         H, W = self.im_H_resize, self.im_W_resize
@@ -229,7 +229,7 @@ class openroomsScene3D(openroomsScene2D):
 
         self.pts_from['mi'] = True
 
-    def mi_get_segs(self, if_also_dump_lit_lamps=True):
+    def mi_get_segs(self, if_also_dump_xml_with_lit_lamps_only=True):
         self.mi_seg_dict_of_lists = defaultdict(list)
 
         for frame_idx, mi_depth in enumerate(self.mi_depth_list):
@@ -237,7 +237,7 @@ class openroomsScene3D(openroomsScene2D):
             mi_seg_env = self.mi_invalid_depth_mask_list[frame_idx]
             self.mi_seg_dict_of_lists['env'].append(mi_seg_env) # shine-through area of windows
 
-            if if_also_dump_lit_lamps:
+            if if_also_dump_xml_with_lit_lamps_only:
                 rays_o, rays_d, ray_d_center = self.cam_rays_list[frame_idx]
                 rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
                 rays_mi = mi.Ray3f(mi.Point3f(rays_o_flatten), mi.Vector3f(rays_d_flatten))
@@ -289,6 +289,7 @@ class openroomsScene3D(openroomsScene2D):
 
         self.vertices_list = []
         self.faces_list = []
+        self.ids_list = []
         self.bverts_list = []
         
         light_axis_list = []
@@ -362,6 +363,7 @@ class openroomsScene3D(openroomsScene2D):
                 self.vertices_list.append(None)
                 self.faces_list.append(None)
             self.bverts_list.append(bverts_transformed)
+            self.ids_list.append(shape['id'])
             
             self.shape_list_valid.append(shape)
 

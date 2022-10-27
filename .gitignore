@@ -14,3 +14,5 @@ mitsuba/tmp_scene_*
 lib/utils_OR/__pycache__
 lib/__pycache__
 ScreenCamera_*.json
+tmp_mesh*
+test_files/

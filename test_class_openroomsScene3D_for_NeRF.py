@@ -95,7 +95,7 @@ openrooms_scene = openroomsScene3D(
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
         },
     mi_params_dict={
-        'if_also_dump_lit_lamps': True,  # True: to dump a second file containing lit-up lamps only
+        'if_also_dump_xml_with_lit_lamps_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
@@ -109,18 +109,49 @@ openrooms_scene.K # intrinsics; again in OpenCV convention
 openrooms_scene.im_H_resize, openrooms_scene.im_W_resize # original rendered images are of 480x640; resized to this dimension
 
 '''
-dump mesh
+dump mesh (1) from loaded objects in openrooms_scene
+-> test_files/tmp_mesh_1.obj
 '''
-import copy
-from lib.utils_OR.utils_OR_mesh import writeMesh
+import shutil
+from lib.utils_OR.utils_OR_mesh import write_one_mesh_from_v_f_lists, write_mesh_list_from_v_f_lists
 
-num_vertices = 0
-f_list = []
-for vertices, faces in zip(openrooms_scene.vertices_list, openrooms_scene.faces_list):
-    f_list.append(copy.deepcopy(faces + num_vertices))
-    num_vertices += vertices.shape[0]
-v_list = copy.deepcopy(openrooms_scene.vertices_list)
-writeMesh('./tmp_mesh.obj', np.vstack(v_list), np.vstack(f_list))
+if Path('test_files/1').exists():
+    shutil.rmtree(str(Path('test_files/1')))
+Path('test_files/1').mkdir(parents=True, exist_ok=False)
+
+vertices_list, faces_list, ids_list = [], [], []
+for vertices, faces, id, shape_valid in zip(openrooms_scene.vertices_list, openrooms_scene.faces_list, openrooms_scene.ids_list, openrooms_scene.shape_list_valid):
+    if not shape_valid['if_in_emitter_dict']:
+        vertices_list.append(vertices)
+        faces_list.append(faces)
+        ids_list.append(id)
+
+write_one_mesh_from_v_f_lists('test_files/tmp_mesh_1.obj', vertices_list, faces_list, ids_list)
+write_mesh_list_from_v_f_lists(Path('test_files/1'), vertices_list, faces_list, ids_list)
+
+'''
+dump mesh (2) from original scene XML
+-> test_files/tmp_mesh_2.obj
+'''
+
+from lib.utils_mitsuba import dump_OR_xml_for_mi
+
+if Path('test_files/2').exists():
+    shutil.rmtree(str(Path('test_files/2')))
+Path('test_files/2').mkdir(parents=True, exist_ok=False)
+
+xml_path = openrooms_scene.xml_file # e.g. 'data/public_re_3/scenes/xml1/scene0552_00_more/mainDiffLight.xml'
+mi_xml_dump_path = dump_OR_xml_for_mi(
+    xml_path, 
+    shapes_root=shapes_root, 
+    layout_root=layout_root, 
+    envmaps_root=envmaps_root, 
+    if_dump_mesh=True, 
+    xml_dump_dir=Path('test_files'), 
+    dump_mesh_path='test_files/tmp_mesh_2.obj', 
+    dump_mesh_dir=Path('test_files/2'), 
+    )
+print('[!!!] You can also load this XML with full goemetry into Mitsuba 3: ', mi_xml_dump_path)
 
 '''
 scene file for Mitsuba; see lib/class_openroomsScene3D.py->load_mi() for more usage

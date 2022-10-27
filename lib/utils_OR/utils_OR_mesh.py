@@ -1,6 +1,9 @@
+from inspect import isdatadescriptor
 import trimesh
 import numpy as np
 import quaternion
+import copy
+from pathlib import Path
 
 # original obj operations by Zhengqin
 def loadMesh(name):
@@ -34,6 +37,29 @@ def writeMesh(name, vertices, faces ):
         for n in range(0,faces.shape[0] ):
             meshOut.write('f %d %d %d\n' %
                     (faces[n, 0], faces[n, 1], faces[n, 2]) )
+
+def write_one_mesh_from_v_f_lists(mesh_path: str, vertices_list: list, faces_list: list, ids_list: list=[]):
+    assert len(vertices_list) == len(faces_list)
+    if ids_list == []:
+        ids_list == ['']*len(vertices_list)
+
+    num_vertices = 0
+    f_list = []
+    for vertices, faces, id in zip(vertices_list, faces_list, ids_list):
+        f_list.append(copy.deepcopy(faces + num_vertices))
+        num_vertices += vertices.shape[0]
+
+    v_list = copy.deepcopy(vertices_list)
+    
+    writeMesh(mesh_path, np.vstack(v_list), np.vstack(f_list))
+
+def write_mesh_list_from_v_f_lists(mesh_dir: Path, vertices_list: list, faces_list: list, ids_list: list=[]):
+    assert len(vertices_list) == len(faces_list)
+    if ids_list == []:
+        ids_list == ['']*len(vertices_list)
+
+    for idx, (vertices, faces, id) in enumerate(zip(vertices_list, faces_list, ids_list)):
+        writeMesh(str(mesh_dir / ('%d_%s.obj'%(idx, id))), vertices, faces)
 
 def computeBox(vertices ):
     minX, maxX = vertices[:, 0].min(), vertices[:, 0].max()
