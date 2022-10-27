@@ -7,7 +7,7 @@ import random
 from pathlib import Path
 
 from lib.utils_OR.utils_OR_xml import transformToXml, loadMesh, transform_with_transforms_xml_list
-from lib.utils_OR.utils_OR_mesh import write_one_mesh_from_v_f_lists, write_mesh_list_from_v_f_lists
+from lib.utils_OR.utils_OR_mesh import write_one_mesh_from_v_f_lists, write_mesh_list_from_v_f_lists, flip_ceiling_normal
 from lib.utils_misc import get_datetime, gen_random_str
 
 def replace_str_xml(filename, lookup_dict: dict={}):
@@ -114,6 +114,8 @@ def dump_OR_xml_for_mi(
                         transform.get(key)) for key in transform.keys()}}
                     transforms_list.append(transform_dict)
             vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
+            if '/uv_mapped.obj' in obj_path:
+                    faces = flip_ceiling_normal(faces, vertices)
             vertices_transformed, _ = transform_with_transforms_xml_list(transforms_list, vertices)
             vertices_list.append(vertices_transformed)
             faces_list.append(faces)

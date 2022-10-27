@@ -16,11 +16,7 @@ OR_RAW_ROOT = {
 sys.path.insert(0, PATH_HOME)
 from pathlib import Path
 import numpy as np
-import matplotlib.pyplot as plt
-import imageio.v2 as imageio
-import numpy as np
 np.set_printoptions(suppress=True)
-from lib.utils_io import load_matrix, load_img, load_binary, load_h5
 
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_visualizer_openroomsScene_2D import visualizer_openroomsScene_2D
@@ -86,10 +82,10 @@ openrooms_scene = openroomsScene3D(
         'im_sdr', 'poses', 'seg', 
         'im_hdr', 'albedo', 'roughness', 
         'depth', 'normal', 
-        'lighting_SG', 
-        'lighting_envmap', 
-        # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'lighting_SG', 
+        # 'lighting_envmap', 
+        'layout', 
+        'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
     im_params_dict={
@@ -105,7 +101,7 @@ openrooms_scene = openroomsScene3D(
         'if_convert_lighting_SG_to_global': True, 
     }, 
     shape_params_dict={
-        'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
+        'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
         },
     emitter_params_dict={

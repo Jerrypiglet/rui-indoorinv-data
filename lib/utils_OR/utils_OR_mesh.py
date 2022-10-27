@@ -163,6 +163,24 @@ def remove_top_down_faces(mesh):
     new_mesh = trimesh.Trimesh(vertices=v, faces=np.asarray(f_after))
     return new_mesh
 
+def flip_ceiling_normal(faces, vertices):
+    '''
+    works on uv_mapped.obj files
+    '''
+    ceiling_z = np.amax(vertices[:, 2])
+    ceiling_faces_N = 0
+    # print(faces)
+    for face_idx, face in enumerate(faces):
+        vertices_3 = vertices[face-1]
+        if np.all(vertices_3[:, 2] == ceiling_z):
+            ceiling_faces_N += 1
+            # print(face_idx, face.shape)
+            faces[face_idx] = face[[1, 0, 2]] # flip the normal
+    assert ceiling_faces_N == 2, 'should be two triangles for the ceiling'
+    # print('->', faces)
+
+    return faces
+
 def mesh_to_contour(mesh, if_input_is_v_e=False, vertical_dim=-1):
     if if_input_is_v_e:
         v, e = mesh

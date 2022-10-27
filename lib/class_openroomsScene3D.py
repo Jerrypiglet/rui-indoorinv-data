@@ -23,7 +23,7 @@ from .class_openroomsScene2D import openroomsScene2D
 
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, mesh_to_skeleton, transform_v
 from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
-from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox
+from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world
 from lib.utils_dvgo import get_rays_np
@@ -357,6 +357,8 @@ class openroomsScene3D(openroomsScene2D):
             if if_load_mesh:
                 self.vertices_list.append(vertices_transformed)
                 # self.faces_list.append(faces+self.num_vertices)
+                if '/uv_mapped.obj' in shape['filename']:
+                    faces = flip_ceiling_normal(faces, vertices)
                 self.faces_list.append(faces)
                 # self.num_vertices += vertices_transformed.shape[0]
             else:
@@ -366,6 +368,8 @@ class openroomsScene3D(openroomsScene2D):
             self.ids_list.append(shape['id'])
             
             self.shape_list_valid.append(shape)
+
+
 
             if if_emitter:
                 if shape['emitter_prop']['obj_type'] == 'window':
