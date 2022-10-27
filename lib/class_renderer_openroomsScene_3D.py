@@ -19,7 +19,7 @@ class renderer_openroomsScene_3D(object):
     A class for differentiable renderers of OpenRooms (public/public-re versions) scene contents.
 
     renderer options:
-    - Zhengqin's surface renderer (Li et al., 2020, Inverse Rendering for Complex Indoor Scenes)
+    - Zhengqin Li's surface renderer (Li et al., 2020, Inverse Rendering for Complex Indoor Scenes)
         - input: per-pixel lighting envmap (e.g. 8x16); or SGs (to convert to envmaps)
     - PhySG surface renderer (Zhang et al., 2021, PhySG)
         - input: per-pixel lighting SGs (without having to convert to envmaps)
@@ -38,6 +38,22 @@ class renderer_openroomsScene_3D(object):
         self.renderer_option = renderer_option
         assert self.renderer_option in ['ZQ', 'PhySG']
         self.get_device(host)
+
+        if self.renderer_option == 'ZQ':
+            from lib.utils_rendering_ZQ import output2env_per_point, rendering_layer_per_point
+            self.SG_params = self.os.lighting_params_dict
+            self.output2env = output2env_per_point(
+                SG_num=self.SG_params['SG_num'], # default: 12
+                env_height=self.SG_params['env_height'], # default: 8
+                env_width=self.SG_params['env_width'], # default: 16
+                device=self.device, 
+                )
+            self.render_layer_ZQ = rendering_layer_per_point(
+                imWidth=self.os.im_W_resize, imHeight=self.os.im_H_resize, 
+                env_width=self.SG_params['env_width'], 
+                env_height=self.SG_params['env_height'], 
+                device=self.device, 
+                )
 
         self.pts_from = pts_from
         assert self.pts_from in ['mi', 'depth']
@@ -62,9 +78,6 @@ class renderer_openroomsScene_3D(object):
     def render(self, frame_idx: int):
         '''
         frame_idx: 0-based indexing into all frames: [0, 1, ..., self.os.frame_num-1]
-
-        images/demo_render_PhySG_1.png
-        images/demo_render_PhySG_2.png
         '''
         if self.renderer_option == 'PhySG':
             return_dict = self.render_PhySG(frame_idx)
@@ -94,6 +107,10 @@ class renderer_openroomsScene_3D(object):
     def render_PhySG(self, frame_idx):
         '''
         Mostly adapted from https://github.com/Jerrypiglet/PhySG/blob/master/code/model/sg_render.py#L137
+
+        images/demo_render_PhySG_1.png
+        images/demo_render_PhySG_2.png
+        images/demo_render_PhySG_Direct_1.png
         '''
 
         assert self.os.if_has_lighting_SG
@@ -135,4 +152,39 @@ class renderer_openroomsScene_3D(object):
 
 
     def render_ZQ(self, frame_idx):
-        pass
+        '''
+        images/demo_render_ZQ_1.png
+        images/demo_render_ZQ_2.png
+        images/demo_render_ZQ_Direct_1.png
+        '''
+        assert self.os.if_has_lighting_envmap
+        H, W = self.os.im_H_resize, self.os.im_W_resize
+        N_frames = 1
+        N = N_frames * H * W
+        rays_uv = torch.zeros([N_frames, H, W, 2], device=self.device).long()
+        uu, vv = torch.meshgrid(
+            torch.linspace(0, W-1, W, device=self.device),
+            torch.linspace(0, H-1, H, device=self.device))  # pytorch's meshgrid has indexing='ij'
+        rays_uv[:, :, :, 0] = uu.T.unsqueeze(0).expand(N_frames, -1, -1).long()
+        rays_uv[:, :, :, 1] = vv.T.unsqueeze(0).expand(N_frames, -1, -1).long()
+        rays_uv = rays_uv.flatten(0, 2) # (N, 2)
+
+        lighting_envmap_cam = torch.from_numpy(self.os.lighting_envmap_list[frame_idx]).to(self.device) # (env_row, env_col, 3, env_height, env_width)
+        envmap_cam = lighting_envmap_cam.flatten(0, 1) # (N, 3, env_height, env_width)
+
+        normal_cam_opengl = torch.from_numpy(self.os.normal_list[frame_idx]).to(self.device).flatten(0, 1) # (N, 3)
+        albedo = torch.from_numpy(self.os.albedo_list[frame_idx]).to(self.device).flatten(0, 1) # (N, 3)
+        roughness = torch.from_numpy(self.os.roughness_list[frame_idx]).to(self.device).flatten(0, 1) # (N, 1)
+
+        tic = time.time()
+        diffuse, specular = self.render_layer_ZQ.forwardEnv(rays_uv=rays_uv, normal=normal_cam_opengl, envmap=envmap_cam, albedo=albedo, roughness=roughness)
+        rgb_marched_hdr = diffuse + specular
+        print('Rendering done. Took %.2f ms.'%((time.time()-tic)*1000.))
+    
+        return_dict = {
+            'rgb_marched': rgb_marched_hdr,
+            'rgb_specular_marched': specular,
+            'rgb_diffuse_marched': diffuse,
+        }
+
+        return return_dict

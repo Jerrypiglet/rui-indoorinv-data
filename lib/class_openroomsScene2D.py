@@ -85,11 +85,17 @@ class openroomsScene2D(object):
         self.if_scale_HDR = im_params_dict.get('if_scale_HDR', True) # scale HDR images with segs
         self.if_scale_HDR_per_frame = im_params_dict.get('if_scale_HDR_per_frame', False) # True: individually scale each HDR frame; False: get one global HDR scale
         self.if_clip_HDR_to_01 = im_params_dict.get('if_clip_HDR_to_01', False) # only useful when scaling HDR
+        
+        if_direct_lighting = im_params_dict.get('if_direct_lighting', False)
+        self.im_key = {True: 'imDirect_', False: 'im_'}[if_direct_lighting]
+        self.imsgEnv_key = {True: 'imsgEnvDirect_', False: 'imsgEnv_'}[if_direct_lighting]
+        self.imenv_key = {True: 'imenvDirect_', False: 'imenv_'}[if_direct_lighting]
 
         # self.im_params_dict = im_params_dict
         self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
         self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
         self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
+
 
         '''
         BRDF, lighting properties
@@ -152,6 +158,10 @@ class openroomsScene2D(object):
     @property
     def if_has_BRDF(self):
         return all([_ in self.modality_list for _ in ['albedo', 'roughness']])
+
+    @property
+    def if_has_lighting_envmap(self):
+        return all([_ in self.modality_list for _ in ['lighting_envmap']])
 
     @property
     def if_has_lighting_SG(self):
@@ -240,7 +250,8 @@ class openroomsScene2D(object):
         print(white_blue('[openroomsScene] load_im_sdr for %d frames...'%len(self.frame_id_list)))
 
         self.im_sdr_ext in ['jpg', 'png']
-        self.im_sdr_file_list = [self.scene_rendering_path / ('im_%d.%s'%(i, self.im_sdr_ext)) for i in self.frame_id_list]
+
+        self.im_sdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_sdr_ext)) for i in self.frame_id_list]
         self.im_sdr_list = [load_img(_, (self.im_H_load, self.im_W_load, 3), ext=self.im_sdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_sdr_file_list]
         # check_list_of_tensors_size(self.im_sdr_list, (self.im_H_load, self.im_W_load, 3))
 
@@ -254,7 +265,7 @@ class openroomsScene2D(object):
         print(white_blue('[openroomsScene] load_im_hdr for %d frames...'%len(self.frame_id_list)))
 
         self.im_hdr_ext in ['hdr'] # .rgbe not supported for now
-        self.im_hdr_file_list = [self.scene_rendering_path / ('im_%d.%s'%(i, self.im_hdr_ext)) for i in self.frame_id_list]
+        self.im_hdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_hdr_ext)) for i in self.frame_id_list]
         self.im_hdr_list = [load_HDR(_, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
 
         if self.if_scale_HDR:
@@ -415,7 +426,7 @@ class openroomsScene2D(object):
         print(white_blue('[openroomsScene] load_lighting_SG for %d frames...'%len(self.frame_id_list)))
         print(red('THIS MIGHT BE SLOW...'))
 
-        lighting_SG_files = [self.scene_rendering_path / ('imsgEnv_%d.h5'%i) for i in self.frame_id_list]
+        lighting_SG_files = [self.scene_rendering_path / ('%s%d.h5'%(self.imsgEnv_key, i)) for i in self.frame_id_list]
 
         self.lighting_SG_list = []
 
@@ -445,10 +456,10 @@ class openroomsScene2D(object):
         env_height, env_width = self.lighting_params_dict['env_height'], self.lighting_params_dict['env_width']
         env_row, env_col = self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col']
 
-        if self.openrooms_version == 'public_re' and (env_height, env_width) == (8, 16):
-            lighting_envmap_files = [self.scene_rendering_path / ('imenv_8x16_%d.hdr'%i) for i in self.frame_id_list]
-        else:
-            lighting_envmap_files = [self.scene_rendering_path / ('imenv_%d.hdr'%i) for i in self.frame_id_list]
+        # if self.openrooms_version == 'public_re' and (env_height, env_width) == (8, 16):
+        #     lighting_envmap_files = [self.scene_rendering_path / ('%s8x16_%d.hdr'%(imenv_key, i)) for i in self.frame_id_list]
+        # else:
+        lighting_envmap_files = [self.scene_rendering_path / ('%s%d.hdr'%(self.imenv_key, i)) for i in self.frame_id_list]
 
         self.lighting_envmap_list = []
 

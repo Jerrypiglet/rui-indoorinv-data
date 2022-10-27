@@ -96,9 +96,12 @@ openrooms_scene = openroomsScene3D(
         'im_H_load': 480, 'im_W_load': 640, 
         # 'im_H_resize': 240, 'im_W_resize': 320
         'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
+        'if_direct_lighting': True, # if load direct lighting envmaps and SGs inetad of total lighting
         }, 
     lighting_params_dict={
-        'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32, 
+        'env_row': 120, 'env_col': 160, 'SG_num': 12, 
+        # 'env_height': 16, 'env_width': 32, 
+        'env_height': 8, 'env_width': 16, 
         'if_convert_lighting_SG_to_global': True, 
     }, 
     shape_params_dict={
@@ -209,8 +212,3 @@ if opt.render_3d:
         pts_from='mi')
     
     renderer_3D.render(frame_idx=0)
-# dump_path = Path(PATH_HOME) / ('logs/pickles/OR_public_re_gt_%s_#MOD_openrooms.pickle'%scene_name[5:])
-# OR.fuse_3D_geometry(dump_path=dump_path)
-
-# dump_path = Path(PATH_HOME) / ('logs/pickles/OR_public_re_gt_%s_#MOD_openrooms.pickle'%scene_name[5:])
-# OR.fuse_3D_geometry(dump_path=dump_path)

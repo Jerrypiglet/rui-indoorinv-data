@@ -204,6 +204,9 @@ Supported 3D differentiable renderers (using GT labels):
 PYTORCH_ENABLE_MPS_FALLBACK=1 python test_class_openroomsScene3D.py --vis_3d_o3d False --render_3d True
 ```
 
+To render with direct lighting only, set `'if_direct_lighting': True`. Comparisons:
+![](images/demo_render_PhySG_Direct_1.png)
+![](images/demo_render_ZQ_Direct_1.png)
 # Todolist
 - [ ] **Interactive mode**: map keys to load/offload modalities on-the-go without having to change the flags and restart the viewer
 - [ ] **Mitsuba scene**: enabling emitters and materials -> differentiable RGB rendering 
