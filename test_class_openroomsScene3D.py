@@ -31,7 +31,8 @@ parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, defaul
 parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize in open3D')
 parser.add_argument('--vis_2d_proj', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
-parser.add_argument('--pcd_color_mode', type=str, default='rgb', help='if create color map for all points')
+parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help='if create color map for all points')
+parser.add_argument('--pcd_color_mode_mi', type=str, default='input', help='if create color map for all points')
 parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
 parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
 opt = parser.parse_args()
@@ -68,10 +69,19 @@ frame_ids = [2]
 The lounge with very specular floor and 3 lamps
 data/public_re_3/main_xml/scene0008_00_more/im_58.png
 '''
-# meta_split = 'main_xml'
-# scene_name = 'scene0008_00_more'
-# # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-# frame_ids = [102]
+meta_split = 'main_xml'
+scene_name = 'scene0008_00_more'
+# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
+frame_ids = [114]
+
+'''
+The conference room with one lamp
+data/public_re_3/main_xml/scene0005_00_more/im_3.png
+'''
+meta_split = 'main_xml'
+scene_name = 'scene0005_00_more'
+# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
+frame_ids = [3]
 
 openrooms_scene = openroomsScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
@@ -101,7 +111,7 @@ openrooms_scene = openroomsScene3D(
         'if_convert_lighting_SG_to_global': True, 
     }, 
     shape_params_dict={
-        'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
+        'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
         },
     emitter_params_dict={
@@ -141,6 +151,20 @@ if opt.vis_3d_plt:
     )
     visualizer_3D_plt.vis_3d_with_plt()
 
+if opt.render_3d:
+    renderer_3D = renderer_openroomsScene_3D(
+        openrooms_scene, 
+        renderer_option=opt.renderer_option, 
+        host=host, 
+        pts_from='mi')
+    
+    renderer_return_dict = renderer_3D.render(frame_idx=0, if_show_rendering_plt=False)
+    ts = np.median(renderer_return_dict['ts'], axis=1)
+    # ts = renderer_return_dict['ray_o'][:, 0, 0]; ts = ts - np.amin(ts); ts = ts / np.amax(ts)
+    # visibility = np.median(renderer_return_dict['visibility'], axis=1)
+    from scipy import stats
+    visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
+
 if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
         openrooms_scene, 
@@ -164,7 +188,8 @@ if opt.vis_3d_o3d:
             'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
             'if_normal': False, # [OPTIONAL] turn off normals to avoid clusters
             'subsample_normal_rate_x': 2, 
-            'pcd_color_mode': opt.pcd_color_mode, 
+            'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
+            # 'input_colors': (ts, 'dist'), 
             }, 
         lighting_SG_params={
             'subsample_lighting_SG_rate': 200, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
@@ -189,6 +214,9 @@ if opt.vis_3d_o3d:
             'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 1,
+            'pcd_color_mode': opt.pcd_color_mode_mi, # using t from differentiable renderer to colorize points: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-t.png
+            'input_colors': (ts, 'dist'), # get from renderer, etc.
+            # 'input_colors': (visibility, 'mask'), # get from renderer, etc.
 
             'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
@@ -197,14 +225,13 @@ if opt.vis_3d_o3d:
             'if_normal': False, 
             'normal_subsample': 50, 
             'normal_scale': 0.2, 
+
         }, 
+        # extra_rays={
+        #     'ray_o': renderer_return_dict['ray_o'], 
+        #     'ray_e': renderer_return_dict['ray_e'], 
+        #     'visibility': renderer_return_dict['visibility'], 
+        #     'ts': renderer_return_dict['ts'], 
+        # }, 
     )
 
-if opt.render_3d:
-    renderer_3D = renderer_openroomsScene_3D(
-        openrooms_scene, 
-        renderer_option=opt.renderer_option, 
-        host=host, 
-        pts_from='mi')
-    
-    renderer_3D.render(frame_idx=0)

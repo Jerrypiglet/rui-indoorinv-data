@@ -11,32 +11,32 @@ def loadMesh(name):
     faces = []
     with open(str(name), 'r') as meshIn:
         lines = meshIn.readlines()
-    lines = [x.strip() for x in lines if len(x.strip() ) > 2 ]
+    lines = [x.strip() for x in lines if len(x.strip()) > 2 ]
     for l in lines:
         if l[0:2] == 'v ':
             vstr = l.split(' ')[1:4]
             varr = [float(x) for x in vstr ]
-            varr = np.array(varr ).reshape([1, 3] )
-            vertices.append(varr )
+            varr = np.array(varr).reshape([1, 3])
+            vertices.append(varr)
         elif l[0:2] == 'f ':
             fstr = l.split(' ')[1:4]
-            farr = [int(x.split('/')[0] ) for x in fstr ]
-            farr = np.array(farr ).reshape([1, 3] )
-            faces.append(farr )
+            farr = [int(x.split('/')[0]) for x in fstr ]
+            farr = np.array(farr).reshape([1, 3])
+            faces.append(farr)
 
-    vertices = np.concatenate(vertices, axis=0 )
-    faces = np.concatenate(faces, axis=0 )
+    vertices = np.concatenate(vertices, axis=0).astype(np.float32)
+    faces = np.concatenate(faces, axis=0).astype(np.int32)
     return vertices, faces
 
 
-def writeMesh(name, vertices, faces ):
+def writeMesh(name, vertices, faces):
     with open(name, 'w') as meshOut:
         for n in range(0, vertices.shape[0]):
             meshOut.write('v %.3f %.3f %.3f\n' %
-                    (vertices[n, 0], vertices[n, 1], vertices[n, 2] ) )
-        for n in range(0,faces.shape[0] ):
+                    (vertices[n, 0], vertices[n, 1], vertices[n, 2]))
+        for n in range(0,faces.shape[0]):
             meshOut.write('f %d %d %d\n' %
-                    (faces[n, 0], faces[n, 1], faces[n, 2]) )
+                    (faces[n, 0], faces[n, 1], faces[n, 2]))
 
 def write_one_mesh_from_v_f_lists(mesh_path: str, vertices_list: list, faces_list: list, ids_list: list=[]):
     assert len(vertices_list) == len(faces_list)
@@ -61,57 +61,57 @@ def write_mesh_list_from_v_f_lists(mesh_dir: Path, vertices_list: list, faces_li
     for idx, (vertices, faces, id) in enumerate(zip(vertices_list, faces_list, ids_list)):
         writeMesh(str(mesh_dir / ('%d_%s.obj'%(idx, id))), vertices, faces)
 
-def computeBox(vertices ):
+def computeBox(vertices):
     minX, maxX = vertices[:, 0].min(), vertices[:, 0].max()
     minY, maxY = vertices[:, 1].min(), vertices[:, 1].max()
     minZ, maxZ = vertices[:, 2].min(), vertices[:, 2].max()
 
     corners = []
-    corners.append(np.array([minX, minY, minZ] ).reshape(1, 3) )
-    corners.append(np.array([maxX, minY, minZ] ).reshape(1, 3) )
-    corners.append(np.array([maxX, minY, maxZ] ).reshape(1, 3) )
-    corners.append(np.array([minX, minY, maxZ] ).reshape(1, 3) )
+    corners.append(np.array([minX, minY, minZ]).reshape(1, 3))
+    corners.append(np.array([maxX, minY, minZ]).reshape(1, 3))
+    corners.append(np.array([maxX, minY, maxZ]).reshape(1, 3))
+    corners.append(np.array([minX, minY, maxZ]).reshape(1, 3))
 
-    corners.append(np.array([minX, maxY, minZ] ).reshape(1, 3) )
-    corners.append(np.array([maxX, maxY, minZ] ).reshape(1, 3) )
-    corners.append(np.array([maxX, maxY, maxZ] ).reshape(1, 3) )
-    corners.append(np.array([minX, maxY, maxZ] ).reshape(1, 3) )
+    corners.append(np.array([minX, maxY, minZ]).reshape(1, 3))
+    corners.append(np.array([maxX, maxY, minZ]).reshape(1, 3))
+    corners.append(np.array([maxX, maxY, maxZ]).reshape(1, 3))
+    corners.append(np.array([minX, maxY, maxZ]).reshape(1, 3))
 
-    corners = np.concatenate(corners ).astype(np.float32 )
+    corners = np.concatenate(corners).astype(np.float32)
 
     faces = []
-    faces.append(np.array([1, 2, 3] ).reshape(1, 3) )
-    faces.append(np.array([1, 3, 4] ).reshape(1, 3) )
+    faces.append(np.array([1, 2, 3]).reshape(1, 3))
+    faces.append(np.array([1, 3, 4]).reshape(1, 3))
 
-    faces.append(np.array([5, 7, 6] ).reshape(1, 3) )
-    faces.append(np.array([5, 8, 7] ).reshape(1, 3) )
+    faces.append(np.array([5, 7, 6]).reshape(1, 3))
+    faces.append(np.array([5, 8, 7]).reshape(1, 3))
 
-    faces.append(np.array([1, 6, 2] ).reshape(1, 3) )
-    faces.append(np.array([1, 5, 6] ).reshape(1, 3) )
+    faces.append(np.array([1, 6, 2]).reshape(1, 3))
+    faces.append(np.array([1, 5, 6]).reshape(1, 3))
 
-    faces.append(np.array([2, 7, 3] ).reshape(1, 3) )
-    faces.append(np.array([2, 6, 7] ).reshape(1, 3) )
+    faces.append(np.array([2, 7, 3]).reshape(1, 3))
+    faces.append(np.array([2, 6, 7]).reshape(1, 3))
 
-    faces.append(np.array([3, 8, 4] ).reshape(1, 3) )
-    faces.append(np.array([3, 7, 8] ).reshape(1, 3) )
+    faces.append(np.array([3, 8, 4]).reshape(1, 3))
+    faces.append(np.array([3, 7, 8]).reshape(1, 3))
 
-    faces.append(np.array([4, 5, 1] ).reshape(1, 3) )
-    faces.append(np.array([4, 8, 5] ).reshape(1, 3) )
+    faces.append(np.array([4, 5, 1]).reshape(1, 3))
+    faces.append(np.array([4, 8, 5]).reshape(1, 3))
 
-    faces = np.concatenate(faces ).astype(np.int32 )
+    faces = np.concatenate(faces).astype(np.int32)
 
     return corners, faces
 
 
 def computeTransform(vertices, t, q, s):
     if s != None:
-        scale = np.array(s, dtype=np.float32 ).reshape(1, 3)
+        scale = np.array(s, dtype=np.float32).reshape(1, 3)
         vertices = vertices * scale
 
     if q != None:
         q = np.quaternion(q[0], q[1], q[2], q[3])
-        rotMat = quaternion.as_rotation_matrix(q )
-        if np.abs(rotMat[1, 1] ) > 0.5:
+        rotMat = quaternion.as_rotation_matrix(q)
+        if np.abs(rotMat[1, 1]) > 0.5:
             d = rotMat[1, 1]
             rotMat[:, 1] = 0
             rotMat[1, :] = 0
@@ -119,11 +119,11 @@ def computeTransform(vertices, t, q, s):
                 rotMat[1, 1] = -1
             else:
                 rotMat[1, 1] = 1
-        vertices = np.matmul(rotMat, vertices.transpose() )
+        vertices = np.matmul(rotMat, vertices.transpose())
         vertices = vertices.transpose()
 
     if t != None:
-        trans = np.array(t, dtype=np.float32 ).reshape(1, 3)
+        trans = np.array(t, dtype=np.float32).reshape(1, 3)
         vertices = vertices + trans
 
     return vertices, trans.squeeze(), rotMat, scale.squeeze()
@@ -247,15 +247,15 @@ def transform_v(vertices, transforms):
     assert vertices.shape[1]==3
 
     s = transforms[0][1]
-    scale = np.array(s, dtype=np.float32 ).reshape(1, 3)
+    scale = np.array(s, dtype=np.float32).reshape(1, 3)
     vertices = vertices * scale
     
     rotMat = transforms[1][1]
-    vertices = np.matmul(rotMat, vertices.transpose() )
+    vertices = np.matmul(rotMat, vertices.transpose())
     vertices = vertices.transpose()
     
     t = transforms[2][1]
-    trans = np.array(t, dtype=np.float32 ).reshape(1, 3)
+    trans = np.array(t, dtype=np.float32).reshape(1, 3)
     vertices = vertices + trans
     
     return vertices
@@ -352,7 +352,7 @@ def writeMesh_rect(name, vertices):
     with open(name, 'w') as meshOut:
         for n in range(0, vertices.shape[0]):
             meshOut.write('v %.3f %.3f %.3f\n' %
-                    (vertices[n, 0], vertices[n, 1], vertices[n, 2] ) )
-        for n in range(0,faces.shape[0] ):
+                    (vertices[n, 0], vertices[n, 1], vertices[n, 2]))
+        for n in range(0,faces.shape[0]):
             meshOut.write('f %d %d %d\n' %
-                    (faces[n, 0], faces[n, 1], faces[n, 2]) )
+                    (faces[n, 0], faces[n, 1], faces[n, 2]))

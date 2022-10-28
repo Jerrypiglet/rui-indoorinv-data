@@ -164,14 +164,18 @@ class rendering_layer_per_point():
             camx, camy, normal = camxynormal_tuple
 
         # [!!!] multiply the local SG self.ls grid vectors (think of as coefficients) with the LOCAL camera-dependent basis (think of as basis..)
-        # ... and then you arrive at a hemisphere in the camera cooords
+        # ... and then you arrive at a hemisphere in the local cooords
         l = ldirections[:, :, 0:1] * camx.unsqueeze(1) \
                 + ldirections[:, :, 1:2] * camy.unsqueeze(1) \
                 + ldirections[:, :, 2:3] * normal.unsqueeze(1)    
             # (1, 128, 1) * (N, 1, 3) -> (N, 128, 3)
+        # print(ldirections.shape, camx.shape, l.shape) # torch.Size([1, 128, 3]) torch.Size([19200, 3]) torch.Size([19200, 128, 3])
         # print(l.shape) # torch.Size([N, 128, 3])
 
-        N_pts = albedo.size(0)
+        # [debug] should be the same:
+        # T_cam2local = torch.stack((camx, camy, normal), axis=-1).unsqueeze(1).expand(-1, 128, -1, -1).flatten(0, 1) # concat as cols
+        # ldirections_ = ldirections.expand(19200, -1, -1).unsqueeze(-1).flatten(0, 1)
+        # l_ = torch.bmm(T_cam2local, ldirections_).view(19200, 128, 3) # should equal
 
         # print(l.shape, self.v.unsqueeze(1).shape)
         v_rays = self.v[:, rays_uv[:, 1], rays_uv[:, 0]].transpose(0, 1) # (N, 3)

@@ -71,7 +71,7 @@ def transform_with_transforms_xml_list(transforms_list, vertices, if_only_rotate
             t = [translate['x'], translate['y'], translate['z']]
             vertices = apply_t(t, vertices)
             transforms_converted_list.append(('t', np.asarray(t).reshape(3)))
-    return vertices, transforms_converted_list
+    return vertices.astype(np.float32), transforms_converted_list
 
 def transform_with_transforms_dat_list(transforms_list, vertices):
     # suitanle for transforms_list read from transform.dat: [('s', array([1., 1., 1.], dtype=float32)), ('rot', array([[ 1., -0.,  0.], [ 0.,  0.,  1.], [-0., -1.,  0.]])), ...]

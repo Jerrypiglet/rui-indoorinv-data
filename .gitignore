@@ -4,7 +4,6 @@
 *.npz
 *.dat
 data
-data/openrooms_public*
 *.exr
 mitsuba/my_first_render.png
 mitsuba/meshes_dump
@@ -16,3 +15,5 @@ lib/__pycache__
 ScreenCamera_*.json
 tmp_mesh*
 test_files/
+test_scripts/*.hdr
+test_scripts/*.obj

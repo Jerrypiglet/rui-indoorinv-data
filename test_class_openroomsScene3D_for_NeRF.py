@@ -59,9 +59,9 @@ frame_ids = list(range(87))
 The lounge with very specular floor and 3 lamps
 data/public_re_3/main_xml/scene0008_00_more/im_58.png
 '''
-# meta_split = 'main_xml'
-# scene_name = 'scene0008_00_more'
-# frame_ids = list(range(102))
+meta_split = 'main_xml'
+scene_name = 'scene0008_00_more'
+frame_ids = list(range(102))
 
 '''
 The conference room with a ceiling lamp; shiny chairs and floor
