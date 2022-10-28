@@ -286,13 +286,16 @@ class renderer_openroomsScene_3D(object):
         pts = torch.from_numpy(self.os.mi_pts_list[frame_idx]).to(self.device).flatten(0, 1) # (N, 3)
         l_dirs = lpts.unsqueeze(0) - pts.unsqueeze(1) # (N, M=256, 3)
         pts_distL2 = torch.linalg.norm(l_dirs, dim=2, keepdims=True)
-        l_dirs = torch.nn.functional.normalize(l_dirs, dim=-1) # (N, M=256, 3), dir: scene points to lamp
 
-        pts_cos = torch.sum(l_dirs * normal.unsqueeze(1), dim=2, keepdim=True) # (N, M=256, 1); == ndl [!!!!!]
+        l_dirs = torch.nn.functional.normalize(l_dirs, dim=2) # (N, M=256, 3), dir: scene points to lamp
+
+        # pts_cos = torch.sum(l_dirs * normal.unsqueeze(1), dim=2, keepdim=True) # (N, M=256, 1); == ndl [!!!!!]
         lpt_cos = torch.clamp(torch.sum(l_dirs * lpts_normal.unsqueeze(0), dim=2, keepdim=True), -1, 1) # (N, M=256, 1)
-        pts_intensity = lpts_intensity.unsqueeze(0) * torch.clamp(pts_cos, min=0, max=1) * lpt_cos.abs() # (N, M=256, 3)
+        
+        pts_intensity = lpts_intensity.unsqueeze(0) * lpt_cos.abs() # (N, M=256, 3)
+        # pts_intensity = lpts_intensity.unsqueeze(0) * torch.clamp(pts_cos, min=0, max=1) * lpt_cos.abs() # (N, M=256, 3)
         # pts_intensity = lpts_intensity.unsqueeze(0) * torch.clamp(pts_cos, min=0, max=1) * torch.clamp(lpt_cos, min=0, max=1) # (N, M=256, 3)
-        pts_intensity_weighted = pts_intensity / pts_distL2 * lpts_area.unsqueeze(0) / prob
+        pts_intensity_weighted = pts_intensity / (pts_distL2**2) * lpts_area.unsqueeze(0) / prob
 
         # >>>> compute visibility
         N_pts = normal.shape[0]
@@ -317,7 +320,6 @@ class renderer_openroomsScene_3D(object):
         pts_intensity_weighted = pts_intensity_weighted * visibility.view(N_pts, M_lpts, 1).to(self.device)
 
         tic = time.time()
-
         diffuse, specular = self.render_layer_ZQ_from_emitter.forwardEnv(
             normal=normal, 
             albedo=albedo, 

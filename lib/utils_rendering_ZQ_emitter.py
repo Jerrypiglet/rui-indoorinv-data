@@ -92,14 +92,13 @@ class rendering_layer_per_point_from_emitter():
         assert tuple(albedo.shape)==(N_pts, 3)
         assert tuple(roughness.shape)==(N_pts, 1)
 
-        h_dirs = (v_dirs.unsqueeze(1) + l_dirs) / 2 # (N, 1, 3), (N, M, 3) -> (N(HW), M(128), 3)
-        h_dirs = torch.nn.functional.normalize(h_dirs, dim=-1)
-
-        vdh = torch.sum((v_dirs.unsqueeze(1) * h_dirs), dim=2, keepdim=True) # -> (N, M, 1) [w_o * h]
-        self.temp.data[0] = 2.0
-        frac0 = self.F0 + (1-self.F0) * torch.pow(self.temp.expand_as(vdh), (-5.55472*vdh-6.98316)*vdh)
+        ndl = torch.clamp(torch.sum(normal.unsqueeze(1) * l_dirs, dim=2, keepdim=True), 0, 1) # [!!!] cos in rendering function; normal and l are both in camera coords [n * l]
 
         albedoBatch = albedo / np.pi
+        brdfDiffuse = albedoBatch.unsqueeze(1).expand([N_pts, M_lpts, 3]) * ndl.expand([N_pts, M_lpts, 3])
+        colorDiffuse = torch.sum(brdfDiffuse * pts_intensity_weighted, dim=1) # I_d
+
+        # ======== specular
         roughBatch = roughness
         assert torch.amin(roughness) >= 0. and torch.amax(roughness) <= 1.
 
@@ -107,9 +106,16 @@ class rendering_layer_per_point_from_emitter():
         alpha = roughBatch * roughBatch
         alpha2 = alpha * alpha
 
-        ndv = torch.clamp(torch.sum(normal * v_dirs.expand_as(normal), dim = 1, keepdim=True), 0, 1).unsqueeze(2) # (N, 1, 1) [n * v]
-        ndh = torch.clamp(torch.sum(normal.unsqueeze(1) * h_dirs, dim = 2, keepdim=True), 0, 1) # sum((N, 1, 3) * (N, M, 3)) -> (N, M, 1)
-        ndl = torch.clamp(torch.sum(normal.unsqueeze(1) * l_dirs, dim = 2, keepdim=True), 0, 1) # [!!!] cos in rendering function; normal and l are both in camera coords [n * l]
+        h_dirs = (v_dirs.unsqueeze(1) + l_dirs) / 2 # (N, 1, 3), (N, M, 3) -> (N(HW), M(128), 3)
+        h_dirs = torch.nn.functional.normalize(h_dirs, dim=-1)
+
+        vdh = torch.sum((v_dirs.unsqueeze(1) * h_dirs), dim=2, keepdim=True) # -> (N, M, 1) [w_o * h]
+        self.temp.data[0] = 2.0
+        frac0 = self.F0 + (1-self.F0) * torch.pow(self.temp.expand_as(vdh), (-5.55472*vdh-6.98316)*vdh)
+
+        ndh = torch.clamp(torch.sum(normal.unsqueeze(1) * h_dirs, dim=2, keepdim=True), 0, 1) # sum((N, 1, 3) * (N, M, 3)) -> (N, M, 1)
+        ndv = torch.clamp(torch.sum(normal * v_dirs.expand_as(normal), dim=1, keepdim=True), 0, 1).unsqueeze(2) # (N, 1, 1) [n * v]
+        
 
         frac = alpha2.unsqueeze(1).expand_as(frac0) * frac0
         nom0 = ndh * ndh * (alpha2.unsqueeze(1).expand_as(ndh) - 1) + 1
@@ -131,14 +137,12 @@ class rendering_layer_per_point_from_emitter():
         #      * ndl.expand([N_pts, self.env_width * self.env_height, 3])
         # colorDiffuse = torch.sum(brdfDiffuse * pts_intensity_weighted * self.envWeight.expand_as(brdfDiffuse), dim=1) # I_d
         
-        brdfDiffuse = albedoBatch.unsqueeze(1).expand([N_pts, M_lpts, 3])
-        colorDiffuse = torch.sum(brdfDiffuse * pts_intensity_weighted, dim=1) # I_d
 
         # brdfSpec = specPred.expand([N_pts, self.env_width * self.env_height, 3]) \
         #      * ndl.expand([N_pts, self.env_width * self.env_height, 3])
         # colorSpec = torch.sum(brdfSpec * pts_intensity_weighted * self.envWeight.expand_as(brdfSpec), dim=1) # I_s
 
-        brdfSpec = specPred.expand([N_pts, M_lpts, 3])
+        brdfSpec = specPred.expand([N_pts, M_lpts, 3]) * ndl.expand([N_pts, M_lpts, 3])
         colorSpec = torch.sum(brdfSpec * pts_intensity_weighted, dim=1) # I_s
 
         return colorDiffuse, colorSpec

@@ -92,8 +92,8 @@ openrooms_scene = openroomsScene3D(
         'im_sdr', 'poses', 'seg', 
         'im_hdr', 'albedo', 'roughness', 
         'depth', 'normal', 
-        # 'lighting_SG', 
-        # 'lighting_envmap', 
+        'lighting_SG', 
+        'lighting_envmap', 
         'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
