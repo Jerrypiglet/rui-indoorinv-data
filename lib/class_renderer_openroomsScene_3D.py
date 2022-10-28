@@ -38,19 +38,19 @@ class renderer_openroomsScene_3D(object):
         self.os = openrooms_scene
 
         self.renderer_option = renderer_option
-        assert self.renderer_option in ['ZQ', 'PhySG', 'ZQ_direct']
+        assert self.renderer_option in ['ZQ', 'PhySG', 'ZQ_emitter']
         self.get_device(host)
 
         if self.renderer_option == 'ZQ':
             self.render_layer_ZQ = rendering_layer_per_point(
-                imWidth=self.os.im_W_resize, imHeight=self.os.im_H_resize, 
+                imWidth=self.os.W, imHeight=self.os.H, 
                 env_width=self.os.lighting_params_dict['env_width'], 
                 env_height=self.os.lighting_params_dict['env_height'], 
                 device=self.device, 
                 )
-        if self.renderer_option == 'ZQ_direct':
+        if self.renderer_option == 'ZQ_emitter':
             self.render_layer_ZQ_from_emitter = rendering_layer_per_point_from_emitter(
-                imWidth=self.os.im_W_resize, imHeight=self.os.im_H_resize, 
+                imWidth=self.os.W, imHeight=self.os.H, 
                 env_width=self.os.lighting_params_dict['env_width'], 
                 env_height=self.os.lighting_params_dict['env_height'], 
                 device=self.device, 
@@ -84,21 +84,21 @@ class renderer_openroomsScene_3D(object):
             return_dict = self.render_PhySG(frame_idx)
         if self.renderer_option == 'ZQ':
             return_dict = self.render_ZQ(frame_idx)
-        if self.renderer_option == 'ZQ_direct':
-            return_dict = self.render_ZQ_direct(frame_idx)
+        if self.renderer_option == 'ZQ_emitter':
+            return_dict = self.render_ZQ_emitter(frame_idx)
 
         im_sdr = np.clip(self.os.im_hdr_list[frame_idx]**(1./2.2), 0., 1.)
 
         rgb_marched_hdr = return_dict['rgb_marched']
-        im_marched_hdr = rgb_marched_hdr.cpu().numpy().reshape(self.os.im_H_resize, self.os.im_W_resize, 3)
+        im_marched_hdr = rgb_marched_hdr.cpu().numpy().reshape(self.os.H, self.os.W, 3)
         im_marched_sdr = np.clip(im_marched_hdr**(1./2.2), 0., 1.)
 
         rgb_marched_diffuse_hdr = return_dict['rgb_marched_diffuse']
-        im_marched_diffuse_hdr = rgb_marched_diffuse_hdr.cpu().numpy().reshape(self.os.im_H_resize, self.os.im_W_resize, 3)
+        im_marched_diffuse_hdr = rgb_marched_diffuse_hdr.cpu().numpy().reshape(self.os.H, self.os.W, 3)
         im_marched_diffuse_sdr = np.clip(im_marched_diffuse_hdr**(1./2.2), 0., 1.)
 
         rgb_marched_specular_hdr = return_dict['rgb_marched_specular']
-        im_marched_specular_hdr = rgb_marched_specular_hdr.cpu().numpy().reshape(self.os.im_H_resize, self.os.im_W_resize, 3)
+        im_marched_specular_hdr = rgb_marched_specular_hdr.cpu().numpy().reshape(self.os.H, self.os.W, 3)
         im_marched_specular_sdr = np.clip(im_marched_specular_hdr**(1./2.2), 0., 1.)
 
         if if_show_rendering_plt:
@@ -175,10 +175,10 @@ class renderer_openroomsScene_3D(object):
         '''
         images/demo_render_ZQ_1.png
         images/demo_render_ZQ_2.png
-        images/demo_render_ZQ_Direct_1.png
+        images/demo_render_ZQ_emitter_1.png
         '''
         assert self.os.if_has_lighting_envmap
-        H, W = self.os.im_H_resize, self.os.im_W_resize
+        H, W = self.os.H, self.os.W
         N_frames = 1
         N = N_frames * H * W
         rays_uv = torch.zeros([N_frames, H, W, 2], device=self.device).long()
@@ -209,11 +209,11 @@ class renderer_openroomsScene_3D(object):
 
         return return_dict
 
-    def render_ZQ_direct(self, frame_idx, max_plate=256):
+    def render_ZQ_emitter(self, frame_idx, max_plate=256):
         '''
         [TODO] simplify lamp mesh
         '''
-        H, W = self.os.im_H_resize, self.os.im_W_resize
+        H, W = self.os.H, self.os.W
         N_frames = 1
 
         albedo = torch.from_numpy(self.os.albedo_list[frame_idx]).to(self.device).flatten(0, 1) # (N, 3)

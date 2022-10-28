@@ -354,7 +354,7 @@ class visualizer_openroomsScene_3D_plt(object):
             ax = plt.subplot(4, N_cols, 1+3*N_cols+frame_idx)
             R = self.os.pose_list[frame_idx][:3, :3]
             mi_normal_global = self.os.mi_normal_global_list[frame_idx]
-            mi_normal_cam = (R.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.im_H_resize, self.os.im_W_resize, 3)
+            mi_normal_cam = (R.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.H, self.os.W, 3)
             # transform mi_normal from OpenCV (right-down-forward) to OpenGL convention (right-up-backward)
             mi_normal_cam = np.stack([mi_normal_cam[:, :, 0], -mi_normal_cam[:, :, 1], -mi_normal_cam[:, :, 2]], axis=-1)
             mi_normal_vis = np.clip((mi_normal_cam+1.)/2., 0., 1.)

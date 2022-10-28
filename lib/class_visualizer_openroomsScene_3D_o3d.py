@@ -53,6 +53,9 @@ class visualizer_openroomsScene_3D_o3d(object):
         self.modality_list_vis = modality_list_vis
         for _ in self.modality_list_vis:
             assert _ in ['dense_geo', 'cameras', 'lighting_SG', 'layout', 'shapes', 'emitters', 'mi']
+        if 'mi' in self.modality_list_vis:
+            self.mi_pcd_color_list = None
+        self.extra_geometry_list = []
 
     def run_demo(self, extra_geometry_list=[]):
 
@@ -145,7 +148,6 @@ class visualizer_openroomsScene_3D_o3d(object):
     def run_o3d(
         self, 
         if_shader: bool=False, 
-        extra_rays: dict={}, 
         **kwargs, 
     ):
 
@@ -165,25 +167,11 @@ class visualizer_openroomsScene_3D_o3d(object):
                     geo = _
                 self.vis.add_geometry(geo)
 
-            if extra_rays != {}:
-                xs = extra_rays['ray_o'].reshape(-1, 3)[::1000]
-                xs_end = extra_rays['ray_e'].reshape(-1, 3)[::1000]
-                # visibility = extra_rays['visibility'].flatten()[::1000]
-                # xs = xs[visibility==1]
-                # xs_end = xs_end[visibility==1]
-                ts = extra_rays['ts'].flatten()[::1000]
-                dirs = o3d.geometry.LineSet()
-                dirs.points = o3d.utility.Vector3dVector(np.vstack((xs, xs_end)))
-                # dirs.colors = o3d.utility.Vector3dVector([[1., 0., 0.] if vis == 1 else [0.8, 0.8, 0.8] for vis in visibility]) # red: visible; blue: not visible
-                dirs.colors = o3d.utility.Vector3dVector([[1., 0., 0.]] * xs.shape[0])
-                dirs.lines = o3d.utility.Vector2iVector([[_, _+xs.shape[0]] for _ in range(xs.shape[0])])
-                self.vis.add_geometry(dirs)
-
             self.vis.run()
 
     def init_o3d_vis(self):
         self.vis = o3d.visualization.Visualizer()
-        self.w = self.vis.create_window()
+        self.os.W = self.vis.create_window()
         self.opt = self.vis.get_render_option()
         self.opt.background_color = np.asarray([1., 1., 1.])
 
@@ -237,10 +225,32 @@ class visualizer_openroomsScene_3D_o3d(object):
                 mi_params
             )
 
+        o3d_geometry_list += self.extra_geometry_list
+
         return o3d_geometry_list
 
-    def get_pcd_color(self, pcd_color_mode: str, input_colors=()):
-        assert pcd_color_mode in ['rgb', 'normal', 'dist_emitter0', 'mi_visibility_emitter0', 'input']
+    def add_extra_geometry(self, geometry_list: list=[]):
+        valid_extra_geometry_list = ['rays']
+        for geometry_type, geometry in geometry_list:
+            assert geometry_type in valid_extra_geometry_list
+            if geometry_type == 'rays':
+                ray_o = geometry['ray_o'] # (N, 3)
+                ray_e = geometry['ray_e'] # (N, 3)
+                # visibility = geometry['visibility'].squeeze() # (N,)
+                # [TODO] add options for colormap tensor (e.g. colorize according to t, or visibility)
+                assert len(ray_o.shape)==len(ray_e.shape)==2
+                # assert len(visibility.shape)==1
+                assert ray_o.shape[0]==ray_e.shape[0]
+                # ==visibility.shape[0]
+                dirs = o3d.geometry.LineSet()
+                dirs.points = o3d.utility.Vector3dVector(np.vstack((ray_o, ray_e)))
+                # dirs.colors = o3d.utility.Vector3dVector([[1., 0., 0.] if vis == 1 else [0.8, 0.8, 0.8] for vis in visibility]) # red: visible; blue: not visible
+                dirs.colors = o3d.utility.Vector3dVector([[1., 0., 0.]] * ray_o.shape[0])
+                dirs.lines = o3d.utility.Vector2iVector([[_, _+ray_o.shape[0]] for _ in range(ray_o.shape[0])])
+                self.extra_geometry_list.append(dirs)
+
+    def get_pcd_color_fused_geo(self, pcd_color_mode: str):
+        assert pcd_color_mode in ['rgb', 'normal', 'dist_emitter0', 'mi_visibility_emitter0']
         pcd_color = None
 
         if pcd_color_mode == 'rgb':
@@ -283,15 +293,6 @@ class visualizer_openroomsScene_3D_o3d(object):
             # pcd_color = np.ones((visibility.shape[0], 3)) * 0.5
 
             # return xs, ds, ts, visibility
-
-        elif pcd_color_mode == 'input':
-            assert input_colors != ()
-            color_tensor, color_type = input_colors
-            assert color_type in ['dist', 'mask']
-            if color_type == 'mask':
-                pcd_color = color_map_color(color_tensor)
-            if color_type == 'dist':
-                pcd_color = color_map_color(color_tensor, vmin=np.amin(color_tensor), vmax=np.amax(color_tensor))
 
         return pcd_color
         
@@ -388,7 +389,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         # N_pcd = xyz_pcd.shape[0]
 
         pcd_color_mode = dense_geo_params.get('pcd_color_mode', 'rgb')
-        pcd_color = self.get_pcd_color(pcd_color_mode, dense_geo_params.get('input_colors', ()))
+        pcd_color = self.get_pcd_color_fused_geo(pcd_color_mode)
 
         if pcd_color_mode == 'mi_visibility_emitter0': # show all occluded rays
             xs, ds, ts, visibility = _
@@ -783,22 +784,20 @@ class visualizer_openroomsScene_3D_o3d(object):
         normal_scale = mi_params.get('normal_scale', 0.2)
 
         if if_pts:
-            pcd_color_mode = mi_params.get('pcd_color_mode', 'input')
-            assert pcd_color_mode == 'input', 'only support this for mi, for now'
-            pcd_color = self.get_pcd_color(pcd_color_mode, mi_params.get('input_colors'))
-
             for frame_idx, (mi_depth, mi_normals, mi_pts) in enumerate(zip(self.os.mi_depth_list, self.os.mi_normal_global_list, self.os.mi_pts_list)):
                 # assert np.sum(mi_depth==np.inf)==0
                 mi_pts_ = mi_pts[mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
                 pcd_pts = o3d.geometry.PointCloud()
                 pcd_pts.points = o3d.utility.Vector3dVector(mi_pts_)
-                if pcd_color is None:
+                if self.mi_pcd_color_list is None:
                     if if_pts_colorize_rgb:
                         mi_rgb = self.os.im_sdr_list[frame_idx][mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
                         pcd_pts.colors = o3d.utility.Vector3dVector(mi_rgb)
                     else:
                         pcd_pts.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*mi_pts_.shape[0])
                 else:
+                    assert isinstance(self.mi_pcd_color_list, list)
+                    pcd_color = self.mi_pcd_color_list[frame_idx]
                     assert pcd_color[::pts_subsample].shape[0] == mi_pts_.shape[0]
                     pcd_pts.colors = o3d.utility.Vector3dVector(pcd_color[::pts_subsample])
 
@@ -815,3 +814,16 @@ class visualizer_openroomsScene_3D_o3d(object):
 
 
         return geometry_list
+
+    def set_mi_pcd_color_from_input(self, input_colors_tuple: tuple=()):
+        assert input_colors_tuple != ()
+        color_tensor_list, color_type = input_colors_tuple
+        assert len(color_tensor_list) == self.os.frame_num
+        assert color_type in ['dist', 'mask']
+
+        if color_type == 'mask':
+            self.mi_pcd_color_list = [color_map_color(color_tensor) for color_tensor in color_tensor_list]
+        if color_type == 'dist':
+            self.mi_pcd_color_list = [color_map_color(color_tensor, vmin=np.amin(color_tensor), vmax=np.amax(color_tensor)) for color_tensor in color_tensor_list]
+
+        assert self.mi_pcd_color_list is not None

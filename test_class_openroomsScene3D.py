@@ -27,12 +27,16 @@ from lib.class_renderer_openroomsScene_3D import renderer_openroomsScene_3D
 from lib.utils_misc import str2bool
 import argparse
 parser = argparse.ArgumentParser()
+# visualizers
 parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
 parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize in open3D')
 parser.add_argument('--vis_2d_proj', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
-parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help='if create color map for all points')
-parser.add_argument('--pcd_color_mode_mi', type=str, default='input', help='if create color map for all points')
+# options for visualizers
+parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help='colormap for all points in fused geo')
+parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=True, default=False, help='if create color map for all points of Mitsuba; required: input_colors_tuple')
+parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
+# differential renderer
 parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
 parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
 opt = parser.parse_args()
@@ -158,13 +162,14 @@ if opt.render_3d:
         host=host, 
         pts_from='mi')
     
-    renderer_return_dict = renderer_3D.render(frame_idx=0, if_show_rendering_plt=True)
+    renderer_return_dict = renderer_3D.render(frame_idx=0, if_show_rendering_plt=False)
     ts = np.median(renderer_return_dict['ts'], axis=1)
     # ts = renderer_return_dict['ray_o'][:, 0, 0]; ts = ts - np.amin(ts); ts = ts / np.amax(ts)
     visibility = np.amax(renderer_return_dict['visibility'], axis=1)
     print('visibility', visibility.shape, np.sum(visibility)/float(visibility.shape[0]))
     # from scipy import stats
     # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
+
 
 if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
@@ -180,6 +185,35 @@ if opt.vis_3d_o3d:
             ], 
     )
 
+    if opt.if_set_pcd_color_mi:
+        '''
+        use results from renderer to colorize Mitsuba/fused points
+        '''
+        assert opt.render_3d
+        assert openrooms_scene.if_has_mitsuba_rays_pts
+        visualizer_3D_o3d.set_mi_pcd_color_from_input(
+            # input_colors_tuple=(ts, 'dist'), # get from renderer, etc.: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-t.png
+            input_colors_tuple=([visibility], 'mask'), # get from renderer, etc.: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-visibility-any.png
+        )
+    
+    if opt.if_add_rays_from_renderer:
+        assert opt.render_3d
+        assert openrooms_scene.if_has_mitsuba_rays_pts
+        _sample_rate = 1
+        # _pts_idx = list(range(openrooms_scene.W*openrooms_scene.H)) # visualize for all scene points
+        _pts_idx = 60 * openrooms_scene.W + 80 # only visualize for one scene point w.r.t. all lamp points
+        visibility = renderer_return_dict['visibility'][_pts_idx].reshape(-1,)[::_sample_rate]
+        visualizer_3D_o3d.add_extra_geometry(
+            [
+                ('rays', {
+                    'ray_o': renderer_return_dict['ray_o'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
+                    'ray_e': renderer_return_dict['ray_e'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
+                    # 'visibility': renderer_return_dict['visibility'].reshape(-1,)[::100], 
+                    # 't': renderer_return_dict['t'], 
+                }), 
+            ]
+            )
+
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={}, 
@@ -190,7 +224,6 @@ if opt.vis_3d_o3d:
             'if_normal': False, # [OPTIONAL] turn off normals to avoid clusters
             'subsample_normal_rate_x': 2, 
             'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
-            # 'input_colors': (ts, 'dist'), 
             }, 
         lighting_SG_params={
             'subsample_lighting_SG_rate': 200, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
@@ -215,9 +248,6 @@ if opt.vis_3d_o3d:
             'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 1,
-            'pcd_color_mode': opt.pcd_color_mode_mi, # using t from differentiable renderer to colorize points
-            # 'input_colors': (ts, 'dist'), # get from renderer, etc.: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-t.png
-            'input_colors': (visibility, 'mask'), # get from renderer, etc.: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-visibility-any.png
 
             'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
@@ -228,11 +258,5 @@ if opt.vis_3d_o3d:
             'normal_scale': 0.2, 
 
         }, 
-        # extra_rays={
-        #     'ray_o': renderer_return_dict['ray_o'], 
-        #     'ray_e': renderer_return_dict['ray_e'], 
-        #     'visibility': renderer_return_dict['visibility'], 
-        #     'ts': renderer_return_dict['ts'], 
-        # }, 
     )
 

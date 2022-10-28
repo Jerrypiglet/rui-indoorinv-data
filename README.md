@@ -199,7 +199,7 @@ Supported 3D differentiable renderers (using GT labels):
   - `ZQ`: Zhengqin's surface renderer (*Li et al., 2020, Inverse Rendering for Complex Indoor Scenes*)
   - `PhySG`: PhySG surface renderer (*Zhang et al., 2021, PhySG*)
 - Direct-lighting-only renderer, via importance sampling on emitter surface
-  - `ZQ_direct`: Zhengqin's emitter-based direct lighting renderer (*Li et al., 2022, Physically-Based Editing...*)
+  - `ZQ_emitter`: Zhengqin's emitter-based direct lighting renderer (*Li et al., 2022, Physically-Based Editing...*)
 
 ### Full lighting renderers from ground truth lighting
 PhySG:
@@ -217,18 +217,25 @@ PhySG:
 ![](images/demo_render_PhySG_Direct_1.png)
 
 ZQ:
-![](images/demo_render_ZQ_Direct_1.png)
+![](images/demo_render_ZQ_emitter_1.png)****
 
 ### Direct-lighting-only renderer
 To render with Zhengqin's emitter-based direct lighting renderer, 
 
 ``` bash
-PYTORCH_ENABLE_MPS_FALLBACK=1 python test_class_openroomsScene3D.py --vis_3d_o3d False --render_3d True --renderer_option ZQ_direct --pcd_color_mode_mi input
+PYTORCH_ENABLE_MPS_FALLBACK=1 python test_class_openroomsScene3D.py --vis_3d_o3d False --render_3d True --renderer_option **ZQ_emitter** --pcd_color_mode_mi input
 ```
 
 ![](images/demo_render_ZQ_emitter.png)
 
-set ``--vis_3d_o3d True`` to visualize the Mistuba points colorized by either scene-lamp ray $t$ or $visibility$ (images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-t.png or images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-visibility-any.png). And set `mi_params['if_cam_rays']=True` to visualize scene-lamp rays.
+set ``--vis_3d_o3d True --if_set_pcd_color_mi True`` to visualize the Mistuba points colorized by either scene-lamp ray $t$ or $visibility$ (images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-t.png or images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-visibility-any.png). And set `mi_params['if_cam_rays']=True` to visualize scene-lamp rays.
+
+Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True``:
+``` bash
+
+```
+![](images/demo_render_ZQ_emitter_rays_1.png)
+![](images/demo_render_ZQ_emitter_rays_2.png)
 # Todolist
 - [ ] **Interactive mode**: map keys to load/offload modalities on-the-go without having to change the flags and restart the viewer
 - [ ] **Mitsuba scene**: enabling emitters and materials -> differentiable RGB rendering 

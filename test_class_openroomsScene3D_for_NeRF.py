@@ -106,7 +106,7 @@ openrooms_scene = openroomsScene3D(
 openrooms_scene.pose_list # [R|t]; camera coordinates is in OpenCV convention (right-down-forward) (same as ScanNet)
 openrooms_scene.im_hdr_list # HDR images
 openrooms_scene.K # intrinsics; again in OpenCV convention
-openrooms_scene.im_H_resize, openrooms_scene.im_W_resize # original rendered images are of 480x640; resized to this dimension
+H, W # original rendered images are of 480x640; resized to this dimension
 
 '''
 dump mesh (1) from loaded objects in openrooms_scene

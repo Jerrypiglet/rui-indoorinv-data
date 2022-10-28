@@ -95,7 +95,7 @@ class openroomsScene2D(object):
         self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
         self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
         self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
-
+        self.H, self.W = self.im_H_resize, self.im_W_resize
 
         '''
         BRDF, lighting properties

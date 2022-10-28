@@ -296,7 +296,7 @@ class openroomsScene3D(openroomsScene2D):
         # self.num_vertices = 0
         obj_path_list = []
         self.shape_list_valid = []
-        self.window_list = []
+        self.Window_list = []
         self.lamp_list = []
         
         print(blue_text('[openroomsScene3D] loading %d shapes and %d emitters...'%(len(self.shape_list_ori), len(self.emitter_list[1:]))))
@@ -373,13 +373,13 @@ class openroomsScene3D(openroomsScene2D):
 
             if if_emitter:
                 if shape['emitter_prop']['obj_type'] == 'window':
-                    self.window_list.append((shape, vertices_transformed, faces))
+                    self.Window_list.append((shape, vertices_transformed, faces))
                 elif shape['emitter_prop']['obj_type'] == 'obj':
                     self.lamp_list.append((shape, vertices_transformed, faces))
 
         print(blue_text('[openroomsScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d lamps lit'%(
             len(self.shape_list_valid), 
-            len([_ for _ in self.window_list if _[0]['emitter_prop']['if_lit_up']]), len(self.window_list), 
+            len([_ for _ in self.Window_list if _[0]['emitter_prop']['if_lit_up']]), len(self.Window_list), 
             len([_ for _ in self.lamp_list if _[0]['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
             )))
 
