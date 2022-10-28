@@ -30,6 +30,7 @@ def loadMesh(name):
 
 
 def writeMesh(name, vertices, faces):
+    assert np.amin(faces)>=1, 'faces has to be 1-based!'
     with open(name, 'w') as meshOut:
         for n in range(0, vertices.shape[0]):
             meshOut.write('v %.3f %.3f %.3f\n' %

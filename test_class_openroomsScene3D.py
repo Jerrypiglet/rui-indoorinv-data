@@ -158,12 +158,13 @@ if opt.render_3d:
         host=host, 
         pts_from='mi')
     
-    renderer_return_dict = renderer_3D.render(frame_idx=0, if_show_rendering_plt=False)
+    renderer_return_dict = renderer_3D.render(frame_idx=0, if_show_rendering_plt=True)
     ts = np.median(renderer_return_dict['ts'], axis=1)
     # ts = renderer_return_dict['ray_o'][:, 0, 0]; ts = ts - np.amin(ts); ts = ts / np.amax(ts)
-    # visibility = np.median(renderer_return_dict['visibility'], axis=1)
-    from scipy import stats
-    visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
+    visibility = np.amax(renderer_return_dict['visibility'], axis=1)
+    print('visibility', visibility.shape, np.sum(visibility)/float(visibility.shape[0]))
+    # from scipy import stats
+    # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
 
 if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
@@ -214,9 +215,9 @@ if opt.vis_3d_o3d:
             'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 1,
-            'pcd_color_mode': opt.pcd_color_mode_mi, # using t from differentiable renderer to colorize points: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-t.png
-            'input_colors': (ts, 'dist'), # get from renderer, etc.
-            # 'input_colors': (visibility, 'mask'), # get from renderer, etc.
+            'pcd_color_mode': opt.pcd_color_mode_mi, # using t from differentiable renderer to colorize points
+            # 'input_colors': (ts, 'dist'), # get from renderer, etc.: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-t.png
+            'input_colors': (visibility, 'mask'), # get from renderer, etc.: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-visibility-any.png
 
             'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length

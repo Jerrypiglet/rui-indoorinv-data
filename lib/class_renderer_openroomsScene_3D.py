@@ -240,6 +240,19 @@ class renderer_openroomsScene_3D(object):
         e1 = v2 - v1
         e2 = v3 - v1
         lpts_normal = np.cross(e1, e2)
+
+        # [DEBUG] get rid of upper faces
+        # faces = faces[lpts_normal[:, 1]<0]
+        # from lib.utils_OR.utils_OR_mesh import writeMesh
+        # writeMesh('tmp_mesh.obj', vertices, faces)
+        # v1 = vertices[faces[:, 0]-1, :]
+        # v2 = vertices[faces[:, 1]-1, :]
+        # v3 = vertices[faces[:, 2]-1, :]
+        # lpts = 1.0 / 3.0 * (v1 + v2 + v3)
+        # e1 = v2 - v1
+        # e2 = v3 - v1
+        # lpts_normal = np.cross(e1, e2)
+
         lpts_area = 0.5 * np.sqrt(np.sum(
             lpts_normal * lpts_normal, axis=1, keepdims = True))
         lpts_normal = lpts_normal / np.maximum(2 * lpts_area, 1e-6)
@@ -277,8 +290,8 @@ class renderer_openroomsScene_3D(object):
 
         pts_cos = torch.sum(l_dirs * normal.unsqueeze(1), dim=2, keepdim=True) # (N, M=256, 1); == ndl [!!!!!]
         lpt_cos = torch.clamp(torch.sum(l_dirs * lpts_normal.unsqueeze(0), dim=2, keepdim=True), -1, 1) # (N, M=256, 1)
-        # pts_intensity = lpts_intensity.unsqueeze(0) * torch.clamp(pts_cos, min=0, max=1) * lpt_cos.abs() # (N, M=256, 3)
-        pts_intensity = lpts_intensity.unsqueeze(0) * torch.clamp(pts_cos, min=0, max=1) * torch.clamp(lpt_cos, min=0, max=1) # (N, M=256, 3)
+        pts_intensity = lpts_intensity.unsqueeze(0) * torch.clamp(pts_cos, min=0, max=1) * lpt_cos.abs() # (N, M=256, 3)
+        # pts_intensity = lpts_intensity.unsqueeze(0) * torch.clamp(pts_cos, min=0, max=1) * torch.clamp(lpt_cos, min=0, max=1) # (N, M=256, 3)
         pts_intensity_weighted = pts_intensity / pts_distL2 * lpts_area.unsqueeze(0) / prob
 
         # >>>> compute visibility
@@ -291,13 +304,14 @@ class renderer_openroomsScene_3D(object):
         # ds = (torch.from_numpy(center.reshape(1, 1, 3)) - pts.unsqueeze(1).expand(-1, M_lpts, -1).cpu()).flatten(0, 1)
         ds_mi = mi.Vector3f(ds)
         xs = pts.unsqueeze(1).expand(-1, M_lpts, -1).flatten(0, 1).cpu()
-        xs_mi = mi.Point3f(xs+0.01*ds)
+        xs_mi = mi.Point3f(xs+1e-4*ds)
         # ray origin, direction, t_max
         rays_mi = mi.Ray3f(xs_mi, ds_mi)
         ret = self.os.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
         ts = ret.t.torch()
-        visibility = np.logical_and(ts > 1e-2, ts < (pts_distL2.flatten().cpu() - 1e-2))
-        visibility = 1. - visibility.float()
+        # visibility = np.logical_and(ts > 1e-3, ts < (pts_distL2.flatten().cpu()-1e-2))
+        # visibility = 1. - visibility.float()
+        visibility = (ts > (pts_distL2.flatten().cpu()-1e-2)).float()
         # <<<< compute visibility
 # 
         pts_intensity_weighted = pts_intensity_weighted * visibility.view(N_pts, M_lpts, 1).to(self.device)
