@@ -104,6 +104,24 @@ class openroomsScene3D(openroomsScene2D):
             if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'mi': self.load_mi(self.mi_params_dict)
 
+    def get_modality(self, modality):
+        if modality in super().valid_modalities:
+            return super(openroomsScene3D, self).get_modality(modality)
+
+        if 'mi_' in modality:
+            assert self.pts_from['mi']
+
+        if modality == 'mi_depth': 
+            return self.mi_depth_list
+        elif modality == 'mi_normal': 
+            return self.mi_normal_global_list
+        elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
+            seg_key = modality.split('_')[-1] 
+            return self.seg_dict_of_lists[seg_key]
+        else:
+            assert False, 'Unsupported modality: ' + modality
+
+
     def load_mi(self, mi_params_dict={}):
         '''
         load scene representation into Mitsuba 3

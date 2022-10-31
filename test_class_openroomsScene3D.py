@@ -30,7 +30,7 @@ parser = argparse.ArgumentParser()
 # visualizers
 parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
 parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize in open3D')
-parser.add_argument('--vis_2d_proj', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
+parser.add_argument('--vis_2d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
 # options for visualizers
 parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help='colormap for all points in fused geo')
@@ -66,26 +66,26 @@ data/public_re_3/mainDiffLight_xml1/scene0552_00_more/im_4.png
 '''
 meta_split = 'mainDiffLight_xml1'
 scene_name = 'scene0552_00_more'
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
-frame_ids = [2]
+frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
+# frame_ids = [2]
 
 '''
 The lounge with very specular floor and 3 lamps
 data/public_re_3/main_xml/scene0008_00_more/im_58.png
 '''
-meta_split = 'main_xml'
-scene_name = 'scene0008_00_more'
+# meta_split = 'main_xml'
+# scene_name = 'scene0008_00_more'
 # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-frame_ids = [114]
+# frame_ids = [114]
 
 '''
 The conference room with one lamp
 data/public_re_3/main_xml/scene0005_00_more/im_3.png
 '''
-meta_split = 'main_xml'
-scene_name = 'scene0005_00_more'
+# meta_split = 'main_xml'
+# scene_name = 'scene0005_00_more'
 # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-frame_ids = [3]
+# frame_ids = [3]
 
 openrooms_scene = openroomsScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
@@ -96,8 +96,8 @@ openrooms_scene = openroomsScene3D(
         'im_sdr', 'poses', 'seg', 
         'im_hdr', 'albedo', 'roughness', 
         'depth', 'normal', 
-        'lighting_SG', 
-        'lighting_envmap', 
+        # 'lighting_SG', 
+        # 'lighting_envmap', 
         'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
@@ -130,12 +130,16 @@ openrooms_scene = openroomsScene3D(
         },
 )
 
-if opt.vis_2d_proj:
+if opt.vis_2d_plt:
     visualizer_2D = visualizer_openroomsScene_2D(
         openrooms_scene, 
         modality_list_vis=[
-            'layout', 
+            # 'layout', 
             # 'shapes', 
+            # 'depth', 'mi_depth', 
+            # 'normal', 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            'seg_area', 'seg_env', 'seg_obj', 
+            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         frame_idx_list=[0, 1, 2, 3, 4], 
     )
@@ -149,8 +153,6 @@ if opt.vis_3d_plt:
             'shapes', # boxes and labels (no meshes in plt visualization)
             'emitters', # emitter properties
             'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
-            'mi_depth_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            'mi_seg', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
     )
     visualizer_3D_plt.vis_3d_with_plt()
@@ -160,11 +162,19 @@ if opt.render_3d:
         openrooms_scene, 
         renderer_option=opt.renderer_option, 
         host=host, 
-        pts_from='mi')
+        renderer_params={
+            'pts_from': 'mi', 
+        }
+    )
     
-    renderer_return_dict = renderer_3D.render(frame_idx=0, if_show_rendering_plt=False)
+    renderer_return_dict = renderer_3D.render(
+        frame_idx=0, 
+        if_show_rendering_plt=True, 
+        render_params={
+            'max_plate': 256, 
+            'emitter_type_index': ('lamp', 0), 
+        })
     ts = np.median(renderer_return_dict['ts'], axis=1)
-    # ts = renderer_return_dict['ray_o'][:, 0, 0]; ts = ts - np.amin(ts); ts = ts / np.amax(ts)
     visibility = np.amax(renderer_return_dict['visibility'], axis=1)
     print('visibility', visibility.shape, np.sum(visibility)/float(visibility.shape[0]))
     # from scipy import stats
@@ -199,20 +209,21 @@ if opt.vis_3d_o3d:
     if opt.if_add_rays_from_renderer:
         assert opt.render_3d
         assert openrooms_scene.if_has_mitsuba_rays_pts
-        _sample_rate = 1
-        # _pts_idx = list(range(openrooms_scene.W*openrooms_scene.H)) # visualize for all scene points
-        _pts_idx = 60 * openrooms_scene.W + 80 # only visualize for one scene point w.r.t. all lamp points
+        
+        _pts_idx = list(range(openrooms_scene.W*openrooms_scene.H)); _sample_rate = 1000 # visualize for all scene points;
+        # _pts_idx = 60 * openrooms_scene.W + 80; _sample_rate = 1 # only visualize for one scene point w.r.t. all lamp points
         visibility = renderer_return_dict['visibility'][_pts_idx].reshape(-1,)[::_sample_rate]
-        visualizer_3D_o3d.add_extra_geometry(
-            [
-                ('rays', {
-                    'ray_o': renderer_return_dict['ray_o'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
-                    'ray_e': renderer_return_dict['ray_e'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
-                    # 'visibility': renderer_return_dict['visibility'].reshape(-1,)[::100], 
-                    # 't': renderer_return_dict['t'], 
-                }), 
-            ]
-            )
+        visualizer_3D_o3d.add_extra_geometry([
+            ('rays', {
+                'ray_o': renderer_return_dict['ray_o'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
+                'ray_e': renderer_return_dict['ray_e'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
+                # 'visibility': renderer_return_dict['visibility'].reshape(-1,)[::100], 
+                # 't': renderer_return_dict['t'], 
+            }), 
+            # ('pts', {
+            #     'pts': renderer_return_dict['ray_o'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
+            # }), 
+            ])
 
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 

@@ -130,7 +130,7 @@ class openroomsScene2D(object):
         return [
             'im_hdr', 'im_sdr', 'poses', 
             'albedo', 'roughness', 'depth', 'normal', 
-            'seg', 
+            'seg', 'seg_area', 'seg_env', 'seg_obj', 
             'lighting_SG', 'lighting_envmap', 
             'semseg', 'matseg', 
             ]
@@ -180,7 +180,6 @@ class openroomsScene2D(object):
         return len(self.frame_id_list)
 
     def get_modality(self, modality):
-        
         if modality == 'im_sdr': 
             return self.im_sdr_list
         elif modality == 'im_hdr': 

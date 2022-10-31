@@ -31,7 +31,7 @@ class renderer_openroomsScene_3D(object):
         openrooms_scene, 
         renderer_option: str, 
         host: str, # machine
-        pts_from: str='mi', # 'mi': ray-intersection with mitsuba scene; 'depth': backprojected from OptixRenderer renderer depth maps
+        renderer_params: dict={}, 
     ):
 
         assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
@@ -50,13 +50,10 @@ class renderer_openroomsScene_3D(object):
                 )
         if self.renderer_option == 'ZQ_emitter':
             self.render_layer_ZQ_from_emitter = rendering_layer_per_point_from_emitter(
-                imWidth=self.os.W, imHeight=self.os.H, 
-                env_width=self.os.lighting_params_dict['env_width'], 
-                env_height=self.os.lighting_params_dict['env_height'], 
                 device=self.device, 
                 )
 
-        self.pts_from = pts_from
+        self.pts_from = renderer_params.get('pts_from', 'mi') # 'mi': ray-intersection with mitsuba scene; 'depth': backprojected from OptixRenderer renderer depth maps
         assert self.pts_from in ['mi', 'depth']
         if self.pts_from == 'mi':
             assert self.os.if_has_mitsuba_scene and self.os.pts_from['mi']
@@ -76,16 +73,22 @@ class renderer_openroomsScene_3D(object):
         if self.device == 'cpu':
             print(yellow('[WARNING] rendering could be slow because device is cpu at %s'%host))
 
-    def render(self, frame_idx: int, if_show_rendering_plt: bool=True):
+    def render(
+        self, 
+        frame_idx: int, 
+        if_show_rendering_plt: bool=True, 
+        render_params: dict={}, 
+    ):
         '''
         frame_idx: 0-based indexing into all frames: [0, 1, ..., self.os.frame_num-1]
         '''
+        
         if self.renderer_option == 'PhySG':
             return_dict = self.render_PhySG(frame_idx)
         if self.renderer_option == 'ZQ':
             return_dict = self.render_ZQ(frame_idx)
         if self.renderer_option == 'ZQ_emitter':
-            return_dict = self.render_ZQ_emitter(frame_idx)
+            return_dict = self.render_ZQ_emitter(frame_idx, render_params=render_params)
 
         im_sdr = np.clip(self.os.im_hdr_list[frame_idx]**(1./2.2), 0., 1.)
 
@@ -209,13 +212,16 @@ class renderer_openroomsScene_3D(object):
 
         return return_dict
 
-    def render_ZQ_emitter(self, frame_idx, max_plate=256):
+    def render_ZQ_emitter(
+        self, 
+        frame_idx, 
+        render_params={}, 
+    ):
+        max_plate = render_params.get('max_plate', 256)
+        (emitter_type, emitter_index) = render_params.get('emitter_type_index')
         '''
         [TODO] simplify lamp mesh
         '''
-        H, W = self.os.H, self.os.W
-        N_frames = 1
-
         albedo = torch.from_numpy(self.os.albedo_list[frame_idx]).to(self.device).flatten(0, 1) # (N, 3)
         roughness = torch.from_numpy(self.os.roughness_list[frame_idx]).to(self.device).flatten(0, 1) # (N, 1)
         # normal_cam_opengl = torch.from_numpy(self.os.mi_normal_list[frame_idx]).to(self.device).flatten(0, 1) # (N, 3)
@@ -227,7 +233,8 @@ class renderer_openroomsScene_3D(object):
         _, rays_d, _ = self.os.cam_rays_list[frame_idx]
         viewdirs = -torch.from_numpy(rays_d).to(self.device).flatten(0, 1)
         
-        lamp, vertices, faces = self.os.lamp_list[0]
+        assert emitter_type == 'lamp', 'no support for windows for now'
+        lamp, vertices, faces = self.os.lamp_list[emitter_index]
         intensity = lamp['emitter_prop']['intensity'] # (3,)
         center = lamp['emitter_prop']['box3D_world']['center'] # (3,)
 
@@ -320,17 +327,12 @@ class renderer_openroomsScene_3D(object):
         pts_intensity_weighted = pts_intensity_weighted * visibility.view(N_pts, M_lpts, 1).to(self.device)
 
         tic = time.time()
-        diffuse, specular = self.render_layer_ZQ_from_emitter.forwardEnv(
+        diffuse, specular = self.render_layer_ZQ_from_emitter.forward_rays(
             normal=normal, 
             albedo=albedo, 
             roughness=roughness, 
             v_dirs=viewdirs, # scene points to camera center (-ray_d)
-            # lpts=lpts, # (M, 3), points on the lamp
             l_dirs=l_dirs, # (N, M=256, 3), dir: scene points to lamp
-            # pts_distL2=pts_distL2, # (N, M=256, 1), dist: scene points to lamp
-            # lpts_normal=lpts_normal, 
-            # lpts_area=lpts_area, 
-            # lpts_intensityensity=lpts_intensityensity, 
             pts_intensity_weighted=pts_intensity_weighted, 
             )
         rgb_marched_hdr = diffuse + specular

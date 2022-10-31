@@ -230,7 +230,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         return o3d_geometry_list
 
     def add_extra_geometry(self, geometry_list: list=[]):
-        valid_extra_geometry_list = ['rays']
+        valid_extra_geometry_list = ['rays', 'pts']
         for geometry_type, geometry in geometry_list:
             assert geometry_type in valid_extra_geometry_list
             if geometry_type == 'rays':
@@ -248,6 +248,12 @@ class visualizer_openroomsScene_3D_o3d(object):
                 dirs.colors = o3d.utility.Vector3dVector([[1., 0., 0.]] * ray_o.shape[0])
                 dirs.lines = o3d.utility.Vector2iVector([[_, _+ray_o.shape[0]] for _ in range(ray_o.shape[0])])
                 self.extra_geometry_list.append(dirs)
+            if geometry_type == 'pts':
+                pts = geometry['pts'] # (N, 3)
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(pts)
+                pcd.colors = o3d.utility.Vector3dVector([[0., 0., 0.]]*pts.shape[0])
+                self.extra_geometry_list.append(pcd)
 
     def get_pcd_color_fused_geo(self, pcd_color_mode: str):
         assert pcd_color_mode in ['rgb', 'normal', 'dist_emitter0', 'mi_visibility_emitter0']
