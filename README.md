@@ -168,6 +168,9 @@ dense_geo:
 lighting_SG:
 ![](images/demo_lighting_SG_o3d.png)
 
+lighting_envmap:
+![](images/demo_lighting_envmap_o3d.png)
+
 shapes:
 ![](images/demo_shapes_o3d.png)
 
@@ -237,6 +240,7 @@ Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True
 ![](images/demo_render_ZQ_emitter_rays_1.png)
 ![](images/demo_render_ZQ_emitter_rays_2.png)
 # Todolist
+- [ ] vis envmap
 - [ ] **Interactive mode**: map keys to load/offload modalities on-the-go without having to change the flags and restart the viewer
 - [ ] **Mitsuba scene**: enabling emitters and materials -> differentiable RGB rendering 
 - [ ] write ``rL.forwardEnv`` to Numpy version to replace in *utils_openrooms.py*

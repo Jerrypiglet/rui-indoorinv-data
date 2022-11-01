@@ -54,7 +54,7 @@ class visualizer_openroomsScene_3D_o3d(object):
 
         self.modality_list_vis = modality_list_vis
         for _ in self.modality_list_vis:
-            assert _ in ['dense_geo', 'cameras', 'lighting_SG', 'layout', 'shapes', 'emitters', 'mi']
+            assert _ in ['dense_geo', 'cameras', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi']
         if 'mi' in self.modality_list_vis:
             self.mi_pcd_color_list = None
         self.extra_geometry_list = []
@@ -182,7 +182,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         modality_list: list, 
         cam_params: dict = {}, 
         dense_geo_params: dict = {}, 
-        lighting_SG_params: dict = {}, 
+        lighting_params: dict = {}, 
         layout_params: dict = {}, 
         shapes_params: dict = {}, 
         emitters_params: dict = {}, 
@@ -200,11 +200,13 @@ class visualizer_openroomsScene_3D_o3d(object):
             )
         
         if 'lighting_SG' in modality_list:
-            '''
-            the classroom scene: images/demo_lighting_SG_o3d.png
-            '''
             o3d_geometry_list += self.collect_lighting_SG(
-                lighting_SG_params
+                lighting_params
+            )
+
+        if 'lighting_envmap' in modality_list:
+            o3d_geometry_list += self.collect_lighting_envmap(
+                lighting_params
             )
 
         if 'layout' in modality_list:
@@ -457,65 +459,88 @@ class visualizer_openroomsScene_3D_o3d(object):
 
         return geometry_list
 
-    def collect_lighting_SG(self, lighting_SG_params: dict={}):
-
+    def collect_lighting_SG(self, lighting_params: dict={}):
+        '''
+        the classroom scene: images/demo_lighting_SG_o3d.png
+        '''
         assert self.os.if_has_lighting_SG
 
-        subsample_lighting_SG_rate = lighting_SG_params.get('subsample_lighting_SG_rate', 1)
-        SG_scale = lighting_SG_params.get('SG_scale', 1.) # if autoscale, act as extra scale
-        SG_keep_ratio = lighting_SG_params.get('SG_keep_ratio', 0.05)
-        SG_clip_ratio = lighting_SG_params.get('SG_clip_ratio', 0.1)
-        SG_autoscale = lighting_SG_params.get('SG_autoscale', True)
-        # if SG_autoscale:
-        #     SG_scale = 1.
+        subsample_lighting_pts_rate = lighting_params.get('subsample_lighting_pts_rate', 1)
+        if_use_mi_geometry = lighting_params.get('if_use_mi_geometry', True)
+        lighting_SG_fused_dict = self.os._fuse_3D_lighting(subsample_rate_pts=subsample_lighting_pts_rate, if_use_mi_geometry=if_use_mi_geometry, lighting_source='lighting_SG')
 
-        lighting_SG_fused_dict = self.os._fuse_3D_lighting_SG(subsample_rate=subsample_lighting_SG_rate)
+        geometry_list = self.process_lighting(lighting_SG_fused_dict, lighting_params=lighting_params, lighting_source='lighting_SG')
+        return geometry_list
 
-        xyz_SG_pcd, normal_SG_pcd, axis_SG_pcd, weight_SG_pcd, lamb_SG_pcd = get_list_of_keys(lighting_SG_fused_dict, ['X_global_SG', 'normal_global_SG', 'axis_SG', 'weight_SG', 'lamb_SG'])
+    def collect_lighting_envmap(self, lighting_params: dict={}):
+        '''
+        the classroom scene: images/demo_lighting_envmap_o3d.png
+        '''
+        assert self.os.if_has_lighting_envmap
 
-        N_pts = xyz_SG_pcd.shape[0]
-        SG_num = axis_SG_pcd.shape[1]
+        subsample_lighting_pts_rate = lighting_params.get('subsample_lighting_pts_rate', 1)
+        lighting_envmap_fused_dict = self.os._fuse_3D_lighting(subsample_rate_pts=subsample_lighting_pts_rate, lighting_source='lighting_envmap')
 
-        xyz_SG_pcd = np.tile(np.expand_dims(xyz_SG_pcd, 1), (1, SG_num, 1)).reshape((-1, 3))
-        length_SG_pcd = np.linalg.norm(weight_SG_pcd.reshape((-1, 3)), axis=1, keepdims=True) / 500.
-        
+        geometry_list = self.process_lighting(lighting_envmap_fused_dict, lighting_params=lighting_params, lighting_source='lighting_envmap', lighting_color=[1., 0., 1.]) # pink
+        return geometry_list
+
+    def process_lighting(self, lighting_fused_dict: dict, lighting_source: str, lighting_params: dict={}, lighting_color=[0., 0., 1.]):
+        assert lighting_source in ['lighting_SG', 'lighting_envmap'] # not supporting 'lighting_sampled' yet
+
+        lighting_scale = lighting_params.get('lighting_scale', 1.) # if autoscale, act as extra scale
+        lighting_keep_ratio = lighting_params.get('lighting_keep_ratio', 0.05)
+        lighting_clip_ratio = lighting_params.get('lighting_clip_ratio', 0.1)
+        lighting_autoscale = lighting_params.get('lighting_autoscale', True)
+        # if lighting_autoscale:
+        #     lighting_scale = 1.
+
+        # if lighting_source == 'lighting_SG':
+        #     xyz_pcd, normal_pcd, axis_pcd, weight_pcd, lamb_SG_pcd = get_list_of_keys(lighting_fused_dict, ['X_global_lighting', 'normal_global_lighting', 'axis', 'weight_SG', 'lamb_SG'])
+        # if lighting_source == 'lighting_envmap':
+        xyz_pcd, normal_pcd, axis_pcd, weight_pcd = get_list_of_keys(lighting_fused_dict, ['X_global_lighting', 'normal_global_lighting', 'axis', 'weight']) # [TODO] lamb is not visualized for now
+
+        N_pts = xyz_pcd.shape[0]
+        wi_num = axis_pcd.shape[1] # num of rays per-point
+
+        xyz_pcd = np.tile(np.expand_dims(xyz_pcd, 1), (1, wi_num, 1)).reshape((-1, 3))
+        length_pcd = np.linalg.norm(weight_pcd.reshape((-1, 3)), axis=1, keepdims=True) / 500.
 
         # keep only SGs pointing towards outside of the surface
-        axis_SG_mask = np.ones_like(length_SG_pcd.squeeze()).astype(bool)
-        axis_SG_mask = np.sum(np.repeat(np.expand_dims(normal_SG_pcd, 1), SG_num, axis=1) * axis_SG_pcd, axis=2) > 0.
-        axis_SG_mask =  axis_SG_mask.reshape(-1) # (N*12,)
+        axis_mask = np.ones_like(length_pcd.squeeze()).astype(bool)
+        axis_mask = np.sum(np.repeat(np.expand_dims(normal_pcd, 1), wi_num, axis=1) * axis_pcd, axis=2) > 0.
+        axis_mask =  axis_mask.reshape(-1) # (N*12,)
 
-        if SG_keep_ratio > 0.:
-            assert SG_keep_ratio > 0. and SG_keep_ratio <= 1.
-            percentile = np.percentile(length_SG_pcd.flatten(), 100-SG_keep_ratio*100)
-            axis_SG_mask = np.logical_and(axis_SG_mask, length_SG_pcd.flatten() > percentile) # (N*12,)
+        if lighting_keep_ratio > 0.:
+            assert lighting_keep_ratio > 0. and lighting_keep_ratio <= 1.
+            percentile = np.percentile(length_pcd.flatten(), 100-lighting_keep_ratio*100)
+            axis_mask = np.logical_and(axis_mask, length_pcd.flatten() > percentile) # (N*12,)
         else:
             pass
 
-        if SG_clip_ratio > 0.: # within keeped SGs
-            assert SG_clip_ratio > 0. and SG_clip_ratio <= 1.
-            percentile = np.percentile(length_SG_pcd[axis_SG_mask].flatten(), 100-SG_clip_ratio*100)
-            length_SG_pcd[length_SG_pcd > percentile] = percentile
+        if lighting_clip_ratio > 0.: # within keeped SGs
+            assert lighting_clip_ratio > 0. and lighting_clip_ratio <= 1.
+            percentile = np.percentile(length_pcd[axis_mask].flatten(), 100-lighting_clip_ratio*100)
+            length_pcd[length_pcd > percentile] = percentile
 
-        if SG_autoscale:
-            # ic(np.amax(length_SG_pcd))
-            ceiling_y, floor_y = np.amax(xyz_SG_pcd[:, 2]), np.amin(xyz_SG_pcd[:, 2])
-            length_SG_pcd = length_SG_pcd / np.amax(length_SG_pcd) * abs(ceiling_y - floor_y)
-            # ic(np.amax(length_SG_pcd))
+        if lighting_autoscale:
+            # ic(np.amax(length_pcd))
+            ceiling_y, floor_y = np.amax(xyz_pcd[:, 2]), np.amin(xyz_pcd[:, 2])
+            length_pcd = length_pcd / np.amax(length_pcd) * abs(ceiling_y - floor_y)
+            # ic(np.amax(length_pcd))
         
-        length_SG_pcd *= SG_scale
+        length_pcd *= lighting_scale
 
-        axis_SG_pcd_end = xyz_SG_pcd + length_SG_pcd * axis_SG_pcd.reshape((-1, 3))
-        xyz_SG_pcd, axis_SG_pcd_end = xyz_SG_pcd[axis_SG_mask], axis_SG_pcd_end[axis_SG_mask]
-        N_pts = xyz_SG_pcd.shape[0]
-        print('Showing %d lighting SGs...'%N_pts)
+        axis_pcd_end = xyz_pcd + length_pcd * axis_pcd.reshape((-1, 3))
+        xyz_pcd, axis_pcd_end = xyz_pcd[axis_mask], axis_pcd_end[axis_mask]
+        N_pts = xyz_pcd.shape[0]
+        print('Showing lighting for %d points...'%N_pts)
         
-        axis_SGs = o3d.geometry.LineSet()
-        axis_SGs.points = o3d.utility.Vector3dVector(np.vstack((xyz_SG_pcd, axis_SG_pcd_end)))
-        axis_SGs.colors = o3d.utility.Vector3dVector([[0., 0., 1.] for _ in range(N_pts)])
-        axis_SGs.lines = o3d.utility.Vector2iVector([[_, _+N_pts] for _ in range(N_pts)])
+        lighting_arrows = o3d.geometry.LineSet()
+        lighting_arrows.points = o3d.utility.Vector3dVector(np.vstack((xyz_pcd, axis_pcd_end)))
+        lighting_arrows.colors = o3d.utility.Vector3dVector([lighting_color for _ in range(N_pts)])
+        lighting_arrows.lines = o3d.utility.Vector2iVector([[_, _+N_pts] for _ in range(N_pts)])
         
-        geometry_list = [axis_SGs]
+        geometry_list = [lighting_arrows]
 
         return geometry_list
 

@@ -278,7 +278,6 @@ class renderDirecLighting:
             else:
                 pts_int = lpt_int[n:n+1, :] * torch.clamp(pts_cos, min=0, max=1) \
                         * lpt_cos.abs()
-                import ipdb; ipdb.set_trace()
 
             pts_shading = pts_int / pts_distL2.detach() * lpts_area.detach() / prob
 

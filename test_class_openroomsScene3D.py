@@ -85,13 +85,15 @@ data/public_re_3/main_xml/scene0008_00_more/im_58.png
 The conference room with one lamp
 data/public_re_3/main_xml/scene0005_00_more/im_3.png
 '''
-# meta_split = 'main_xml'
-# scene_name = 'scene0005_00_more'
+meta_split = 'main_xml'
+scene_name = 'scene0005_00_more'
 # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
 # frame_ids = [3]
 # frame_ids = list(range(102))
+frame_ids = list(range(5, 102, 20))
 
 openrooms_scene = openroomsScene3D(
+    if_debug_info=opt.if_debug_info, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
         'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root}, 
     scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
@@ -100,7 +102,7 @@ openrooms_scene = openroomsScene3D(
         'im_sdr', 'poses', 'seg', 
         # 'im_hdr', 'albedo', 'roughness', 
         'depth', 'normal', 
-        'lighting_SG', 
+        # 'lighting_SG', 
         'lighting_envmap', 
         'layout', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
@@ -116,7 +118,8 @@ openrooms_scene = openroomsScene3D(
         'env_row': 120, 'env_col': 160, 'SG_num': 12, 
         # 'env_height': 16, 'env_width': 32, 
         'env_height': 8, 'env_width': 16, 
-        'if_convert_lighting_SG_to_global': False, 
+        'if_convert_lighting_SG_to_global': True, 
+        'if_use_mi_geometry': True, 
     }, 
     shape_params_dict={
         'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
@@ -145,7 +148,7 @@ if opt.vis_2d_plt:
             # 'shapes', 
             # 'depth', 'mi_depth', 
             # 'normal', 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
+            # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             'lighting_envmap', 
             # 'seg_area', 'seg_env', 'seg_obj', 
             # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
@@ -209,11 +212,12 @@ if opt.vis_3d_o3d:
         modality_list_vis=[
             # 'dense_geo', 
             'cameras', 
-            # 'lighting_SG', 
+            # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
+            'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             'layout', 
             # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             # 'emitters', # emitter properties (e.g. SGs, half envmaps)
-            'mi', #mitsuba sampled rays, pts
+            'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -259,15 +263,17 @@ if opt.vis_3d_o3d:
             'subsample_normal_rate_x': 2, 
             'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
             }, 
-        lighting_SG_params={
-            'subsample_lighting_SG_rate': 200, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
-            # 'SG_scale': 1., 
-            # 'SG_keep_ratio': 0.05, 
-            # 'SG_clip_ratio': 0.1, 
-            'SG_scale': 0.5, 
-            'SG_keep_ratio': 0.2, 
-            'SG_clip_ratio': 0.3, 
-            'SG_autoscale': True, 
+        lighting_params={
+            'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+            # 'lighting_scale': 1., 
+            # 'lighting_keep_ratio': 0.05, 
+            # 'lighting_clip_ratio': 0.1, 
+            'lighting_scale': 0.5, 
+            # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
+            # 'lighting_clip_ratio': 0.3, 
+            'lighting_keep_ratio': 0.1, # - good for lighting_envmap
+            'lighting_clip_ratio': 0.2, 
+            'lighting_autoscale': True, 
             }, 
         shapes_params={
             'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
@@ -292,7 +298,6 @@ if opt.vis_3d_o3d:
             'if_normal': False, 
             'normal_subsample': 50, 
             'normal_scale': 0.2, 
-
         }, 
     )
 

@@ -1,12 +1,11 @@
 from webbrowser import BackgroundBrowser
 import numpy as np
-import open3d as o3d
-from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, check_list_of_tensors_size
+import time
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 import matplotlib.pyplot as plt
 from lib.utils_vis import vis_index_map, colorize
-from lib.utils_rendering_ZQ import output2env_per_point_torch
+from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
 from lib.utils_OR.utils_OR_cam import project_3d_line
 from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
 class visualizer_openroomsScene_2D(object):
@@ -38,7 +37,7 @@ class visualizer_openroomsScene_2D(object):
 
         self.semseg_colors = np.loadtxt('data/colors/openrooms_colors.txt').astype('uint8')
         if any([_ in ['lighting_SG'] for _ in self.modality_list_vis]):
-            self.output2env = output2env_per_point_torch(
+            self.converter_SG_to_envmap = converter_SG_to_envmap(
                 SG_num=self.os.lighting_params_dict['SG_num'], 
                 env_width=self.os.lighting_params_dict['env_width'], 
                 env_height=self.os.lighting_params_dict['env_height']
@@ -188,7 +187,12 @@ class visualizer_openroomsScene_2D(object):
                 axis_local, lamb, weight = np.split(_im, [3, 4], axis=3)
                 if self.os.if_has_HDR_scale:
                     weight = weight / self.os.hdr_scale_list[frame_idx]
-                envmap_cam = self.output2env.fromSGtoIm_2D_np(axis_local, lamb, weight) # -> (120, 160, 3, 8, 16)
+                # ts = time.time()
+                envmap_cam = self.converter_SG_to_envmap.convert_converter_SG_to_envmap_2D(axis_local, lamb, weight) # -> (120, 160, 3, 8, 16)
+                # print('----', time.time() - ts)
+                # ts = time.time()
+                # envmap_cam = self.converter_SG_to_envmap.convert_converter_SG_to_envmap_2D_np(axis_local, lamb, weight) # -> (120, 160, 3, 8, 16)
+                # print('====', time.time() - ts)
                 lighting_scale = lighting_params.get('lighting_scale', 0.1)
                 _im = np.clip(downsample_lighting_envmap(envmap_cam, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
 
