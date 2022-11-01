@@ -5,9 +5,10 @@ from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from lib.utils_OR.utils_OR_cam import project_3d_line
 from lib.utils_vis import vis_index_map, colorize
+from lib.utils_rendering_ZQ import output2env_per_point_torch
+from lib.utils_OR.utils_OR_cam import project_3d_line
+from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
 class visualizer_openroomsScene_2D(object):
     '''
     A class used to **visualize** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties / semantics).
@@ -36,12 +37,21 @@ class visualizer_openroomsScene_2D(object):
         # self.N_rows = len(self.modality_list_vis) + 1
 
         self.semseg_colors = np.loadtxt('data/colors/openrooms_colors.txt').astype('uint8')
+        if any([_ in ['lighting_SG'] for _ in self.modality_list_vis]):
+            self.output2env = output2env_per_point_torch(
+                SG_num=self.os.lighting_params_dict['SG_num'], 
+                env_width=self.os.lighting_params_dict['env_width'], 
+                env_height=self.os.lighting_params_dict['env_height']
+                )
+
 
     @property
     def valid_modalities_2D_vis(self):
         return [
             'im', 'layout', 
             'albedo', 'roughness', 'depth', 'normal', 
+            'lighting_SG', # convert to lighting_envmap and vis
+            'lighting_envmap', 
             'semseg', 'matseg', 'seg_area', 'seg_env', 'seg_obj', 
             'mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', 
             ]
@@ -50,6 +60,7 @@ class visualizer_openroomsScene_2D(object):
         assert self.os.if_has_im_sdr
 
         ax_list = subfig.subplots(1, self.N_cols)
+        if self.N_cols == 1: ax_list = [ax_list]
         assert len(self.frame_idx_list) == len(ax_list)
         for ax, frame_idx in zip(ax_list, self.frame_idx_list):
             if if_show_im:
@@ -60,17 +71,21 @@ class visualizer_openroomsScene_2D(object):
 
         return ax_list, start_idx
 
-    def vis_2d_with_plt(self):
+    def vis_2d_with_plt(
+        self, 
+        **kwargs, 
+        ):
         '''
         visualize verything indicated in modality_list for the frame_idx-st frame (0-based)
         '''
         height_width_list = []
+        assert self.os.if_has_im_sdr
         for frame_idx in self.frame_idx_list:
             im = self.os.im_sdr_list[frame_idx]
             height, width = im.shape[:2]
             height_width_list.append((height, width))
 
-        compatible_modalities = ['im', 'albedo', 'roughness', 'depth', 'normal', 'semseg', 'matseg', 'seg_area', 'seg_env', 'seg_obj', 'mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']
+        compatible_modalities = ['im'] + self.valid_modalities_2D_vis
         # modality_list_show = [_ for _ in compatible_modalities if _ in ['im']+self.modality_list_vis]
         modality_list_show = [_ for _ in self.modality_list_vis if _ in compatible_modalities]
         if 'im' not in modality_list_show: modality_list_show = ['im']+modality_list_show
@@ -100,7 +115,7 @@ class visualizer_openroomsScene_2D(object):
                         ax.set_ylim(height*1.5, -height*.5)
                 else:
                     # other modalities
-                    self.vis_2d_modality(subfig, ax_list, modality)
+                    self.vis_2d_modality(fig=subfig, ax_list=ax_list, modality=modality, **kwargs)
 
                     if modality == 'albedo':
                         modality_title_appendix = '(in SDR space)'
@@ -113,7 +128,15 @@ class visualizer_openroomsScene_2D(object):
 
         plt.show()
 
-    def vis_2d_modality(self, fig, ax_list, modality):
+    def vis_2d_modality(
+        self, 
+        fig, 
+        ax_list, 
+        modality, 
+        lighting_params={
+            'lighting_scale': 0.1, 
+            }, 
+        ):
         '''
         visualize 2D map for the modality the frame_idx-st frame (0-based)
 
@@ -160,7 +183,21 @@ class visualizer_openroomsScene_2D(object):
                 _im = vis_index_map(_im['mat_aggre_map'])
             if modality == 'semseg':
                 _im = np.array(colorize(_im, self.semseg_colors).convert('RGB'))
-                
+
+            if modality == 'lighting_SG':
+                axis_local, lamb, weight = np.split(_im, [3, 4], axis=3)
+                if self.os.if_has_HDR_scale:
+                    weight = weight / self.os.hdr_scale_list[frame_idx]
+                envmap_cam = self.output2env.fromSGtoIm_2D_np(axis_local, lamb, weight) # -> (120, 160, 3, 8, 16)
+                lighting_scale = lighting_params.get('lighting_scale', 0.1)
+                _im = np.clip(downsample_lighting_envmap(envmap_cam, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
+
+            if modality == 'lighting_envmap':
+                if self.os.if_has_HDR_scale:
+                    _im = _im / self.os.hdr_scale_list[frame_idx]
+                lighting_scale = lighting_params.get('lighting_scale', 0.1)
+                _im = np.clip(downsample_lighting_envmap(_im, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
+
             ax.imshow(_im)
 
     def vis_2d_layout(self, ax_list):

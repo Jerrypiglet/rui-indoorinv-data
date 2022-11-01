@@ -6,7 +6,7 @@ import numpy as np
 np.set_printoptions(precision=4)
 np.set_printoptions(suppress=True)
 
-class output2env_per_point():
+class output2env_per_point_torch():
     def __init__(self, SG_num, env_width = 16, env_height = 8, device='cpu'):
         self.env_width = env_width
         self.env_height = env_height
@@ -47,6 +47,24 @@ class output2env_per_point():
 
         envmaps = torch.sum(envmaps, dim=1)
 
+        return envmaps
+
+    def fromSGtoIm_2D_np(self, axis: np.ndarray, lamb: np.ndarray, weight: np.ndarray):
+        '''
+        axis, lamb, weight: (H, W, SG_num, 3/1/3)
+        '''
+        H, W = axis.shape[:2]
+        assert axis.shape[:2] == lamb.shape[:2] == weight.shape[:2]
+        axis = torch.from_numpy(axis).unsqueeze(-1).unsqueeze(-1)
+        weight = torch.from_numpy(weight).unsqueeze(-1).unsqueeze(-1)
+        lamb = torch.from_numpy(lamb).unsqueeze(-1).unsqueeze(-1)
+        mi = lamb.expand([H, W, self.SG_num, 1, self.env_height, self.env_width])* \
+                (torch.sum(axis.expand([H, W, self.SG_num, 3, self.env_height, self.env_width]) * \
+                self.ls.unsqueeze(0).expand([H, W, self.SG_num, 3, self.env_height, self.env_width]), dim=3).unsqueeze(3) - 1)
+        envmaps = weight.expand([H, W, self.SG_num, 3, self.env_height, self.env_width]) * \
+            torch.exp(mi).expand([H, W, self.SG_num, 3, self.env_height, self.env_width])
+
+        envmaps = torch.sum(envmaps, dim=2).cpu().numpy()
         return envmaps
 
     def postprocess_weight(self, weightOrig):

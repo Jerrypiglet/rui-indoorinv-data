@@ -239,3 +239,4 @@ Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True
 # Todolist
 - [ ] **Interactive mode**: map keys to load/offload modalities on-the-go without having to change the flags and restart the viewer
 - [ ] **Mitsuba scene**: enabling emitters and materials -> differentiable RGB rendering 
+- [ ] write ``rL.forwardEnv`` to Numpy version to replace in *utils_openrooms.py*

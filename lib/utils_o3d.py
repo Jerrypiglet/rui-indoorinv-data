@@ -182,3 +182,38 @@ def get_sphere(scale=5., resolution=200, hemisphere_normal=None, envmap=None):
 
     # self.vis.add_geometry(sphere)
     return sphere
+
+def remove_ceiling(xyz_pcd: np.ndarray, pcd_color: np.ndarray, if_debug_info: bool=False):
+    # remove ceiling points; assuming y axis is up
+    ceiling_y = np.amax(xyz_pcd[:, 1]) # y axis is up
+    pcd_mask = xyz_pcd[:, 1] < (ceiling_y*0.95)
+    xyz_pcd = xyz_pcd[pcd_mask]
+    pcd_color = pcd_color[pcd_mask]
+    if if_debug_info:
+        print('Removed points close to ceiling... percentage: %.2f'%(np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
+
+    return xyz_pcd, pcd_color
+
+def remove_walls(layout_bbox_3d: np.ndarray, xyz_pcd: np.ndarray, pcd_color: np.ndarray, if_debug_info: bool=False):
+    dists_all = np.zeros((xyz_pcd.shape[0]), dtype=np.float32) + np.inf
+
+    for wall_v_idxes in [(4, 0, 5), (6, 5, 2), (7, 6, 3), (7, 3, 4)]:
+        plane_normal = np.cross(layout_bbox_3d[wall_v_idxes[1]]-layout_bbox_3d[wall_v_idxes[0]], layout_bbox_3d[wall_v_idxes[2]]-layout_bbox_3d[wall_v_idxes[0]])
+        plane_normal = plane_normal / np.linalg.norm(plane_normal)
+        
+        l1 = xyz_pcd - layout_bbox_3d[wall_v_idxes[0]].reshape(1, 3)
+        dist_ = np.sum(l1 * plane_normal.reshape(1, 3), axis=1)
+        dists_all = np.minimum(dist_, dists_all)
+
+    layout_sides = np.vstack((layout_bbox_3d[1]-layout_bbox_3d[0], layout_bbox_3d[3]-layout_bbox_3d[0], layout_bbox_3d[4]-layout_bbox_3d[0]))
+    layout_dimensions = np.linalg.norm(layout_sides, axis=1)
+    if if_debug_info:
+        print(layout_dimensions)
+
+    pcd_mask = dists_all > np.amin(layout_dimensions)*0.05 # threshold is 5% of the shortest room dimension
+    xyz_pcd = xyz_pcd[pcd_mask]
+    pcd_color = pcd_color[pcd_mask]
+    if if_debug_info:
+        print('Removed points close to walls... percentage: %.2f'%(np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
+
+    return xyz_pcd, pcd_color

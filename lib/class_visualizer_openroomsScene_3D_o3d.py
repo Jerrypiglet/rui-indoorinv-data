@@ -22,7 +22,7 @@ from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 
 from lib.utils_misc import get_list_of_keys, gen_random_str
-from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere
+from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_OR.utils_OR_mesh import writeMesh
 from lib.utils_vis import color_map_color
@@ -44,11 +44,13 @@ class visualizer_openroomsScene_3D_o3d(object):
         self, 
         openrooms_scene, 
         modality_list_vis: list, 
+        if_debug_info: bool=False, 
     ):
 
         assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
 
         self.os = openrooms_scene
+        self.if_debug_info = if_debug_info
 
         self.modality_list_vis = modality_list_vis
         for _ in self.modality_list_vis:
@@ -422,34 +424,11 @@ class visualizer_openroomsScene_3D_o3d(object):
         assert pcd_color.shape[0] == xyz_pcd.shape[0]
 
         if not if_ceiling:
-            # remove ceiling points
-            ceiling_y = np.amax(xyz_pcd[:, 1]) # y axis is up
-            pcd_mask = xyz_pcd[:, 1] < (ceiling_y*0.95)
-            xyz_pcd = xyz_pcd[pcd_mask]
-            pcd_color = pcd_color[pcd_mask]
-            print('Removed points close to ceiling... percentage: %.2f'%(np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
-
+            xyz_pcd, pcd_color = remove_ceiling(xyz_pcd, pcd_color, if_debug_info=self.if_debug_info)
         if not if_walls:
             assert self.os.if_has_layout
             layout_bbox_3d = self.os.layout_box_3d_transformed
-            dists_all = np.zeros((xyz_pcd.shape[0]), dtype=np.float32) + np.inf
-
-            for wall_v_idxes in [(4, 0, 5), (6, 5, 2), (7, 6, 3), (7, 3, 4)]:
-                plane_normal = np.cross(layout_bbox_3d[wall_v_idxes[1]]-layout_bbox_3d[wall_v_idxes[0]], layout_bbox_3d[wall_v_idxes[2]]-layout_bbox_3d[wall_v_idxes[0]])
-                plane_normal = plane_normal / np.linalg.norm(plane_normal)
-                
-                l1 = xyz_pcd - layout_bbox_3d[wall_v_idxes[0]].reshape(1, 3)
-                dist_ = np.sum(l1 * plane_normal.reshape(1, 3), axis=1)
-                dists_all = np.minimum(dist_, dists_all)
-
-            layout_sides = np.vstack((layout_bbox_3d[1]-layout_bbox_3d[0], layout_bbox_3d[3]-layout_bbox_3d[0], layout_bbox_3d[4]-layout_bbox_3d[0]))
-            layout_dimensions = np.linalg.norm(layout_sides, axis=1)
-            print(layout_dimensions)
-
-            pcd_mask = dists_all > np.amin(layout_dimensions)*0.05 # threshold is 5% of the shortest room dimension
-            xyz_pcd = xyz_pcd[pcd_mask]
-            pcd_color = pcd_color[pcd_mask]
-            print('Removed points close to walls... percentage: %.2f'%(np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
+            xyz_pcd, pcd_color = remove_walls(layout_bbox_3d, xyz_pcd, pcd_color, if_debug_info=self.if_debug_info)
 
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(xyz_pcd)
@@ -784,6 +763,8 @@ class visualizer_openroomsScene_3D_o3d(object):
         if_pts = mi_params.get('if_pts', True)
         pts_subsample = mi_params.get('pts_subsample', 10)
         if_pts_colorize_rgb = mi_params.get('if_pts_colorize_rgb', 0.2)
+        if_ceiling = mi_params.get('if_ceiling', False)
+        if_walls = mi_params.get('if_walls', False)
 
         if_normal = mi_params.get('if_normal', True)
         normal_subsample = mi_params.get('normal_subsample', 10)
@@ -794,19 +775,25 @@ class visualizer_openroomsScene_3D_o3d(object):
                 # assert np.sum(mi_depth==np.inf)==0
                 mi_pts_ = mi_pts[mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
                 pcd_pts = o3d.geometry.PointCloud()
-                pcd_pts.points = o3d.utility.Vector3dVector(mi_pts_)
                 if self.mi_pcd_color_list is None:
                     if if_pts_colorize_rgb:
-                        mi_rgb = self.os.im_sdr_list[frame_idx][mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
-                        pcd_pts.colors = o3d.utility.Vector3dVector(mi_rgb)
+                        mi_color_ = self.os.im_sdr_list[frame_idx][mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
                     else:
-                        pcd_pts.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*mi_pts_.shape[0])
+                        mi_color_ = np.array([[0.3, 0.3, 0.3]]*mi_pts_.shape[0])
                 else:
                     assert isinstance(self.mi_pcd_color_list, list)
-                    pcd_color = self.mi_pcd_color_list[frame_idx]
-                    assert pcd_color[::pts_subsample].shape[0] == mi_pts_.shape[0]
-                    pcd_pts.colors = o3d.utility.Vector3dVector(pcd_color[::pts_subsample])
+                    mi_color_ = self.mi_pcd_color_list[frame_idx][::pts_subsample]
 
+                if not if_ceiling:
+                    mi_pts_, mi_color_ = remove_ceiling(mi_pts_, mi_color_, if_debug_info=self.if_debug_info)
+                if not if_walls:
+                    assert self.os.if_has_layout
+                    layout_bbox_3d = self.os.layout_box_3d_transformed
+                    mi_pts_, mi_color_ = remove_walls(layout_bbox_3d, mi_pts_, mi_color_, if_debug_info=self.if_debug_info)
+
+                assert mi_color_.shape[0] == mi_pts_.shape[0]
+                pcd_pts.points = o3d.utility.Vector3dVector(mi_pts_)
+                pcd_pts.colors = o3d.utility.Vector3dVector(mi_color_)
                 geometry_list.append(pcd_pts)
 
                 if if_normal:

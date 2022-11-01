@@ -93,44 +93,38 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
 
     return pose_list, origin_lookatvector_up_list
 
-from lib.utils_rendering_openrooms import renderingLayer
-def convert_SG_axis_local_global(lighting_params, split_lighting_SG_list_split, split_pose_list_split, split_normal_list):
-    rL = renderingLayer(imWidth=lighting_params['env_col'], imHeight=lighting_params['env_row'], isCuda=False)
 
-    lighting_SG_global_list = []
+def convert_SG_angle_to_axis_np(lighting_SG_local_angles):
+    '''
+    lighting_SG_local_angles: (H, W, SG_num, 2)
+    normal: (H, W, 3), in camera coordinates, OpenGL convention
+    '''
+    theta, phi = np.split(lighting_SG_local_angles, 2, axis=3) # (H, W, SG_num, 1), (H, W, SG_num, 1)
+    axisX = np.sin(theta) * np.cos(phi)
+    axisY = np.sin(theta) * np.sin(phi)
+    axisZ = np.cos(theta)
+    axis_local = np.concatenate([axisX, axisY, axisZ], axis=3) # [H, W, 12, 3]; in a local SG (self.ls) coords
+    axis_local = axis_local / (np.linalg.norm(axis_local, axis=3, keepdims=True)+1e-6)
+    return axis_local
 
-    for lighting_SG, pose, normal in zip(split_lighting_SG_list_split, split_pose_list_split, split_normal_list):
-        lighting_SG_torch = torch.from_numpy(lighting_SG).view(-1, lighting_params['SG_num'], 6)
-        theta_torch, phi_torch, _, _ = torch.split(lighting_SG_torch, [1, 1, 1, 3], dim=2)
-        theta_torch = theta_torch.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) # (HW, 12(SG_num), 1, 1, 1, 1)
-        phi_torch = phi_torch.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-        normal_torch = torch.from_numpy(normal).unsqueeze(0).permute(0, 3, 1, 2) # (1, 3, H, W)
+def convert_SG_axis_local_global_np(rL, lighting_params, lighting_SG_local, pose, normal_opengl):
+    '''
+    split_lighting_SG_local: (H, W, SG_num, 6)
+    normal: (H, W, 3), in camera coordinates, OpenGL convention
+    '''
 
-        _, camx, camy, normalPred = rL.forwardEnv(normal_torch, None, if_normal_only=True) # torch.Size([B, 128, 3, 120, 160]), [B, 3, 120, 160], [B, 3, 120, 160], [B, 3, 120, 160]
-        envNum = lighting_params['env_row'] * lighting_params['env_col']
-        camx_reshape = camx.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-        camy_reshape = camy.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-        camz_reshape = normalPred.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
+    normal_torch = torch.from_numpy(normal_opengl).unsqueeze(0).permute(0, 3, 1, 2) # (1, 3, H, W)
+    camx, camy, normalPred = rL.forwardEnv(normal_torch, None, if_normal_only=True) # torch.Size([B, 128, 3, 120, 160]), [B, 3, 120, 160], [B, 3, 120, 160], [B, 3, 120, 160]
+    axis_local_SG_flattened = lighting_SG_local[:, :, :, :3].reshape(-1, lighting_params['SG_num'], 3) # (HW, SG_num, 3)
+    T_flattened = torch.cat((camx, camy, normalPred), axis=0).permute(2, 3, 0, 1).flatten(0, 1).cpu().numpy() # (HW, 3, 3)
+    axis_SG_np = axis_local_SG_flattened @ T_flattened # (HW, SG_num, 3)
 
-        axisX = torch.sin(theta_torch ) * torch.cos(phi_torch )
-        axisY = torch.sin(theta_torch ) * torch.sin(phi_torch )
-        axisZ = torch.cos(theta_torch )
-        axis_local_SG = torch.cat([axisX, axisY, axisZ], dim=5) # [19200, 12, 1, 1, 1, 3]; in a local SG (self.ls) coords
+    axis_SG_np = np.stack([axis_SG_np[:, :, 0], -axis_SG_np[:, :, 1], -axis_SG_np[:, :, 2]], axis=-1) # transform axis from opengl convention (right-up-backward) to opencv (right-down-forward)
+    
+    R = pose[:3, :3]
+    axis_SG_np_global = axis_SG_np @ (R.T)
+    axis_SG_np_global = axis_SG_np_global.reshape(lighting_params['env_row'], lighting_params['env_col'], lighting_params['SG_num'], 3)
 
-        axis_SG = axis_local_SG[:, :, :, :, :, 0:1] * camx_reshape \
-            + axis_local_SG[:, :, :, :, :, 1:2] * camy_reshape \
-            + axis_local_SG[:, :, :, :, :, 2:3] * camz_reshape # transfer from a local camera-dependent coords to the ONE AND ONLY camera coords (LightNet)
-        axis_SG = axis_SG.squeeze() # [19200, 12, 3]
+    lighting_SG = np.concatenate((axis_SG_np_global, lighting_SG_local[:, :, :, 3:]), axis=3) # (120, 160, 12(SG_num), 7); axis, lamb, weight: 3, 1, 3
 
-        axis_SG_np = axis_SG.cpu().numpy()
-        axis_SG_np = np.stack([axis_SG_np[:, :, 0], -axis_SG_np[:, :, 1], -axis_SG_np[:, :, 2]], axis=-1) # transform axis from opengl convention (right-up-backward) to opencv (right-down-forward)
-        
-        R = pose[:3, :3]
-        axis_SG_np_global = axis_SG_np @ (R.T)
-        axis_SG_np_global = axis_SG_np_global.reshape(lighting_params['env_row'], lighting_params['env_col'], lighting_params['SG_num'], 3)
-
-        lighting_SG = np.concatenate((axis_SG_np_global, lighting_SG[:, :, :, 2:6]), axis=3) # (120, 160, 12(SG_num), 7); axis, lamb, weight: 3, 1, 3
-
-        lighting_SG_global_list.append(lighting_SG)
-
-    return lighting_SG_global_list
+    return lighting_SG

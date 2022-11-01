@@ -11,10 +11,10 @@ from collections import defaultdict
 from lib.utils_io import load_matrix, load_img, resize_img, load_HDR, scale_HDR, load_binary, load_h5, load_envmap, resize_intrinsics
 from lib.utils_matseg import get_map_aggre_map
 from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, check_list_of_tensors_size
-from lib.utils_openrooms import load_OR_public_poses_to_Rt, convert_SG_axis_local_global
+from lib.utils_openrooms import load_OR_public_poses_to_Rt, convert_SG_axis_local_global_np, convert_SG_angle_to_axis_np
+from lib.utils_rendering_openrooms import renderingLayer
 from tqdm import tqdm
 import pickle
-import torch
 
 class openroomsScene2D(object):
     '''
@@ -102,10 +102,11 @@ class openroomsScene2D(object):
         '''
         self.clip_roughness_min_to = BRDF_params_dict.get('clip_roughness_min_to', 0.)
         assert self.clip_roughness_min_to >= 0. and self.clip_roughness_min_to <= 1.
-        self.if_convert_lighting_SG_to_global = lighting_params_dict.get('if_convert_lighting_SG_to_global', False)
-        self.lighting_params_dict = lighting_params_dict
-        self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
 
+        self.lighting_params_dict = lighting_params_dict
+        self.if_convert_lighting_SG_to_global = lighting_params_dict.get('if_convert_lighting_SG_to_global', False)
+        self.rL = renderingLayer(imWidth=self.lighting_params_dict['env_col'], imHeight=self.lighting_params_dict['env_row'], isCuda=False)
+        self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
 
         '''
         modalities to load
@@ -197,7 +198,7 @@ class openroomsScene2D(object):
         elif modality == 'normal': 
             return self.normal_list
         elif modality == 'lighting_SG': 
-            return self.lighting_SG_list
+            return self.lighting_SG_local_list
         elif modality == 'lighting_envmap': 
             return self.lighting_envmap_list
         elif modality == 'semseg': 
@@ -420,27 +421,33 @@ class openroomsScene2D(object):
         self.if_convert_lighting_SG_to_global = True: 
             (H', W', SG_num, 7(axis, lamb, weight: 3, 1, 3)), in global coordinates (OpenCV convention: right-down-forward)
         '''
-        if hasattr(self, 'lighting_SG_list'): return
+        if hasattr(self, 'lighting_SG_local_list'): return
 
         print(white_blue('[openroomsScene] load_lighting_SG for %d frames...'%len(self.frame_id_list)))
         print(red('THIS MIGHT BE SLOW...'))
 
         lighting_SG_files = [self.scene_rendering_path / ('%s%d.h5'%(self.imsgEnv_key, i)) for i in self.frame_id_list]
 
-        self.lighting_SG_list = []
+        self.lighting_SG_local_list = []
 
-        for idx, lighting_SG_file in enumerate(tqdm(lighting_SG_files)):
+        for frame_idx, lighting_SG_file in enumerate(tqdm(lighting_SG_files)):
             lighting_SG = load_h5(lighting_SG_file)
             if 'im_hdr' in self.modality_list and self.if_scale_HDR:
-                hdr_scale = self.hdr_scale_list[idx]
+                hdr_scale = self.hdr_scale_list[frame_idx]
                 lighting_SG[:, :, :, 3:6] = lighting_SG[:, :, :, 3:6] * hdr_scale # (120, 160, 12(SG_num), 6); theta, phi, lamb, weight: 1, 1, 1, 3
-            self.lighting_SG_list.append(lighting_SG)
+            lighting_SG = np.concatenate(
+                (convert_SG_angle_to_axis_np(lighting_SG[:, :, :, :2]),  # (120, 160, 12(SG_num), 7); axis_local, lamb, weight: 3, 1, 3
+                lighting_SG[:, :, :, 2:]), axis=3)
+            self.lighting_SG_local_list.append(lighting_SG)
 
         env_row, env_col = self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col']
-        assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 6) for _ in self.lighting_SG_list])
+        assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 7) for _ in self.lighting_SG_local_list])
 
         if self.if_convert_lighting_SG_to_global:
-            self.lighting_SG_global_list = convert_SG_axis_local_global(self.lighting_params_dict, self.lighting_SG_list, self.pose_list, self.normal_list)
+            self.lighting_SG_global_list = []
+            for lighting_SG_local, pose, normal in zip(self.lighting_SG_local_list, self.pose_list, self.normal_list):
+                lighting_SG_global = convert_SG_axis_local_global_np(self.rL, self.lighting_params_dict, lighting_SG_local, pose, normal)
+                self.lighting_SG_global_list.append(lighting_SG_global)
             assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 7) for _ in self.lighting_SG_global_list])
 
         print(blue_text('[openroomsScene] DONE. load_lighting_SG'))
@@ -473,7 +480,6 @@ class openroomsScene2D(object):
             assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
 
         print(blue_text('[openroomsScene] DONE. load_lighting_envmap'))
-
 
     def load_semseg(self):
         '''
@@ -670,42 +676,14 @@ class openroomsScene2D(object):
         lamb_SG_global_list = []
 
         for idx in tqdm(range(len(self.frame_id_list))):
-            lighting_SG = self.lighting_SG_list[idx] # (120, 160, 12(SG_num), 6)
-            lighting_SG_torch = torch.from_numpy(lighting_SG).view(-1, SG_params['SG_num'], 6)
+            if self.if_convert_lighting_SG_to_global:
+                lighting_SG_global = self.lighting_SG_global_list[idx] # (120, 160, 12(SG_num), 7)
+            else:
+                lighting_SG_global = convert_SG_axis_local_global_np(self.rL, self.lighting_params_dict, self.lighting_SG_local_list[idx], self.pose_list[idx], self.normal_list[idx])
 
-            theta_torch, phi_torch, lamb_torch, weight_torch = torch.split(lighting_SG_torch, [1, 1, 1, 3], dim=2)
-            theta_torch = theta_torch.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) # (HW, 12(SG_num), 1, 1, 1, 1)
-            phi_torch = phi_torch.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-            # lamb_torch = lamb_torch.unsqueeze(-1).unsqueeze(-1)
-            # weight_torch = weight_torch.unsqueeze(-1).unsqueeze(-1)
-
-            normal_torch = torch.from_numpy(self.normal_list[idx]).unsqueeze(0).permute(0, 3, 1, 2) # (1, 3, H, W)
-
-            ls_coords, camx, camy, normalPred = rL.forwardEnv(normal_torch, None, if_normal_only=True) # torch.Size([B, 128, 3, 120, 160]), [B, 3, 120, 160], [B, 3, 120, 160], [B, 3, 120, 160]
-            envNum = SG_params['env_row'] * SG_params['env_col']
-            camx_reshape = camx.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-            camy_reshape = camy.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-            camz_reshape = normalPred.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-
-            axisX = torch.sin(theta_torch ) * torch.cos(phi_torch )
-            axisY = torch.sin(theta_torch ) * torch.sin(phi_torch )
-            axisZ = torch.cos(theta_torch )
-            axis_local_SG = torch.cat([axisX, axisY, axisZ], dim=5) # [19200, 12, 1, 1, 1, 3]; in a local SG (self.ls) coords
-
-            axis_SG = axis_local_SG[:, :, :, :, :, 0:1] * camx_reshape \
-                + axis_local_SG[:, :, :, :, :, 1:2] * camy_reshape \
-                + axis_local_SG[:, :, :, :, :, 2:3] * camz_reshape # transfer from a local camera-dependent coords to the ONE AND ONLY camera coords (LightNet)
-            axis_SG = axis_SG.squeeze() # [19200, 12, 3]
-
-            axis_SG_np = axis_SG.cpu().numpy()
-            axis_SG_np = np.stack([axis_SG_np[:, :, 0], -axis_SG_np[:, :, 1], -axis_SG_np[:, :, 2]], axis=-1) # transform axis from opengl convention (right-up-backward) to opencv (right-down-forward)
-
-            R = self.pose_list[idx][:3, :3]
-            
-            axis_SG_np_global = axis_SG_np @ (R.T)
-            axis_SG_np_global = axis_SG_np_global.reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 3)
-            weight_SG_np = weight_torch.cpu().squeeze().numpy().reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 3)
-            lamb_SG_np = lamb_torch.cpu().squeeze().numpy().reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 1)
+            axis_SG_np_global = lighting_SG_global[:, :, :, :3].reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 3)
+            lamb_SG_np = lighting_SG_global[:, :, :, 3:4].reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 1)
+            weight_SG_np = lighting_SG_global[:, :, :, 4:].reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 3)
 
             X_flatten_mask = X_lighting_flatten_mask_list[idx]
             axis_SG_np_global = axis_SG_np_global[X_flatten_mask]

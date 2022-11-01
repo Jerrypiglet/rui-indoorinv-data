@@ -162,14 +162,15 @@ class renderingLayer():
         
         # [!!!] multiply the local SG self.ls grid vectors (think of as coefficients) with the LOCAL camera-dependent basis (think of as basis..)
         # ... and then you arrive at a hemisphere in the camera cooords
+        if if_normal_only:
+            return camx, camy, normal
+
         l = ldirections[:, :, 0:1, :, :] * camx.unsqueeze(1) \
                 + ldirections[:, :, 1:2, :, :] * camy.unsqueeze(1) \
                 + ldirections[:, :, 2:3, :, :] * normal.unsqueeze(1)    
         # print(ldirections[:, 20, :, :, :].flatten())
         # print(l.shape) # torch.Size([1, 128, 3, 120, 160])
 
-        if if_normal_only:
-            return l, camx, camy, normal
 
         bn = albedo.size(0)
         albedo = F.adaptive_avg_pool2d(albedo, (envR, envC) )

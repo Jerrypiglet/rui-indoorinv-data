@@ -169,7 +169,7 @@ def load_h5(path: Path) -> np.ndarray:
     im = np.array(hf.get('data' ) )
     return im 
 
-# def convert_SG_axis_local_global_torch(rL, lighting_SG_torch, normal_torch):
+# def convert_SG_axis_local_global_np_torch(rL, lighting_SG_torch, normal_torch):
 #     '''
 #     rL: rL = renderingLayer(imWidth = SG_params['env_col'], imHeight = SG_params['env_row'], isCuda=False)
 #     lighting_SG_torch: (N, SG_num, 6)

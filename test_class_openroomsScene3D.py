@@ -39,6 +39,8 @@ parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', con
 # differential renderer
 parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
 parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
+# debug
+parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/public_re_3'
@@ -67,7 +69,8 @@ data/public_re_3/mainDiffLight_xml1/scene0552_00_more/im_4.png
 meta_split = 'mainDiffLight_xml1'
 scene_name = 'scene0552_00_more'
 frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
-# frame_ids = [2]
+frame_ids = [2]
+# frame_ids = list(range(87))
 
 '''
 The lounge with very specular floor and 3 lamps
@@ -86,6 +89,7 @@ data/public_re_3/main_xml/scene0005_00_more/im_3.png
 # scene_name = 'scene0005_00_more'
 # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
 # frame_ids = [3]
+# frame_ids = list(range(102))
 
 openrooms_scene = openroomsScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
@@ -94,25 +98,25 @@ openrooms_scene = openroomsScene3D(
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'im_sdr', 'poses', 'seg', 
-        'im_hdr', 'albedo', 'roughness', 
+        # 'im_hdr', 'albedo', 'roughness', 
         'depth', 'normal', 
-        # 'lighting_SG', 
-        # 'lighting_envmap', 
+        'lighting_SG', 
+        'lighting_envmap', 
         'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
     im_params_dict={
         'im_H_load': 480, 'im_W_load': 640, 
         # 'im_H_resize': 240, 'im_W_resize': 320
         'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
-        'if_direct_lighting': True, # if load direct lighting envmaps and SGs inetad of total lighting
+        'if_direct_lighting': False, # if load direct lighting envmaps and SGs inetad of total lighting
         }, 
     lighting_params_dict={
         'env_row': 120, 'env_col': 160, 'SG_num': 12, 
         # 'env_height': 16, 'env_width': 32, 
         'env_height': 8, 'env_width': 16, 
-        'if_convert_lighting_SG_to_global': True, 
+        'if_convert_lighting_SG_to_global': False, 
     }, 
     shape_params_dict={
         'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
@@ -130,6 +134,9 @@ openrooms_scene = openroomsScene3D(
         },
 )
 
+'''
+Matploblib 2D viewer
+'''
 if opt.vis_2d_plt:
     visualizer_2D = visualizer_openroomsScene_2D(
         openrooms_scene, 
@@ -138,13 +145,23 @@ if opt.vis_2d_plt:
             # 'shapes', 
             # 'depth', 'mi_depth', 
             # 'normal', 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            'seg_area', 'seg_env', 'seg_obj', 
-            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
+            'lighting_envmap', 
+            # 'seg_area', 'seg_env', 'seg_obj', 
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
-        frame_idx_list=[0, 1, 2, 3, 4], 
+        # frame_idx_list=[0, 1, 2, 3, 4], 
+        frame_idx_list=[0], 
     )
-    visualizer_2D.vis_2d_with_plt()
+    visualizer_2D.vis_2d_with_plt(
+        lighting_params={
+            'lighting_scale': 0.01, # rescaling the brightness of the envmap
+            }, 
+            )
 
+'''
+Matploblib 3D viewer
+'''
 if opt.vis_3d_plt:
     visualizer_3D_plt = visualizer_openroomsScene_3D_plt(
         openrooms_scene, 
@@ -157,6 +174,9 @@ if opt.vis_3d_plt:
     )
     visualizer_3D_plt.vis_3d_with_plt()
 
+'''
+Differential renderers
+'''
 if opt.render_3d:
     renderer_3D = renderer_openroomsScene_3D(
         openrooms_scene, 
@@ -180,7 +200,9 @@ if opt.render_3d:
     # from scipy import stats
     # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
 
-
+'''
+Open3D 3D viewer
+'''
 if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
         openrooms_scene, 
@@ -189,10 +211,11 @@ if opt.vis_3d_o3d:
             'cameras', 
             # 'lighting_SG', 
             'layout', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
-            'emitters', # emitter properties (e.g. SGs, half envmaps)
+            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
+            # 'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', #mitsuba sampled rays, pts
             ], 
+        if_debug_info=opt.if_debug_info, 
     )
 
     if opt.if_set_pcd_color_mi:
@@ -259,6 +282,8 @@ if opt.vis_3d_o3d:
             'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 1,
+            'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
+            'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
 
             'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
