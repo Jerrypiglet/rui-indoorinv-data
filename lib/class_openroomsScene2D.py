@@ -114,9 +114,9 @@ class openroomsScene2D(object):
         '''
         modalities to load
         '''
-        self.modality_list = modality_list
+        self.modality_list = list(set(modality_list))
         if 'im_hdr' in self.modality_list and self.if_scale_HDR:
-            assert 'seg' in modality_list
+            assert 'seg' in self.modality_list
 
         ''''
         flags to set
@@ -140,7 +140,7 @@ class openroomsScene2D(object):
             ]
 
     @property
-    def if_has_cameras(self):
+    def if_has_poses(self):
         return all([_ in self.modality_list for _ in ['poses']])
 
     @property
@@ -174,10 +174,6 @@ class openroomsScene2D(object):
     @property
     def if_has_semseg(self):
         return all([_ in self.modality_list for _ in ['semseg']])
-
-    @property
-    def if_has_layout(self):
-        return all([_ in self.modality_list for _ in ['layout']])
 
     @property
     def frame_num(self):
@@ -238,6 +234,7 @@ class openroomsScene2D(object):
         -> K: (3, 3)
         '''
         self.K = load_matrix(self.intrinsic_path)
+        # self.K = load_matrix('/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader/data/public_re_3/main_xml/scene0008_00_more/intrinsic.txt')
         assert self.K.shape == (3, 3)
         assert self.K[0][2] == float(self.im_W_load) / 2.
         assert self.K[1][2] == float(self.im_H_load) / 2.

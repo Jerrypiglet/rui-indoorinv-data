@@ -182,9 +182,11 @@ def flip_ceiling_normal(faces, vertices):
 
     return faces
 
-def mesh_to_contour(mesh, if_input_is_v_e=False, vertical_dim=-1):
+def mesh_to_contour(mesh, if_input_is_v_e=False, if_input_is_Trimesh=False, vertical_dim=-1):
     if if_input_is_v_e:
         v, e = mesh
+    elif if_input_is_Trimesh:
+        v, e = np.array(mesh.vertices), np.array(mesh.faces) # 0-based faces
     else:
         mesh = remove_top_down_faces(mesh)
         v = np.array(mesh.vertices)

@@ -10,7 +10,7 @@ from lib.utils_OR.utils_OR_cam import project_3d_line
 from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
 class visualizer_openroomsScene_2D(object):
     '''
-    A class used to **visualize** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties / semantics).
+    A class used to **visualize** **per-pixel** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties / semantics).
     '''
     def __init__(
         self, 
@@ -23,7 +23,7 @@ class visualizer_openroomsScene_2D(object):
 
         self.os = openrooms_scene
 
-        self.modality_list_vis = modality_list_vis
+        self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
             assert _ in self.valid_modalities_2D_vis, 'Invalid modality: %s'%_
 
@@ -43,16 +43,16 @@ class visualizer_openroomsScene_2D(object):
                 env_height=self.os.lighting_params_dict['env_height']
                 )
 
-
     @property
     def valid_modalities_2D_vis(self):
         return [
-            'im', 'layout', 
+            'im', 
             'albedo', 'roughness', 'depth', 'normal', 
             'lighting_SG', # convert to lighting_envmap and vis
             'lighting_envmap', 
             'semseg', 'matseg', 'seg_area', 'seg_env', 'seg_obj', 
             'mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', 
+            'layout', 'shapes', 
             ]
 
     def create_im_row_ax_list(self, subfig, start_idx: int=1, if_show_im: bool=False, title: str=''):
@@ -140,7 +140,7 @@ class visualizer_openroomsScene_2D(object):
         visualize 2D map for the modality the frame_idx-st frame (0-based)
 
         '''
-        assert self.os.if_has_im_sdr and self.os.if_has_cameras
+        assert self.os.if_has_im_sdr and self.os.if_has_poses
         if modality in ['depth', 'normal']: assert self.os.if_has_dense_geo
         if modality in ['albedo', 'roughness']: assert self.os.if_has_BRDF
         if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.os.if_has_seg
@@ -211,7 +211,7 @@ class visualizer_openroomsScene_2D(object):
         images/demo_layout_3D_proj.png
 
         '''
-        assert self.os.if_has_im_sdr and self.os.if_has_cameras
+        assert self.os.if_has_im_sdr and self.os.if_has_poses
         assert self.os.if_has_layout
 
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):

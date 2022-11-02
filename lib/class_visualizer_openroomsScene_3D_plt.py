@@ -45,18 +45,22 @@ class visualizer_openroomsScene_3D_plt(object):
 
         self.os = openrooms_scene
 
-        self.modality_list_vis = modality_list_vis
+        self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
             assert _ in self.valid_modalities_3D_vis, 'Invalid modality_vis: %s'%_
 
     @property
     def valid_modalities_3D_vis(self):
-        return ['layout', 'shapes', 'emitters', 'emitter_envs']
+        return ['layout', 'shapes', 'poses', 'emitters', 'emitter_envs']
 
     def vis_3d_with_plt(self):
         ax = None
+        if 'poses' in self.modality_list_vis:
+            assert 'shapes' in self.modality_list_vis or 'layout' in self.modality_list_vis, 'poses can only be visualized in layout view or shapes view!'
         if 'shapes' in self.modality_list_vis:
-            ax = self.vis_shapes()
+            self.vis_shapes(if_poses='poses' in self.modality_list_vis)
+        if 'layout' in self.modality_list_vis:
+            self.vis_layout(if_poses='poses' in self.modality_list_vis)
         if 'emitters' in self.modality_list_vis:
             self.vis_emitters(ax)
         if 'emitter_envs' in self.modality_list_vis:
@@ -67,7 +71,12 @@ class visualizer_openroomsScene_3D_plt(object):
         #     self.vis_mi_seg()
         plt.show()
 
-    def vis_layout(self):
+    def vis_layout(self, if_poses=False):
+        '''
+        images/demo_layout_3D.png
+        images/demo_layout_2D.png
+        images/demo_layout_poses_2D_view1_oldpose.png
+        '''
         fig = plt.figure(figsize=(15, 4))
         fig.suptitle('layout mesh 3D')
 
@@ -76,7 +85,7 @@ class visualizer_openroomsScene_3D_plt(object):
         ax1.set_proj_type('ortho')
         ax1.set_aspect("auto")
         vis_axis(ax1)
-        v_pairs = (self.v, self.e)
+        v_pairs = (self.os.v, self.os.e)
         for v_pair in v_pairs:
             ax1.plot3D(v_pair[0], v_pair[1], v_pair[2])
 
@@ -85,46 +94,63 @@ class visualizer_openroomsScene_3D_plt(object):
         ax2.set_proj_type('ortho')
         ax2.set_aspect("auto")
         vis_axis(ax2)
-        v_pairs = v_pairs_from_v3d_e(self.v_skeleton, self.e_skeleton)
+        v_pairs = v_pairs_from_v3d_e(self.os.v_skeleton, self.os.e_skeleton)
         for v_pair in v_pairs:
             ax2.plot3D(v_pair[0], v_pair[1], v_pair[2])
-        vis_cube_plt(self.layout_box_3d, ax2, 'b', linestyle='--')
+        vis_cube_plt(self.os.layout_box_3d, ax2, 'b', linestyle='--')
 
         ax3 = plt.subplot(133, projection='3d')
         ax3.set_title('[FINAL COORDS] layout skeleton bbox in transformed coordinates')
         ax3.set_proj_type('ortho')
         ax3.set_aspect("auto")
         vis_axis(ax3)
-        v_pairs = v_pairs_from_v3d_e(self.v_skeleton_transformed, self.e_skeleton)
+        v_pairs = v_pairs_from_v3d_e(self.os.v_skeleton_transformed, self.os.e_skeleton)
         for v_pair in v_pairs:
             ax3.plot3D(v_pair[0], v_pair[1], v_pair[2])
-        for v_idx, v in enumerate(self.layout_box_3d_transformed):
+        for v_idx, v in enumerate(self.os.layout_box_3d_transformed):
             ax3.text(v[0], v[1], v[2], str(v_idx))
         ax3.view_init(elev=-71, azim=-65)
 
         plt.show(block=False)
 
         # visualize floor of original layout, and rectangle hull, in 2D
-        fig = plt.figure()
+        fig = plt.figure(figsize=(10, 10))
         fig.suptitle('layout 2D')
         # ax = fig.gca()
-        ax1 = plt.subplot(111)
-        ax1.set_title('layout 2D BEV')
-        ax1.set_aspect("equal")
-        v_pairs = v_pairs_from_v2d_e(self.v_2d, self.e_2d)
+        ax = plt.subplot(111)
+        ax.set_title('layout 2D BEV')
+        ax.set_aspect("equal")
+        v_pairs = v_pairs_from_v2d_e(self.os.v_2d_transformed, self.os.e_2d)
         for v_pair in v_pairs:
-            ax1.plot(v_pair[0], v_pair[1])
+            ax.plot(v_pair[0], v_pair[1])
 
         hull_pair_idxes = [[0, 1], [1, 2], [2, 3], [3, 0]]
-        hull_v_pairs = [([self.layout_hull_2d[idx[0]][0], self.layout_hull_2d[idx[1]][0]], [self.layout_hull_2d[idx[0]][1], self.layout_hull_2d[idx[1]][1]]) for idx in hull_pair_idxes]
+        hull_v_pairs = [([self.os.layout_hull_2d_transformed[idx[0]][0], self.os.layout_hull_2d_transformed[idx[1]][0]], [self.os.layout_hull_2d_transformed[idx[0]][1], self.os.layout_hull_2d_transformed[idx[1]][1]]) for idx in hull_pair_idxes]
         for v_pair in hull_v_pairs:
-            ax1.plot(v_pair[0], v_pair[1], 'b--')
+            ax.plot(v_pair[0], v_pair[1], 'b--')
+
+        if if_poses:
+            assert self.os.if_has_poses
+            for (origin, lookatvector, up) in self.os.origin_lookatvector_up_list:
+                origin_ = origin.flatten()
+                lookatvector_ = lookatvector.flatten()
+                lookat_ = origin_ + lookatvector.flatten() * 0.5 # arrows are 0.5 in length
+                ax.scatter(origin_[0], origin_[2], color='k', marker='*')
+                ax.arrow(origin_[0], origin_[2], lookatvector_[0], lookatvector_[2], lw=1, joinstyle='bevel', color='b')
+                # a = Arrow3D([origin_[0], lookat_[0]], [origin_[1], lookat_[1]], [origin_[2], lookat_[2]], mutation_scale=5,
+                #     lw=1, arrowstyle="->", color='b')
+                # ax.add_artist(a)
+
         plt.grid()
 
         plt.show(block=False)
         
-    def vis_shapes(self):
-        
+    def vis_shapes(self, if_poses=False):
+        '''
+        images/demo_shapes_3D.png
+        images/demo_shapes_poses_3D_view1_oldpose.png
+        images/demo_shapes_poses_3D_view2_oldpose.png
+        '''
         if not self.os.if_has_colors:
             self.os.load_colors()
 
@@ -165,12 +191,21 @@ class visualizer_openroomsScene_3D_plt(object):
             vis_cube_plt(bverts_transformed, ax, color=obj_color, linestyle=linestyle, linewidth=linewidth, label=cat_name)
             print(if_emitter, shape_idx, shape['id'], cat_id, cat_name, Path(obj_path).relative_to(self.os.shapes_root))
 
-            
         if_layout = 'layout' in self.modality_list_vis
 
         if if_layout:
             vis_cube_plt(self.os.layout_box_3d_transformed, ax, 'b', '--')
         
+        if if_poses:
+            assert self.os.if_has_poses
+            for (origin, lookatvector, up) in self.os.origin_lookatvector_up_list:
+                origin_ = origin.flatten()
+                lookat_ = origin_ + lookatvector.flatten() * 0.5 # arrows are 0.5 in length
+                ax.scatter(origin_[0], origin_[1], origin_[2], color='k', marker='*')
+                a = Arrow3D([origin_[0], lookat_[0]], [origin_[1], lookat_[1]], [origin_[2], lookat_[2]], mutation_scale=5,
+                    lw=1, arrowstyle="->", color='b')
+                ax.add_artist(a)
+
         # ===== cameras
         # vis_axis_xyz(ax, xaxis.flatten(), yaxis.flatten(), zaxis.flatten(), origin.flatten(), suffix='_c') # cameras
 
@@ -183,7 +218,8 @@ class visualizer_openroomsScene_3D_plt(object):
 
         ax.set_box_aspect([1,1,1])
         set_axes_equal(ax) # IMPORTANT - this is also required
-        ax.view_init(elev=-55, azim=120)
+        # ax.view_init(elev=-55, azim=120) # side view
+        ax.view_init(elev=0, azim=90) # BEV
 
         # plt.show(block=False)
         plt.draw()

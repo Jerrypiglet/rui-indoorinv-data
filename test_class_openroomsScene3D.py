@@ -76,21 +76,33 @@ frame_ids = [2]
 The lounge with very specular floor and 3 lamps
 data/public_re_3/main_xml/scene0008_00_more/im_58.png
 '''
-# meta_split = 'main_xml'
-# scene_name = 'scene0008_00_more'
+meta_split = 'main_xml'
+scene_name = 'scene0008_00_more'
 # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
 # frame_ids = [114]
+frame_ids = list(range(102))
 
 '''
 The conference room with one lamp
 data/public_re_3/main_xml/scene0005_00_more/im_3.png
 '''
-meta_split = 'main_xml'
-scene_name = 'scene0005_00_more'
+# meta_split = 'main_xml'
+# scene_name = 'scene0005_00_more'
 # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-# frame_ids = [3]
-# frame_ids = list(range(102))
-frame_ids = list(range(5, 102, 20))
+# # frame_ids = [3]
+# # frame_ids = list(range(102))
+# frame_ids = list(range(0, 102, 20))
+
+'''
+=== more & better cameras
+'''
+# base_root = Path(PATH_HOME) / 'data/public_re_3_v3pose'
+# xml_root = Path(PATH_HOME) / 'data/public_re_3_v3pose/scenes'
+
+# meta_split = 'main_xml'
+# scene_name = 'scene0008_00_more'
+# frame_ids = list(range(0, 345, 5))
+# frame_ids = [0, 9]
 
 openrooms_scene = openroomsScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -99,14 +111,16 @@ openrooms_scene = openroomsScene3D(
     scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'im_sdr', 'poses', 'seg', 
+        # 'im_sdr', 
+        'poses', 
+        # 'seg', 
         # 'im_hdr', 'albedo', 'roughness', 
-        'depth', 'normal', 
+        # 'depth', 'normal', 
         # 'lighting_SG', 
-        'lighting_envmap', 
+        # 'lighting_envmap', 
         'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
-        'mi', # mitsuba scene, loading from scene xml file
+        'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'mi', # mitsuba scene, loading from scene xml file
         ], 
     im_params_dict={
         'im_H_load': 480, 'im_W_load': 640, 
@@ -144,12 +158,13 @@ if opt.vis_2d_plt:
     visualizer_2D = visualizer_openroomsScene_2D(
         openrooms_scene, 
         modality_list_vis=[
-            # 'layout', 
+            'im', 
+            'layout', 
             # 'shapes', 
             # 'depth', 'mi_depth', 
             # 'normal', 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
-            'lighting_envmap', 
+            # 'lighting_envmap', 
             # 'seg_area', 'seg_env', 'seg_obj', 
             # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
@@ -171,8 +186,9 @@ if opt.vis_3d_plt:
         modality_list_vis = [
             'layout', 
             'shapes', # boxes and labels (no meshes in plt visualization)
-            'emitters', # emitter properties
-            'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
+            'poses', # camera center + optical axis
+            # 'emitters', # emitter properties
+            # 'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
             ], 
     )
     visualizer_3D_plt.vis_3d_with_plt()
@@ -213,7 +229,7 @@ if opt.vis_3d_o3d:
             # 'dense_geo', 
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
-            'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
+            # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             'layout', 
             # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             # 'emitters', # emitter properties (e.g. SGs, half envmaps)

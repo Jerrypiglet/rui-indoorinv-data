@@ -52,7 +52,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         self.os = openrooms_scene
         self.if_debug_info = if_debug_info
 
-        self.modality_list_vis = modality_list_vis
+        self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
             assert _ in ['dense_geo', 'cameras', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi']
         if 'mi' in self.modality_list_vis:
@@ -307,7 +307,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         return pcd_color
         
     def collect_cameras(self, cam_params: dict={}):
-        assert self.os.if_has_cameras
+        assert self.os.if_has_poses
 
         subsample_cam_rate = cam_params.get('subsample_cam_rate', 1)
         near, far = self.os.near, self.os.far
@@ -801,7 +801,7 @@ class visualizer_openroomsScene_3D_o3d(object):
                 mi_pts_ = mi_pts[mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
                 pcd_pts = o3d.geometry.PointCloud()
                 if self.mi_pcd_color_list is None:
-                    if if_pts_colorize_rgb:
+                    if if_pts_colorize_rgb and self.os.if_has_im_sdr:
                         mi_color_ = self.os.im_sdr_list[frame_idx][mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
                     else:
                         mi_color_ = np.array([[0.3, 0.3, 0.3]]*mi_pts_.shape[0])

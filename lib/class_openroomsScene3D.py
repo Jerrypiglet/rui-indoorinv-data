@@ -64,7 +64,7 @@ class openroomsScene3D(openroomsScene2D):
             if_debug_info = if_debug_info, 
             root_path_dict = root_path_dict, 
             scene_params_dict = scene_params_dict, 
-            modality_list = modality_list, 
+            modality_list = list(set(modality_list)), 
             im_params_dict = im_params_dict, 
             BRDF_params_dict = BRDF_params_dict, 
             lighting_params_dict = lighting_params_dict, 
@@ -84,6 +84,9 @@ class openroomsScene3D(openroomsScene2D):
     def valid_modalities_3D(self):
         return ['layout', 'shapes', 'mi']
 
+    @property
+    def if_has_layout(self):
+        return all([_ in self.modality_list for _ in ['layout']])
 
     @property
     def if_has_shapes(self): # objs + emitters
@@ -421,13 +424,12 @@ class openroomsScene3D(openroomsScene2D):
 
         images/demo_layout_3D.png
         images/demo_layout_2D.png
-
         '''
 
         print(white_blue('[openroomsScene3D] load_layout for scene...'))
 
         self.layout_obj_file = self.layout_root / self.scene_name_short / 'uv_mapped.obj'
-        self.layout_mesh_ori = load_trimesh(self.layout_obj_file) # returns a Trimesh object
+        self.layout_mesh_ori = load_trimesh(self.layout_obj_file) # returns a Trimesh object; [!!!] 0-index faces
         # mesh = mesh.dump()[0]
         self.layout_mesh = remove_top_down_faces(self.layout_mesh_ori)
         self.v = np.asarray(self.layout_mesh.vertices)
@@ -457,7 +459,10 @@ class openroomsScene3D(openroomsScene2D):
         v_transformed = transform_v(np.asarray(self.layout_mesh.vertices), T_layout) # skeleton to TRANSFORMED coordinates
         self.layout_mesh_transformed = trimesh.Trimesh(vertices=v_transformed, faces=self.layout_mesh.faces) # original mesh to TRANSFORMED coordinates
 
+
         self.layout_box_3d_transformed = transform_v(self.layout_box_3d, T_layout)
+        self.v_2d_transformed = transform_v(np.hstack((self.v_2d, np.zeros((6, 1), dtype=self.v_2d.dtype))), T_layout)[:, [0, 2]]
+        self.layout_hull_2d_transformed = self.layout_box_3d_transformed[:4, [0, 2]]
 
         print(blue_text('[openroomsScene3D] DONE. load_layout'))
 
@@ -496,7 +501,7 @@ class openroomsScene3D(openroomsScene2D):
             - fused geometry as dict
             - all camera poses
         '''
-        assert self.if_has_cameras and self.if_has_im_sdr
+        assert self.if_has_poses and self.if_has_im_sdr
         if not if_use_mi_geometry:
             assert self.if_has_dense_geo
 
@@ -608,9 +613,9 @@ class openroomsScene3D(openroomsScene2D):
         X_global_lighting, normal_global_lighting = geo_fused_dict['X'], geo_fused_dict['normal']
 
         if lighting_source == 'lighting_SG':
-            assert self.if_has_lighting_SG and self.if_has_cameras
+            assert self.if_has_lighting_SG and self.if_has_poses
         if lighting_source == 'lighting_envmap':
-            assert self.if_has_lighting_envmap and self.if_has_cameras
+            assert self.if_has_lighting_envmap and self.if_has_poses
 
         axis_global_list = []
         weight_list = []
