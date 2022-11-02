@@ -6,7 +6,8 @@ import numpy as np
 import random
 from pathlib import Path
 
-from lib.utils_OR.utils_OR_xml import transformToXml
+from lib.utils_OR.utils_OR_xml import transformToXml, loadMesh, transform_with_transforms_xml_list
+from lib.utils_OR.utils_OR_mesh import write_one_mesh_from_v_f_lists, write_mesh_list_from_v_f_lists, flip_ceiling_normal
 from lib.utils_misc import get_datetime, gen_random_str
 
 def replace_str_xml(filename, lookup_dict: dict={}):
@@ -20,10 +21,13 @@ def replace_str_xml(filename, lookup_dict: dict={}):
 def dump_OR_xml_for_mi(
     xml_file: str, 
     shapes_root: Path, layout_root: Path, envmaps_root: Path, 
-    xml_dump_dir: Path, 
+    xml_dump_dir: Path=Path('.'), 
     origin_lookatvector_up_tuple: tuple=(), 
     if_no_emitter_shape: bool=False, # remove all window frames and lamps (lit-up & dark)
-    if_also_dump_lit_lamps: bool=True) -> Path:
+    if_dump_mesh: bool=False, 
+    dump_mesh_path: str='', 
+    dump_mesh_dir: Path=Path('.'), 
+    if_also_dump_xml_with_lit_lamps_only: bool=False) -> Path:
 
     t = 1000 * time.time() # current time in milliseconds
     np.random.seed(int(t) % 2**32)
@@ -61,13 +65,21 @@ def dump_OR_xml_for_mi(
 
     shape_ids = []
     lit_up_lamp_list = []
+    vertices_list, faces_list, ids_list = [], [], []
+
     for shape in root.findall('shape'):
-        # optionally remove lamps and windows
         filename_str = shape.findall('string')[0].get('value')
+
+        if 'container' in filename_str:
+            root.remove(shape)
+            continue
+
+        # optionally remove lamps and windows
         if 'window' in filename_str:
             if if_no_emitter_shape:
                 root.remove(shape)
                 continue
+
         if ((filename_str.find('ceiling_lamp') != -1 or filename_str.find('03636649') != -1) \
         and ('aligned_light.obj' in filename_str or 'alignedNew.obj' in filename_str)):
             if len(shape.findall('emitter')) != 0:
@@ -86,6 +98,29 @@ def dump_OR_xml_for_mi(
                 root.remove(shape)
                 continue
 
+        replace_str_xml(shape.findall('string')[0], lookup_dict)
+
+        if if_dump_mesh:
+            obj_path = shape.findall('string')[0].get('value')
+            transforms = shape.findall('transform')
+            transforms_list = []
+            if len(transforms) != 0:
+                transforms = transforms[0]
+                assert transforms.get('name') == 'toWorld', transforms.get('name')
+                for transform in transforms:
+                    transform_name = transform.tag
+                    assert transform_name in ['scale', 'rotate', 'translate']
+                    transform_dict = {transform_name: {key: float(
+                        transform.get(key)) for key in transform.keys()}}
+                    transforms_list.append(transform_dict)
+            vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
+            if '/uv_mapped.obj' in obj_path:
+                    faces = flip_ceiling_normal(faces, vertices)
+            vertices_transformed, _ = transform_with_transforms_xml_list(transforms_list, vertices)
+            vertices_list.append(vertices_transformed)
+            faces_list.append(faces)
+            ids_list.append(shape.get('id'))
+
         # fix duplicate shape ids
         shape_id = shape.get('id')
         if shape_id not in shape_ids:
@@ -101,24 +136,12 @@ def dump_OR_xml_for_mi(
             # for rgb in emitter.findall('rgb'):
             #     rgb.set('name', 'a random name')
 
-        replace_str_xml(shape.findall('string')[0], lookup_dict)
-
-        # if 'uv_mapped/' in filename.get('value'):
-        #     obj_path = shapes_root / filename.get('value').split('uv_mapped/')[1]
-        #     assert obj_path.exists(), str(obj_path)
-        #     filename.set('value', str(obj_path))
-        # if 'layoutMesh' in filename.get('value'):
-        #     obj_path = layout_root / filename.get('value').split('layoutMesh')[1][1:]
-        #     assert obj_path.exists(), str(obj_path)
-        #     filename.set('value', str(obj_path))
-
-
+    if if_dump_mesh:
+        write_one_mesh_from_v_f_lists(dump_mesh_path, vertices_list, faces_list, ids_list)
+        write_mesh_list_from_v_f_lists(dump_mesh_dir, vertices_list, faces_list, ids_list)
+ 
     for emitter in root.findall('emitter'):
         replace_str_xml(emitter.findall('string')[0], lookup_dict)
-        # if 'EnvDataset' in filename.get('value'):
-        #     obj_path = envmaps_root / filename.get('value').split('EnvDataset')[1][1:]
-        #     assert obj_path.exists(), str(obj_path)
-        #     filename.set('value', str(obj_path))
 
     # sampler: adaptive -> independent
     sensor = root.findall('sensor')[0]
@@ -151,7 +174,7 @@ def dump_OR_xml_for_mi(
     with open(str(xml_dump_path), 'w') as xmlOut:
         xmlOut.write(xmlString )
 
-    if if_also_dump_lit_lamps:
+    if if_also_dump_xml_with_lit_lamps_only:
         for shape in root.findall('shape'):
             root.remove(shape)
         for lamp in lit_up_lamp_list:

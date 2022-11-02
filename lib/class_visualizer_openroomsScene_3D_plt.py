@@ -45,29 +45,38 @@ class visualizer_openroomsScene_3D_plt(object):
 
         self.os = openrooms_scene
 
-        self.modality_list_vis = modality_list_vis
+        self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
             assert _ in self.valid_modalities_3D_vis, 'Invalid modality_vis: %s'%_
 
     @property
     def valid_modalities_3D_vis(self):
-        return ['layout', 'shapes', 'emitters', 'emitter_envs', 'mi_depth_normal', 'mi_seg']
+        return ['layout', 'shapes', 'poses', 'emitters', 'emitter_envs']
 
     def vis_3d_with_plt(self):
         ax = None
+        if 'poses' in self.modality_list_vis:
+            assert 'shapes' in self.modality_list_vis or 'layout' in self.modality_list_vis, 'poses can only be visualized in layout view or shapes view!'
         if 'shapes' in self.modality_list_vis:
-            ax = self.vis_shapes()
+            self.vis_shapes(if_poses='poses' in self.modality_list_vis)
+        if 'layout' in self.modality_list_vis:
+            self.vis_layout(if_poses='poses' in self.modality_list_vis)
         if 'emitters' in self.modality_list_vis:
             self.vis_emitters(ax)
         if 'emitter_envs' in self.modality_list_vis:
             self.vis_emitter_envs()
-        if 'mi_depth_normal' in self.modality_list_vis:
-            self.vis_mi_depth_normal()
-        if 'mi_seg' in self.modality_list_vis:
-            self.vis_mi_seg()
+        # if 'mi_depth_normal' in self.modality_list_vis:
+        #     self.vis_mi_depth_normal()
+        # if 'mi_seg' in self.modality_list_vis:
+        #     self.vis_mi_seg()
         plt.show()
 
-    def vis_layout(self):
+    def vis_layout(self, if_poses=False):
+        '''
+        images/demo_layout_3D.png
+        images/demo_layout_2D.png
+        images/demo_layout_poses_2D_view1_oldpose.png
+        '''
         fig = plt.figure(figsize=(15, 4))
         fig.suptitle('layout mesh 3D')
 
@@ -76,7 +85,7 @@ class visualizer_openroomsScene_3D_plt(object):
         ax1.set_proj_type('ortho')
         ax1.set_aspect("auto")
         vis_axis(ax1)
-        v_pairs = (self.v, self.e)
+        v_pairs = (self.os.v, self.os.e)
         for v_pair in v_pairs:
             ax1.plot3D(v_pair[0], v_pair[1], v_pair[2])
 
@@ -85,46 +94,63 @@ class visualizer_openroomsScene_3D_plt(object):
         ax2.set_proj_type('ortho')
         ax2.set_aspect("auto")
         vis_axis(ax2)
-        v_pairs = v_pairs_from_v3d_e(self.v_skeleton, self.e_skeleton)
+        v_pairs = v_pairs_from_v3d_e(self.os.v_skeleton, self.os.e_skeleton)
         for v_pair in v_pairs:
             ax2.plot3D(v_pair[0], v_pair[1], v_pair[2])
-        vis_cube_plt(self.layout_box_3d, ax2, 'b', linestyle='--')
+        vis_cube_plt(self.os.layout_box_3d, ax2, 'b', linestyle='--')
 
         ax3 = plt.subplot(133, projection='3d')
         ax3.set_title('[FINAL COORDS] layout skeleton bbox in transformed coordinates')
         ax3.set_proj_type('ortho')
         ax3.set_aspect("auto")
         vis_axis(ax3)
-        v_pairs = v_pairs_from_v3d_e(self.v_skeleton_transformed, self.e_skeleton)
+        v_pairs = v_pairs_from_v3d_e(self.os.v_skeleton_transformed, self.os.e_skeleton)
         for v_pair in v_pairs:
             ax3.plot3D(v_pair[0], v_pair[1], v_pair[2])
-        for v_idx, v in enumerate(self.layout_box_3d_transformed):
+        for v_idx, v in enumerate(self.os.layout_box_3d_transformed):
             ax3.text(v[0], v[1], v[2], str(v_idx))
         ax3.view_init(elev=-71, azim=-65)
 
         plt.show(block=False)
 
         # visualize floor of original layout, and rectangle hull, in 2D
-        fig = plt.figure()
+        fig = plt.figure(figsize=(10, 10))
         fig.suptitle('layout 2D')
         # ax = fig.gca()
-        ax1 = plt.subplot(111)
-        ax1.set_title('layout 2D BEV')
-        ax1.set_aspect("equal")
-        v_pairs = v_pairs_from_v2d_e(self.v_2d, self.e_2d)
+        ax = plt.subplot(111)
+        ax.set_title('layout 2D BEV')
+        ax.set_aspect("equal")
+        v_pairs = v_pairs_from_v2d_e(self.os.v_2d_transformed, self.os.e_2d)
         for v_pair in v_pairs:
-            ax1.plot(v_pair[0], v_pair[1])
+            ax.plot(v_pair[0], v_pair[1])
 
         hull_pair_idxes = [[0, 1], [1, 2], [2, 3], [3, 0]]
-        hull_v_pairs = [([self.layout_hull_2d[idx[0]][0], self.layout_hull_2d[idx[1]][0]], [self.layout_hull_2d[idx[0]][1], self.layout_hull_2d[idx[1]][1]]) for idx in hull_pair_idxes]
+        hull_v_pairs = [([self.os.layout_hull_2d_transformed[idx[0]][0], self.os.layout_hull_2d_transformed[idx[1]][0]], [self.os.layout_hull_2d_transformed[idx[0]][1], self.os.layout_hull_2d_transformed[idx[1]][1]]) for idx in hull_pair_idxes]
         for v_pair in hull_v_pairs:
-            ax1.plot(v_pair[0], v_pair[1], 'b--')
+            ax.plot(v_pair[0], v_pair[1], 'b--')
+
+        if if_poses:
+            assert self.os.if_has_poses
+            for (origin, lookatvector, up) in self.os.origin_lookatvector_up_list:
+                origin_ = origin.flatten()
+                lookatvector_ = lookatvector.flatten()
+                lookat_ = origin_ + lookatvector.flatten() * 0.5 # arrows are 0.5 in length
+                ax.scatter(origin_[0], origin_[2], color='k', marker='*')
+                ax.arrow(origin_[0], origin_[2], lookatvector_[0], lookatvector_[2], lw=1, joinstyle='bevel', color='b')
+                # a = Arrow3D([origin_[0], lookat_[0]], [origin_[1], lookat_[1]], [origin_[2], lookat_[2]], mutation_scale=5,
+                #     lw=1, arrowstyle="->", color='b')
+                # ax.add_artist(a)
+
         plt.grid()
 
         plt.show(block=False)
         
-    def vis_shapes(self):
-        
+    def vis_shapes(self, if_poses=False):
+        '''
+        images/demo_shapes_3D.png
+        images/demo_shapes_poses_3D_view1_oldpose.png
+        images/demo_shapes_poses_3D_view2_oldpose.png
+        '''
         if not self.os.if_has_colors:
             self.os.load_colors()
 
@@ -165,12 +191,21 @@ class visualizer_openroomsScene_3D_plt(object):
             vis_cube_plt(bverts_transformed, ax, color=obj_color, linestyle=linestyle, linewidth=linewidth, label=cat_name)
             print(if_emitter, shape_idx, shape['id'], cat_id, cat_name, Path(obj_path).relative_to(self.os.shapes_root))
 
-            
         if_layout = 'layout' in self.modality_list_vis
 
         if if_layout:
             vis_cube_plt(self.os.layout_box_3d_transformed, ax, 'b', '--')
         
+        if if_poses:
+            assert self.os.if_has_poses
+            for (origin, lookatvector, up) in self.os.origin_lookatvector_up_list:
+                origin_ = origin.flatten()
+                lookat_ = origin_ + lookatvector.flatten() * 0.5 # arrows are 0.5 in length
+                ax.scatter(origin_[0], origin_[1], origin_[2], color='k', marker='*')
+                a = Arrow3D([origin_[0], lookat_[0]], [origin_[1], lookat_[1]], [origin_[2], lookat_[2]], mutation_scale=5,
+                    lw=1, arrowstyle="->", color='b')
+                ax.add_artist(a)
+
         # ===== cameras
         # vis_axis_xyz(ax, xaxis.flatten(), yaxis.flatten(), zaxis.flatten(), origin.flatten(), suffix='_c') # cameras
 
@@ -183,7 +218,8 @@ class visualizer_openroomsScene_3D_plt(object):
 
         ax.set_box_aspect([1,1,1])
         set_axes_equal(ax) # IMPORTANT - this is also required
-        ax.view_init(elev=-55, azim=120)
+        # ax.view_init(elev=-55, azim=120) # side view
+        ax.view_init(elev=0, azim=90) # BEV
 
         # plt.show(block=False)
         plt.draw()
@@ -322,65 +358,4 @@ class visualizer_openroomsScene_3D_plt(object):
             im_half_env_SDR, _ = to_nonHDR(im_half_env)
             vis_envmap_plt(ax, im_half_env_SDR, ['X_env-', 'Y_env-', 'X_env+', 'Y_env+'])
 
-        plt.show(block=False)
-
-    def vis_mi_depth_normal(self):
-        '''
-        images/demo_mitsuba_ret_depth_normals_2D.png
-        '''
-        assert self.os.pts_from['mi']
-        fig=plt.figure()
-        N_cols = min(self.os.num_frames, 4)
-        # subfigs = fig.subfigures(nrows=N_cols, ncols=1) # https://stackoverflow.com/questions/27426668/row-titles-for-matplotlib-subplot
-
-        for frame_idx in range(N_cols):
-            ax = plt.subplot(4, N_cols, 1+frame_idx)
-            plt.imshow(self.os.depth_list[frame_idx], cmap='jet', vmin=0.)
-            vmin, vmax = np.amin(self.os.depth_list[frame_idx]), np.amax(self.os.depth_list[frame_idx])
-            plt.colorbar()
-            if frame_idx == 0: ax.set_title('depth from OptixRenderer')
-
-            ax = plt.subplot(4, N_cols, 1+N_cols+frame_idx)
-            mi_depth_vis = self.os.mi_depth_list[frame_idx]
-            mi_depth_vis[mi_depth_vis==np.inf] = 0.
-            plt.imshow(mi_depth_vis, vmin=0., vmax=vmax, cmap='jet')
-            plt.colorbar()
-            if frame_idx == 0: ax.set_title('depth from Mitsuba')
-
-            ax = plt.subplot(4, N_cols, 1+2*N_cols+frame_idx)
-            plt.imshow(np.clip((self.os.normal_list[frame_idx]+1.)/2., 0., 1.))
-            if frame_idx == 0: ax.set_title('normals from OptixRenderer')
-
-            ax = plt.subplot(4, N_cols, 1+3*N_cols+frame_idx)
-            R = self.os.pose_list[frame_idx][:3, :3]
-            mi_normal_global = self.os.mi_normal_global_list[frame_idx]
-            mi_normal_cam = (R.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.im_H_resize, self.os.im_W_resize, 3)
-            # transform mi_normal from OpenCV (right-down-forward) to OpenGL convention (right-up-backward)
-            mi_normal_cam = np.stack([mi_normal_cam[:, :, 0], -mi_normal_cam[:, :, 1], -mi_normal_cam[:, :, 2]], axis=-1)
-            mi_normal_vis = np.clip((mi_normal_cam+1.)/2., 0., 1.)
-            mi_normal_vis[mi_normal_global==np.inf] = 0.
-            plt.imshow(mi_normal_vis)
-            if frame_idx == 0: ax.set_title('normals from Mitsuba')
-
-        plt.show(block=False)
-
-    def vis_mi_seg(self):
-        '''
-        images/demo_mitsuba_ret_seg_2D.png
-        '''
-        assert self.os.pts_from['mi']
-        fig=plt.figure()
-        N_cols = min(self.os.num_frames, 6)
-
-        for frame_idx in range(N_cols):
-            for seg_index, seg_key in enumerate(['area', 'env', 'obj']):
-                ax = plt.subplot(6, N_cols, 1+frame_idx+N_cols*seg_index*2)
-                plt.imshow(self.os.seg_dict_of_lists[seg_key][frame_idx])
-                if frame_idx == 0: ax.set_title('seg-%s from OptixRenderer'%seg_key)   
-
-                if seg_key in self.os.mi_seg_dict_of_lists:
-                    ax = plt.subplot(6, N_cols, 1+frame_idx+N_cols*(seg_index*2+1))
-                    plt.imshow(self.os.mi_seg_dict_of_lists[seg_key][frame_idx].astype(np.float32))
-                    if frame_idx == 0: ax.set_title('seg-%s from Mitsuba'%seg_key)
-        
         plt.show(block=False)

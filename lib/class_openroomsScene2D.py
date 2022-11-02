@@ -11,10 +11,11 @@ from collections import defaultdict
 from lib.utils_io import load_matrix, load_img, resize_img, load_HDR, scale_HDR, load_binary, load_h5, load_envmap, resize_intrinsics
 from lib.utils_matseg import get_map_aggre_map
 from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, check_list_of_tensors_size
-from lib.utils_openrooms import load_OR_public_poses_to_Rt, convert_SG_axis_local_global
+from lib.utils_openrooms import load_OR_public_poses_to_Rt
+from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, convert_SG_angles_to_axis_local_np
+from lib.utils_rendering_openrooms import renderingLayer
 from tqdm import tqdm
 import pickle
-import torch
 
 class openroomsScene2D(object):
     '''
@@ -29,6 +30,7 @@ class openroomsScene2D(object):
         im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640}, 
         BRDF_params_dict: dict={}, 
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
+        if_debug_info: bool=False, 
         ):
 
         '''
@@ -36,6 +38,7 @@ class openroomsScene2D(object):
         - frame_id_list are integers as seen in frame file names (e.g. im_1.png -> 1)
         '''
         self.if_save_storage = scene_params_dict.get('if_save_storage', False) # set to True to enable removing duplicated renderer files (e.g. only one copy of geometry files in main, or emitter files only in main and mainDiffMat)
+        self.if_debug_info = if_debug_info
 
         self.meta_split, self.scene_name = get_list_of_keys(scene_params_dict, ['meta_split', 'scene_name'])
         assert self.meta_split in ['main_xml', 'mainDiffMat_xml', 'mainDiffLight_xml', 'main_xml1', 'mainDiffMat_xml1', 'mainDiffLight_xml1']
@@ -85,28 +88,35 @@ class openroomsScene2D(object):
         self.if_scale_HDR = im_params_dict.get('if_scale_HDR', True) # scale HDR images with segs
         self.if_scale_HDR_per_frame = im_params_dict.get('if_scale_HDR_per_frame', False) # True: individually scale each HDR frame; False: get one global HDR scale
         self.if_clip_HDR_to_01 = im_params_dict.get('if_clip_HDR_to_01', False) # only useful when scaling HDR
+        
+        if_direct_lighting = im_params_dict.get('if_direct_lighting', False)
+        self.im_key = {True: 'imDirect_', False: 'im_'}[if_direct_lighting]
+        self.imsgEnv_key = {True: 'imsgEnvDirect_', False: 'imsgEnv_'}[if_direct_lighting]
+        self.imenv_key = {True: 'imenvDirect_', False: 'imenv_'}[if_direct_lighting]
 
         # self.im_params_dict = im_params_dict
         self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
         self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
         self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
+        self.H, self.W = self.im_H_resize, self.im_W_resize
 
         '''
         BRDF, lighting properties
         '''
         self.clip_roughness_min_to = BRDF_params_dict.get('clip_roughness_min_to', 0.)
         assert self.clip_roughness_min_to >= 0. and self.clip_roughness_min_to <= 1.
-        self.if_convert_lighting_SG_to_global = lighting_params_dict.get('if_convert_lighting_SG_to_global', False)
-        self.lighting_params_dict = lighting_params_dict
-        self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
 
+        self.lighting_params_dict = lighting_params_dict
+        self.if_convert_lighting_SG_to_global = lighting_params_dict.get('if_convert_lighting_SG_to_global', False)
+        # self.rL = renderingLayer(imWidth=self.lighting_params_dict['env_col'], imHeight=self.lighting_params_dict['env_row'], isCuda=False)
+        self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
 
         '''
         modalities to load
         '''
-        self.modality_list = modality_list
+        self.modality_list = list(set(modality_list))
         if 'im_hdr' in self.modality_list and self.if_scale_HDR:
-            assert 'seg' in modality_list
+            assert 'seg' in self.modality_list
 
         ''''
         flags to set
@@ -124,13 +134,13 @@ class openroomsScene2D(object):
         return [
             'im_hdr', 'im_sdr', 'poses', 
             'albedo', 'roughness', 'depth', 'normal', 
-            'seg', 
+            'seg', 'seg_area', 'seg_env', 'seg_obj', 
             'lighting_SG', 'lighting_envmap', 
             'semseg', 'matseg', 
             ]
 
     @property
-    def if_has_cameras(self):
+    def if_has_poses(self):
         return all([_ in self.modality_list for _ in ['poses']])
 
     @property
@@ -154,6 +164,10 @@ class openroomsScene2D(object):
         return all([_ in self.modality_list for _ in ['albedo', 'roughness']])
 
     @property
+    def if_has_lighting_envmap(self):
+        return all([_ in self.modality_list for _ in ['lighting_envmap']])
+
+    @property
     def if_has_lighting_SG(self):
         return all([_ in self.modality_list for _ in ['lighting_SG']])
 
@@ -162,15 +176,10 @@ class openroomsScene2D(object):
         return all([_ in self.modality_list for _ in ['semseg']])
 
     @property
-    def if_has_layout(self):
-        return all([_ in self.modality_list for _ in ['layout']])
-
-    @property
     def frame_num(self):
         return len(self.frame_id_list)
 
     def get_modality(self, modality):
-        
         if modality == 'im_sdr': 
             return self.im_sdr_list
         elif modality == 'im_hdr': 
@@ -188,7 +197,7 @@ class openroomsScene2D(object):
         elif modality == 'normal': 
             return self.normal_list
         elif modality == 'lighting_SG': 
-            return self.lighting_SG_list
+            return self.lighting_SG_local_list
         elif modality == 'lighting_envmap': 
             return self.lighting_envmap_list
         elif modality == 'semseg': 
@@ -225,6 +234,7 @@ class openroomsScene2D(object):
         -> K: (3, 3)
         '''
         self.K = load_matrix(self.intrinsic_path)
+        # self.K = load_matrix('/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader/data/public_re_3/main_xml/scene0008_00_more/intrinsic.txt')
         assert self.K.shape == (3, 3)
         assert self.K[0][2] == float(self.im_W_load) / 2.
         assert self.K[1][2] == float(self.im_H_load) / 2.
@@ -240,7 +250,8 @@ class openroomsScene2D(object):
         print(white_blue('[openroomsScene] load_im_sdr for %d frames...'%len(self.frame_id_list)))
 
         self.im_sdr_ext in ['jpg', 'png']
-        self.im_sdr_file_list = [self.scene_rendering_path / ('im_%d.%s'%(i, self.im_sdr_ext)) for i in self.frame_id_list]
+
+        self.im_sdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_sdr_ext)) for i in self.frame_id_list]
         self.im_sdr_list = [load_img(_, (self.im_H_load, self.im_W_load, 3), ext=self.im_sdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_sdr_file_list]
         # check_list_of_tensors_size(self.im_sdr_list, (self.im_H_load, self.im_W_load, 3))
 
@@ -254,7 +265,7 @@ class openroomsScene2D(object):
         print(white_blue('[openroomsScene] load_im_hdr for %d frames...'%len(self.frame_id_list)))
 
         self.im_hdr_ext in ['hdr'] # .rgbe not supported for now
-        self.im_hdr_file_list = [self.scene_rendering_path / ('im_%d.%s'%(i, self.im_hdr_ext)) for i in self.frame_id_list]
+        self.im_hdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_hdr_ext)) for i in self.frame_id_list]
         self.im_hdr_list = [load_HDR(_, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
 
         if self.if_scale_HDR:
@@ -406,31 +417,39 @@ class openroomsScene2D(object):
         '''
         lighting in SG;
         self.if_convert_lighting_SG_to_global = False: 
-            (H', W', SG_num, 6(theta, phi, lamb, weight: 1, 1, 1, 3)), in camera-and-normal-dependent local coordinates
+            (H', W', SG_num, 7(axis_local, lamb, weight: 3, 1, 3)), in camera-and-normal-dependent local coordinates
         self.if_convert_lighting_SG_to_global = True: 
             (H', W', SG_num, 7(axis, lamb, weight: 3, 1, 3)), in global coordinates (OpenCV convention: right-down-forward)
         '''
-        if hasattr(self, 'lighting_SG_list'): return
+        if hasattr(self, 'lighting_SG_local_list'): return
 
         print(white_blue('[openroomsScene] load_lighting_SG for %d frames...'%len(self.frame_id_list)))
         print(red('THIS MIGHT BE SLOW...'))
 
-        lighting_SG_files = [self.scene_rendering_path / ('imsgEnv_%d.h5'%i) for i in self.frame_id_list]
+        lighting_SG_files = [self.scene_rendering_path / ('%s%d.h5'%(self.imsgEnv_key, i)) for i in self.frame_id_list]
 
-        self.lighting_SG_list = []
+        self.lighting_SG_local_list = []
 
-        for idx, lighting_SG_file in enumerate(tqdm(lighting_SG_files)):
+        for frame_idx, lighting_SG_file in enumerate(tqdm(lighting_SG_files)):
             lighting_SG = load_h5(lighting_SG_file)
             if 'im_hdr' in self.modality_list and self.if_scale_HDR:
-                hdr_scale = self.hdr_scale_list[idx]
+                hdr_scale = self.hdr_scale_list[frame_idx]
                 lighting_SG[:, :, :, 3:6] = lighting_SG[:, :, :, 3:6] * hdr_scale # (120, 160, 12(SG_num), 6); theta, phi, lamb, weight: 1, 1, 1, 3
-            self.lighting_SG_list.append(lighting_SG)
+            lighting_SG = np.concatenate(
+                (convert_SG_angles_to_axis_local_np(lighting_SG[:, :, :, :2]),  # (120, 160, 12(SG_num), 7); axis_local, lamb, weight: 3, 1, 3
+                lighting_SG[:, :, :, 2:]), axis=3)
+            self.lighting_SG_local_list.append(lighting_SG)
 
         env_row, env_col = self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col']
-        assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 6) for _ in self.lighting_SG_list])
+        assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 7) for _ in self.lighting_SG_local_list])
 
         if self.if_convert_lighting_SG_to_global:
-            self.lighting_SG_global_list = convert_SG_axis_local_global(self.lighting_params_dict, self.lighting_SG_list, self.pose_list, self.normal_list)
+            self.lighting_SG_global_list = []
+            for lighting_SG_local, pose, normal in zip(self.lighting_SG_local_list, self.pose_list, self.normal_list):
+                lighting_SG_global = np.concatenate(
+                    (convert_lighting_axis_local_to_global_np(self.lighting_params_dict, lighting_SG_local[:, :, :, :3], pose, normal), 
+                    lighting_SG_local[:, :, :, 3:]), axis=3) # (120, 160, 12(SG_num), 7); axis, lamb, weight: 3, 1, 3
+                self.lighting_SG_global_list.append(lighting_SG_global)
             assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 7) for _ in self.lighting_SG_global_list])
 
         print(blue_text('[openroomsScene] DONE. load_lighting_SG'))
@@ -445,10 +464,10 @@ class openroomsScene2D(object):
         env_height, env_width = self.lighting_params_dict['env_height'], self.lighting_params_dict['env_width']
         env_row, env_col = self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col']
 
-        if self.openrooms_version == 'public_re' and (env_height, env_width) == (8, 16):
-            lighting_envmap_files = [self.scene_rendering_path / ('imenv_8x16_%d.hdr'%i) for i in self.frame_id_list]
-        else:
-            lighting_envmap_files = [self.scene_rendering_path / ('imenv_%d.hdr'%i) for i in self.frame_id_list]
+        # if self.openrooms_version == 'public_re' and (env_height, env_width) == (8, 16):
+        #     lighting_envmap_files = [self.scene_rendering_path / ('%s8x16_%d.hdr'%(imenv_key, i)) for i in self.frame_id_list]
+        # else:
+        lighting_envmap_files = [self.scene_rendering_path / ('%s%d.hdr'%(self.imenv_key, i)) for i in self.frame_id_list]
 
         self.lighting_envmap_list = []
 
@@ -463,7 +482,6 @@ class openroomsScene2D(object):
             assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
 
         print(blue_text('[openroomsScene] DONE. load_lighting_envmap'))
-
 
     def load_semseg(self):
         '''
@@ -526,197 +544,3 @@ class openroomsScene2D(object):
         
         print(blue_text('[openroomsScene] DONE. load_semseg'))
 
-    def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate: int=1, subsample_HW_rates: tuple=(1, 1)):
-        '''
-        fuse depth maps (and RGB, normals) into point clouds in global coordinates of OpenCV convention
-
-        optionally dump pcd and cams to pickles
-
-        Args:
-            subsample_rate: int, sample 1/subsample_rate of points to dump
-
-        Returns:
-            - fused geometry as dict
-            - all camera poses
-        '''
-        # assert all([_ in self.modalities for _ in ['im_sdr', 'depth', 'normal', 'poses']])
-        assert self.if_has_dense_geo and self.if_has_cameras and self.if_has_im_sdr
-
-        print(white_blue('[openroomsScene] fuse_3D_geometry for %d frames... subsample_rate: %d, subsample_HW_rates: (%d, %d)'%(len(self.frame_id_list), subsample_rate, subsample_HW_rates[0], subsample_HW_rates[1])))
-
-        X_global_list = []
-        rgb_global_list = []
-        normal_global_list = []
-        X_flatten_mask_list = []
-        X_lighting_flatten_mask_list = []
-
-        for frame_idx in tqdm(range(len(self.frame_id_list))):
-            H_color, W_color = self.im_H_resize, self.im_W_resize
-            uu, vv = np.meshgrid(range(W_color), range(H_color))
-            x_ = (uu - self.K[0][2]) * self.depth_list[frame_idx] / self.K[0][0]
-            y_ = (vv - self.K[1][2]) * self.depth_list[frame_idx] / self.K[1][1]
-            z_ = self.depth_list[frame_idx]
-
-            obj_mask = self.seg_dict_of_lists['obj'][frame_idx] + self.seg_dict_of_lists['area'][frame_idx] # geometry is defined for objects + emitters
-            assert obj_mask.shape[:2] == (H_color, W_color)
-            lighting_mask = self.seg_dict_of_lists['obj'][frame_idx] # lighting is defined for non-emitter objects only
-            assert lighting_mask.shape[:2] == (H_color, W_color)
-
-            if subsample_HW_rates != (1, 1):
-                x_ = x_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
-                y_ = y_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
-                z_ = z_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
-                H_color, W_color = H_color//subsample_HW_rates[0], W_color//subsample_HW_rates[1]
-                obj_mask = obj_mask[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
-                lighting_mask = lighting_mask[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
-                
-            z_ = z_.flatten()
-            X_flatten_mask = np.logical_and(z_ > 0, obj_mask.flatten() > 0)
-            X_lighting_flatten_mask = np.logical_and(z_ > 0, lighting_mask.flatten() > 0)
-            
-            z_ = z_[X_flatten_mask]
-            x_ = x_.flatten()[X_flatten_mask]
-            y_ = y_.flatten()[X_flatten_mask]
-            print('Valid pixels percentage: %.4f'%(sum(X_flatten_mask)/float(H_color*W_color)))
-            X_flatten_mask_list.append(X_flatten_mask)
-            X_lighting_flatten_mask_list.append(X_lighting_flatten_mask)
-
-            X_ = np.stack([x_, y_, z_], axis=-1)
-            t = self.pose_list[frame_idx][:3, -1].reshape((3, 1))
-            R = self.pose_list[frame_idx][:3, :3]
-
-            X_global = (R @ X_.T + t).T
-            X_global_list.append(X_global)
-
-            rgb_global = self.im_sdr_list[frame_idx]
-            if subsample_HW_rates != ():
-                rgb_global = rgb_global[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
-            rgb_global = rgb_global.reshape(-1, 3)[X_flatten_mask]
-            rgb_global_list.append(rgb_global)
-            
-            normal = self.normal_list[frame_idx]
-            if subsample_HW_rates != ():
-                normal = normal[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
-            normal = normal.reshape(-1, 3)[X_flatten_mask]
-            normal = np.stack([normal[:, 0], -normal[:, 1], -normal[:, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
-            normal_global = (R @ normal.T).T
-            normal_global_list.append(normal_global)
-
-        print(blue_text('[openroomsScene] DONE. fuse_3D_geometry'))
-
-        X_global = np.vstack(X_global_list)[::subsample_rate]
-        rgb_global = np.vstack(rgb_global_list)[::subsample_rate]
-        normal_global = np.vstack(normal_global_list)[::subsample_rate]
-
-        assert X_global.shape[0] == rgb_global.shape[0] == normal_global.shape[0]
-
-        geo_fused_dict = {'X': X_global, 'rgb': rgb_global, 'normal': normal_global}
-
-        return geo_fused_dict, X_flatten_mask_list, X_lighting_flatten_mask_list
-
-        # return geo_fused_dict
-
-        # if dump_path != Path(''):
-        #     pcd_dump_path = Path(str(dump_path).replace('#MOD', 'pcd'))
-        #     with open(pcd_dump_path, 'wb') as f:
-        #         pickle.dump(, f)
-
-        #     cam_dump_path = Path(str(dump_path).replace('#MOD', 'cam'))
-        #     with open(cam_dump_path, 'wb') as f:
-        #         pickle.dump({
-        #             'pose_list': self.pose_list, 
-        #             'origin_lookatvector_up_list': self.origin_lookatvector_up_list
-        #             }, f)
-
-        #     print(green('[openroomsScene] DUMPED to %s. fuse_3D_geometry')%(str(dump_path).replace('#MOD', '{pcd,cam}')))
-        #     vis_cmd = 'python tools/vis_all.py --cam_path %s --subsample_cam_rate 1 --pcd_path %s'%(str(cam_dump_path), str(pcd_dump_path))
-        #     print(vis_cmd)
-
-    def _fuse_3D_lighting_SG(self, dump_path: Path=Path(''), subsample_rate: int=1):
-        '''
-        fuse depth maps (and RGB, normals) into point clouds in global coordinates of OpenCV convention
-
-        Args:
-            subsample_rate: int, sample 1/subsample_rate of points to dump
-
-        Returns:
-            - fused lighting and their associated pcd as dict
-        '''
-
-        print(white_blue('[openroomsScene] fuse_3D_lighting_SG for %d frames... subsample_rate: %d'%(len(self.frame_id_list), subsample_rate)))
-
-        geo_fused_SG_dict, _, X_lighting_flatten_mask_list = self._fuse_3D_geometry(subsample_rate=subsample_rate, subsample_HW_rates=self.im_lighting_HW_ratios)
-        X_global_SG, normal_global_SG = geo_fused_SG_dict['X'], geo_fused_SG_dict['normal']
-
-        # assert all([_ in self.modalities for _ in ['lighting_SG']])
-        assert self.if_has_lighting_SG and self.if_has_cameras
-
-        SG_params = self.lighting_params_dict
-        from lib.utils_rendering_openrooms import renderingLayer
-        rL = renderingLayer(imWidth = SG_params['env_col'], imHeight = SG_params['env_row'], isCuda=False)
-
-        axis_SG_global_list = []
-        weight_SG_global_list = []
-        lamb_SG_global_list = []
-
-        for idx in tqdm(range(len(self.frame_id_list))):
-            lighting_SG = self.lighting_SG_list[idx] # (120, 160, 12(SG_num), 6)
-            lighting_SG_torch = torch.from_numpy(lighting_SG).view(-1, SG_params['SG_num'], 6)
-
-            theta_torch, phi_torch, lamb_torch, weight_torch = torch.split(lighting_SG_torch, [1, 1, 1, 3], dim=2)
-            theta_torch = theta_torch.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) # (HW, 12(SG_num), 1, 1, 1, 1)
-            phi_torch = phi_torch.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-            # lamb_torch = lamb_torch.unsqueeze(-1).unsqueeze(-1)
-            # weight_torch = weight_torch.unsqueeze(-1).unsqueeze(-1)
-
-            normal_torch = torch.from_numpy(self.normal_list[idx]).unsqueeze(0).permute(0, 3, 1, 2) # (1, 3, H, W)
-
-            ls_coords, camx, camy, normalPred = rL.forwardEnv(normal_torch, None, if_normal_only=True) # torch.Size([B, 128, 3, 120, 160]), [B, 3, 120, 160], [B, 3, 120, 160], [B, 3, 120, 160]
-            envNum = SG_params['env_row'] * SG_params['env_col']
-            camx_reshape = camx.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-            camy_reshape = camy.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-            camz_reshape = normalPred.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-
-            axisX = torch.sin(theta_torch ) * torch.cos(phi_torch )
-            axisY = torch.sin(theta_torch ) * torch.sin(phi_torch )
-            axisZ = torch.cos(theta_torch )
-            axis_local_SG = torch.cat([axisX, axisY, axisZ], dim=5) # [19200, 12, 1, 1, 1, 3]; in a local SG (self.ls) coords
-
-            axis_SG = axis_local_SG[:, :, :, :, :, 0:1] * camx_reshape \
-                + axis_local_SG[:, :, :, :, :, 1:2] * camy_reshape \
-                + axis_local_SG[:, :, :, :, :, 2:3] * camz_reshape # transfer from a local camera-dependent coords to the ONE AND ONLY camera coords (LightNet)
-            axis_SG = axis_SG.squeeze() # [19200, 12, 3]
-
-            axis_SG_np = axis_SG.cpu().numpy()
-            axis_SG_np = np.stack([axis_SG_np[:, :, 0], -axis_SG_np[:, :, 1], -axis_SG_np[:, :, 2]], axis=-1) # transform axis from opengl convention (right-up-backward) to opencv (right-down-forward)
-
-            R = self.pose_list[idx][:3, :3]
-            
-            axis_SG_np_global = axis_SG_np @ (R.T)
-            axis_SG_np_global = axis_SG_np_global.reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 3)
-            weight_SG_np = weight_torch.cpu().squeeze().numpy().reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 3)
-            lamb_SG_np = lamb_torch.cpu().squeeze().numpy().reshape(SG_params['env_row'] * SG_params['env_col'], SG_params['SG_num'], 1)
-
-            X_flatten_mask = X_lighting_flatten_mask_list[idx]
-            axis_SG_np_global = axis_SG_np_global[X_flatten_mask]
-            weight_SG_np = weight_SG_np[X_flatten_mask]
-            lamb_SG_np = lamb_SG_np[X_flatten_mask]
-
-            axis_SG_global_list.append(axis_SG_np_global)
-            weight_SG_global_list.append(weight_SG_np)
-            lamb_SG_global_list.append(lamb_SG_np)
-
-        print(blue_text('[openroomsScene] DONE. fuse_3D_lighting_SG'))
-
-        axis_SG_global = np.vstack(axis_SG_global_list)[::subsample_rate]
-        weight_SG_global = np.vstack(weight_SG_global_list)[::subsample_rate]
-        lamb_SG_global = np.vstack(lamb_SG_global_list)[::subsample_rate]
-
-        assert X_global_SG.shape[0] == axis_SG_global.shape[0] == weight_SG_global.shape[0] == lamb_SG_global.shape[0]
-
-        lighting_SG_fused_dict = {
-            'X_global_SG': X_global_SG, 'normal_global_SG': normal_global_SG,
-            'axis_SG': axis_SG_global, 'weight_SG': weight_SG_global, 'lamb_SG': lamb_SG_global, 
-            }
-
-        return lighting_SG_fused_dict

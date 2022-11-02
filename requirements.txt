@@ -26,3 +26,5 @@ sympy
 pyquaternion
 ipdb
 jupyterlab
+mitsuba
+

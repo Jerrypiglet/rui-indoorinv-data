@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+import time
+import torch.nn.functional as F
 
 def fuse_depth_pcd_tr(depth_list, pose_list, hwf, subsample_rate=1):
     assert len(depth_list) == len(pose_list)
@@ -93,44 +95,44 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
 
     return pose_list, origin_lookatvector_up_list
 
-from lib.utils_rendering_openrooms import renderingLayer
-def convert_SG_axis_local_global(lighting_params, split_lighting_SG_list_split, split_pose_list_split, split_normal_list):
-    rL = renderingLayer(imWidth=lighting_params['env_col'], imHeight=lighting_params['env_row'], isCuda=False)
 
-    lighting_SG_global_list = []
 
-    for lighting_SG, pose, normal in zip(split_lighting_SG_list_split, split_pose_list_split, split_normal_list):
-        lighting_SG_torch = torch.from_numpy(lighting_SG).view(-1, lighting_params['SG_num'], 6)
-        theta_torch, phi_torch, _, _ = torch.split(lighting_SG_torch, [1, 1, 1, 3], dim=2)
-        theta_torch = theta_torch.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) # (HW, 12(SG_num), 1, 1, 1, 1)
-        phi_torch = phi_torch.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-        normal_torch = torch.from_numpy(normal).unsqueeze(0).permute(0, 3, 1, 2) # (1, 3, H, W)
 
-        _, camx, camy, normalPred = rL.forwardEnv(normal_torch, None, if_normal_only=True) # torch.Size([B, 128, 3, 120, 160]), [B, 3, 120, 160], [B, 3, 120, 160], [B, 3, 120, 160]
-        envNum = lighting_params['env_row'] * lighting_params['env_col']
-        camx_reshape = camx.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-        camy_reshape = camy.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
-        camz_reshape = normalPred.squeeze(0).permute(1, 2, 0).view(envNum, 1, 1, 1, 1, 3)
+def _convert_local_to_cam_coords(normal):
+    '''
+    args:
+        normal: (H, W, 3), normalized
+    return:
+        camx, camy, normal
 
-        axisX = torch.sin(theta_torch ) * torch.cos(phi_torch )
-        axisY = torch.sin(theta_torch ) * torch.sin(phi_torch )
-        axisZ = torch.cos(theta_torch )
-        axis_local_SG = torch.cat([axisX, axisY, axisZ], dim=5) # [19200, 12, 1, 1, 1, 3]; in a local SG (self.ls) coords
+    '''
+    # assert normal.shape[:2] == (self.imHeight, self.imWidth)
+    up = torch.tensor([0,1,0], device='cpu').float()
 
-        axis_SG = axis_local_SG[:, :, :, :, :, 0:1] * camx_reshape \
-            + axis_local_SG[:, :, :, :, :, 1:2] * camy_reshape \
-            + axis_local_SG[:, :, :, :, :, 2:3] * camz_reshape # transfer from a local camera-dependent coords to the ONE AND ONLY camera coords (LightNet)
-        axis_SG = axis_SG.squeeze() # [19200, 12, 3]
+    # (3,), (1, 3, 120, 160)
 
-        axis_SG_np = axis_SG.cpu().numpy()
-        axis_SG_np = np.stack([axis_SG_np[:, :, 0], -axis_SG_np[:, :, 1], -axis_SG_np[:, :, 2]], axis=-1) # transform axis from opengl convention (right-up-backward) to opencv (right-down-forward)
-        
-        R = pose[:3, :3]
-        axis_SG_np_global = axis_SG_np @ (R.T)
-        axis_SG_np_global = axis_SG_np_global.reshape(lighting_params['env_row'], lighting_params['env_col'], lighting_params['SG_num'], 3)
+    camyProj = torch.einsum('b,abcd->acd',(up, normal)).unsqueeze(1).expand_as(normal) * normal # project camera up to normal direction https://en.wikipedia.org/wiki/Vector_projection
+    camy = F.normalize(up.unsqueeze(0).unsqueeze(-1).unsqueeze(-1).expand_as(camyProj) - camyProj, dim=1, p=2)
+    camx = -F.normalize(torch.cross(camy, normal,dim=1), p=2, dim=1) # torch.Size([1, 3, 120, 160])
+    T_cam2local_flattened = torch.cat((camx, camy, normal), axis=0).permute(2, 3, 0, 1).flatten(0, 1).cpu().numpy() # concat as rows: cam2local; (HW, 3, 3)
 
-        lighting_SG = np.concatenate((axis_SG_np_global, lighting_SG[:, :, :, 2:6]), axis=3) # (120, 160, 12(SG_num), 7); axis, lamb, weight: 3, 1, 3
+    return T_cam2local_flattened
 
-        lighting_SG_global_list.append(lighting_SG)
+def get_T_local_to_camopengl_np(normal):
+    '''
+    args:
+        normal: (H, W, 3), normalized
+    return:
+        camx, camy, normal
 
-    return lighting_SG_global_list
+    '''
+    # assert normal.shape[:2] == (self.imHeight, self.imWidth)
+    up = np.array([0, 1, 0], dtype=np.float32)[np.newaxis, np.newaxis] # (1, 1, 3)
+    camy_proj = np.sum(up * normal, axis=2, keepdims=True) * normal # (H, W, 3)
+    cam_y = up - camy_proj
+    cam_y = cam_y / (np.linalg.norm(cam_y, axis=2, keepdims=True) + 1e-6) # (H, W, 3)
+    cam_x = - np.cross(cam_y, normal, axis=2)
+    cam_x = cam_x / (np.linalg.norm(cam_x, axis=2, keepdims=True) + 1e-6) # (H, W, 3)
+    T_local_to_camopengl =  np.stack((cam_x, cam_y, normal), axis=-1)# concat as cols: local2cam; (H, W, 3, 3)
+
+    return T_local_to_camopengl
