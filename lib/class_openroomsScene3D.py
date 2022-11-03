@@ -59,7 +59,6 @@ class openroomsScene3D(openroomsScene2D):
         self.emitter_params_dict = emitter_params_dict
         self.mi_params_dict = mi_params_dict
 
-
         super().__init__(
             if_debug_info = if_debug_info, 
             root_path_dict = root_path_dict, 
@@ -225,7 +224,9 @@ class openroomsScene3D(openroomsScene2D):
         self.mi_normal_global_list = []
         self.mi_pts_list = []
 
-        for frame_idx, (rays_o, rays_d, ray_d_center) in enumerate(self.cam_rays_list):
+        print('[mi_sample_rays_pts]...')
+        
+        for frame_idx, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(self.cam_rays_list)):
             rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
 
             xs_mi = mi.Point3f(rays_o_flatten)

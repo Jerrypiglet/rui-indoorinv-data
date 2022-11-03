@@ -96,12 +96,12 @@ data/public_re_3/main_xml/scene0005_00_more/im_3.png
 '''
 === more & better cameras
 '''
-# base_root = Path(PATH_HOME) / 'data/public_re_3_v3pose'
-# xml_root = Path(PATH_HOME) / 'data/public_re_3_v3pose/scenes'
+base_root = Path(PATH_HOME) / 'data/public_re_3_v3pose_2048'
+xml_root = Path(PATH_HOME) / 'data/public_re_3_v3pose_2048/scenes'
 
-# meta_split = 'main_xml'
-# scene_name = 'scene0008_00_more'
-# frame_ids = list(range(0, 345, 5))
+meta_split = 'main_xml'
+scene_name = 'scene0008_00_more'
+frame_ids = list(range(0, 345, 1))
 # frame_ids = [0, 9]
 
 openrooms_scene = openroomsScene3D(
@@ -111,7 +111,7 @@ openrooms_scene = openroomsScene3D(
     scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        # 'im_sdr', 
+        'im_sdr', 
         'poses', 
         # 'seg', 
         # 'im_hdr', 'albedo', 'roughness', 
@@ -119,8 +119,8 @@ openrooms_scene = openroomsScene3D(
         # 'lighting_SG', 
         # 'lighting_envmap', 
         'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
-        # 'mi', # mitsuba scene, loading from scene xml file
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        'mi', # mitsuba scene, loading from scene xml file
         ], 
     im_params_dict={
         'im_H_load': 480, 'im_W_load': 640, 
@@ -185,8 +185,8 @@ if opt.vis_3d_plt:
         openrooms_scene, 
         modality_list_vis = [
             'layout', 
-            'shapes', # boxes and labels (no meshes in plt visualization)
             'poses', # camera center + optical axis
+            # 'shapes', # boxes and labels (no meshes in plt visualization)
             # 'emitters', # emitter properties
             # 'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
             ], 
