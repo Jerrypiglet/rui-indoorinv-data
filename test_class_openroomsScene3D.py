@@ -96,20 +96,20 @@ data/public_re_3/main_xml/scene0005_00_more/im_3.png
 '''
 === more & better cameras
 '''
-# base_root = Path(PATH_HOME) / 'data/public_re_3_v3pose_2048'
-# xml_root = Path(PATH_HOME) / 'data/public_re_3_v3pose_2048/scenes'
-
-# meta_split = 'main_xml'
-# scene_name = 'scene0008_00_more'
-# frame_ids = list(range(0, 345, 1))
-# # frame_ids = [321]
-
-base_root = Path(PATH_HOME) / 'public_re_3_tmp2'
-xml_root = Path(PATH_HOME) / 'public_re_3_tmp2/scenes'
+base_root = Path(PATH_HOME) / 'data/public_re_3_v3pose_2048'
+xml_root = Path(PATH_HOME) / 'data/public_re_3_v3pose_2048/scenes'
 
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
-frame_ids = list(range(0, 102, 1))
+frame_ids = list(range(0, 345, 1))
+# frame_ids = [321]
+
+# base_root = Path(PATH_HOME) / 'public_re_3_tmp2'
+# xml_root = Path(PATH_HOME) / 'public_re_3_tmp2/scenes'
+
+# meta_split = 'main_xml'
+# scene_name = 'scene0008_00_more'
+# frame_ids = list(range(0, 102, 1))
 
 openrooms_scene = openroomsScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -125,7 +125,7 @@ openrooms_scene = openroomsScene3D(
         # 'depth', 'normal', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
-        # 'layout', 
+        'layout', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
@@ -237,10 +237,10 @@ if opt.vis_3d_o3d:
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            # 'layout', 
+            'layout', 
             # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             # 'emitters', # emitter properties (e.g. SGs, half envmaps)
-            # 'mi', # mitsuba sampled rays, pts
+            'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
