@@ -309,13 +309,14 @@ class visualizer_openroomsScene_3D_o3d(object):
     def collect_cameras(self, cam_params: dict={}):
         assert self.os.if_has_poses
 
+        if_cam_axis_only = cam_params.get('if_cam_axis_only', False)
         subsample_cam_rate = cam_params.get('subsample_cam_rate', 1)
         near, far = self.os.near, self.os.far
 
         pose_list = self.os.pose_list
         origin_lookatvector_up_list = self.os.origin_lookatvector_up_list
         cam_frustrm_list = []
-        cam_axes_list = []
+        # cam_axes_list = []
         cam_center_list = []
         # cam_o_d_list = []
 
@@ -338,12 +339,18 @@ class visualizer_openroomsScene_3D_o3d(object):
         #     cam_list.append(cam)
 
         cam_list = []
+        cam_axis_list = []
         for (rays_o, rays_d, _) in self.os.cam_rays_list:
             cam_o = rays_o[0,0] # (3,)
             cam_d = rays_d[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
             cam_list.append(np.array([cam_o, *(cam_o+cam_d*max(near, far*0.05))]))
 
+            cam_axis = cam_d.mean(0)
+            cam_axis_list.append(np.array([cam_o, cam_o+cam_axis]))
+
         c2w_list = pose_list
+
+        cam_axis_arrow_list = []
 
         for cam_idx, cam in enumerate(cam_list):
             # cam_color = [0.5, 0.5, 0.5]
@@ -372,12 +379,24 @@ class visualizer_openroomsScene_3D_o3d(object):
             cam_center.colors = o3d.utility.Vector3dVector(np.array(cam_color).reshape(1, 3))
             cam_center_list.append(cam_center)
 
-        if subsample_cam_rate != 1: # subsample camera poses if too many
-            cam_frustrm_list = cam_axes_list[::subsample_cam_rate] + [cam_axes_list[-1]]
+            cam_axis = cam_axis_list[cam_idx]
+            cam_axis_arrow = o3d.geometry.LineSet()
+            cam_axis_arrow.points = o3d.utility.Vector3dVector(cam_axis)
+            cam_axis_arrow.colors = o3d.utility.Vector3dVector([cam_color for i in range(2)])
+            cam_axis_arrow.lines = o3d.utility.Vector2iVector([[0,1]])
+            cam_axis_arrow_list.append(cam_axis_arrow)
 
-        geometry_list = [
-            *cam_frustrm_list, *cam_center_list, # pcd + cams
-        ]
+        # if subsample_cam_rate != 1: # subsample camera poses if too many
+        #     cam_frustrm_list = cam_axes_list[::subsample_cam_rate] + [cam_axes_list[-1]]
+
+        if if_cam_axis_only:
+            geometry_list = [
+                *cam_axis_arrow_list, *cam_center_list, # pcd + cams
+            ]
+        else:
+            geometry_list = [
+                *cam_frustrm_list, *cam_center_list, # pcd + cams
+            ]
 
         return geometry_list
 

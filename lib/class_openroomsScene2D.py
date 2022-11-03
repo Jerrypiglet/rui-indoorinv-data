@@ -144,11 +144,11 @@ class openroomsScene2D(object):
         return all([_ in self.modality_list for _ in ['poses']])
 
     @property
-    def if_has_im_sdr(self):
-        return all([_ in self.modality_list for _ in ['im_sdr']])
+    def if_has_im_hdr(self):
+        return all([_ in self.modality_list for _ in ['im_hdr']])
 
     @property
-    def if_has_HDR_scale(self):
+    def if_has_hdr_scale(self):
         return all([_ in self.modality_list for _ in ['im_hdr']]) and self.if_scale_HDR
 
     @property
@@ -233,8 +233,8 @@ class openroomsScene2D(object):
         '''
         -> K: (3, 3)
         '''
-        self.K = load_matrix(self.intrinsic_path)
-        # self.K = load_matrix('/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader/data/public_re_3/main_xml/scene0008_00_more/intrinsic.txt')
+        # self.K = load_matrix(self.intrinsic_path)
+        self.K = load_matrix('/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader/data/public_re_3/main_xml/scene0008_00_more/intrinsic.txt')
         assert self.K.shape == (3, 3)
         assert self.K[0][2] == float(self.im_W_load) / 2.
         assert self.K[1][2] == float(self.im_H_load) / 2.

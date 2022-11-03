@@ -224,8 +224,8 @@ class openroomsScene3D(openroomsScene2D):
         self.mi_normal_global_list = []
         self.mi_pts_list = []
 
-        print('[mi_sample_rays_pts]...')
-        
+        print('[mi_sample_rays_pts] for %d frames...'%len(self.cam_rays_list))
+
         for frame_idx, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(self.cam_rays_list)):
             rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
 
@@ -268,6 +268,9 @@ class openroomsScene3D(openroomsScene2D):
         self.pts_from['mi'] = True
 
     def mi_get_segs(self, if_also_dump_xml_with_lit_lamps_only=True):
+        '''
+        images/demo_mitsuba_ret_seg_2D.png
+        '''
         self.mi_seg_dict_of_lists = defaultdict(list)
 
         for frame_idx, mi_depth in enumerate(self.mi_depth_list):
