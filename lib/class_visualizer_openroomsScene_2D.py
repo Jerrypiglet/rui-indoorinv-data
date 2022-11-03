@@ -185,7 +185,7 @@ class visualizer_openroomsScene_2D(object):
 
             if modality == 'lighting_SG':
                 axis_local, lamb, weight = np.split(_im, [3, 4], axis=3)
-                if self.os.if_has_HDR_scale:
+                if self.os.if_has_hdr_scale:
                     weight = weight / self.os.hdr_scale_list[frame_idx]
                 # ts = time.time()
                 envmap_cam = self.converter_SG_to_envmap.convert_converter_SG_to_envmap_2D(axis_local, lamb, weight) # -> (120, 160, 3, 8, 16)
@@ -197,7 +197,7 @@ class visualizer_openroomsScene_2D(object):
                 _im = np.clip(downsample_lighting_envmap(envmap_cam, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
 
             if modality == 'lighting_envmap':
-                if self.os.if_has_HDR_scale:
+                if self.os.if_has_hdr_scale:
                     _im = _im / self.os.hdr_scale_list[frame_idx]
                 lighting_scale = lighting_params.get('lighting_scale', 0.1)
                 _im = np.clip(downsample_lighting_envmap(_im, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
