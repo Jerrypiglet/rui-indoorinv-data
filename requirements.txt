@@ -23,7 +23,7 @@ numpy-quaternion
 # sympy
 h5py
 sympy
-pyquaternion
+# pyquaternion
 ipdb
 jupyterlab
 mitsuba
