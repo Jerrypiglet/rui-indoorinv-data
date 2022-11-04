@@ -240,7 +240,6 @@ Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True
 ![](images/demo_render_ZQ_emitter_rays_2.png)
 # Todolist
 - [x] vis envmap
-- [ ] check_and_sort_modalities
 - [ ] unit test scrpt without X
 - [ ] batch mi ray intersection when too many frames
 - [ ] multi-gpu support

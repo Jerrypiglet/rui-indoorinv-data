@@ -91,7 +91,7 @@ scene_name = 'scene0005_00_more'
 frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
 # frame_ids = [3]
 # frame_ids = list(range(102))
-frame_ids = list(range(0, 102, 10))
+frame_ids = list(range(3, 102, 10))
 
 '''
 === more & better cameras
@@ -214,11 +214,13 @@ if opt.render_3d:
             'max_plate': 256, 
             'emitter_type_index': ('lamp', 0), 
         })
-    ts = np.median(renderer_return_dict['ts'], axis=1)
-    visibility = np.amax(renderer_return_dict['visibility'], axis=1)
-    print('visibility', visibility.shape, np.sum(visibility)/float(visibility.shape[0]))
-    # from scipy import stats
-    # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
+    
+    if opt.renderer_option == 'ZQ_emitter':
+        ts = np.median(renderer_return_dict['ts'], axis=1)
+        visibility = np.amax(renderer_return_dict['visibility'], axis=1)
+        print('visibility', visibility.shape, np.sum(visibility)/float(visibility.shape[0]))
+        # from scipy import stats
+        # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
 
 '''
 Open3D 3D viewer
@@ -254,8 +256,8 @@ if opt.vis_3d_o3d:
         assert opt.render_3d
         assert openrooms_scene.if_has_mitsuba_rays_pts
         
-        _pts_idx = list(range(openrooms_scene.W*openrooms_scene.H)); _sample_rate = 1000 # visualize for all scene points;
-        # _pts_idx = 60 * openrooms_scene.W + 80; _sample_rate = 1 # only visualize for one scene point w.r.t. all lamp points
+        # _pts_idx = list(range(openrooms_scene.W*openrooms_scene.H)); _sample_rate = 1000 # visualize for all scene points;
+        _pts_idx = 60 * openrooms_scene.W + 80; _sample_rate = 1 # only visualize for one scene point w.r.t. all lamp points
         visibility = renderer_return_dict['visibility'][_pts_idx].reshape(-1,)[::_sample_rate]
         visualizer_3D_o3d.add_extra_geometry([
             ('rays', {

@@ -189,7 +189,9 @@ class visualizer_openroomsScene_3D_o3d(object):
         mi_params: dict = {}, 
     ):
         
-        o3d_geometry_list = [o3d.geometry.TriangleMesh.create_coordinate_frame()]
+        o3d_geometry_list = []
+
+        o3d_geometry_list += [o3d.geometry.TriangleMesh.create_coordinate_frame()]
 
         if 'cameras' in modality_list:
             o3d_geometry_list += self.collect_cameras(cam_params)
