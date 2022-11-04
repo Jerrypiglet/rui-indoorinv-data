@@ -823,7 +823,7 @@ class visualizer_openroomsScene_3D_o3d(object):
                     if if_pts_colorize_rgb and self.os.if_has_im_sdr:
                         mi_color_ = self.os.im_sdr_list[frame_idx][mi_depth!=np.inf, :][::pts_subsample] # [H, W, 3] -> [N', 3]
                     else:
-                        mi_color_ = np.array([[0.3, 0.3, 0.3]]*mi_pts_.shape[0])
+                        mi_color_ = np.array([[0.7, 0.7, 0.7]]*mi_pts_.shape[0])
                 else:
                     assert isinstance(self.mi_pcd_color_list, list)
                     mi_color_ = self.mi_pcd_color_list[frame_idx][::pts_subsample]

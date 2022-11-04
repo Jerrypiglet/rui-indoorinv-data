@@ -77,6 +77,9 @@ class visualizer_openroomsScene_3D_plt(object):
         images/demo_layout_2D.png
         images/demo_layout_poses_2D_view1_oldpose.png
         '''
+
+        assert self.os.if_has_layout
+        
         fig = plt.figure(figsize=(15, 4))
         fig.suptitle('layout mesh 3D')
 

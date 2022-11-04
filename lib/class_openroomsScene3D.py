@@ -17,7 +17,7 @@ import mitsuba as mi
 # from lib.global_vars import mi_variant
 # mi.set_variant(mi_variant)
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, get_device
+from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue
 from lib.utils_mitsuba import dump_OR_xml_for_mi
 
 from .class_openroomsScene2D import openroomsScene2D
@@ -29,6 +29,7 @@ from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_ls_np
 from lib.utils_dvgo import get_rays_np
+from lib.utils_misc import get_device
 
 class openroomsScene3D(openroomsScene2D):
     '''
@@ -51,15 +52,15 @@ class openroomsScene3D(openroomsScene2D):
         host: str='', 
     ):
 
-        for _ in modality_list:
-            assert _ in super().valid_modalities + self.valid_modalities_3D, 'Invalid modality: %s'%_
-
         self.if_loaded_colors = False
 
         self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
         self.emitter_params_dict = emitter_params_dict
         self.mi_params_dict = mi_params_dict
+
+        self.host = host
+        self.device = get_device(self.host)
 
         super().__init__(
             if_debug_info = if_debug_info, 
@@ -71,11 +72,11 @@ class openroomsScene3D(openroomsScene2D):
             lighting_params_dict = lighting_params_dict, 
         )
 
+        self.modality_list = self.check_and_sort_modalities(list(set(self.modality_list)))
         self.shapes_root, self.layout_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'layout_root', 'envmaps_root'], [PosixPath, PosixPath, PosixPath])
         self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
         self.pcd_color = None
 
-        self.host = host
 
         '''
         load everything
@@ -86,6 +87,10 @@ class openroomsScene3D(openroomsScene2D):
     @property
     def valid_modalities_3D(self):
         return ['layout', 'shapes', 'mi']
+
+    @property
+    def valid_modalities(self):
+        return super().valid_modalities + self.valid_modalities_3D
 
     @property
     def if_has_layout(self):
@@ -150,7 +155,6 @@ class openroomsScene3D(openroomsScene2D):
             mi.set_variant(variant)
         else:
             mi.set_variant(mi_variant_dict[self.host])
-        self.device = get_device(self.host)
 
         self.mi_xml_dump_path = dump_OR_xml_for_mi(
             str(self.xml_file), 
@@ -217,6 +221,8 @@ class openroomsScene3D(openroomsScene2D):
             self.cam_rays_list.append((rays_o, rays_d, ray_d_center))
 
     def to_d(self, x: np.ndarray):
+        if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
+            return x
         return torch.from_numpy(x).to(self.device)
 
     def mi_sample_rays_pts(self):

@@ -86,30 +86,23 @@ frame_ids = list(range(102))
 The conference room with one lamp
 data/public_re_3/main_xml/scene0005_00_more/im_3.png
 '''
-# meta_split = 'main_xml'
-# scene_name = 'scene0005_00_more'
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-# # frame_ids = [3]
-# # frame_ids = list(range(102))
-# frame_ids = list(range(0, 102, 20))
+meta_split = 'main_xml'
+scene_name = 'scene0005_00_more'
+frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
+# frame_ids = [3]
+# frame_ids = list(range(102))
+frame_ids = list(range(0, 102, 10))
 
 '''
 === more & better cameras
 '''
-# base_root = Path(PATH_HOME) / 'data/public_re_3_v3pose_2048'
-# xml_root = Path(PATH_HOME) / 'data/public_re_3_v3pose_2048/scenes'
+# base_root = Path(PATH_HOME) / 'data/public_re_3_v5pose_2048'
+# xml_root = Path(PATH_HOME) / 'data/public_re_3_v5pose_2048/scenes'
 
 # meta_split = 'main_xml'
 # scene_name = 'scene0008_00_more'
 # frame_ids = list(range(0, 345, 1))
-# # frame_ids = [321]
-
-base_root = Path(PATH_HOME) / 'public_re_3_tmp2'
-xml_root = Path(PATH_HOME) / 'public_re_3_tmp2/scenes'
-
-meta_split = 'main_xml'
-scene_name = 'scene0008_00_more'
-frame_ids = list(range(0, 102, 1))
+# frame_ids = [321]
 
 openrooms_scene = openroomsScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -119,15 +112,15 @@ openrooms_scene = openroomsScene3D(
     scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        # 'im_sdr', 
+        'im_sdr', 
         'poses', 
-        # 'seg', 
-        # 'im_hdr', 'albedo', 'roughness', 
-        # 'depth', 'normal', 
-        # 'lighting_SG', 
+        'seg', 'im_hdr', 
+        'albedo', 'roughness', 
+        'depth', 'normal', 
+        'lighting_SG', 
         # 'lighting_envmap', 
-        # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        'layout', 
+        'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
     im_params_dict={
@@ -194,7 +187,7 @@ if opt.vis_3d_plt:
         modality_list_vis = [
             'layout', 
             'poses', # camera center + optical axis
-            'shapes', # boxes and labels (no meshes in plt visualization)
+            # 'shapes', # boxes and labels (no meshes in plt visualization)
             # 'emitters', # emitter properties
             # 'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
             ], 
@@ -238,10 +231,10 @@ if opt.vis_3d_o3d:
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            # 'layout', 
-            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
-            # 'emitters', # emitter properties (e.g. SGs, half envmaps)
-            # 'mi', # mitsuba sampled rays, pts
+            'layout', 
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
+            'emitters', # emitter properties (e.g. SGs, half envmaps)
+            'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -279,7 +272,7 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
-            'if_cam_axis_only': True
+            'if_cam_axis_only': False, 
             }, 
         dense_geo_params={
             'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)

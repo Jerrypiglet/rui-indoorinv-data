@@ -14,7 +14,7 @@ from lib.class_openroomsScene3D import openroomsScene3D
 from lib.utils_rendering_PhySG import render_with_sg
 from lib.utils_rendering_ZQ import rendering_layer_per_point
 from lib.utils_rendering_ZQ_emitter import rendering_layer_per_point_from_emitter
-from lib.utils_misc import yellow, get_device
+from lib.utils_misc import get_device
 
 class renderer_openroomsScene_3D(object):
     '''
@@ -39,7 +39,7 @@ class renderer_openroomsScene_3D(object):
 
         self.renderer_option = renderer_option
         assert self.renderer_option in ['ZQ', 'PhySG', 'ZQ_emitter']
-        get_device(host)
+        self.device = get_device(host)
 
         if self.renderer_option == 'ZQ':
             self.render_layer_ZQ = rendering_layer_per_point(

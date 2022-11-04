@@ -114,7 +114,7 @@ class openroomsScene2D(object):
         '''
         modalities to load
         '''
-        self.modality_list = list(set(modality_list))
+        self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
         if 'im_hdr' in self.modality_list and self.if_scale_hdr:
             assert 'seg' in self.modality_list
 
@@ -138,6 +138,12 @@ class openroomsScene2D(object):
             'lighting_SG', 'lighting_envmap', 
             'semseg', 'matseg', 
             ]
+
+    def check_and_sort_modalities(self, modalitiy_list):
+        modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
+        for _ in modalitiy_list_new:
+            assert _ in self.valid_modalities, 'Invalid modality: %s'%_
+        return modalitiy_list_new
 
     @property
     def if_has_poses(self):
@@ -447,10 +453,12 @@ class openroomsScene2D(object):
         assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 7) for _ in self.lighting_SG_local_list])
 
         if self.if_convert_lighting_SG_to_global:
+            if hasattr(self, 'pose_list'): self.load_poses()
+
             self.lighting_SG_global_list = []
             for lighting_SG_local, pose, normal in zip(self.lighting_SG_local_list, self.pose_list, self.normal_list):
                 lighting_SG_global = np.concatenate(
-                    (convert_lighting_axis_local_to_global_np(self.lighting_params_dict, lighting_SG_local[:, :, :, :3], pose, normal), 
+                    (convert_lighting_axis_local_to_global_np(lighting_SG_local[:, :, :, :3], pose, normal), 
                     lighting_SG_local[:, :, :, 3:]), axis=3) # (120, 160, 12(SG_num), 7); axis, lamb, weight: 3, 1, 3
                 self.lighting_SG_global_list.append(lighting_SG_global)
             assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 7) for _ in self.lighting_SG_global_list])

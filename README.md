@@ -234,12 +234,13 @@ set ``--vis_3d_o3d True --if_set_pcd_color_mi True`` to visualize the Mistuba po
 
 Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True``:
 ``` bash
-
+(dvgo-py38) ➜  OpenRooms_RAW_loader git:(mm1) PYTORCH_ENABLE_MPS_FALLBACK=1 python test_class_openroomsScene3D.py --vis_3d_o3d True --render_3d True --vis_3d_plt False --if_add_rays_from_renderer --renderer_option ZQ_emitter
 ```
 ![](images/demo_render_ZQ_emitter_rays_1.png)
 ![](images/demo_render_ZQ_emitter_rays_2.png)
 # Todolist
 - [x] vis envmap
+- [ ] check_and_sort_modalities
 - [ ] unit test scrpt without X
 - [ ] batch mi ray intersection when too many frames
 - [ ] multi-gpu support
