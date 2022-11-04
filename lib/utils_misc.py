@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import argparse
 import random
 import string
+import torch
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -139,3 +140,17 @@ def colorize(gray, palette):
     color = Image.fromarray(gray.astype(np.uint8)).convert('P')
     color.putpalette(palette)
     return color
+
+def get_device(host: str):
+    assert host in ['apple', 'mm1', 'qc'], 'Unsupported host: %s!'%host
+    device = 'cpu'
+    if host == 'apple':
+        if torch.backends.mps.is_built() and torch.backends.mps.is_available():
+            device = 'mps'
+    else:
+        if torch.cuda.is_available():
+            device = 'cuda'
+    # device = 'cpu'
+    if device == 'cpu':
+        print(yellow('[WARNING] rendering could be slow because device is cpu at %s'%host))
+    return device

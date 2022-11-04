@@ -15,8 +15,8 @@ import copy
 # Import the library using the alias "mi"
 import mitsuba as mi
 # Set the variant of the renderer
-from lib.global_vars import mi_variant
-mi.set_variant(mi_variant)
+# from lib.global_vars import mi_variant
+# mi.set_variant(mi_variant)
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D

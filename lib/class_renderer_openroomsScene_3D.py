@@ -2,8 +2,8 @@ import numpy as np
 from tqdm import tqdm
 
 import mitsuba as mi
-from lib.global_vars import mi_variant
-mi.set_variant(mi_variant)
+# from lib.global_vars import mi_variant
+# mi.set_variant(mi_variant)
 import torch
 import matplotlib.pyplot as plt
 import time
@@ -14,7 +14,7 @@ from lib.class_openroomsScene3D import openroomsScene3D
 from lib.utils_rendering_PhySG import render_with_sg
 from lib.utils_rendering_ZQ import rendering_layer_per_point
 from lib.utils_rendering_ZQ_emitter import rendering_layer_per_point_from_emitter
-from lib.utils_misc import yellow
+from lib.utils_misc import yellow, get_device
 
 class renderer_openroomsScene_3D(object):
     '''
@@ -39,7 +39,7 @@ class renderer_openroomsScene_3D(object):
 
         self.renderer_option = renderer_option
         assert self.renderer_option in ['ZQ', 'PhySG', 'ZQ_emitter']
-        self.get_device(host)
+        get_device(host)
 
         if self.renderer_option == 'ZQ':
             self.render_layer_ZQ = rendering_layer_per_point(
@@ -59,19 +59,6 @@ class renderer_openroomsScene_3D(object):
             assert self.os.if_has_mitsuba_scene and self.os.pts_from['mi']
         if self.pts_from == 'depth':
             assert self.os.if_has_dense_geo and self.os.pts_from['depth']
-
-    def get_device(self, host: str):
-        assert host in ['apple', 'mm1', 'qc']
-        self.device = 'cpu'
-        if host == 'apple':
-            if torch.backends.mps.is_built() and torch.backends.mps.is_available():
-                self.device = 'mps'
-        else:
-            if torch.cuda.is_available():
-                self.device = 'cuda'
-        # self.device = 'cpu'
-        if self.device == 'cpu':
-            print(yellow('[WARNING] rendering could be slow because device is cpu at %s'%host))
 
     def render(
         self, 

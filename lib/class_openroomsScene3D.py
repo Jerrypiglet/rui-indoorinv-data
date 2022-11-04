@@ -9,14 +9,15 @@ import trimesh
 import shutil
 from collections import defaultdict
 from math import prod
-
+from lib.global_vars import mi_variant_dict
+import torch
 # Import the library using the alias "mi"
 import mitsuba as mi
 # Set the variant of the renderer
-from lib.global_vars import mi_variant
-mi.set_variant(mi_variant)
+# from lib.global_vars import mi_variant
+# mi.set_variant(mi_variant)
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue
+from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, get_device
 from lib.utils_mitsuba import dump_OR_xml_for_mi
 
 from .class_openroomsScene2D import openroomsScene2D
@@ -47,6 +48,7 @@ class openroomsScene3D(openroomsScene2D):
         emitter_params_dict: dict={'N_ambient_rep': '3SG-SkyGrd'},
         mi_params_dict: dict={'if_sample_rays_pts': True}, 
         if_debug_info: bool=False, 
+        host: str='', 
     ):
 
         for _ in modality_list:
@@ -72,6 +74,8 @@ class openroomsScene3D(openroomsScene2D):
         self.shapes_root, self.layout_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'layout_root', 'envmaps_root'], [PosixPath, PosixPath, PosixPath])
         self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
         self.pcd_color = None
+
+        self.host = host
 
         '''
         load everything
@@ -141,6 +145,12 @@ class openroomsScene3D(openroomsScene2D):
         xml_dump_dir = self.PATH_HOME / 'mitsuba'
 
         if_also_dump_xml_with_lit_lamps_only = mi_params_dict.get('if_also_dump_xml_with_lit_lamps_only', True)
+        variant = mi_params_dict.get('variant', '')
+        if variant != '':
+            mi.set_variant(variant)
+        else:
+            mi.set_variant(mi_variant_dict[self.host])
+        self.device = get_device(self.host)
 
         self.mi_xml_dump_path = dump_OR_xml_for_mi(
             str(self.xml_file), 
@@ -206,6 +216,9 @@ class openroomsScene3D(openroomsScene2D):
             rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, self.pose_list[frame_idx], inverse_y=True)
             self.cam_rays_list.append((rays_o, rays_d, ray_d_center))
 
+    def to_d(self, x: np.ndarray):
+        return torch.from_numpy(x).to(self.device)
+
     def mi_sample_rays_pts(self):
         '''
         sample per-pixel rays in NeRF/DVGO setting
@@ -229,8 +242,8 @@ class openroomsScene3D(openroomsScene2D):
         for frame_idx, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(self.cam_rays_list)):
             rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
 
-            xs_mi = mi.Point3f(rays_o_flatten)
-            ds_mi = mi.Vector3f(rays_d_flatten)
+            xs_mi = mi.Point3f(self.to_d(rays_o_flatten))
+            ds_mi = mi.Vector3f(self.to_d(rays_d_flatten))
             # ray origin, direction, t_max
             rays_mi = mi.Ray3f(xs_mi, ds_mi)
             ret = self.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
@@ -281,7 +294,7 @@ class openroomsScene3D(openroomsScene2D):
             if if_also_dump_xml_with_lit_lamps_only:
                 rays_o, rays_d, ray_d_center = self.cam_rays_list[frame_idx]
                 rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
-                rays_mi = mi.Ray3f(mi.Point3f(rays_o_flatten), mi.Vector3f(rays_d_flatten))
+                rays_mi = mi.Ray3f(mi.Point3f(self.to_d(rays_o_flatten)), mi.Vector3f(self.to_d(rays_d_flatten)))
                 ret = self.mi_scene_lit_up_lamps_only.ray_intersect(rays_mi)
                 
                 ret_t = ret.t.numpy().reshape(self.im_H_resize, self.im_W_resize)

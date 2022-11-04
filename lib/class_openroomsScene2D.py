@@ -85,8 +85,8 @@ class openroomsScene2D(object):
 
         self.im_sdr_ext = im_params_dict.get('im_sdr_ext', 'png')
         self.im_hdr_ext = im_params_dict.get('im_hdr_ext', 'hdr')
-        self.if_scale_HDR = im_params_dict.get('if_scale_HDR', True) # scale HDR images with segs
-        self.if_scale_HDR_per_frame = im_params_dict.get('if_scale_HDR_per_frame', False) # True: individually scale each HDR frame; False: get one global HDR scale
+        self.if_scale_hdr = im_params_dict.get('if_scale_hdr', True) # scale HDR images with segs
+        self.if_scale_hdr_per_frame = im_params_dict.get('if_scale_hdr_per_frame', False) # True: individually scale each HDR frame; False: get one global HDR scale
         self.if_clip_HDR_to_01 = im_params_dict.get('if_clip_HDR_to_01', False) # only useful when scaling HDR
         
         if_direct_lighting = im_params_dict.get('if_direct_lighting', False)
@@ -115,7 +115,7 @@ class openroomsScene2D(object):
         modalities to load
         '''
         self.modality_list = list(set(modality_list))
-        if 'im_hdr' in self.modality_list and self.if_scale_HDR:
+        if 'im_hdr' in self.modality_list and self.if_scale_hdr:
             assert 'seg' in self.modality_list
 
         ''''
@@ -153,7 +153,7 @@ class openroomsScene2D(object):
 
     @property
     def if_has_hdr_scale(self):
-        return all([_ in self.modality_list for _ in ['im_hdr']]) and self.if_scale_HDR
+        return all([_ in self.modality_list for _ in ['im_hdr']]) and self.if_scale_hdr
 
     @property
     def if_has_seg(self):
@@ -272,13 +272,12 @@ class openroomsScene2D(object):
         self.im_hdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_hdr_ext)) for i in self.frame_id_list]
         self.im_hdr_list = [load_HDR(_, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
 
-        if self.if_scale_HDR:
-
+        if self.if_scale_hdr:
             if not hasattr(self, 'seg_dict_of_lists'):
                 self.load_seg()
 
             self.hdr_scale_list = []
-            if self.if_scale_HDR_per_frame:
+            if self.if_scale_hdr_per_frame:
                 hdr_scale_list_ = []
                 for im_hdr, seg_ori in zip(self.im_hdr_list, self.seg_dict_of_lists['ori']):
                     hdr_scale_ = scale_HDR(im_hdr, seg_ori[..., np.newaxis], fixed_scale=True, if_return_scale_only=True)
@@ -436,7 +435,7 @@ class openroomsScene2D(object):
 
         for frame_idx, lighting_SG_file in enumerate(tqdm(lighting_SG_files)):
             lighting_SG = load_h5(lighting_SG_file)
-            if 'im_hdr' in self.modality_list and self.if_scale_HDR:
+            if 'im_hdr' in self.modality_list and self.if_scale_hdr:
                 hdr_scale = self.hdr_scale_list[frame_idx]
                 lighting_SG[:, :, :, 3:6] = lighting_SG[:, :, :, 3:6] * hdr_scale # (120, 160, 12(SG_num), 6); theta, phi, lamb, weight: 1, 1, 1, 3
             lighting_SG = np.concatenate(
@@ -477,7 +476,7 @@ class openroomsScene2D(object):
 
         for idx, lighting_envmap_file in enumerate(tqdm(lighting_envmap_files)):
             envmap = load_envmap(str(lighting_envmap_file), env_height=env_height, env_width=env_width)[0].transpose(1, 2, 0, 3, 4) # -> (120, 160, 3, 8, 16)
-            if 'im_hdr' in self.modality_list and self.if_scale_HDR:
+            if 'im_hdr' in self.modality_list and self.if_scale_hdr:
                 hdr_scale = self.hdr_scale_list[idx]
                 envmap = envmap * hdr_scale
     

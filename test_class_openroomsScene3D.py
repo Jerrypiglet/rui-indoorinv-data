@@ -113,6 +113,7 @@ frame_ids = list(range(0, 102, 1))
 
 openrooms_scene = openroomsScene3D(
     if_debug_info=opt.if_debug_info, 
+    host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
         'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root}, 
     scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 

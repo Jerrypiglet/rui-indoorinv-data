@@ -11,8 +11,8 @@ OR_RAW_ROOT = {
     'qc': '', 
 }[host]
 
-mi_variant = {
+mi_variant_dict = {
     'apple': 'llvm_ad_rgb', 
     'mm1': 'cuda_ad_rgb', 
     'qc': 'cuda_ad_rgb', 
- }[host]
+}

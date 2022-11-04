@@ -240,7 +240,9 @@ Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True
 ![](images/demo_render_ZQ_emitter_rays_2.png)
 # Todolist
 - [x] vis envmap
+- [ ] unit test scrpt without X
 - [ ] batch mi ray intersection when too many frames
+- [ ] multi-gpu support
 - [ ] vis 3D grid of unit length in o3d visualizer
 - [ ] vis projection of layout+objects in visualizer_openroomsScene_2D()
 - [x] vis 3D layout+objects+**camera poses** in visualizer_openroomsScene_3D_plt()

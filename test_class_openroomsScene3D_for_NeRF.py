@@ -157,6 +157,6 @@ print('[!!!] You can also load this XML with full goemetry into Mitsuba 3: ', mi
 scene file for Mitsuba; see lib/class_openroomsScene3D.py->load_mi() for more usage
 '''
 import mitsuba as mi
-from lib.global_vars import mi_variant
-mi.set_variant(mi_variant)
+# from lib.global_vars import mi_variant
+# mi.set_variant(mi_variant)
 mi_scene = mi.load_file(str(openrooms_scene.mi_xml_dump_path))
