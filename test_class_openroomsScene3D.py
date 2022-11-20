@@ -20,7 +20,7 @@ np.set_printoptions(suppress=True)
 
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_visualizer_openroomsScene_2D import visualizer_openroomsScene_2D
-from lib.class_visualizer_openroomsScene_3D_o3d import visualizer_openroomsScene_3D_o3d
+from lib.class_visualizer_scene_3D_o3d import visualizer_openroomsScene_3D_o3d
 from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
 from lib.class_renderer_openroomsScene_3D import renderer_openroomsScene_3D
 
@@ -274,7 +274,7 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
-            'if_cam_axis_only': True, 
+            'if_cam_axis_only': False, 
             }, 
         dense_geo_params={
             'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)

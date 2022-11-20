@@ -12,7 +12,7 @@ from lib.utils_io import load_matrix, load_img, load_binary, load_h5
 
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_visualizer_openroomsScene_2D import visualizer_openroomsScene_2D
-from lib.class_visualizer_openroomsScene_3D_o3d import visualizer_openroomsScene_3D_o3d
+from lib.class_visualizer_scene_3D_o3d import visualizer_openroomsScene_3D_o3d
 from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
 from lib.class_renderer_openroomsScene_3D import renderer_openroomsScene_3D
 

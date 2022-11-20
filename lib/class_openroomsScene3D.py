@@ -87,7 +87,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         if 'mi' in self.modality_list:
             mitsubaBase.__init__(
                 self, 
-                cam_rays_list = self.cam_rays_list, 
                 device = self.device, 
             )
         self.load_modalities_3D()
@@ -220,15 +219,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             self.seg_from['mi'] = True
 
     def load_cam_rays(self, cam_params_dict={}):
-        H, W = self.im_H_resize, self.im_W_resize
-        K = self.K
         self.near = cam_params_dict.get('near', 0.1)
         self.far = cam_params_dict.get('far', 7.)
-        
-        self.cam_rays_list = []
-        for frame_idx in range(self.num_frames):
-            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, self.pose_list[frame_idx], inverse_y=True)
-            self.cam_rays_list.append((rays_o, rays_d, ray_d_center))
+        self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, self.K, self.pose_list)
 
     def load_shapes(self, shape_params_dict={}):
         '''

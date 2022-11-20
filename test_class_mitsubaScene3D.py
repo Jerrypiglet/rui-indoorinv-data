@@ -17,6 +17,7 @@ import numpy as np
 np.set_printoptions(suppress=True)
 
 from lib.class_mitsubaScene3D import mitsubaScene3D
+from lib.class_visualizer_scene_3D_o3d import visualizer_openroomsScene_3D_o3d
 
 from lib.utils_misc import str2bool
 import argparse
@@ -54,22 +55,22 @@ openrooms_scene = mitsubaScene3D(
     scene_params_dict={'xml_filename': xml_filename, 'scene_name': scene_name, 'mitsuba_version': '3.0.0', 'intrinsics_path': intrinsics_path}, 
     mi_params_dict={
         'if_also_dump_xml_with_lit_lamps_only': True,  # True: to dump a second file containing lit-up lamps only
-        'debug_render_test_image': True, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
+        'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
+        'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
         'if_get_segs': True, # True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'im_sdr', 
-        'poses', 
+        # 'im_sdr', 
+        # 'poses', 
         # 'seg', 'im_hdr', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
-        'layout', 
+        # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
-        # 'mi', # mitsuba scene, loading from scene xml file
         ], 
     im_params_dict={
         'im_H': 240, 'im_W': 320
@@ -78,7 +79,7 @@ openrooms_scene = mitsubaScene3D(
     lighting_params_dict={
     }, 
     shape_params_dict={
-        'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
+        'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
         },
     emitter_params_dict={
@@ -155,103 +156,73 @@ openrooms_scene = mitsubaScene3D(
 #         # from scipy import stats
 #         # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
 
-# '''
-# Open3D 3D viewer
-# '''
-# if opt.vis_3d_o3d:
-#     visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
-#         openrooms_scene, 
-#         modality_list_vis=[
-#             # 'dense_geo', 
-#             'cameras', 
-#             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
-#             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-#             # 'layout', 
-#             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
-#             'emitters', # emitter properties (e.g. SGs, half envmaps)
-#             'mi', # mitsuba sampled rays, pts
-#             ], 
-#         if_debug_info=opt.if_debug_info, 
-#     )
+'''
+Open3D 3D viewer
+'''
+if opt.vis_3d_o3d:
+    visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
+        openrooms_scene, 
+        modality_list_vis=[
+            # 'dense_geo', 
+            'cameras', 
+            # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
+            # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
+            # 'layout', 
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
+            # 'emitters', # emitter properties (e.g. SGs, half envmaps)
+            'mi', # mitsuba sampled rays, pts
+            ], 
+        if_debug_info=opt.if_debug_info, 
+    )
 
-#     if opt.if_set_pcd_color_mi:
-#         '''
-#         use results from renderer to colorize Mitsuba/fused points
-#         '''
-#         assert opt.render_3d
-#         assert openrooms_scene.if_has_mitsuba_rays_pts
-#         visualizer_3D_o3d.set_mi_pcd_color_from_input(
-#             # input_colors_tuple=(ts, 'dist'), # get from renderer, etc.: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-t.png
-#             input_colors_tuple=([visibility], 'mask'), # get from renderer, etc.: images/demo_mitsuba_ret_pts_pcd-color-mode-mi_renderer-visibility-any.png
-#         )
-    
-#     if opt.if_add_rays_from_renderer:
-#         assert opt.render_3d
-#         assert openrooms_scene.if_has_mitsuba_rays_pts
-        
-#         # _pts_idx = list(range(openrooms_scene.W*openrooms_scene.H)); _sample_rate = 1000 # visualize for all scene points;
-#         _pts_idx = 60 * openrooms_scene.W + 80; _sample_rate = 1 # only visualize for one scene point w.r.t. all lamp points
-#         visibility = renderer_return_dict['visibility'][_pts_idx].reshape(-1,)[::_sample_rate]
-#         visualizer_3D_o3d.add_extra_geometry([
-#             ('rays', {
-#                 'ray_o': renderer_return_dict['ray_o'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
-#                 'ray_e': renderer_return_dict['ray_e'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
-#                 # 'visibility': renderer_return_dict['visibility'].reshape(-1,)[::100], 
-#                 # 't': renderer_return_dict['t'], 
-#             }), 
-#             # ('pts', {
-#             #     'pts': renderer_return_dict['ray_o'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
-#             # }), 
-#             ])
+    visualizer_3D_o3d.run_o3d(
+        if_shader=opt.if_shader, # set to False to disable faycny shaders 
+        cam_params={
+            'if_cam_axis_only': False, 
+            }, 
+        # dense_geo_params={
+        #     'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
+        #     'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
+        #     'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
+        #     'if_normal': False, # [OPTIONAL] turn off normals to avoid clusters
+        #     'subsample_normal_rate_x': 2, 
+        #     'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
+        #     }, 
+        # lighting_params={
+        #     'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        #     # 'lighting_scale': 1., 
+        #     # 'lighting_keep_ratio': 0.05, 
+        #     # 'lighting_clip_ratio': 0.1, 
+        #     'lighting_scale': 0.5, 
+        #     # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
+        #     # 'lighting_clip_ratio': 0.3, 
+        #     'lighting_keep_ratio': 0.1, # - good for lighting_envmap
+        #     'lighting_clip_ratio': 0.2, 
+        #     'lighting_autoscale': True, 
+        #     }, 
+        shapes_params={
+            'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
+            'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
+            'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
+        },
+        # emitters_params={
+        #     'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
+        #     'scale_SG_length': 2., 
+        # },
+        mi_params={
+            'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
+            'if_pts_colorize_rgb': True, 
+            'pts_subsample': 1,
+            'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
+            'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
-#     visualizer_3D_o3d.run_o3d(
-#         if_shader=opt.if_shader, # set to False to disable faycny shaders 
-#         cam_params={
-#             'if_cam_axis_only': True, 
-#             }, 
-#         dense_geo_params={
-#             'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
-#             'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
-#             'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
-#             'if_normal': False, # [OPTIONAL] turn off normals to avoid clusters
-#             'subsample_normal_rate_x': 2, 
-#             'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
-#             }, 
-#         lighting_params={
-#             'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
-#             # 'lighting_scale': 1., 
-#             # 'lighting_keep_ratio': 0.05, 
-#             # 'lighting_clip_ratio': 0.1, 
-#             'lighting_scale': 0.5, 
-#             # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
-#             # 'lighting_clip_ratio': 0.3, 
-#             'lighting_keep_ratio': 0.1, # - good for lighting_envmap
-#             'lighting_clip_ratio': 0.2, 
-#             'lighting_autoscale': True, 
-#             }, 
-#         shapes_params={
-#             'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
-#             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
-#             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
-#         },
-#         emitters_params={
-#             'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
-#             'scale_SG_length': 2., 
-#         },
-#         mi_params={
-#             'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
-#             'if_pts_colorize_rgb': True, 
-#             'pts_subsample': 1,
-#             'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
-#             'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
-
-#             'if_cam_rays': False, 
-#             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
-#             'cam_rays_subsample': 10, 
+            'if_cam_rays': False, 
+            'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
+            'cam_rays_subsample': 10, 
             
-#             'if_normal': False, 
-#             'normal_subsample': 50, 
-#             'normal_scale': 0.2, 
-#         }, 
-#     )
+            'if_normal': False, 
+            'normal_subsample': 50, 
+            'normal_scale': 0.2, 
+        }, 
+    )
 

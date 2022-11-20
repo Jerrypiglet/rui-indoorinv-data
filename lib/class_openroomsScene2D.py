@@ -77,7 +77,7 @@ class openroomsScene2D(object):
 
         self.scene_rendering_path = self.rendering_root / self.meta_split / self.scene_name
         self.scene_xml_path = self.xml_scene_root / (self.meta_split.split('_')[1]) / self.scene_name
-        self.intrinsic_path = self.scene_rendering_path / 'intrinsic.txt'
+        self.intrinsics_path = self.scene_rendering_path / 'intrinsic.txt'
 
         '''
         im properties
@@ -243,7 +243,7 @@ class openroomsScene2D(object):
         '''
         -> K: (3, 3)
         '''
-        self.K = load_matrix(self.intrinsic_path)
+        self.K = load_matrix(self.intrinsics_path)
         # self.K = load_matrix('/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader/data/public_re_3/main_xml/scene0008_00_more/intrinsic.txt')
         assert self.K.shape == (3, 3)
         assert self.K[0][2] == float(self.im_W_load) / 2.

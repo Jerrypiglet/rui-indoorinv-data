@@ -20,6 +20,7 @@ import mitsuba as mi
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
+from lib.class_mitsubaScene3D import mitsubaScene3D
 
 from lib.utils_misc import get_list_of_keys, gen_random_str
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
@@ -47,7 +48,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         if_debug_info: bool=False, 
     ):
 
-        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
+        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D, mitsubaScene3D!'
 
         self.os = openrooms_scene
         self.if_debug_info = if_debug_info
@@ -316,7 +317,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         near, far = self.os.near, self.os.far
 
         pose_list = self.os.pose_list
-        origin_lookatvector_up_list = self.os.origin_lookatvector_up_list
+        # origin_lookatvector_up_list = self.os.origin_lookatvector_up_list
         cam_frustrm_list = []
         # cam_axes_list = []
         cam_center_list = []
@@ -613,6 +614,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         )):
 
             if_emitter = shape['if_in_emitter_dict']
+            cat_name = 'N/A'; cat_id = -1
 
             if np.amax(bverts[:, 1]) <= np.amin(bverts[:, 1]):
                 obj_color = [0., 0., 0.] # black for invalid objects
@@ -624,20 +626,24 @@ class visualizer_openroomsScene_3D_o3d(object):
                     continue # skipping layout as an object
                 if shape['random_id'] in emitters_obj_random_id_list and not if_emitter:
                     continue # skip shape if it is also in the list as an emitter (so that we don't create two shapes for one emitters)
-                cat_id_str = str(obj_path).split('/')[-3]
-                assert cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
-                cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
-                obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
-                obj_color = [float(x)/255. for x in obj_color]
-                linestyle = '-'
-                linewidth = 1
-                if if_emitter:
-                    linewidth = 3
-                    linestyle = '--'
-                    obj_color = [0.4, 0.4, 0.4] # dark grey for emitters; colormap see 
-                    '''
-                    images/OR42_color_mapping_light.png
-                    '''
+
+                if self.os.if_loaded_colors:
+                    cat_id_str = str(obj_path).split('/')[-3]
+                    assert cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
+                    cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
+                    obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
+                    obj_color = [float(x)/255. for x in obj_color]
+                    linestyle = '-'
+                    linewidth = 1
+                    if if_emitter:
+                        linewidth = 3
+                        linestyle = '--'
+                        obj_color = [0.4, 0.4, 0.4] # dark grey for emitters; colormap see 
+                        '''
+                        images/OR42_color_mapping_light.png
+                        '''
+                else:
+                    obj_color = [0.7, 0.7, 0.7]
 
             '''
             applicable if necessary
@@ -667,7 +673,7 @@ class visualizer_openroomsScene_3D_o3d(object):
                 shape_mesh.compute_triangle_normals()
                 geometry_list.append([shape_mesh, 'shape_emitter_'+shape['random_id'] if if_emitter else 'shape_obj_'+shape['random_id']])
 
-            print('[collect_shapes] --', if_emitter, cat_name, shape_idx, cat_id, obj_path)
+            print('[collect_shapes] --', if_emitter, shape_idx, obj_path, cat_name, cat_id)
 
             # shape_label = o3d.visualization.gui.Label3D([0., 0., 0.], np.mean(bverts, axis=0).reshape((3, 1)), cat_name)
             # geometry_list.append(shape_label)

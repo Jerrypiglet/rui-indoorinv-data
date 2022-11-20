@@ -11,6 +11,8 @@ from collections import defaultdict
 from math import prod
 from lib.global_vars import mi_variant_dict
 import torch
+import random
+import string
 # Import the library using the alias "mi"
 import mitsuba as mi
 # Set the variant of the renderer
@@ -19,7 +21,7 @@ import mitsuba as mi
 
 from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue
 from lib.utils_io import load_matrix, resize_intrinsics
-
+from .class_mitsubaBase import mitsubaBase
 
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, mesh_to_skeleton, transform_v
 from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
@@ -27,10 +29,9 @@ from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_ls_np
-from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import get_device
 
-class mitsubaScene3D():
+class mitsubaScene3D(mitsubaBase):
     '''
     A class used to visualize/render Mitsuba scene in XML format
     '''
@@ -42,7 +43,7 @@ class mitsubaScene3D():
         im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640}, 
         BRDF_params_dict: dict={}, 
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
-        cam_params_dict: dict={'near': 0.1, 'far': 7.}, 
+        cam_params_dict: dict={'near': 0.01, 'far': 7.}, 
         shape_params_dict: dict={'if_load_mesh': True}, 
         emitter_params_dict: dict={'N_ambient_rep': '3SG-SkyGrd'},
         mi_params_dict: dict={'if_sample_rays_pts': True}, 
@@ -50,16 +51,17 @@ class mitsubaScene3D():
         host: str='', 
     ):
 
-        self.root_path_dict = self.root_path_dict
+        self.root_path_dict = root_path_dict
         self.PATH_HOME, self.rendering_root, self.xml_scene_root = get_list_of_keys(
             self.root_path_dict, 
             ['PATH_HOME', 'rendering_root', 'xml_scene_root'], 
-            [PosixPath, PosixPath, PosixPath, PosixPath]
+            [PosixPath, PosixPath, PosixPath]
             )
         self.xml_filename, self.scene_name, self.mitsuba_version, self.intrinsics_path = get_list_of_keys(scene_params_dict, ['xml_filename', 'scene_name', 'mitsuba_version', 'intrinsics_path'], [str, str, str, PosixPath])
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
+        self.scene_path = self.rendering_root / self.scene_name
         self.scene_rendering_path = self.rendering_root / self.scene_name / 'rendering'
-        self.scene_xml_path = self.xml_scene_root / self.xml_filename
+        self.xml_file = self.xml_scene_root / self.scene_name / self.xml_filename
 
         self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
@@ -67,29 +69,49 @@ class mitsubaScene3D():
         self.mi_params_dict = mi_params_dict
 
         self.H, self.W = get_list_of_keys(im_params_dict, ['im_H', 'im_W'])
+        self.near = cam_params_dict.get('near', 0.01)
+        self.far = cam_params_dict.get('far', 10.)
 
         self.host = host
         self.device = get_device(self.host)
 
-
-        self.modality_list = self.check_and_sort_modalities(list(set(self.modality_list)))
+        self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
         self.pcd_color = None
 
         '''
         load everything
         '''
         self.load_intrinsics()
-        self.load_mi(self.mi_params_dict)
-        # self.load_cam_rays(self.cam_params_dict)
-        # self.load_modalities_3D()
+        mitsubaBase.__init__(
+            self, 
+            device = self.device, 
+        )
 
-    @property
-    def valid_modalities_3D(self):
-        return ['layout', 'shapes', 'mi']
+        self.load_cam_rays(self.cam_params_dict)
+        self.load_mi(self.mi_params_dict)
+        self.load_modalities_3D()
 
     @property
     def valid_modalities(self):
-        return super().valid_modalities + self.valid_modalities_3D
+        return ['layout', 'shapes']
+
+    def check_and_sort_modalities(self, modalitiy_list):
+        modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
+        for _ in modalitiy_list_new:
+            assert _ in self.valid_modalities, 'Invalid modality: %s'%_
+        return modalitiy_list_new
+
+    @property
+    def if_has_im_sdr(self):
+        return hasattr(self, 'im_sdr_list')
+
+    @property
+    def if_has_im_hdr(self):
+        return hasattr(self, 'im_hdr_list')
+
+    @property
+    def if_has_poses(self):
+        return hasattr(self, 'pose_list')
 
     @property
     def if_has_layout(self):
@@ -100,20 +122,24 @@ class mitsubaScene3D():
         return all([_ in self.modality_list for _ in ['shapes']])
 
     @property
+    def if_has_mitsuba_scene(self):
+        return True
+
+    @property
     def if_has_mitsuba_rays_pts(self):
         return self.mi_params_dict['if_sample_rays_pts']
 
     @property
     def if_has_mitsuba_segs(self):
-        return 'mi' in self.modality_list and self.mi_params_dict['if_get_segs']
+        return self.mi_params_dict['if_get_segs']
 
     @property
     def if_has_mitsuba_all(self):
         return all([self.if_has_mitsuba_scene, self.if_has_mitsuba_rays_pts, self.if_has_mitsuba_segs, ])
 
     @property
-    def if_has_colors(self):
-        return self.if_loaded_colors
+    def if_has_colors(self): # no semantic label colors
+        return False
 
     def load_modalities_3D(self):
         for _ in self.modality_list:
@@ -147,7 +173,7 @@ class mitsubaScene3D():
         else:
             mi.set_variant(mi_variant_dict[self.host])
 
-        self.mi_scene = mi.load_file(str(self.scene_xml_path))
+        self.mi_scene = mi.load_file(str(self.xml_file))
 
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
@@ -156,9 +182,24 @@ class mitsubaScene3D():
             '''
             test_rendering_path = self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'
             print(blue_text('Rendering... test frame by Mitsuba: %s')%str(test_rendering_path))
-            image = mi.render(self.mi_scene, spp=64)
+            image = mi.render(self.mi_scene, spp=16)
             mi.util.write_bitmap(str(test_rendering_path), image)
             print(blue_text('DONE.'))
+
+        debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
+        if debug_dump_mesh:
+            '''
+            images/demo_mitsuba_dump_meshes.png
+            '''
+            mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
+            if mesh_dump_root.exists():
+                shutil.rmtree(str(mesh_dump_root))
+            mesh_dump_root.mkdir()
+
+            for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
+                if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
+                # print(type(shape), isinstance(shape, mi.llvm_ad_rgb.Mesh))
+                shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
 
         if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
         if if_sample_rays_pts:
@@ -167,22 +208,71 @@ class mitsubaScene3D():
         if_get_segs = mi_params_dict.get('if_get_segs', True)
         if if_get_segs:
             assert if_sample_rays_pts
-            self.mi_get_segs()
+            self.mi_get_segs(if_also_dump_xml_with_lit_lamps_only=False) # [TODO] enable masks for emitters
 
     def load_intrinsics(self):
         '''
         -> K: (3, 3)
         '''
-        self.K = load_matrix(self.intrinsic_path)
+        self.K = load_matrix(self.intrinsics_path)
         assert self.K.shape == (3, 3)
         self.im_W_load = int(self.K[0][2] * 2)
         self.im_H_load = int(self.K[1][2] * 2)
 
-        if self.im_W_load != self.im_W or self.im_H_load != self.im_H:
-            scale_factor = [t / s for t, s in zip((self.im_H, self.im_W), (self.im_H_load, self.im_W_load))]
+        if self.im_W_load != self.W or self.im_H_load != self.H:
+            scale_factor = [t / s for t, s in zip((self.H, self.W), (self.im_H_load, self.im_W_load))]
             self.K = resize_intrinsics(self.K, scale_factor)
 
+    def load_cam_rays(self, cam_params_dict={}):
+        if not hasattr(self, 'pose_list'):
+            self.generate_pose_list()
+
+        self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, self.K, self.pose_list)
+
+    def generate_pose_list(self):
+        self.pose_list = [np.hstack((
+            np.eye(3, dtype=np.float32), np.zeros((3, 1), dtype=np.float32)
+            ))]
+    
     def load_shapes(self, shape_params_dict={}):
+        '''
+        load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
+
+        images/demo_shapes_3D.png
+        images/demo_emitters_3D.png # the classroom scene
+
+        '''
+        if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', False)
+        if_load_emitter_mesh = shape_params_dict.get('if_load_emitter_mesh', False)
+        print(white_blue('[mitsubaScene3D] load_shapes for scene...'))
+        root = get_XML_root(self.xml_file)
+        shapes = root.findall('shape')
+        
+        self.shape_list_valid = []
+        self.vertices_list = []
+        self.faces_list = []
+        self.ids_list = []
+        self.bverts_list = []
+
+        for shape in tqdm(shapes):
+            if not shape.get('type') != 'object': continue # [TODO] fix
+            if not len(shape.findall('string')) > 0: continue
+            filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
+            obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
+            if if_load_obj_mesh:
+                vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
+                bverts, bfaces = computeBox(vertices)
+                self.vertices_list.append(vertices)
+                self.faces_list.append(faces)
+                self.bverts_list.append(bverts)
+                self.ids_list.append(shape.findall('ref')[0].get('id'))
+                self.shape_list_valid.append({
+                    'filename': filename.get('value'), 
+                    'if_in_emitter_dict': False, 
+                    'random_id': ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)), 
+                })
+
+    def load_shapes_(self, shape_params_dict={}):
         '''
         load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
 
@@ -203,7 +293,7 @@ class mitsubaScene3D():
 
         self.shape_list_ori, self.emitter_list = parse_XML_for_shapes_global(
             root=root, 
-            scene_xml_path=self.scene_xml_path, 
+            scene_xml_path=self.xml_file, 
             root_uv_mapped=self.shapes_root, 
             root_layoutMesh=self.layout_root, 
             root_EnvDataset=self.envmaps_root, 
@@ -221,7 +311,7 @@ class mitsubaScene3D():
         self.ids_list = []
         self.bverts_list = []
         
-        light_axis_list = []
+        # light_axis_list = []
         # self.num_vertices = 0
         obj_path_list = []
         self.shape_list_valid = []
@@ -362,22 +452,21 @@ class mitsubaScene3D():
         '''
         load mapping from obj cat id to RGB
         '''
+        self.if_loaded_colors = False
+        return
 
-        if self.if_has_colors:
-            pass
-
-        OR_mapping_cat_str_to_id_file = self.semantic_labels_root / 'semanticLabelName_OR42.txt'
-        with open(str(OR_mapping_cat_str_to_id_file)) as f:
-            mylist = f.read().splitlines() 
+        # OR_mapping_cat_str_to_id_file = self.semantic_labels_root / 'semanticLabelName_OR42.txt'
+        # with open(str(OR_mapping_cat_str_to_id_file)) as f:
+        #     mylist = f.read().splitlines() 
         
-        self.OR_mapping_cat_str_to_id_name_dict = {x.split(' ')[0]: (int(x.split(' ')[1]), x.split(' ')[2]) for x in mylist} # cat id is 0-based (0 being unlabelled)!
+        # self.OR_mapping_cat_str_to_id_name_dict = {x.split(' ')[0]: (int(x.split(' ')[1]), x.split(' ')[2]) for x in mylist} # cat id is 0-based (0 being unlabelled)!
         
-        OR_mapping_id_to_color_file = self.semantic_labels_root / 'colors/OR4X_mapping_catInt_to_RGB_light.pkl'
-        with (open(OR_mapping_id_to_color_file, "rb")) as f:
-            OR4X_mapping_catInt_to_RGB_light = pickle.load(f)
-        self.OR_mapping_id_to_color_dict = OR4X_mapping_catInt_to_RGB_light['OR42']
+        # OR_mapping_id_to_color_file = self.semantic_labels_root / 'colors/OR4X_mapping_catInt_to_RGB_light.pkl'
+        # with (open(OR_mapping_id_to_color_file, "rb")) as f:
+        #     OR4X_mapping_catInt_to_RGB_light = pickle.load(f)
+        # self.OR_mapping_id_to_color_dict = OR4X_mapping_catInt_to_RGB_light['OR42']
 
-        self.if_loaded_colors = True
+        # self.if_loaded_colors = True
 
     def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False):
         '''
@@ -406,7 +495,7 @@ class mitsubaScene3D():
         X_lighting_flatten_mask_list = []
 
         for frame_idx in tqdm(range(len(self.frame_id_list))):
-            H_color, W_color = self.im_H_resize, self.im_W_resize
+            H_color, W_color = self.H, self.W
             uu, vv = np.meshgrid(range(W_color), range(H_color))
             x_ = (uu - self.K[0][2]) * self.depth_list[frame_idx] / self.K[0][0]
             y_ = (vv - self.K[1][2]) * self.depth_list[frame_idx] / self.K[1][1]

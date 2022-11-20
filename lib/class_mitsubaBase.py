@@ -20,7 +20,6 @@ import mitsuba as mi
 from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue
 from lib.utils_io import load_matrix, resize_intrinsics
 
-
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, mesh_to_skeleton, transform_v
 from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal
@@ -36,16 +35,21 @@ class mitsubaBase():
     '''
     def __init__(
         self, 
-        cam_rays_list: list, 
         device: str='', 
     ): 
-        self.cam_rays_list = cam_rays_list
         self.device = device
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
             return x
         return torch.from_numpy(x).to(self.device)
+
+    def get_cam_rays_list(self, H, W, K, pose_list):
+        cam_rays_list = []
+        for pose in pose_list:
+            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=True)
+            cam_rays_list.append((rays_o, rays_d, ray_d_center))
+        return cam_rays_list
 
     def mi_sample_rays_pts(self):
         '''
