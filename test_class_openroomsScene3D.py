@@ -114,10 +114,10 @@ openrooms_scene = openroomsScene3D(
     modality_list = [
         'im_sdr', 
         'poses', 
-        'seg', 'im_hdr', 
-        'albedo', 'roughness', 
-        'depth', 'normal', 
-        'lighting_SG', 
+        # 'seg', 'im_hdr', 
+        # 'albedo', 'roughness', 
+        # 'depth', 'normal', 
+        # 'lighting_SG', 
         # 'lighting_envmap', 
         'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
@@ -233,7 +233,7 @@ if opt.vis_3d_o3d:
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            'layout', 
+            # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
@@ -274,7 +274,7 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
-            'if_cam_axis_only': False, 
+            'if_cam_axis_only': True, 
             }, 
         dense_geo_params={
             'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)

@@ -851,7 +851,6 @@ class visualizer_openroomsScene_3D_o3d(object):
                     pcd_normals.lines = o3d.utility.Vector2iVector([[_, _+mi_normals_end.shape[0]] for _ in range(mi_normals_end.shape[0])])
                     geometry_list.append(pcd_normals)
 
-
         return geometry_list
 
     def set_mi_pcd_color_from_input(self, input_colors_tuple: tuple=()):

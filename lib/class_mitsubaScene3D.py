@@ -18,10 +18,8 @@ import mitsuba as mi
 # mi.set_variant(mi_variant)
 
 from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue
-from lib.utils_mitsuba import dump_OR_xml_for_mi
+from lib.utils_io import load_matrix, resize_intrinsics
 
-from .class_openroomsScene2D import openroomsScene2D
-from .class_mitsubaBase import mitsubaBase
 
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, mesh_to_skeleton, transform_v
 from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
@@ -32,10 +30,9 @@ from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import get_device
 
-class openroomsScene3D(openroomsScene2D, mitsubaBase):
+class mitsubaScene3D():
     '''
-    A class used to visualize OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties for inverse rendering).
-    For high-level semantic properties (e.g. layout, objects, emitters, use class: openroomsScene3D)
+    A class used to visualize/render Mitsuba scene in XML format
     '''
     def __init__(
         self, 
@@ -53,44 +50,38 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         host: str='', 
     ):
 
-        self.if_loaded_colors = False
+        self.root_path_dict = self.root_path_dict
+        self.PATH_HOME, self.rendering_root, self.xml_scene_root = get_list_of_keys(
+            self.root_path_dict, 
+            ['PATH_HOME', 'rendering_root', 'xml_scene_root'], 
+            [PosixPath, PosixPath, PosixPath, PosixPath]
+            )
+        self.xml_filename, self.scene_name, self.mitsuba_version, self.intrinsics_path = get_list_of_keys(scene_params_dict, ['xml_filename', 'scene_name', 'mitsuba_version', 'intrinsics_path'], [str, str, str, PosixPath])
+        assert self.mitsuba_version in ['3.0.0', '0.6.0']
+        self.scene_rendering_path = self.rendering_root / self.scene_name / 'rendering'
+        self.scene_xml_path = self.xml_scene_root / self.xml_filename
 
         self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
         self.emitter_params_dict = emitter_params_dict
         self.mi_params_dict = mi_params_dict
 
+        self.H, self.W = get_list_of_keys(im_params_dict, ['im_H', 'im_W'])
+
         self.host = host
         self.device = get_device(self.host)
 
-        openroomsScene2D.__init__(
-            self, 
-            if_debug_info = if_debug_info, 
-            root_path_dict = root_path_dict, 
-            scene_params_dict = scene_params_dict, 
-            modality_list = list(set(modality_list)), 
-            im_params_dict = im_params_dict, 
-            BRDF_params_dict = BRDF_params_dict, 
-            lighting_params_dict = lighting_params_dict, 
-        )
 
         self.modality_list = self.check_and_sort_modalities(list(set(self.modality_list)))
-        self.shapes_root, self.layout_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'layout_root', 'envmaps_root'], [PosixPath, PosixPath, PosixPath])
-        self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
         self.pcd_color = None
-
 
         '''
         load everything
         '''
-        self.load_cam_rays(self.cam_params_dict)
-        if 'mi' in self.modality_list:
-            mitsubaBase.__init__(
-                self, 
-                cam_rays_list = self.cam_rays_list, 
-                device = self.device, 
-            )
-        self.load_modalities_3D()
+        self.load_intrinsics()
+        self.load_mi(self.mi_params_dict)
+        # self.load_cam_rays(self.cam_params_dict)
+        # self.load_modalities_3D()
 
     @property
     def valid_modalities_3D(self):
@@ -109,12 +100,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         return all([_ in self.modality_list for _ in ['shapes']])
 
     @property
-    def if_has_mitsuba_scene(self):
-        return all([_ in self.modality_list for _ in ['mi']])
-
-    @property
     def if_has_mitsuba_rays_pts(self):
-        return 'mi' in self.modality_list and self.mi_params_dict['if_sample_rays_pts']
+        return self.mi_params_dict['if_sample_rays_pts']
 
     @property
     def if_has_mitsuba_segs(self):
@@ -132,11 +119,10 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         for _ in self.modality_list:
             if _ == 'layout': self.load_layout()
             if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
-            if _ == 'mi': self.load_mi(self.mi_params_dict)
 
     def get_modality(self, modality):
         if modality in super().valid_modalities:
-            return super(openroomsScene3D, self).get_modality(modality)
+            return super(mitsubaScene3D, self).get_modality(modality)
 
         if 'mi_' in modality:
             assert self.pts_from['mi']
@@ -155,80 +141,46 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        xml_dump_dir = self.PATH_HOME / 'mitsuba'
-
-        if_also_dump_xml_with_lit_lamps_only = mi_params_dict.get('if_also_dump_xml_with_lit_lamps_only', True)
         variant = mi_params_dict.get('variant', '')
         if variant != '':
             mi.set_variant(variant)
         else:
             mi.set_variant(mi_variant_dict[self.host])
 
-        self.mi_xml_dump_path = dump_OR_xml_for_mi(
-            str(self.xml_file), 
-            shapes_root=self.shapes_root, 
-            layout_root=self.layout_root, 
-            envmaps_root=self.envmaps_root, 
-            xml_dump_dir=xml_dump_dir, 
-            origin_lookatvector_up_tuple=self.origin_lookatvector_up_list[0], # [debug] set to any frame_idx
-            if_no_emitter_shape=False, 
-            if_also_dump_xml_with_lit_lamps_only=if_also_dump_xml_with_lit_lamps_only, 
-            )
-        print(blue_text('XML for Mitsuba dumped to: %s')%str(self.mi_xml_dump_path))
-
-        self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
-        if if_also_dump_xml_with_lit_lamps_only:
-            self.mi_scene_lit_up_lamps_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
-
-        debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
-        if debug_dump_mesh:
-            '''
-            images/demo_mitsuba_dump_meshes.png
-            '''
-            mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
-            if mesh_dump_root.exists():
-                shutil.rmtree(str(mesh_dump_root))
-            mesh_dump_root.mkdir()
-
-            for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
-                shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
+        self.mi_scene = mi.load_file(str(self.scene_xml_path))
 
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
             '''
             images/demo_mitsuba_render.png
             '''
-            print(blue_text('Rendering... test frame by Mitsuba: %s')%str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'))
+            test_rendering_path = self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'
+            print(blue_text('Rendering... test frame by Mitsuba: %s')%str(test_rendering_path))
             image = mi.render(self.mi_scene, spp=64)
-            mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'), image)
-            mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
-            if if_also_dump_xml_with_lit_lamps_only:
-                image = mi.render(self.mi_scene_lit_up_lamps_only, spp=64)
-                mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render_lit_up_lamps_only.exr'), image)
-
+            mi.util.write_bitmap(str(test_rendering_path), image)
             print(blue_text('DONE.'))
 
         if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
         if if_sample_rays_pts:
             self.mi_sample_rays_pts()
-            self.pts_from['mi'] = True
-
+        
         if_get_segs = mi_params_dict.get('if_get_segs', True)
         if if_get_segs:
             assert if_sample_rays_pts
-            self.mi_get_segs(if_also_dump_xml_with_lit_lamps_only=if_also_dump_xml_with_lit_lamps_only)
-            self.seg_from['mi'] = True
+            self.mi_get_segs()
 
-    def load_cam_rays(self, cam_params_dict={}):
-        H, W = self.im_H_resize, self.im_W_resize
-        K = self.K
-        self.near = cam_params_dict.get('near', 0.1)
-        self.far = cam_params_dict.get('far', 7.)
-        
-        self.cam_rays_list = []
-        for frame_idx in range(self.num_frames):
-            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, self.pose_list[frame_idx], inverse_y=True)
-            self.cam_rays_list.append((rays_o, rays_d, ray_d_center))
+    def load_intrinsics(self):
+        '''
+        -> K: (3, 3)
+        '''
+        self.K = load_matrix(self.intrinsic_path)
+        assert self.K.shape == (3, 3)
+        self.im_W_load = int(self.K[0][2] * 2)
+        self.im_H_load = int(self.K[1][2] * 2)
+
+        if self.im_W_load != self.im_W or self.im_H_load != self.im_H:
+            scale_factor = [t / s for t, s in zip((self.im_H, self.im_W), (self.im_H_load, self.im_W_load))]
+            self.K = resize_intrinsics(self.K, scale_factor)
 
     def load_shapes(self, shape_params_dict={}):
         '''
@@ -240,7 +192,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', False)
         if_load_emitter_mesh = shape_params_dict.get('if_load_emitter_mesh', False)
-        print(white_blue('[openroomsScene3D] load_shapes for scene...'))
+        print(white_blue('[mitsubaScene3D] load_shapes for scene...'))
 
         # load emitter properties from light*.dat files of **a specific N_ambient_representation**
         self.emitter_dict_of_lists_world = load_emitter_dat_world(light_dir=self.scene_rendering_path, N_ambient_rep=self.emitter_params_dict['N_ambient_rep'], if_save_storage=self.if_save_storage)
@@ -276,7 +228,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         self.Window_list = []
         self.lamp_list = []
         
-        print(blue_text('[openroomsScene3D] loading %d shapes and %d emitters...'%(len(self.shape_list_ori), len(self.emitter_list[1:]))))
+        print(blue_text('[mitsubaScene3D] loading %d shapes and %d emitters...'%(len(self.shape_list_ori), len(self.emitter_list[1:]))))
 
         self.emitter_env = self.emitter_list[0] # e.g. {'if_emitter': True, 'emitter_prop': {'emitter_type': 'envmap', 'if_env': True, 'emitter_filename': '.../EnvDataset/1611L.hdr', 'emitter_scale': 164.1757}}
         assert self.emitter_env['if_emitter']
@@ -352,7 +304,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 elif shape['emitter_prop']['obj_type'] == 'obj':
                     self.lamp_list.append((shape, vertices_transformed, faces))
 
-        print(blue_text('[openroomsScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d lamps lit'%(
+        print(blue_text('[mitsubaScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d lamps lit'%(
             len(self.shape_list_valid), 
             len([_ for _ in self.Window_list if _[0]['emitter_prop']['if_lit_up']]), len(self.Window_list), 
             len([_ for _ in self.lamp_list if _[0]['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
@@ -366,7 +318,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         images/demo_layout_2D.png
         '''
 
-        print(white_blue('[openroomsScene3D] load_layout for scene...'))
+        print(white_blue('[mitsubaScene3D] load_layout for scene...'))
 
         self.layout_obj_file = self.layout_root / self.scene_name_short / 'uv_mapped.obj'
         self.layout_mesh_ori = load_trimesh(self.layout_obj_file) # returns a Trimesh object; [!!!] 0-index faces
@@ -404,7 +356,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         self.v_2d_transformed = transform_v(np.hstack((self.v_2d, np.zeros((6, 1), dtype=self.v_2d.dtype))), T_layout)[:, [0, 2]]
         self.layout_hull_2d_transformed = self.layout_box_3d_transformed[:4, [0, 2]]
 
-        print(blue_text('[openroomsScene3D] DONE. load_layout'))
+        print(blue_text('[mitsubaScene3D] DONE. load_layout'))
 
     def load_colors(self):
         '''

@@ -117,5 +117,5 @@ Should be consistent with OpenRooms renderings in layout:
 '''
 scene = mi.load_file("scene.xml")
 image = mi.render(scene, spp=256)
-mi.util.write_bitmap("my_first_render.png", image)
-mi.util.write_bitmap("my_first_render.exr", image)
+mi.util.write_bitmap("rendering_openrooms.png", image)
+mi.util.write_bitmap("rendering_openrooms.exr", image)

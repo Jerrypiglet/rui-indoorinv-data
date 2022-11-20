@@ -5,6 +5,9 @@ adapted from dvgo.py -> get_rays_of_a_view() -> get_rays()
 import numpy as np
 
 def get_rays_np(H, W, K, c2w, inverse_y: bool=True, if_normalize_d: bool=True):
+    '''
+    inverse_y: camera axis (z) pointing forward
+    '''
     i, j = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing='xy')
     if inverse_y:
         dirs = np.stack([(i-K[0][2])/K[0][0], (j-K[1][2])/K[1][1], np.ones_like(i)], -1)
