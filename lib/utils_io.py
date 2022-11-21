@@ -62,6 +62,21 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
 
     return im
 
+def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_'):
+    # Read HDR image
+    im_hdr = load_hdr(str(hdr_image_path)) * scale
+    
+    seg_path = png_image_path.replace(im_key, 'immask_')
+    seg = load_img(Path(seg_path))[:, :, 0] / 255. # [0., 1.]
+    seg_area = np.logical_and(seg > 0.49, seg < 0.51).astype(np.float32)
+    seg_env = (seg < 0.1).astype(np.float32)
+    seg_obj = (seg > 0.9) 
+
+    im_hdr_scaled, hdr_scale = scale_HDR(im_hdr, seg[..., np.newaxis], fixed_scale=True, if_print=True, if_clip_01=False)
+    
+    im_SDR = np.clip(im_hdr_scaled**(1.0/2.2), 0., 1.)
+    im_SDR_uint8 = (255. * im_SDR).astype(np.uint8)
+    Image.fromarray(im_SDR_uint8).save(str(png_image_path))
 
 def load_HDR(path: Path, expected_shape: tuple=(), target_HW: Tuple[int, int]=()) -> np.ndarray:
     if not path.exists():

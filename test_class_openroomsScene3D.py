@@ -19,8 +19,8 @@ import numpy as np
 np.set_printoptions(suppress=True)
 
 from lib.class_openroomsScene3D import openroomsScene3D
-from lib.class_visualizer_openroomsScene_2D import visualizer_openroomsScene_2D
-from lib.class_visualizer_scene_3D_o3d import visualizer_openroomsScene_3D_o3d
+from lib.class_visualizer_scene_2D import visualizer_scene_2D
+from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
 from lib.class_renderer_openroomsScene_3D import renderer_openroomsScene_3D
 
@@ -156,7 +156,7 @@ openrooms_scene = openroomsScene3D(
 Matploblib 2D viewer
 '''
 if opt.vis_2d_plt:
-    visualizer_2D = visualizer_openroomsScene_2D(
+    visualizer_2D = visualizer_scene_2D(
         openrooms_scene, 
         modality_list_vis=[
             'im', 
@@ -226,7 +226,7 @@ if opt.render_3d:
 Open3D 3D viewer
 '''
 if opt.vis_3d_o3d:
-    visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
+    visualizer_3D_o3d = visualizer_scene_3D_o3d(
         openrooms_scene, 
         modality_list_vis=[
             # 'dense_geo', 

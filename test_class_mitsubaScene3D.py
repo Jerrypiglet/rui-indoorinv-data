@@ -17,7 +17,8 @@ import numpy as np
 np.set_printoptions(suppress=True)
 
 from lib.class_mitsubaScene3D import mitsubaScene3D
-from lib.class_visualizer_scene_3D_o3d import visualizer_openroomsScene_3D_o3d
+from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
+from lib.class_visualizer_scene_2D import visualizer_scene_2D
 
 from lib.utils_misc import str2bool
 import argparse
@@ -52,28 +53,33 @@ openrooms_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root}, 
-    scene_params_dict={'xml_filename': xml_filename, 'scene_name': scene_name, 'mitsuba_version': '3.0.0', 'intrinsics_path': intrinsics_path}, 
+    scene_params_dict={'xml_filename': xml_filename, 'scene_name': scene_name, 'mitsuba_version': '3.0.0', 'intrinsics_path': intrinsics_path, 'up_axis': 'y+'}, 
     mi_params_dict={
         'if_also_dump_xml_with_lit_lamps_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
+        'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
+        'poses_num': 200, 
+        'if_render_im': False, # True to render im with Mitsuba
         'if_get_segs': True, # True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        # 'im_sdr', 
-        # 'poses', 
+        'im_sdr', 
         # 'seg', 'im_hdr', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
-        # 'layout', 
+        'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
     im_params_dict={
-        'im_H': 240, 'im_W': 320
+        # 'im_H_resize': 480, 'im_W_resize': 640, 
+        'im_H_load': 480, 'im_W_load': 640, 
+        'im_H_resize': 240, 'im_W_resize': 320, 
+        'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
         }, 
     lighting_params_dict={
@@ -90,7 +96,7 @@ openrooms_scene = mitsubaScene3D(
 # Matploblib 2D viewer
 # '''
 # if opt.vis_2d_plt:
-#     visualizer_2D = visualizer_openroomsScene_2D(
+#     visualizer_2D = visualizer_scene_2D(
 #         openrooms_scene, 
 #         modality_list_vis=[
 #             'im', 
@@ -160,14 +166,14 @@ openrooms_scene = mitsubaScene3D(
 Open3D 3D viewer
 '''
 if opt.vis_3d_o3d:
-    visualizer_3D_o3d = visualizer_openroomsScene_3D_o3d(
+    visualizer_3D_o3d = visualizer_scene_3D_o3d(
         openrooms_scene, 
         modality_list_vis=[
             # 'dense_geo', 
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            # 'layout', 
+            'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             # 'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
@@ -202,8 +208,9 @@ if opt.vis_3d_o3d:
         #     }, 
         shapes_params={
             'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
-            'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
+            'if_meshes': False, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
+            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
         },
         # emitters_params={
         #     'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
@@ -213,7 +220,7 @@ if opt.vis_3d_o3d:
             'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 1,
-            'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
+            'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
             'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
             'if_cam_rays': False, 
@@ -223,6 +230,7 @@ if opt.vis_3d_o3d:
             'if_normal': False, 
             'normal_subsample': 50, 
             'normal_scale': 0.2, 
+
         }, 
     )
 

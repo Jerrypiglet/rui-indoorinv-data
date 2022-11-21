@@ -209,7 +209,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
         if if_sample_rays_pts:
-            self.mi_sample_rays_pts()
+            self.mi_sample_rays_pts(self.cam_rays_list)
             self.pts_from['mi'] = True
 
         if_get_segs = mi_params_dict.get('if_get_segs', True)

@@ -9,6 +9,7 @@ mitsuba/my_first_render.png
 mitsuba/meshes_dump
 mitsuba/tmp.xml
 mitsuba/tmp_scene_*
+mitsuba/tmp_sample_poses_rendering
 
 lib/utils_OR/__pycache__
 lib/__pycache__
@@ -17,3 +18,5 @@ tmp_mesh*
 test_files/
 test_scripts/*.hdr
 test_scripts/*.obj
+
+tmp.py

@@ -8,7 +8,7 @@ from lib.utils_vis import vis_index_map, colorize
 from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
 from lib.utils_OR.utils_OR_cam import project_3d_line
 from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
-class visualizer_openroomsScene_2D(object):
+class visualizer_scene_2D(object):
     '''
     A class used to **visualize** **per-pixel** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties / semantics).
     '''

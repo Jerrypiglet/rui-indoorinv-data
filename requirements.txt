@@ -25,6 +25,7 @@ h5py
 sympy
 # pyquaternion
 ipdb
+# openexr
 jupyterlab
 mitsuba
 

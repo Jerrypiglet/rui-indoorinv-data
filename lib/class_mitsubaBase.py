@@ -51,7 +51,7 @@ class mitsubaBase():
             cam_rays_list.append((rays_o, rays_d, ray_d_center))
         return cam_rays_list
 
-    def mi_sample_rays_pts(self):
+    def mi_sample_rays_pts(self, cam_rays_list):
         '''
         sample per-pixel rays in NeRF/DVGO setting
         -> populate: 
@@ -67,9 +67,9 @@ class mitsubaBase():
         self.mi_normal_global_list = []
         self.mi_pts_list = []
 
-        print('[mi_sample_rays_pts] for %d frames...'%len(self.cam_rays_list))
+        print('[mi_sample_rays_pts] for %d frames...'%len(cam_rays_list))
 
-        for frame_idx, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(self.cam_rays_list)):
+        for frame_idx, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(cam_rays_list)):
             rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
 
             xs_mi = mi.Point3f(self.to_d(rays_o_flatten))

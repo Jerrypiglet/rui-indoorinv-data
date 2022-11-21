@@ -35,6 +35,18 @@ pip install torch torchvision torchaudio --extra-index-url https://download.pyto
 pip install -r requirements.txt
 ```
 
+Install OpenEXR on mac:
+
+``` bash
+brew install openexr
+brew install IlmBase
+export CFLAGS="-I/Users/jerrypiglet/miniconda3/envs/dvgo-py38/lib/python3.8/site-packages/mitsuba/include/OpenEXR"
+# export LDFLAGS="-L/opt/homebrew/lib"
+pip install OpenEXR
+```
+
+
+
 Hopefully that was everything. 
 ## Mitsuba 3 based inference, and notes on installation on ARM64 Mac
 On Mac, make sure you are using a arm64 Python binary, installed with arm64 conda for example. Check your python binary type via:
@@ -240,12 +252,13 @@ Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True
 ![](images/demo_render_ZQ_emitter_rays_2.png)
 # Todolist
 - [x] vis envmap
+- [ ] room coverage count
 - [ ] o3d: show layout bbox without meshes
 - [ ] unit test scrpt without X
 - [ ] batch mi ray intersection when too many frames
 - [ ] multi-gpu support
 - [ ] vis 3D grid of unit length in o3d visualizer
-- [ ] vis projection of layout+objects in visualizer_openroomsScene_2D()
+- [ ] vis projection of layout+objects in visualizer_scene_2D()
 - [x] vis 3D layout+objects+**camera poses** in visualizer_openroomsScene_3D_plt()
 - [ ] **Interactive mode**: map keys to load/offload modalities on-the-go without having to change the flags and restart the viewer
 - [ ] **Mitsuba scene**: enabling emitters and materials -> differentiable RGB rendering 

@@ -37,7 +37,7 @@ aabb_01 = np.array([[0, 0, 0],
                     [1, 1, 1],
                     [1, 1, 0]])
 
-class visualizer_openroomsScene_3D_o3d(object):
+class visualizer_scene_3D_o3d(object):
     '''
     A class used to **visualize** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties for inverse rendering + 3D semantics).
     '''
@@ -571,9 +571,12 @@ class visualizer_openroomsScene_3D_o3d(object):
         images/demo_layout_o3d.png
         '''
         assert self.os.if_has_layout
+        return_list = []
 
-        layout_mesh = self.os.layout_mesh_transformed.as_open3d
-        layout_mesh.compute_vertex_normals()
+        if hasattr(self.os, 'layout_mesh_transformed'):
+            layout_mesh = self.os.layout_mesh_transformed.as_open3d
+            layout_mesh.compute_vertex_normals()
+            return_list.append([layout_mesh, 'layout'])
 
         layout_bbox_3d = self.os.layout_box_3d_transformed
         layout_bbox_pcd = o3d.geometry.LineSet()
@@ -581,7 +584,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         layout_bbox_pcd.colors = o3d.utility.Vector3dVector([[1,0,0] for i in range(12)])
         layout_bbox_pcd.lines = o3d.utility.Vector2iVector([[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])
 
-        return [[layout_mesh, 'layout'], layout_bbox_pcd]
+        return return_list + [layout_bbox_pcd]
 
     def collect_shapes(self, shapes_params: dict={}):
         '''
@@ -598,7 +601,6 @@ class visualizer_openroomsScene_3D_o3d(object):
 
         if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_obj_mesh', False)
         if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_emitter_mesh', False)
-        if_labels = shapes_params.get('if_labels', True)
 
         self.os.load_colors()
 
@@ -606,12 +608,12 @@ class visualizer_openroomsScene_3D_o3d(object):
 
         emitters_obj_random_id_list = [shape['filename'] for shape in self.os.shape_list_valid if shape['if_in_emitter_dict']]
 
-        for shape_idx, (shape, vertices, faces, bverts) in enumerate(zip(
+        for shape_idx, (shape, vertices, faces, bverts) in tqdm(enumerate(zip(
             self.os.shape_list_valid, 
             self.os.vertices_list, 
             self.os.faces_list, 
             self.os.bverts_list, 
-        )):
+        ))):
 
             if_emitter = shape['if_in_emitter_dict']
             cat_name = 'N/A'; cat_id = -1
@@ -645,17 +647,22 @@ class visualizer_openroomsScene_3D_o3d(object):
                 else:
                     obj_color = [0.7, 0.7, 0.7]
 
-            '''
-            applicable if necessary
-            '''
 
             # trimesh.repair.fill_holes(shape_mesh)
             # trimesh.repair.fix_winding(shape_mesh)
             # trimesh.repair.fix_inversion(shape_mesh)
             # trimesh.repair.fix_normals(shape_mesh)
+            shape_bbox = o3d.geometry.LineSet()
+            shape_bbox.points = o3d.utility.Vector3dVector(bverts)
+            shape_bbox.colors = o3d.utility.Vector3dVector([obj_color if not if_emitter else [0., 0., 0.] for i in range(12)]) # black for emitters
+            shape_bbox.lines = o3d.utility.Vector2iVector([[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])
+            geometry_list.append(shape_bbox)
+
+            '''
+            applicable if necessary
+            '''
 
             if_mesh = if_obj_meshes if not if_emitter else if_emitter_meshes
-
             if if_mesh:
                 assert np.amax(faces-1) < vertices.shape[0]
                 shape_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
@@ -679,6 +686,7 @@ class visualizer_openroomsScene_3D_o3d(object):
             # geometry_list.append(shape_label)
             # self.vis.add_3d_label(np.mean(bverts, axis=0), cat_name)
 
+            if_labels = shapes_params.get('if_labels', True)
             if if_labels:
                 pcd_10 = text_3d(
                     cat_name, 
@@ -691,14 +699,7 @@ class visualizer_openroomsScene_3D_o3d(object):
                 # pcd_10 = text_3d(cat_name, pos=np.mean(bverts, axis=0).tolist(), font_size=100, density=10)
                 geometry_list.append(pcd_10)
 
-            shape_bbox = o3d.geometry.LineSet()
-            shape_bbox.points = o3d.utility.Vector3dVector(bverts)
-            shape_bbox.colors = o3d.utility.Vector3dVector([obj_color if not if_emitter else [0., 0., 0.] for i in range(12)]) # black for emitters
-            shape_bbox.lines = o3d.utility.Vector2iVector([[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])
-            geometry_list.append(shape_bbox)
-
         if_dump_mesh = shapes_params.get('if_dump_mesh', False)
-
         if if_dump_mesh:
             num_vertices = 0
             f_list = []
@@ -710,6 +711,20 @@ class visualizer_openroomsScene_3D_o3d(object):
             v = np.array(self.os.layout_mesh_ori.vertices)
             v_list = copy.deepcopy(self.os.vertices_list) + [v]
             writeMesh('./tmp_mesh.obj', np.vstack(v_list), np.vstack(f_list))
+
+        if_voxel_volume = shapes_params.get('if_voxel_volume', False)
+        if if_voxel_volume:
+            '''
+            show voxels of unit sizes along object/bbox vertices; just to show the scale of the scene: images/demo_shapes_voxel_o3d.png
+            '''
+            # voxel_grid = o3d.geometry.VoxelGrid.create_dense(xyz_min.reshape((3, 1)), np.ones((3, 1)), 1., xyz_max[0]-xyz_min[0], xyz_max[1]-xyz_min[1], xyz_max[2]-xyz_min[2])
+            bverts_all = np.vstack(self.os.bverts_list)
+            pcd_bverts_all = o3d.geometry.PointCloud()
+            pcd_bverts_all.points = o3d.utility.Vector3dVector(bverts_all)
+            pcd_bverts_all.colors = o3d.utility.Vector3dVector(np.random.uniform(0, 1, size=(bverts_all.shape[0], 3)))
+
+            voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud(pcd_bverts_all, voxel_size=1.)
+            geometry_list.append(voxel_grid)
 
         return geometry_list
 
@@ -814,7 +829,7 @@ class visualizer_openroomsScene_3D_o3d(object):
         '''
         if_pts = mi_params.get('if_pts', True)
         pts_subsample = mi_params.get('pts_subsample', 10)
-        if_pts_colorize_rgb = mi_params.get('if_pts_colorize_rgb', 0.2)
+        if_pts_colorize_rgb = mi_params.get('if_pts_colorize_rgb', True)
         if_ceiling = mi_params.get('if_ceiling', False)
         if_walls = mi_params.get('if_walls', False)
 
