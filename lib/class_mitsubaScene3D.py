@@ -297,7 +297,7 @@ class mitsubaScene3D(mitsubaBase):
             cam_params = np.load(self.pose_file)
             assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
             poses_num = min(self.mi_params_dict.get('poses_num'), len(cam_params))
-            T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
+            T_c_b2m = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., -1.]], dtype=np.float32)
             T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world
             scale_m2b = np.array([0.206,0.206,0.206]).reshape((3, 1))
             trans_m2b = np.array([-0.074684,0.23965,-0.30727]).reshape((3, 1))
