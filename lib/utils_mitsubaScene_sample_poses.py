@@ -204,10 +204,10 @@ def func_mitsubaScene_sample_poses(lverts, boxes,
                     camPose[2, :] = up
                     camPoses.append(camPose)
 
-                    if (camPose[1, :] - camPose[0, :])[1] > np.sin(20/180*np.pi):
-                        import ipdb; ipdb.set_trace()
-                    if (camPose[1, :] - camPose[0, :])[1] <np.sin(-60/180*np.pi):
-                        import ipdb; ipdb.set_trace()
+                    # if (camPose[1, :] - camPose[0, :])[1] > np.sin(20/180*np.pi):
+                    #     import ipdb; ipdb.set_trace()
+                    # if (camPose[1, :] - camPose[0, :])[1] <np.sin(-60/180*np.pi):
+                    #     import ipdb; ipdb.set_trace()
 
                     if if_vis_plt:
                         plt.scatter(pointLoc[0], pointLoc[2], c='b')

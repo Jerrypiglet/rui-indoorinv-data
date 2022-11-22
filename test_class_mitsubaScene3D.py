@@ -3,8 +3,8 @@ work with Mitsuba/Blender scenes
 '''
 import sys
 
-host = 'mm1'
-# host = 'apple'
+# host = 'mm1'
+host = 'apple'
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
     'mm1': '', 
@@ -24,17 +24,17 @@ from lib.utils_misc import str2bool
 import argparse
 parser = argparse.ArgumentParser()
 # visualizers
-parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
+# parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
 parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize in open3D')
-parser.add_argument('--vis_2d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
+# parser.add_argument('--vis_2d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
 # options for visualizers
 parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help='colormap for all points in fused geo')
 parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=True, default=False, help='if create color map for all points of Mitsuba; required: input_colors_tuple')
-parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
+# parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
 # differential renderer
-parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
-parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
+# parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
+# parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -67,14 +67,14 @@ openrooms_scene = mitsubaScene3D(
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
-        'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
+        'if_sample_poses': True, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
         'poses_num': 200, 
         'if_render_im': True, # True to render im with Mitsuba
         'if_get_segs': True, # True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        # 'im_sdr', 
+        'im_sdr', 
         # 'seg', 'im_hdr', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
@@ -87,11 +87,24 @@ openrooms_scene = mitsubaScene3D(
         # 'im_H_resize': 480, 'im_W_resize': 640, 
         'im_H_load': 320, 'im_W_load': 640, 
         'im_H_resize': 160, 'im_W_resize': 320, 
-        'spp': 2048, 
+        # 'spp': 2048, 
+        'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
         }, 
-    lighting_params_dict={
+    cam_params_dict={
+        'near': 0.1, 'far': 10., 
+        'heightMin' : 0.7,  
+        'heightMax' : 2.,  
+        'distMin': 1., # to wall distance min
+        'distMax': 4.5, 
+        'thetaMin': -60, 
+        'thetaMax' : 40, # theta: pitch angle; up+
+        'phiMin': -60, # yaw angle
+        'phiMax': 60, 
+        'if_vis_plt': False, # images/demo_sample_pose.png
     }, 
+    # lighting_params_dict={
+    # }, 
     shape_params_dict={
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters

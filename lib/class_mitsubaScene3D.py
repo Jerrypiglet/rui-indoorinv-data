@@ -47,7 +47,7 @@ class mitsubaScene3D(mitsubaBase):
         im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640, 'spp': 1024}, 
         BRDF_params_dict: dict={}, 
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
-        cam_params_dict: dict={'near': 0.01, 'far': 7.}, 
+        cam_params_dict: dict={'near': 0.1, 'far': 10.}, 
         shape_params_dict: dict={'if_load_mesh': True}, 
         emitter_params_dict: dict={'N_ambient_rep': '3SG-SkyGrd'},
         mi_params_dict: dict={'if_sample_rays_pts': True, 'if_sample_poses': False}, 
@@ -90,7 +90,7 @@ class mitsubaScene3D(mitsubaBase):
         self.im_sdr_ext = im_params_dict.get('im_sdr_ext', 'png')
         self.im_hdr_ext = im_params_dict.get('im_hdr_ext', 'exr')
 
-        self.near = cam_params_dict.get('near', 0.01)
+        self.near = cam_params_dict.get('near', 0.1)
         self.far = cam_params_dict.get('far', 10.)
 
         self.host = host
@@ -111,8 +111,8 @@ class mitsubaScene3D(mitsubaBase):
         )
 
         self.load_mi_scene(self.mi_params_dict)
-        self.load_poses()
-        self.frame_id_list = list(range(len(self.pose_list)))
+        self.load_poses(self.cam_params_dict)
+
         self.load_modalities_3D()
 
         self.get_cam_rays(self.cam_params_dict)
@@ -172,7 +172,7 @@ class mitsubaScene3D(mitsubaBase):
         for _ in self.modality_list:
             if _ == 'layout': self.load_layout()
             if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
-            if _ == 'im_sdr': self.load_im_sdr() # load exr im and convert to SDR
+            if _ == 'im_sdr': self.load_im_sdr()
 
     def get_modality(self, modality):
         if modality in super().valid_modalities:
@@ -256,12 +256,27 @@ class mitsubaScene3D(mitsubaBase):
             scale_factor = [t / s for t, s in zip((self.H, self.W), (self.im_H_load, self.im_W_load))]
             self.K = resize_intrinsics(self.K, scale_factor)
 
-    def load_poses(self):
+    def load_poses(self, cam_params_dict):
         '''
         pose_list: list of pose matrices (**camera-to-world** transformation), each (3, 4): [R|t] (OpenCV convention: right-down-forward)
         '''
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
+        if self.mi_params_dict.get('if_sample_poses', False):
+            if_resample = 'n'
+            if hasattr(self, 'pose_list'):
+                if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
+            if self.pose_file.exists():
+                if_resample = input(red("pose file exists: %s. Resample pose? [y/n]"%str(self.pose_file)))
+            if if_resample in ['Y', 'y']:
+                self.sample_poses(self.mi_params_dict.get('poses_num'), cam_params_dict)
+            else:
+                print(yellow('ABORTED resample pose.'))
+        else:
+            if not self.pose_file.exists():
+            # if not hasattr(self, 'pose_list'):
+                self.get_room_center_pose()
+
         print(white_blue('[mitsubaScene] load_poses from %s'%str(self.pose_file)))
          
         pose_list = []
@@ -323,23 +338,11 @@ class mitsubaScene3D(mitsubaBase):
         self.pose_list = pose_list[:poses_num]
         self.origin_lookatvector_up_list = origin_lookatvector_up_list[:poses_num]
 
-        print(cam_params[0])
+        # print(cam_params[0])
 
         print(blue_text('[mistubaScene] DONE. load_poses'))
 
     def get_cam_rays(self, cam_params_dict={}):
-        if self.mi_params_dict.get('if_sample_poses', False):
-            if_resample = 'n'
-            if hasattr(self, 'pose_list'):
-                if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
-            if if_resample in ['Y', 'y'] or not hasattr(self, 'pose_list'):
-                self.sample_poses(self.mi_params_dict.get('poses_num'))
-            else:
-                print(yellow('ABORTED resample pose.'))
-        else:
-            if not hasattr(self, 'pose_list'):
-                self.get_room_center_pose()
-
         self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, self.K, self.pose_list)
 
     def get_room_center_pose(self):
@@ -352,7 +355,7 @@ class mitsubaScene3D(mitsubaBase):
             np.eye(3, dtype=np.float32), ((self.xyz_max+self.xyz_min)/2.).reshape(3, 1)
             ))]
 
-    def sample_poses(self, poses_num: int):
+    def sample_poses(self, poses_num: int, cam_params_dict: dict):
         from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
         assert self.up_axis == 'y+', 'not supporting other axes for now'
         if not self.if_loaded_layout: self.load_layout()
@@ -361,23 +364,7 @@ class mitsubaScene3D(mitsubaBase):
         boxes = [[bverts, bfaces] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) if not shape['is_layout']]
         cads = [[vertices, faces] for vertices, faces, shape in zip(self.vertices_list, self.faces_list, self.shape_list_valid) if not shape['is_layout']]
 
-        param_dict={
-            'samplePoint': poses_num, 
-            'heightMin' : 1.,  
-            'heightMax' : 1.8,  
-            'distMin': 1., # to wall distance min
-            'distMax': 3.5, 
-            'thetaMin': -60, 
-            'thetaMax' : 20, # theta: pitch angle; up+
-            'phiMin': -60, # yaw angle
-            'phiMax': 60, 
-            # 'thetaMin': -0.1, 
-            # 'thetaMax' : 0, # theta: pitch angle; up+
-            # 'phiMin': -0.1, # yaw angle
-            # 'phiMax': 0, 
-            'if_vis_plt': False, # images/demo_sample_pose.png
-        }
-
+        cam_params_dict['samplePoint'] = poses_num
         origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
             scene_dict={
                 'lverts': lverts, 
@@ -385,7 +372,7 @@ class mitsubaScene3D(mitsubaBase):
                 'cads': cads, 
             }, 
             program_dict={}, 
-            param_dict=param_dict, 
+            param_dict=cam_params_dict, 
             path_dict={},
         ) # [pointLoc; target; up]
 
@@ -466,10 +453,10 @@ class mitsubaScene3D(mitsubaBase):
         self.pose_list = [pose_list[_] for _ in camIndex[:poses_num]]
         self.origin_lookatvector_up_list = [origin_lookatvector_up_list[_] for _ in camIndex[:poses_num]]
 
-        if self.pose_file.exists():
-            txt = input(red("pose_list loaded. Overrite cam.txt? [y/n]"))
-            if txt in ['N', 'n']:
-                return
+        # if self.pose_file.exists():
+        #     txt = input(red("pose_list loaded. Overrite cam.txt? [y/n]"))
+        #     if txt in ['N', 'n']:
+        #         return
     
         with open(str(self.pose_file), 'w') as camOut:
             cam_poses_write = [origin_lookat_up_list[_] for _ in camIndex[:poses_num]]
@@ -526,7 +513,7 @@ class mitsubaScene3D(mitsubaBase):
         # self.im_sdr_ext = 'png'
         self.im_key = 'im_'
 
-        self.im_sdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_sdr_ext)) for i in self.frame_id_list]
+        self.im_sdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_sdr_ext)) for i in range(len(self.pose_list))]
         self.im_sdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=self.im_sdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_sdr_file_list]
 
         print(blue_text('[mitsubaScene] DONE. load_im_sdr'))

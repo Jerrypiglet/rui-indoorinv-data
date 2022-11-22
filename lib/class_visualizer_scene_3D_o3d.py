@@ -313,6 +313,7 @@ class visualizer_scene_3D_o3d(object):
         assert self.os.if_has_poses
 
         if_cam_axis_only = cam_params.get('if_cam_axis_only', False)
+        if_cam_traj = cam_params.get('if_cam_traj', False)
         subsample_cam_rate = cam_params.get('subsample_cam_rate', 1)
         near, far = self.os.near, self.os.far
 
@@ -390,7 +391,7 @@ class visualizer_scene_3D_o3d(object):
             cam_axis_arrow.lines = o3d.utility.Vector2iVector([[0,1]])
             cam_axis_arrow_list.append(cam_axis_arrow)
             
-            if cam_idx < len(cam_list)-1:
+            if if_cam_traj and cam_idx < len(cam_list)-1:
                 cam_traj = o3d.geometry.LineSet()   
                 cam_traj.points = o3d.utility.Vector3dVector(np.array([cam_list[cam_idx][0], cam_list[cam_idx+1][1]]))
                 cam_traj.colors = o3d.utility.Vector3dVector([cam_color for i in range(2)])

@@ -96,12 +96,12 @@ frame_ids = list(range(3, 102, 10))
 '''
 === more & better cameras
 '''
-# base_root = Path(PATH_HOME) / 'data/public_re_3_v5pose_2048'
-# xml_root = Path(PATH_HOME) / 'data/public_re_3_v5pose_2048/scenes'
+base_root = Path(PATH_HOME) / 'data/public_re_3_v5pose_2048'
+xml_root = Path(PATH_HOME) / 'data/public_re_3_v5pose_2048/scenes'
 
-# meta_split = 'main_xml'
-# scene_name = 'scene0008_00_more'
-# frame_ids = list(range(0, 345, 1))
+meta_split = 'main_xml'
+scene_name = 'scene0008_00_more'
+frame_ids = list(range(0, 345, 1))
 # frame_ids = [321]
 
 openrooms_scene = openroomsScene3D(
@@ -275,6 +275,7 @@ if opt.vis_3d_o3d:
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
             'if_cam_axis_only': False, 
+            'if_cam_traj': False, 
             }, 
         dense_geo_params={
             'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
