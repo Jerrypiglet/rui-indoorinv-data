@@ -41,7 +41,7 @@ opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/scenes'
 xml_root = Path(PATH_HOME) / 'data/scenes'
-intrinsics_path = Path(PATH_HOME) / 'data/intrinsic.txt'
+intrinsics_path = Path(PATH_HOME) / 'data/scenes/intrinsic_mitsubaScene.txt'
 
 '''
 The kitchen scene: data/scenes/kitchen/scene_v3.xml
@@ -53,20 +53,28 @@ openrooms_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root}, 
-    scene_params_dict={'xml_filename': xml_filename, 'scene_name': scene_name, 'mitsuba_version': '3.0.0', 'intrinsics_path': intrinsics_path, 'up_axis': 'y+'}, 
+    scene_params_dict={
+        'xml_filename': xml_filename, 
+        'scene_name': scene_name, 
+        'mitsuba_version': '3.0.0', 
+        'intrinsics_path': intrinsics_path, 
+        'up_axis': 'y+', 
+        # 'pose_file': ('OpenRooms', 'cam.txt'), 
+        'pose_file': ('Blender', 'train.npy'), 
+        }, 
     mi_params_dict={
         'if_also_dump_xml_with_lit_lamps_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
         'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        'poses_num': 200, 
+        'poses_num': 2, 
         'if_render_im': False, # True to render im with Mitsuba
         'if_get_segs': True, # True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'im_sdr', 
+        # 'im_sdr', 
         # 'seg', 'im_hdr', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
@@ -77,8 +85,8 @@ openrooms_scene = mitsubaScene3D(
         ], 
     im_params_dict={
         # 'im_H_resize': 480, 'im_W_resize': 640, 
-        'im_H_load': 480, 'im_W_load': 640, 
-        'im_H_resize': 240, 'im_W_resize': 320, 
+        'im_H_load': 320, 'im_W_load': 640, 
+        'im_H_resize': 160, 'im_W_resize': 320, 
         'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
         }, 

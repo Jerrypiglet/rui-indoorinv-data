@@ -321,6 +321,7 @@ class visualizer_scene_3D_o3d(object):
         cam_frustrm_list = []
         # cam_axes_list = []
         cam_center_list = []
+        cam_traj_list = []
         # cam_o_d_list = []
 
         # for cam_idx, (pose, origin_lookatvector_up) in enumerate(zip(pose_list, origin_lookatvector_up_list)):
@@ -388,17 +389,24 @@ class visualizer_scene_3D_o3d(object):
             cam_axis_arrow.colors = o3d.utility.Vector3dVector([cam_color for i in range(2)])
             cam_axis_arrow.lines = o3d.utility.Vector2iVector([[0,1]])
             cam_axis_arrow_list.append(cam_axis_arrow)
+            
+            if cam_idx < len(cam_list)-1:
+                cam_traj = o3d.geometry.LineSet()   
+                cam_traj.points = o3d.utility.Vector3dVector(np.array([cam_list[cam_idx][0], cam_list[cam_idx+1][1]]))
+                cam_traj.colors = o3d.utility.Vector3dVector([cam_color for i in range(2)])
+                cam_traj.lines = o3d.utility.Vector2iVector([[0,1]])
+                cam_traj_list.append(cam_traj)
 
         # if subsample_cam_rate != 1: # subsample camera poses if too many
         #     cam_frustrm_list = cam_axes_list[::subsample_cam_rate] + [cam_axes_list[-1]]
 
         if if_cam_axis_only:
             geometry_list = [
-                *cam_axis_arrow_list, *cam_center_list, # pcd + cams
+                *cam_axis_arrow_list, *cam_center_list, *cam_traj_list, # pcd + cams
             ]
         else:
             geometry_list = [
-                *cam_frustrm_list, *cam_center_list, # pcd + cams
+                *cam_frustrm_list, *cam_center_list, *cam_traj_list, # pcd + cams
             ]
 
         return geometry_list

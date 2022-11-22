@@ -7,6 +7,7 @@ from tqdm import tqdm
 import pickle
 import glob
 import cv2
+import scipy
 import shutil
 from lib.global_vars import mi_variant_dict
 import random
@@ -70,7 +71,10 @@ class mitsubaScene3D(mitsubaBase):
         self.scene_rendering_path = self.rendering_root / self.scene_name / 'rendering'
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
         self.xml_file = self.xml_scene_root / self.scene_name / self.xml_filename
-        self.cam_file = self.xml_scene_root / self.scene_name / 'cam.txt'
+
+        self.pose_format, pose_file = scene_params_dict['pose_file']
+        assert self.pose_format in ['OpenRooms', "Blender"], 'Unsupported pose file'
+        self.pose_file = self.xml_scene_root / self.scene_name / pose_file
 
         self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
@@ -258,30 +262,68 @@ class mitsubaScene3D(mitsubaBase):
         '''
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
-        print(white_blue('[mitsubaScene] load_poses from %s'%str(self.cam_file)))
-
-        cam_params = read_cam_params(self.cam_file)
+        print(white_blue('[mitsubaScene] load_poses from %s'%str(self.pose_file)))
+         
         pose_list = []
         origin_lookatvector_up_list = []
 
-        poses_num = max(self.mi_params_dict.get('poses_num'), len(cam_params))
+        if self.pose_format == 'OpenRooms':
+            '''
+            OpenRooms convention; The camera coordinates is in OpenCV convention (right-down-forward).
+            '''
+            cam_params = read_cam_params(self.pose_file)
+            assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
+            poses_num = min(self.mi_params_dict.get('poses_num'), len(cam_params))
 
-        for cam_param in cam_params:
-            origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-            origin = origin.flatten()
-            lookat = lookat.flatten()
-            up = up.flatten()
-            at_vector = normalize_v(lookat - origin)
-            assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
+            for cam_param in cam_params:
+                origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+                origin = origin.flatten()
+                lookat = lookat.flatten()
+                up = up.flatten()
+                at_vector = normalize_v(lookat - origin)
+                assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
 
-            t = origin.reshape((3, 1)).astype(np.float32)
-            R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
-            
-            pose_list.append(np.hstack((R, t)))
-            origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+                t = origin.reshape((3, 1)).astype(np.float32)
+                R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
+                
+                pose_list.append(np.hstack((R, t)))
+                origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+
+        elif self.pose_format == 'Blender':
+            '''
+            Liwen's Blender convention: (N, 2, 3), [t, euler angles]
+            Blender x y z == Mitsuba x z -y; Mitsuba x y z == Blender x z -y
+            '''
+            cam_params = np.load(self.pose_file)
+            assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
+            poses_num = min(self.mi_params_dict.get('poses_num'), len(cam_params))
+            T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
+            T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world
+            scale_m2b = np.array([0.206,0.206,0.206]).reshape((3, 1))
+            trans_m2b = np.array([-0.074684,0.23965,-0.30727]).reshape((3, 1))
+
+            for cam_param in cam_params:
+                t_c2w_b = cam_param[0].reshape((3, 1)).astype(np.float32)
+                t_c2w_b = (t_c2w_b - trans_m2b) / scale_m2b
+                t = T_w_b2m @ t_c2w_b # -> t_c2w_w
+                # t = (t - trans_m2b) / scale_m2b
+
+                R_c2w_b = scipy.spatial.transform.Rotation.from_euler('xyz', [cam_param[1][0], cam_param[1][1], cam_param[1][2]]).as_matrix()
+                R = T_w_b2m @ R_c2w_b @ T_c_b2m # https://i.imgur.com/nkzfvwt.png
+
+                _, __, at_vector = np.split(R, 3, axis=-1)
+                at_vector = normalize_v(at_vector)
+                up = normalize_v(-__) # (3, 1)
+                assert np.abs(np.sum(at_vector * up)) < 1e-3
+                origin = t
+
+                pose_list.append(np.hstack((R, t)))
+                origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
 
         self.pose_list = pose_list[:poses_num]
         self.origin_lookatvector_up_list = origin_lookatvector_up_list[:poses_num]
+
+        print(cam_params[0])
 
         print(blue_text('[mistubaScene] DONE. load_poses'))
 
@@ -424,12 +466,12 @@ class mitsubaScene3D(mitsubaBase):
         self.pose_list = [pose_list[_] for _ in camIndex[:poses_num]]
         self.origin_lookatvector_up_list = [origin_lookatvector_up_list[_] for _ in camIndex[:poses_num]]
 
-        if self.cam_file.exists():
+        if self.pose_file.exists():
             txt = input(red("pose_list loaded. Overrite cam.txt? [y/n]"))
             if txt in ['N', 'n']:
                 return
     
-        with open(str(self.cam_file), 'w') as camOut:
+        with open(str(self.pose_file), 'w') as camOut:
             cam_poses_write = [origin_lookat_up_list[_] for _ in camIndex[:poses_num]]
             camOut.write('%d\n'%len(cam_poses_write))
             print('Final sampled camera poses: %d'%len(cam_poses_write))
@@ -437,7 +479,7 @@ class mitsubaScene3D(mitsubaBase):
                 for n in range(0, 3):
                     camOut.write('%.3f %.3f %.3f\n'%\
                         (camPose[n, 0], camPose[n, 1], camPose[n, 2]))
-        print(blue_text('cam.txt written to %s.'%str(self.cam_file)))
+        print(blue_text('cam.txt written to %s.'%str(self.pose_file)))
 
     def render_im(self):
         self.spp = self.im_params_dict.get('spp', 1024)

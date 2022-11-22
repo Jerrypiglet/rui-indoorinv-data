@@ -1,15 +1,8 @@
-from pathlib import Path, PosixPath
-import matplotlib.pyplot as plt
 import numpy as np
 np.set_printoptions(suppress=True)
 
 from tqdm import tqdm
-import pickle
-import trimesh
-import shutil
 from collections import defaultdict
-from math import prod
-from lib.global_vars import mi_variant_dict
 import torch
 # Import the library using the alias "mi"
 import mitsuba as mi
@@ -17,17 +10,7 @@ import mitsuba as mi
 # from lib.global_vars import mi_variant
 # mi.set_variant(mi_variant)
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue
-from lib.utils_io import load_matrix, resize_intrinsics
-
-from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, mesh_to_skeleton, transform_v
-from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
-from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal
-from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
-from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world
-from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_ls_np
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import get_device
 
 class mitsubaBase():
     '''
@@ -102,6 +85,7 @@ class mitsubaBase():
 
             # mi_pts = ret.p.numpy().reshape(self.H, self.W, 3)
             mi_pts = ret.t.numpy()[:, np.newaxis] * rays_d_flatten + rays_o_flatten
+            assert sum(ret.t.numpy()!=np.inf) > 1, 'no rays hit any surface!'
             assert np.amax(np.abs((mi_pts - ret.p.numpy())[ret.t.numpy()!=np.inf, :])) < 1e-3 # except in window areas
             mi_pts = mi_pts.reshape(self.H, self.W, 3)
             mi_pts[invalid_depth_mask, :] = np.inf
