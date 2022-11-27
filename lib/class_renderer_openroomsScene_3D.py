@@ -220,63 +220,21 @@ class renderer_openroomsScene_3D(object):
         _, rays_d, _ = self.os.cam_rays_list[frame_idx]
         viewdirs = -torch.from_numpy(rays_d).to(self.device).flatten(0, 1)
         
-        assert emitter_type == 'lamp', 'no support for windows for now'
-        lamp, vertices, faces = self.os.lamp_list[emitter_index]
-        intensity = lamp['emitter_prop']['intensity'] # (3,)
-        center = lamp['emitter_prop']['box3D_world']['center'] # (3,)
+        '''
+        sample pts on emitter surface -> lpts for light points
+        '''
+        from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
+        emitter_dict = {'lamp': self.os.lamp_list, 'window': self.os.window_list}
+        lpts_dict = sample_mesh_emitter(emitter_type, emitter_index=emitter_index, emitter_dict=emitter_dict, max_plate=max_plate)
 
-        # >>>> sample lamp
-        v1 = vertices[faces[:, 0]-1, :]
-        v2 = vertices[faces[:, 1]-1, :]
-        v3 = vertices[faces[:, 2]-1, :]
-
-        lpts = 1.0 / 3.0 * (v1 + v2 + v3)
-        e1 = v2 - v1
-        e2 = v3 - v1
-        lpts_normal = np.cross(e1, e2)
-
-        # [DEBUG] get rid of upper faces
-        # faces = faces[lpts_normal[:, 1]<0]
-        # from lib.utils_OR.utils_OR_mesh import writeMesh
-        # writeMesh('tmp_mesh.obj', vertices, faces)
-        # v1 = vertices[faces[:, 0]-1, :]
-        # v2 = vertices[faces[:, 1]-1, :]
-        # v3 = vertices[faces[:, 2]-1, :]
-        # lpts = 1.0 / 3.0 * (v1 + v2 + v3)
-        # e1 = v2 - v1
-        # e2 = v3 - v1
-        # lpts_normal = np.cross(e1, e2)
-
-        lpts_area = 0.5 * np.sqrt(np.sum(
-            lpts_normal * lpts_normal, axis=1, keepdims = True))
-        lpts_normal = lpts_normal / np.maximum(2 * lpts_area, 1e-6)
-
-        center = np.mean(vertices, axis=0, keepdims = True)
-
-        normal_flip = (np.sum(lpts_normal * (lpts - center), axis=1, keepdims=True) < 0) # [TODO] ZQ is trying to deal with concave faces. Better ideas?
-        normal_flip = normal_flip.astype(np.float32)
-        lpts_normal = -lpts_normal * normal_flip + (1 - normal_flip) * lpts_normal
-
-        plate_num = lpts.shape[0]
-
-        lpts = torch.from_numpy(lpts).to(self.device) # (M=256, 3)
-        lpts_normal = torch.from_numpy(lpts_normal).to(self.device)
-        lpts_area = torch.from_numpy(lpts_area).to(self.device)
-
-        if plate_num > max_plate: # [TODO] choose fixed max_plate num of plates
-            prob = float(max_plate)  / float(plate_num)
-            select_ind = np.random.choice([0, 1], size=(plate_num), p=[1-prob, prob])
-            select_ind = torch.from_numpy(select_ind).long().to(self.device)
-            lpts = lpts[select_ind == 1]
-            lpts_normal = lpts_normal[select_ind == 1]
-            lpts_area = lpts_area[select_ind == 1]
-            prob = float(torch.sum(select_ind))  / float(plate_num)
-        else:
-            prob = 1
-
-        lpts_intensity = torch.from_numpy(intensity).to(self.device).view(1, 3)
-        # <<<< sample lamp
-
+        lpts = torch.from_numpy(lpts_dict['lpts']).to(self.device) # (M=256, 3)
+        lpts_normal = torch.from_numpy(lpts_dict['lpts_normal']).to(self.device)
+        lpts_area = torch.from_numpy(lpts_dict['lpts_area']).to(self.device)
+        lpts_intensity = torch.from_numpy(lpts_dict['lpts_intensity']).to(self.device).view(1, 3)
+        
+        '''
+        get scene-to-emitter rays
+        '''
         pts = torch.from_numpy(self.os.mi_pts_list[frame_idx]).to(self.device).flatten(0, 1) # (N, 3)
         l_dirs = lpts.unsqueeze(0) - pts.unsqueeze(1) # (N, M=256, 3)
         pts_distL2 = torch.linalg.norm(l_dirs, dim=2, keepdims=True)
@@ -289,7 +247,7 @@ class renderer_openroomsScene_3D(object):
         pts_intensity = lpts_intensity.unsqueeze(0) * lpt_cos.abs() # (N, M=256, 3)
         # pts_intensity = lpts_intensity.unsqueeze(0) * torch.clamp(pts_cos, min=0, max=1) * lpt_cos.abs() # (N, M=256, 3)
         # pts_intensity = lpts_intensity.unsqueeze(0) * torch.clamp(pts_cos, min=0, max=1) * torch.clamp(lpt_cos, min=0, max=1) # (N, M=256, 3)
-        pts_intensity_weighted = pts_intensity / (pts_distL2**2) * lpts_area.unsqueeze(0) / prob
+        pts_intensity_weighted = pts_intensity / (pts_distL2**2) * lpts_area.unsqueeze(0) / lpts_dict['lpts_prob']
 
         # >>>> compute visibility
         N_pts = normal.shape[0]

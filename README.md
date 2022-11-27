@@ -231,13 +231,13 @@ PhySG:
 ![](images/demo_render_PhySG_Direct_1.png)
 
 ZQ:
-![](images/demo_render_ZQ_emitter_1.png)****
+![](images/demo_render_ZQ_emitter_1.png)
 
 ### Direct-lighting-only renderer
 To render with Zhengqin's emitter-based direct lighting renderer, 
 
 ``` bash
-PYTORCH_ENABLE_MPS_FALLBACK=1 python test_class_openroomsScene3D.py --vis_3d_o3d False --render_3d True --renderer_option **ZQ_emitter** --pcd_color_mode_mi input
+PYTORCH_ENABLE_MPS_FALLBACK=1 python test_class_openroomsScene3D.py --vis_3d_o3d False --render_3d True --renderer_option **ZQ_emitter**
 ```
 
 ![](images/demo_render_ZQ_emitter.png)

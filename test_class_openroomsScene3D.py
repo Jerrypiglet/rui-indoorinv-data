@@ -43,8 +43,6 @@ parser.add_argument('--renderer_option', type=str, default='PhySG', help='differ
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/public_re_3'
-xml_root = Path(PATH_HOME) / 'data/public_re_3/scenes'
 # intrinsics_path = Path(PATH_HOME) / 'data/intrinsic.txt'
 semantic_labels_root = Path(PATH_HOME) / 'files_openrooms'
 layout_root = Path(OR_RAW_ROOT) / 'layoutMesh'
@@ -94,15 +92,16 @@ frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
 frame_ids = list(range(3, 102, 10))
 
 '''
-=== more & better cameras
+- more & better cameras
 '''
-base_root = Path(PATH_HOME) / 'data/public_re_3_v5pose_2048'
-xml_root = Path(PATH_HOME) / 'data/public_re_3_v5pose_2048/scenes'
-
+dataset_version = 'public_re_3_v3pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
-frame_ids = list(range(0, 345, 1))
+frame_ids = list(range(0, 345, 10))
 # frame_ids = [321]
+
+base_root = Path(PATH_HOME) / 'data' / dataset_version
+xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
 
 openrooms_scene = openroomsScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -114,8 +113,8 @@ openrooms_scene = openroomsScene3D(
     modality_list = [
         'im_sdr', 
         'poses', 
-        # 'seg', 'im_hdr', 
-        # 'albedo', 'roughness', 
+        'seg', 'im_hdr', 
+        'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
@@ -137,7 +136,7 @@ openrooms_scene = openroomsScene3D(
         'if_use_mi_geometry': True, 
     }, 
     shape_params_dict={
-        'if_load_obj_mesh': False, # set to False to not load meshes for objs (furniture) to save time
+        'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
         },
     emitter_params_dict={
@@ -279,9 +278,9 @@ if opt.vis_3d_o3d:
             }, 
         dense_geo_params={
             'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
-            'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
-            'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
-            'if_normal': False, # [OPTIONAL] turn off normals to avoid clusters
+            'if_ceiling': False, # remove ceiling points to better see the furniture 
+            'if_walls': False, # remove wall points to better see the furniture 
+            'if_normal': False, # turn off normals to avoid clusters
             'subsample_normal_rate_x': 2, 
             'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
             }, 
@@ -299,19 +298,20 @@ if opt.vis_3d_o3d:
             }, 
         shapes_params={
             'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
-            'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
-            'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
+            'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
+            'if_labels': False, # if show labels (False: only show bboxes)
         },
         emitters_params={
-            'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
+            'if_half_envmap': False, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)
             'scale_SG_length': 2., 
+            'if_sampling_emitter': True, # if sample and visualize points on emitter surface; show intensity as vectors along normals: images/demo_envmap_o3d_sampling.png
         },
         mi_params={
-            'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
+            'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 1,
-            'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
-            'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
+            'if_ceiling': False, # remove ceiling points to better see the furniture 
+            'if_walls': True, # remove wall points to better see the furniture 
 
             'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length

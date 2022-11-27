@@ -615,7 +615,7 @@ class visualizer_scene_3D_o3d(object):
 
         geometry_list = []
 
-        emitters_obj_random_id_list = [shape['filename'] for shape in self.os.shape_list_valid if shape['if_in_emitter_dict']]
+        emitters_obj_random_id_list = [shape['random_id'] for shape in self.os.shape_list_valid if shape['if_in_emitter_dict']]
 
         for shape_idx, (shape, vertices, faces, bverts) in tqdm(enumerate(zip(
             self.os.shape_list_valid, 
@@ -682,14 +682,14 @@ class visualizer_scene_3D_o3d(object):
                     target_number_of_triangles = int(len(shape_mesh.triangles)*shapes_params.get('simply_ratio', 1.))
                     target_number_of_triangles = max(10000, min(50, target_number_of_triangles))
                     shape_mesh = shape_mesh.simplify_quadric_decimation(target_number_of_triangles=target_number_of_triangles)
-                    print('[%s] Mesh simplified to %d->%d triangles.'%(cat_name, N_triangles, len(shape_mesh.triangles)))
+                    print('[%s-%s] Mesh simplified to %d->%d triangles.'%(cat_name, shape['random_id'], N_triangles, len(shape_mesh.triangles)))
 
                 shape_mesh.paint_uniform_color(obj_color)
                 shape_mesh.compute_vertex_normals()
                 shape_mesh.compute_triangle_normals()
                 geometry_list.append([shape_mesh, 'shape_emitter_'+shape['random_id'] if if_emitter else 'shape_obj_'+shape['random_id']])
 
-            print('[collect_shapes] --', if_emitter, shape_idx, obj_path, cat_name, cat_id)
+            print('[collect_shapes] --', if_emitter, shape_idx, obj_path, cat_name, cat_id, shape['random_id'])
 
             # shape_label = o3d.visualization.gui.Label3D([0., 0., 0.], np.mean(bverts, axis=0).reshape((3, 1)), cat_name)
             # geometry_list.append(shape_label)
@@ -746,6 +746,7 @@ class visualizer_scene_3D_o3d(object):
 
         if_half_envmap = emitters_params.get('if_half_envmap', True)
         scale_SG_length = emitters_params.get('scale_SG_length', 2.)
+        if_sampling_emitter = emitters_params.get('if_sampling_emitter', True)
 
         self.os.load_colors()
 
@@ -787,6 +788,24 @@ class visualizer_scene_3D_o3d(object):
 
                     sphere_envmap = get_sphere(hemisphere_normal=shape['emitter_prop']['box3D_world']['zAxis'].reshape((3,)), envmap=im_envmap_ori_SDR)
                     geometry_list.append([sphere_envmap, 'envmap'])
+
+        '''
+        LAMPS samples as area lights: images/demo_envmap_o3d_sampling.png
+        '''
+        if if_sampling_emitter:
+            from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
+            emitter_dict = {'lamp': self.os.lamp_list, 'window': self.os.window_list}
+            max_plate = 64
+            for emitter_type in ['lamp']:
+                for emitter_index in range(len(emitter_dict[emitter_type])):
+                    lpts_dict = sample_mesh_emitter(emitter_type, emitter_index=emitter_index, emitter_dict=emitter_dict, max_plate=max_plate)
+                    # for lpts, lpts_normal, lpts_intensity in zip(lpts_dict['lpts'], lpts_dict['lpts_normal'], lpts_dict['lpts_intensity']):
+                    lpts_end = lpts_dict['lpts'] + lpts_dict['lpts_normal'] * np.log(lpts_dict['lpts_intensity']) * 0.1
+                    emitter_rays = o3d.geometry.LineSet()
+                    emitter_rays.points = o3d.utility.Vector3dVector(np.vstack((lpts_dict['lpts'], lpts_end)))
+                    emitter_rays.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*lpts_dict['lpts'].shape[0])
+                    emitter_rays.lines = o3d.utility.Vector2iVector([[_, _+lpts_dict['lpts'].shape[0]] for _ in range(lpts_dict['lpts'].shape[0])])
+                    geometry_list.append([emitter_rays, 'emitter_rays'])
 
         return geometry_list
 
