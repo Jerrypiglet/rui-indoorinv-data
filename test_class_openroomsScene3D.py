@@ -47,6 +47,7 @@ parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default
 parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
 # evaluator for rad-MLP
 parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
+parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs')
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -102,10 +103,12 @@ frame_ids = list(range(3, 102, 10))
 '''
 - more & better cameras
 '''
-dataset_version = 'public_re_3_v3pose_2048'
+# dataset_version = 'public_re_3_v3pose_2048'
+dataset_version = 'public_re_3_v5pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
-frame_ids = list(range(0, 345, 50))
+emitter_type_index_list = [('lamp', 0)]
+frame_ids = list(range(0, 345, 1))
 # frame_ids = [321]
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
@@ -148,7 +151,7 @@ openrooms_scene = openroomsScene3D(
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
         },
     emitter_params_dict={
-        'N_ambient_rep': '3SG-SkyGrd'
+        'N_ambient_rep': '3SG-SkyGrd', 
         },
     mi_params_dict={
         'if_also_dump_xml_with_lit_lamps_only': True,  # True: to dump a second file containing lit-up lamps only
@@ -219,7 +222,7 @@ if opt.render_3d:
         if_show_rendering_plt=True, 
         render_params={
             'max_plate': 256, 
-            'emitter_type_index': ('lamp', 0), 
+            'emitter_type_index_list': emitter_type_index_list, 
         })
     
     if opt.renderer_option == 'ZQ_emitter':
@@ -232,16 +235,28 @@ if opt.render_3d:
 '''
 Evaluator for rad-MLP and inv-MLP
 '''
+eval_return_dict = {}
 if opt.eval_rad:
     evaluator_rad = evaluator_scene_rad(
         openrooms_scene=openrooms_scene, 
         host=host, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='rad_3_v3pose_2048_main_xml_scene0008_00_more/last.ckpt', 
+        # ckpt_path='rad_3_v3pose_2048_main_xml_scene0008_00_more/last.ckpt', # 166, 208
+        ckpt_path='rad_3_v5pose_2048_main_xml_scene0008_00_more/last-v1.ckpt', # 110
         dataset_key=dataset_version, 
+        rad_scale=1./5., 
     )
 
-    evaluator_rad.render_im(0, if_plt=True)
+    # render one image by querying rad-MLP: images/demo_eval_radMLP_render.png
+    evaluator_rad.render_im(110, if_plt=True) 
+
+    # sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_envmap_o3d_sampling.png
+    eval_return_dict.update(
+        evaluator_rad.sample_emitter(
+            emitter_params={
+                'max_plate': 64, 
+                'emitter_type_index_list': emitter_type_index_list, 
+                }))
 
 
 '''
@@ -275,9 +290,7 @@ if opt.vis_3d_o3d:
         )
     
     if opt.if_add_rays_from_renderer:
-        assert opt.render_3d
-        assert openrooms_scene.if_has_mitsuba_rays_pts
-        
+        assert opt.render_3d and openrooms_scene.if_has_mitsuba_rays_pts
         # _pts_idx = list(range(openrooms_scene.W*openrooms_scene.H)); _sample_rate = 1000 # visualize for all scene points;
         _pts_idx = 60 * openrooms_scene.W + 80; _sample_rate = 1 # only visualize for one scene point w.r.t. all lamp points
         visibility = renderer_return_dict['visibility'][_pts_idx].reshape(-1,)[::_sample_rate]
@@ -292,6 +305,18 @@ if opt.vis_3d_o3d:
             #     'pts': renderer_return_dict['ray_o'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
             # }), 
             ])
+
+    if opt.if_add_rays_from_eval:
+        if eval_return_dict != {}:
+            assert opt.eval_rad
+            for (lpts, lpts_end) in eval_return_dict['emitter_rays_list']:
+                visualizer_3D_o3d.add_extra_geometry([
+                    ('rays', {
+                        'ray_o': lpts, 
+                        'ray_e': lpts_end, 
+                        'ray_c': np.array([[0., 0., 1.]]*lpts.shape[0]), # BLUE for EST
+                    }),
+                ]) 
 
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
@@ -324,10 +349,11 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # if show labels (False: only show bboxes)
         },
-        emitters_params={
+        emitter_params={
             'if_half_envmap': False, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)
             'scale_SG_length': 2., 
-            'if_sampling_emitter': True, # if sample and visualize points on emitter surface; show intensity as vectors along normals: images/demo_envmap_o3d_sampling.png
+            'if_sampling_emitter': True, # if sample and visualize points on emitter surface; show intensity as vectors along normals (RED for GT): images/demo_envmap_o3d_sampling.png
+            'max_plate': 64, 
         },
         mi_params={
             'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps

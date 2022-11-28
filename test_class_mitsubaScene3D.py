@@ -173,7 +173,7 @@ openrooms_scene = mitsubaScene3D(
 #         if_show_rendering_plt=True, 
 #         render_params={
 #             'max_plate': 256, 
-#             'emitter_type_index': ('lamp', 0), 
+#             'emitter_type_index_list': ('lamp', 0), 
 #         })
     
 #     if opt.renderer_option == 'ZQ_emitter':
@@ -233,7 +233,7 @@ if opt.vis_3d_o3d:
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
         },
-        # emitters_params={
+        # emitter_params={
         #     'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
         #     'scale_SG_length': 2., 
         # },

@@ -250,6 +250,26 @@ Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True
 ```
 ![](images/demo_render_ZQ_emitter_rays_1.png)
 ![](images/demo_render_ZQ_emitter_rays_2.png)
+
+## Evaluator for rad-MLP and inv-MLP
+### rad-MLP
+```opt.eval_rad``` for evaluating rad-MLP loaded from ckpt.
+
+[mm1 3c87ce2] added sampling rad-MLP for est emitter radiance: public_re_3_v3pose_2048 and public_re_3_v5pose_2048
+
+``` bash
+python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_rad True 
+```
+
+Re-render the image from rad-MLP (via querying camera rays)
+![](images/demo_eval_radMLP_render_166.png)
+![](images/demo_eval_radMLP_render_208.png)
+public_re_3_v5pose_2048:
+![](images/demo_eval_radMLP_render_110.png)
+
+Evaluate emitter surface radiance (GT (red) and est. (blue) from querying emitter surface rays)
+![](images/demo_envmap_o3d_sampling.png)
+
 # Todolist
 - [x] vis envmap
 - [ ] room coverage count

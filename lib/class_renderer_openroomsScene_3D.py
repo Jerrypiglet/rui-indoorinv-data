@@ -14,7 +14,7 @@ from lib.class_openroomsScene3D import openroomsScene3D
 from lib.utils_rendering_PhySG import render_with_sg
 from lib.utils_rendering_ZQ import rendering_layer_per_point
 from lib.utils_rendering_ZQ_emitter import rendering_layer_per_point_from_emitter
-from lib.utils_misc import get_device
+from lib.utils_misc import get_device, yellow
 
 class renderer_openroomsScene_3D(object):
     '''
@@ -205,7 +205,9 @@ class renderer_openroomsScene_3D(object):
         render_params={}, 
     ):
         max_plate = render_params.get('max_plate', 256)
-        (emitter_type, emitter_index) = render_params.get('emitter_type_index')
+        _ = render_params.get('emitter_type_index_list')
+        if len(_) > 1: print(yellow('More than one emitters send to render_ZQ_emitter->render_params->emitter_type_index_list; showing 1st one.'))
+        (emitter_type, emitter_index) = _[0]
         '''
         [TODO] simplify lamp mesh
         '''

@@ -186,7 +186,7 @@ class visualizer_scene_3D_o3d(object):
         lighting_params: dict = {}, 
         layout_params: dict = {}, 
         shapes_params: dict = {}, 
-        emitters_params: dict = {}, 
+        emitter_params: dict = {}, 
         mi_params: dict = {}, 
     ):
         
@@ -224,7 +224,7 @@ class visualizer_scene_3D_o3d(object):
 
         if 'emitters' in modality_list:
             o3d_geometry_list += self.collect_emitters(
-                emitters_params
+                emitter_params
             )
 
         if 'mi' in modality_list:
@@ -252,7 +252,12 @@ class visualizer_scene_3D_o3d(object):
                 dirs = o3d.geometry.LineSet()
                 dirs.points = o3d.utility.Vector3dVector(np.vstack((ray_o, ray_e)))
                 # dirs.colors = o3d.utility.Vector3dVector([[1., 0., 0.] if vis == 1 else [0.8, 0.8, 0.8] for vis in visibility]) # red: visible; blue: not visible
-                dirs.colors = o3d.utility.Vector3dVector([[1., 0., 0.]] * ray_o.shape[0])
+                if 'ray_c' in geometry:
+                    ray_c = geometry['ray_c']
+                    assert type(ray_c)==np.ndarray and ray_c.shape in [(3,), (ray_o.shape[0], 3)]
+                else:
+                    ray_c = [[1., 0., 0.]] * ray_o.shape[0]
+                dirs.colors = o3d.utility.Vector3dVector(ray_c)
                 dirs.lines = o3d.utility.Vector2iVector([[_, _+ray_o.shape[0]] for _ in range(ray_o.shape[0])])
                 self.extra_geometry_list.append(dirs)
             if geometry_type == 'pts':
@@ -737,16 +742,17 @@ class visualizer_scene_3D_o3d(object):
 
         return geometry_list
 
-    def collect_emitters(self, emitters_params: dict={}):
+    def collect_emitters(self, emitter_params: dict={}):
         '''
         images/demo_emitters_o3d.png
         images/demo_envmap_o3d.png # added envmap hemisphere
         '''
         assert self.os.if_has_shapes
 
-        if_half_envmap = emitters_params.get('if_half_envmap', True)
-        scale_SG_length = emitters_params.get('scale_SG_length', 2.)
-        if_sampling_emitter = emitters_params.get('if_sampling_emitter', True)
+        if_half_envmap = emitter_params.get('if_half_envmap', True)
+        scale_SG_length = emitter_params.get('scale_SG_length', 2.)
+        if_sampling_emitter = emitter_params.get('if_sampling_emitter', True)
+        max_plate = emitter_params.get('max_plate', 64)
 
         self.os.load_colors()
 
@@ -795,15 +801,14 @@ class visualizer_scene_3D_o3d(object):
         if if_sampling_emitter:
             from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
             emitter_dict = {'lamp': self.os.lamp_list, 'window': self.os.window_list}
-            max_plate = 64
             for emitter_type in ['lamp']:
                 for emitter_index in range(len(emitter_dict[emitter_type])):
                     lpts_dict = sample_mesh_emitter(emitter_type, emitter_index=emitter_index, emitter_dict=emitter_dict, max_plate=max_plate)
                     # for lpts, lpts_normal, lpts_intensity in zip(lpts_dict['lpts'], lpts_dict['lpts_normal'], lpts_dict['lpts_intensity']):
-                    lpts_end = lpts_dict['lpts'] + lpts_dict['lpts_normal'] * np.log(lpts_dict['lpts_intensity']) * 0.1
+                    lpts_end = lpts_dict['lpts'] + lpts_dict['lpts_normal'] * np.log(lpts_dict['lpts_intensity'].sum(-1)) * 0.1
                     emitter_rays = o3d.geometry.LineSet()
                     emitter_rays.points = o3d.utility.Vector3dVector(np.vstack((lpts_dict['lpts'], lpts_end)))
-                    emitter_rays.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*lpts_dict['lpts'].shape[0])
+                    emitter_rays.colors = o3d.utility.Vector3dVector([[1., 0., 0.]]*lpts_dict['lpts'].shape[0]) # RED for GT
                     emitter_rays.lines = o3d.utility.Vector2iVector([[_, _+lpts_dict['lpts'].shape[0]] for _ in range(lpts_dict['lpts'].shape[0])])
                     geometry_list.append([emitter_rays, 'emitter_rays'])
 
