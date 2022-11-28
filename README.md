@@ -268,7 +268,7 @@ public_re_3_v5pose_2048:
 ![](images/demo_eval_radMLP_render_110.png)
 
 Evaluate emitter surface radiance (GT (red) and est. (blue) from querying emitter surface rays)
-![](images/demo_envmap_o3d_sampling.png)
+![](images/demo_emitter_o3d_sampling.png)
 
 # Todolist
 - [x] vis envmap

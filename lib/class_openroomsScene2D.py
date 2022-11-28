@@ -441,9 +441,9 @@ class openroomsScene2D(object):
 
         for frame_idx, lighting_SG_file in enumerate(tqdm(lighting_SG_files)):
             lighting_SG = load_h5(lighting_SG_file)
-            if 'im_hdr' in self.modality_list and self.if_scale_hdr:
-                hdr_scale = self.hdr_scale_list[frame_idx]
-                lighting_SG[:, :, :, 3:6] = lighting_SG[:, :, :, 3:6] * hdr_scale # (120, 160, 12(SG_num), 6); theta, phi, lamb, weight: 1, 1, 1, 3
+            # if 'im_hdr' in self.modality_list and self.if_scale_hdr:
+            #     hdr_scale = self.hdr_scale_list[frame_idx]
+            #     lighting_SG[:, :, :, 3:6] = lighting_SG[:, :, :, 3:6] * hdr_scale # (120, 160, 12(SG_num), 6); theta, phi, lamb, weight: 1, 1, 1, 3
             lighting_SG = np.concatenate(
                 (convert_SG_angles_to_axis_local_np(lighting_SG[:, :, :, :2]),  # (120, 160, 12(SG_num), 7); axis_local, lamb, weight: 3, 1, 3
                 lighting_SG[:, :, :, 2:]), axis=3)
@@ -484,9 +484,9 @@ class openroomsScene2D(object):
 
         for idx, lighting_envmap_file in enumerate(tqdm(lighting_envmap_files)):
             envmap = load_envmap(str(lighting_envmap_file), env_height=env_height, env_width=env_width)[0].transpose(1, 2, 0, 3, 4) # -> (120, 160, 3, 8, 16)
-            if 'im_hdr' in self.modality_list and self.if_scale_hdr:
-                hdr_scale = self.hdr_scale_list[idx]
-                envmap = envmap * hdr_scale
+            # if 'im_hdr' in self.modality_list and self.if_scale_hdr:
+            #     hdr_scale = self.hdr_scale_list[idx]
+            #     envmap = envmap * hdr_scale
     
             self.lighting_envmap_list.append(envmap)
 

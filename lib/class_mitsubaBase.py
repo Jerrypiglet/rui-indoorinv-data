@@ -73,8 +73,9 @@ class mitsubaBase():
             self.mi_depth_list.append(mi_depth)
 
             mi_normal_global = ret.n.numpy().reshape(self.H, self.W, 3)
-            # normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normal_global, axis=-1) > 0, np.any(mi_normal_global != np.inf, axis=-1))
-            # mi_normal_global[normals_flip_mask] = -mi_normal_global[normals_flip_mask]
+            # FLIP inverted normals!
+            normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normal_global, axis=-1) > 0, np.any(mi_normal_global != np.inf, axis=-1))
+            mi_normal_global[normals_flip_mask] = -mi_normal_global[normals_flip_mask]
             mi_normal_global[invalid_depth_mask, :] = np.inf
             self.mi_normal_global_list.append(mi_normal_global)
 

@@ -236,8 +236,14 @@ class visualizer_scene_3D_o3d(object):
 
         return o3d_geometry_list
 
-    def add_extra_geometry(self, geometry_list: list=[]):
+    def add_extra_geometry(self, geometry_list: list=[], if_processed_geometry_list: bool=False):
+        '''
+        if_processed_geometry_list: True if already processed into list of geometries
+        '''
         valid_extra_geometry_list = ['rays', 'pts']
+        if if_processed_geometry_list:
+            self.extra_geometry_list += geometry_list
+            return
         for geometry_type, geometry in geometry_list:
             assert geometry_type in valid_extra_geometry_list
             if geometry_type == 'rays':
@@ -520,12 +526,15 @@ class visualizer_scene_3D_o3d(object):
         geometry_list = self.process_lighting(lighting_envmap_fused_dict, lighting_params=lighting_params, lighting_source='lighting_envmap', lighting_color=[1., 0., 1.]) # pink
         return geometry_list
 
-    def process_lighting(self, lighting_fused_dict: dict, lighting_source: str, lighting_params: dict={}, lighting_color=[0., 0., 1.]):
+    def process_lighting(self, lighting_fused_dict: dict, lighting_source: str, lighting_params: dict={}, lighting_color=[1., 0., 0.], if_X_multiplied: bool=False):
+        '''
+        if_X_multiplied: True if X_global_lighting is already multiplied by wi_num
+        '''
         assert lighting_source in ['lighting_SG', 'lighting_envmap'] # not supporting 'lighting_sampled' yet
 
         lighting_scale = lighting_params.get('lighting_scale', 1.) # if autoscale, act as extra scale
         lighting_keep_ratio = lighting_params.get('lighting_keep_ratio', 0.05)
-        lighting_clip_ratio = lighting_params.get('lighting_clip_ratio', 0.1)
+        lighting_further_clip_ratio = lighting_params.get('lighting_further_clip_ratio', 0.1)
         lighting_autoscale = lighting_params.get('lighting_autoscale', True)
         # if lighting_autoscale:
         #     lighting_scale = 1.
@@ -533,29 +542,29 @@ class visualizer_scene_3D_o3d(object):
         # if lighting_source == 'lighting_SG':
         #     xyz_pcd, normal_pcd, axis_pcd, weight_pcd, lamb_SG_pcd = get_list_of_keys(lighting_fused_dict, ['X_global_lighting', 'normal_global_lighting', 'axis', 'weight_SG', 'lamb_SG'])
         # if lighting_source == 'lighting_envmap':
-        xyz_pcd, normal_pcd, axis_pcd, weight_pcd = get_list_of_keys(lighting_fused_dict, ['X_global_lighting', 'normal_global_lighting', 'axis', 'weight']) # [TODO] lamb is not visualized for now
+        xyz_pcd, axis_pcd, weight_pcd = get_list_of_keys(lighting_fused_dict, ['X_global_lighting', 'axis', 'weight']) # [TODO] lamb is not visualized for now
 
-        N_pts = xyz_pcd.shape[0]
         wi_num = axis_pcd.shape[1] # num of rays per-point
 
-        xyz_pcd = np.tile(np.expand_dims(xyz_pcd, 1), (1, wi_num, 1)).reshape((-1, 3))
-        length_pcd = np.linalg.norm(weight_pcd.reshape((-1, 3)), axis=1, keepdims=True) / 500.
+        if not if_X_multiplied:
+            xyz_pcd = np.tile(np.expand_dims(xyz_pcd, 1), (1, wi_num, 1)).reshape((-1, 3))
+        length_pcd = np.linalg.norm(weight_pcd.reshape((-1, 3)), axis=1, keepdims=True) / 50.
 
         # keep only SGs pointing towards outside of the surface
         axis_mask = np.ones_like(length_pcd.squeeze()).astype(bool)
-        axis_mask = np.sum(np.repeat(np.expand_dims(normal_pcd, 1), wi_num, axis=1) * axis_pcd, axis=2) > 0.
+        if 'normal_global_lighting' in lighting_fused_dict: 
+            normal_pcd = lighting_fused_dict['normal_global_lighting']
+            axis_mask = np.sum(np.repeat(np.expand_dims(normal_pcd, 1), wi_num, axis=1) * axis_pcd, axis=2) > 0.
         axis_mask =  axis_mask.reshape(-1) # (N*12,)
 
         if lighting_keep_ratio > 0.:
             assert lighting_keep_ratio > 0. and lighting_keep_ratio <= 1.
             percentile = np.percentile(length_pcd.flatten(), 100-lighting_keep_ratio*100)
             axis_mask = np.logical_and(axis_mask, length_pcd.flatten() > percentile) # (N*12,)
-        else:
-            pass
 
-        if lighting_clip_ratio > 0.: # within keeped SGs
-            assert lighting_clip_ratio > 0. and lighting_clip_ratio <= 1.
-            percentile = np.percentile(length_pcd[axis_mask].flatten(), 100-lighting_clip_ratio*100)
+        if lighting_further_clip_ratio > 0.: # within **keeped** SGs after lighting_keep_ratio
+            assert lighting_further_clip_ratio > 0. and lighting_further_clip_ratio <= 1.
+            percentile = np.percentile(length_pcd[axis_mask].flatten(), 100-lighting_further_clip_ratio*100)
             length_pcd[length_pcd > percentile] = percentile
 
         if lighting_autoscale:
@@ -569,7 +578,7 @@ class visualizer_scene_3D_o3d(object):
         axis_pcd_end = xyz_pcd + length_pcd * axis_pcd.reshape((-1, 3))
         xyz_pcd, axis_pcd_end = xyz_pcd[axis_mask], axis_pcd_end[axis_mask]
         N_pts = xyz_pcd.shape[0]
-        print('Showing lighting for %d points...'%N_pts)
+        # print('Showing lighting for %d points...'%N_pts)
         
         lighting_arrows = o3d.geometry.LineSet()
         lighting_arrows.points = o3d.utility.Vector3dVector(np.vstack((xyz_pcd, axis_pcd_end)))
@@ -796,7 +805,7 @@ class visualizer_scene_3D_o3d(object):
                     geometry_list.append([sphere_envmap, 'envmap'])
 
         '''
-        LAMPS samples as area lights: images/demo_envmap_o3d_sampling.png
+        LAMPS samples as area lights: images/demo_emitter_o3d_sampling.png
         '''
         if if_sampling_emitter:
             from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter

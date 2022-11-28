@@ -219,12 +219,12 @@ if opt.vis_3d_o3d:
         #     'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
         #     # 'lighting_scale': 1., 
         #     # 'lighting_keep_ratio': 0.05, 
-        #     # 'lighting_clip_ratio': 0.1, 
+        #     # 'lighting_further_clip_ratio': 0.1, 
         #     'lighting_scale': 0.5, 
         #     # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
-        #     # 'lighting_clip_ratio': 0.3, 
+        #     # 'lighting_further_clip_ratio': 0.3, 
         #     'lighting_keep_ratio': 0.1, # - good for lighting_envmap
-        #     'lighting_clip_ratio': 0.2, 
+        #     'lighting_further_clip_ratio': 0.2, 
         #     'lighting_autoscale': True, 
         #     }, 
         shapes_params={

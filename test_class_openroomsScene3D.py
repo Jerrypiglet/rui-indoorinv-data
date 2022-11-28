@@ -108,8 +108,8 @@ dataset_version = 'public_re_3_v5pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
 emitter_type_index_list = [('lamp', 0)]
-frame_ids = list(range(0, 345, 1))
-# frame_ids = [321]
+frame_ids = list(range(0, 345, 10))
+# frame_ids = [41]
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
 xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
@@ -248,16 +248,22 @@ if opt.eval_rad:
     )
 
     # render one image by querying rad-MLP: images/demo_eval_radMLP_render.png
-    evaluator_rad.render_im(110, if_plt=True) 
+    # evaluator_rad.render_im(0, if_plt=True) 
 
-    # sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_envmap_o3d_sampling.png
+    # sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
     eval_return_dict.update(
         evaluator_rad.sample_emitter(
             emitter_params={
                 'max_plate': 64, 
                 'emitter_type_index_list': emitter_type_index_list, 
                 }))
-
+    
+    # sample non-emitter locations along envmap (hemisphere) directions radiance from rad-MLP: images/demo_envmap_o3d_sampling.png
+    eval_return_dict.update(
+        evaluator_rad.sample_lighting_envmap(
+            subsample_rate_pts=1000, 
+        )
+    )
 
 '''
 Open3D 3D viewer
@@ -277,6 +283,21 @@ if opt.vis_3d_o3d:
             ], 
         if_debug_info=opt.if_debug_info, 
     )
+
+    lighting_params_vis={
+        'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        # 'lighting_scale': 1., 
+        # 'lighting_keep_ratio': 0.05, 
+        # 'lighting_further_clip_ratio': 0.1, 
+        'lighting_scale': 2., 
+        # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
+        # 'lighting_further_clip_ratio': 0.3, 
+        'lighting_keep_ratio': 0.1, # - good for lighting_envmap
+        'lighting_further_clip_ratio': 0.3, 
+        # 'lighting_keep_ratio': 0., # - debug
+        # 'lighting_further_clip_ratio': 0., 
+        'lighting_autoscale': False, 
+        }
 
     if opt.if_set_pcd_color_mi:
         '''
@@ -307,16 +328,19 @@ if opt.vis_3d_o3d:
             ])
 
     if opt.if_add_rays_from_eval:
-        if eval_return_dict != {}:
+        if 'emitter_rays_list' in eval_return_dict:
             assert opt.eval_rad
             for (lpts, lpts_end) in eval_return_dict['emitter_rays_list']:
                 visualizer_3D_o3d.add_extra_geometry([
                     ('rays', {
-                        'ray_o': lpts, 
-                        'ray_e': lpts_end, 
-                        'ray_c': np.array([[0., 0., 1.]]*lpts.shape[0]), # BLUE for EST
+                        'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 0., 1.]]*lpts.shape[0]), # BLUE for EST
                     }),
                 ]) 
+        if 'lighting_fused_list' in eval_return_dict:
+            assert opt.eval_rad
+            for lighting_fused_dict in eval_return_dict['lighting_fused_list']:
+                geometry_list = visualizer_3D_o3d.process_lighting(lighting_fused_dict, lighting_params=lighting_params_vis, lighting_source='lighting_envmap', lighting_color=[0., 0., 1.], if_X_multiplied=True)
+                visualizer_3D_o3d.add_extra_geometry(geometry_list, if_processed_geometry_list=True)
 
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
@@ -332,18 +356,7 @@ if opt.vis_3d_o3d:
             'subsample_normal_rate_x': 2, 
             'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
             }, 
-        lighting_params={
-            'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
-            # 'lighting_scale': 1., 
-            # 'lighting_keep_ratio': 0.05, 
-            # 'lighting_clip_ratio': 0.1, 
-            'lighting_scale': 0.5, 
-            # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
-            # 'lighting_clip_ratio': 0.3, 
-            'lighting_keep_ratio': 0.1, # - good for lighting_envmap
-            'lighting_clip_ratio': 0.2, 
-            'lighting_autoscale': True, 
-            }, 
+        lighting_params=lighting_params_vis, 
         shapes_params={
             'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
@@ -352,7 +365,7 @@ if opt.vis_3d_o3d:
         emitter_params={
             'if_half_envmap': False, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)
             'scale_SG_length': 2., 
-            'if_sampling_emitter': True, # if sample and visualize points on emitter surface; show intensity as vectors along normals (RED for GT): images/demo_envmap_o3d_sampling.png
+            'if_sampling_emitter': True, # if sample and visualize points on emitter surface; show intensity as vectors along normals (RED for GT): images/demo_emitter_o3d_sampling.png
             'max_plate': 64, 
         },
         mi_params={

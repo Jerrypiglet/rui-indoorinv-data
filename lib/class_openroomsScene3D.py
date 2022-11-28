@@ -520,6 +520,14 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         return geo_fused_dict, X_flatten_mask_list, X_lighting_flatten_mask_list
 
+    def get_lighting_envmap_dirs_global(self, pose, normal):
+        env_height, env_width = get_list_of_keys(self.lighting_params_dict, ['env_height', 'env_width'], [int, int])
+        wi_num = env_height * env_width
+        ls_local = get_ls_np(env_height, env_width) # (3, 8, 16)
+        lighting_axis_local = ls_local[np.newaxis, np.newaxis].transpose(0, 1, 3, 4, 2).reshape(1, 1, -1, 3) # -> (1, 1, 8*16, 3)
+        axis_np_global = convert_lighting_axis_local_to_global_np(lighting_axis_local, pose, normal).reshape(-1, wi_num, 3) # (120*160, 3, 8, 16)
+        return axis_np_global.astype(np.float32)
+
     def _fuse_3D_lighting(self, lighting_source: str, subsample_rate_pts: int=1, if_use_mi_geometry: bool=False):
         '''
         fuse dense lighting (using corresponding surface geometry)
@@ -535,10 +543,10 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         if if_use_mi_geometry:
             assert self.if_has_mitsuba_all
-            normal_list = self.normal_list
+            normal_list = self.mi_normal_list
         else:
             assert self.if_has_dense_geo
-            normal_list = self.mi_normal_list
+            normal_list = self.normal_list
 
         assert lighting_source in ['lighting_SG', 'lighting_envmap'] # not supporting 'lighting_sampled' yet
 
@@ -567,12 +575,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 weight_np = lighting_global[:, :, :, 4:].reshape(-1, wi_num, 3)
 
             if lighting_source == 'lighting_envmap':
-                env_height, env_width = self.lighting_envmap_list[idx].shape[-2:]
-                wi_num = env_height * env_width
-                weight_np = self.lighting_envmap_list[idx].reshape(-1, 3, wi_num).transpose(0, 2, 1) # (120*160, 3, 8, 16)
-                ls_local = get_ls_np(env_height, env_width) # (3, 8, 16)
-                lighting_axis_local = ls_local[np.newaxis, np.newaxis].transpose(0, 1, 3, 4, 2).reshape(1, 1, -1, 3) # -> (1, 1, 8*16, 3)
-                axis_np_global = convert_lighting_axis_local_to_global_np(lighting_axis_local, self.pose_list[idx], normal_list[idx]).reshape(-1, wi_num, 3) # (120*160, 3, 8, 16)
+                axis_np_global = self.get_lighting_envmap_dirs_global(self.pose_list[idx], normal_list[idx])
 
             if lighting_source == 'lighting_SG':
                 lamb_np = lighting_global[:, :, :, 3:4].reshape(-1, wi_num, 1)
