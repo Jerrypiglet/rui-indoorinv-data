@@ -28,4 +28,4 @@ ipdb
 # openexr
 jupyterlab
 mitsuba
-
+pytorch_lightning

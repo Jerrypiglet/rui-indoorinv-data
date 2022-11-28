@@ -12,7 +12,12 @@ OR_RAW_ROOT = {
     'mm1': '/newfoundland2/ruizhu/siggraphasia20dataset', 
     'qc': '', 
 }[host]
-
+INV_NERF_ROOT = {
+    'apple': '/Users/jerrypiglet/Documents/Projects/inv-nerf', 
+    'mm1': '/home/ruizhu/Documents/Projects/inv-nerf', 
+    'qc': '', 
+}[host]
+1
 sys.path.insert(0, PATH_HOME)
 from pathlib import Path
 import numpy as np
@@ -23,6 +28,7 @@ from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
 from lib.class_renderer_openroomsScene_3D import renderer_openroomsScene_3D
+from lib.class_eval_rad import evaluator_scene_rad
 
 from lib.utils_misc import str2bool
 import argparse
@@ -39,6 +45,8 @@ parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', con
 # differential renderer
 parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
 parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
+# evaluator for rad-MLP
+parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -97,7 +105,7 @@ frame_ids = list(range(3, 102, 10))
 dataset_version = 'public_re_3_v3pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
-frame_ids = list(range(0, 345, 10))
+frame_ids = list(range(0, 345, 50))
 # frame_ids = [321]
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
@@ -220,6 +228,21 @@ if opt.render_3d:
         print('visibility', visibility.shape, np.sum(visibility)/float(visibility.shape[0]))
         # from scipy import stats
         # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
+
+'''
+Evaluator for rad-MLP and inv-MLP
+'''
+if opt.eval_rad:
+    evaluator_rad = evaluator_scene_rad(
+        openrooms_scene=openrooms_scene, 
+        host=host, 
+        INV_NERF_ROOT = INV_NERF_ROOT, 
+        ckpt_path='rad_3_v3pose_2048_main_xml_scene0008_00_more/last.ckpt', 
+        dataset_key=dataset_version, 
+    )
+
+    evaluator_rad.render_im(0, if_plt=True)
+
 
 '''
 Open3D 3D viewer
