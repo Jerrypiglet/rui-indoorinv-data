@@ -3,7 +3,10 @@ import numpy as np
 np.set_printoptions(precision=4)
 np.set_printoptions(suppress=True)
 from typing import Tuple
+import os
 import cv2
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+from PIL import Image
 import struct
 import h5py
 import random
@@ -38,9 +41,11 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         raise FileNotFoundError(path)
         
     assert path.suffix[1:] == ext
-    assert ext in ['png', 'jpg', 'hdr', 'npy']
+    assert ext in ['png', 'jpg', 'hdr', 'npy', 'exr']
     if ext in ['png', 'jpg']:
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    elif ext in ['exr']:
+        im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)[:, :, :3]
     elif ext in ['hdr']:
         im = cv2.imread(str(path), -1)
     elif ext in ['npy']:
@@ -50,29 +55,32 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
     if im is None:
         raise RuntimeError(f"Failed to load {path}")
 
-    if len(im.shape) == 3 and im.shape[2] == 3 and ext in ['png', 'jpg', 'hdr']:
+    if len(im.shape) == 3 and im.shape[2] == 3 and ext in ['png', 'jpg', 'hdr', 'exr']:
         # Color image, convert BGR to RGB
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
     if expected_shape != ():
-        assert tuple(im.shape) == expected_shape
+        assert tuple(im.shape) == expected_shape, '%s != %s'%(str(tuple(im.shape)), str(expected_shape))
 
     if target_HW != ():
         im = resize_img(im, target_HW, resize_method)
 
     return im
 
-def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_'):
+def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if_mask=True, im_hdr=None):
     # Read HDR image
-    im_hdr = load_hdr(str(hdr_image_path)) * scale
-    
-    seg_path = png_image_path.replace(im_key, 'immask_')
-    seg = load_img(Path(seg_path))[:, :, 0] / 255. # [0., 1.]
-    seg_area = np.logical_and(seg > 0.49, seg < 0.51).astype(np.float32)
-    seg_env = (seg < 0.1).astype(np.float32)
-    seg_obj = (seg > 0.9) 
+    if im_hdr is None:
+        im_hdr = load_img(Path(hdr_image_path), ext=str(hdr_image_path).split('.')[1]) * scale
 
-    im_hdr_scaled, hdr_scale = scale_HDR(im_hdr, seg[..., np.newaxis], fixed_scale=True, if_print=True, if_clip_01=False)
+    if if_mask:
+        seg_path = png_image_path.replace(im_key, 'immask_')
+        seg = load_img(Path(seg_path))[:, :, 0] / 255. # [0., 1.]
+        seg_area = np.logical_and(seg > 0.49, seg < 0.51).astype(np.float32)
+        seg_env = (seg < 0.1).astype(np.float32)
+        seg_obj = (seg > 0.9) 
+        im_hdr_scaled, hdr_scale = scale_HDR(im_hdr, seg[..., np.newaxis], fixed_scale=True, if_print=True, if_clip_01=False)
+    else:
+        im_hdr_scaled = im_hdr * scale
     
     im_SDR = np.clip(im_hdr_scaled**(1.0/2.2), 0., 1.)
     im_SDR_uint8 = (255. * im_SDR).astype(np.uint8)

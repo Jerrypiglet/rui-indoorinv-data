@@ -14,7 +14,8 @@ import random
 from lib.utils_io import read_cam_params, normalize_v
 import imageio
 from PIL import Image
-from lib.utils_io import load_matrix, load_img
+import json
+from lib.utils_io import load_matrix, load_img, convert_write_png
 
 import string
 # Import the library using the alias "mi"
@@ -62,19 +63,21 @@ class mitsubaScene3D(mitsubaBase):
             [PosixPath, PosixPath, PosixPath]
             )
         self.xml_filename, self.scene_name, self.mitsuba_version, self.intrinsics_path = get_list_of_keys(scene_params_dict, ['xml_filename', 'scene_name', 'mitsuba_version', 'intrinsics_path'], [str, str, str, PosixPath])
+        self.split, self.frame_ids = get_list_of_keys(scene_params_dict, ['split', 'frame_ids'], [str, list])
         self.mitsuba_version, self.up_axis = get_list_of_keys(scene_params_dict, ['mitsuba_version', 'up_axis'], [str, str])
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
+        assert self.split in ['train', 'val']
         assert self.up_axis in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
 
         self.scene_path = self.rendering_root / self.scene_name
-        self.scene_rendering_path = self.rendering_root / self.scene_name / 'rendering'
+        self.scene_rendering_path = self.rendering_root / self.scene_name / self.split
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
         self.xml_file = self.xml_scene_root / self.scene_name / self.xml_filename
 
         self.pose_format, pose_file = scene_params_dict['pose_file']
-        assert self.pose_format in ['OpenRooms', "Blender"], 'Unsupported pose file'
-        self.pose_file = self.xml_scene_root / self.scene_name / pose_file
+        assert self.pose_format in ['OpenRooms', 'Blender', 'json'], 'Unsupported pose file: '+pose_file
+        self.pose_file = self.xml_scene_root / self.scene_name / self.split / pose_file
 
         self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
@@ -120,7 +123,7 @@ class mitsubaScene3D(mitsubaBase):
 
     @property
     def valid_modalities(self):
-        return ['layout', 'shapes', 'im_sdr']
+        return ['layout', 'shapes', 'im_hdr', 'im_sdr']
 
     def check_and_sort_modalities(self, modalitiy_list):
         modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
@@ -173,6 +176,7 @@ class mitsubaScene3D(mitsubaBase):
             if _ == 'layout': self.load_layout()
             if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'im_sdr': self.load_im_sdr()
+            if _ == 'im_hdr': self.load_im_hdr()
 
     def get_modality(self, modality):
         if modality in super().valid_modalities:
@@ -241,6 +245,7 @@ class mitsubaScene3D(mitsubaBase):
 
         if_render_im = self.mi_params_dict.get('if_render_im', False)
         if if_render_im:
+            assert False, 'disabled for now; focusing on loading Liwen\'s rendering'
             self.render_im()
 
     def load_intrinsics(self):
@@ -256,6 +261,12 @@ class mitsubaScene3D(mitsubaBase):
             scale_factor = [t / s for t, s in zip((self.H, self.W), (self.im_H_load, self.im_W_load))]
             self.K = resize_intrinsics(self.K, scale_factor)
 
+        if self.pose_format == 'json':
+            with open(self.pose_file, 'r') as f:
+                self.meta = json.load(f)
+            f_xy = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length
+            assert min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3, 'computed f_xy is different than read from intrinsics!'
+
     def load_poses(self, cam_params_dict):
         '''
         pose_list: list of pose matrices (**camera-to-world** transformation), each (3, 4): [R|t] (OpenCV convention: right-down-forward)
@@ -263,13 +274,14 @@ class mitsubaScene3D(mitsubaBase):
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
         if self.mi_params_dict.get('if_sample_poses', False):
+            assert False, 'disabled for now; focusing on loading Liwen\'s rendering'
             if_resample = 'n'
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
             if self.pose_file.exists():
                 if_resample = input(red("pose file exists: %s. Resample pose? [y/n]"%str(self.pose_file)))
             if if_resample in ['Y', 'y']:
-                self.sample_poses(self.mi_params_dict.get('poses_num'), cam_params_dict)
+                self.sample_poses(self.mi_params_dict.get('pose_sample_num'), cam_params_dict)
             else:
                 print(yellow('ABORTED resample pose.'))
         else:
@@ -284,11 +296,10 @@ class mitsubaScene3D(mitsubaBase):
 
         if self.pose_format == 'OpenRooms':
             '''
-            OpenRooms convention; The camera coordinates is in OpenCV convention (right-down-forward).
+            OpenRooms convention (matrices containing origin, lookat, up); The camera coordinates is in OpenCV convention (right-down-forward).
             '''
             cam_params = read_cam_params(self.pose_file)
             assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
-            poses_num = min(self.mi_params_dict.get('poses_num'), len(cam_params))
 
             for cam_param in cam_params:
                 origin, lookat, up = np.split(cam_param.T, 3, axis=1)
@@ -304,26 +315,38 @@ class mitsubaScene3D(mitsubaBase):
                 pose_list.append(np.hstack((R, t)))
                 origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
 
-        elif self.pose_format == 'Blender':
+        elif self.pose_format in ['Blender', 'json']:
             '''
-            Liwen's Blender convention: (N, 2, 3), [t, euler angles]
-            Blender x y z == Mitsuba x z -y; Mitsuba x y z == Blender x z -y
+            Blender: 
+                Liwen's Blender convention: (N, 2, 3), [t, euler angles]
+                Blender x y z == Mitsuba x z -y; Mitsuba x y z == Blender x z -y
+            Json:
+                Liwen's NeRF poses; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
             '''
-            cam_params = np.load(self.pose_file)
-            assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
-            poses_num = min(self.mi_params_dict.get('poses_num'), len(cam_params))
-            T_c_b2m = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., -1.]], dtype=np.float32)
-            T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world
+            T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
             scale_m2b = np.array([0.206,0.206,0.206]).reshape((3, 1))
             trans_m2b = np.array([-0.074684,0.23965,-0.30727]).reshape((3, 1))
+            t_c2w_b_list, R_c2w_b_list = [], []
 
-            for cam_param in cam_params:
-                t_c2w_b = cam_param[0].reshape((3, 1)).astype(np.float32)
+            if self.pose_format == 'Blender':
+                cam_params = np.load(self.pose_file)
+                assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
+                T_c_b2m = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., -1.]], dtype=np.float32)
+                for idx in self.frame_ids:
+                    R_c2w_b_list.append(scipy.spatial.transform.Rotation.from_euler('xyz', [cam_params[idx][1][0], cam_params[idx][1][1], cam_params[idx][1][2]]).as_matrix())
+                    t_c2w_b_list.append(cam_param[0].reshape((3, 1)).astype(np.float32))
+            
+            elif self.pose_format == 'json':
+                T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
+                for idx in self.frame_ids:
+                    pose = np.array(self.meta['frames'][idx]['transform_matrix'])[:3, :4].astype(np.float32)
+                    R_c2w_b_list.append(np.split(pose, (3,), axis=1)[0])
+                    t_c2w_b_list.append(np.split(pose, (3,), axis=1)[1])
+
+            for R_c2w_b, t_c2w_b in zip(R_c2w_b_list, t_c2w_b_list):
                 t_c2w_b = (t_c2w_b - trans_m2b) / scale_m2b
                 t = T_w_b2m @ t_c2w_b # -> t_c2w_w
-                # t = (t - trans_m2b) / scale_m2b
 
-                R_c2w_b = scipy.spatial.transform.Rotation.from_euler('xyz', [cam_param[1][0], cam_param[1][1], cam_param[1][2]]).as_matrix()
                 R = T_w_b2m @ R_c2w_b @ T_c_b2m # https://i.imgur.com/nkzfvwt.png
 
                 _, __, at_vector = np.split(R, 3, axis=-1)
@@ -335,10 +358,8 @@ class mitsubaScene3D(mitsubaBase):
                 pose_list.append(np.hstack((R, t)))
                 origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
 
-        self.pose_list = pose_list[:poses_num]
-        self.origin_lookatvector_up_list = origin_lookatvector_up_list[:poses_num]
-
-        # print(cam_params[0])
+        self.pose_list = pose_list
+        self.origin_lookatvector_up_list = origin_lookatvector_up_list
 
         print(blue_text('[mistubaScene] DONE. load_poses'))
 
@@ -355,7 +376,7 @@ class mitsubaScene3D(mitsubaBase):
             np.eye(3, dtype=np.float32), ((self.xyz_max+self.xyz_min)/2.).reshape(3, 1)
             ))]
 
-    def sample_poses(self, poses_num: int, cam_params_dict: dict):
+    def sample_poses(self, pose_sample_num: int, cam_params_dict: dict):
         from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
         assert self.up_axis == 'y+', 'not supporting other axes for now'
         if not self.if_loaded_layout: self.load_layout()
@@ -364,7 +385,7 @@ class mitsubaScene3D(mitsubaBase):
         boxes = [[bverts, bfaces] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) if not shape['is_layout']]
         cads = [[vertices, faces] for vertices, faces, shape in zip(self.vertices_list, self.faces_list, self.shape_list_valid) if not shape['is_layout']]
 
-        cam_params_dict['samplePoint'] = poses_num
+        cam_params_dict['samplePoint'] = pose_sample_num
         origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
             scene_dict={
                 'lverts': lverts, 
@@ -390,7 +411,7 @@ class mitsubaScene3D(mitsubaBase):
             pose_list.append(np.hstack((R, t)))
             origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
 
-        # self.pose_list = pose_list[:poses_num]
+        # self.pose_list = pose_list[:pose_sample_num]
         # return
 
         H, W = self.im_H_load//4, self.im_W_load//4
@@ -450,8 +471,8 @@ class mitsubaScene3D(mitsubaBase):
         print(blue_text('DONE.'))
         # print(normal_costs[camIndex])
 
-        self.pose_list = [pose_list[_] for _ in camIndex[:poses_num]]
-        self.origin_lookatvector_up_list = [origin_lookatvector_up_list[_] for _ in camIndex[:poses_num]]
+        self.pose_list = [pose_list[_] for _ in camIndex[:pose_sample_num]]
+        self.origin_lookatvector_up_list = [origin_lookatvector_up_list[_] for _ in camIndex[:pose_sample_num]]
 
         # if self.pose_file.exists():
         #     txt = input(red("pose_list loaded. Overrite cam.txt? [y/n]"))
@@ -459,7 +480,7 @@ class mitsubaScene3D(mitsubaBase):
         #         return
     
         with open(str(self.pose_file), 'w') as camOut:
-            cam_poses_write = [origin_lookat_up_list[_] for _ in camIndex[:poses_num]]
+            cam_poses_write = [origin_lookat_up_list[_] for _ in camIndex[:pose_sample_num]]
             camOut.write('%d\n'%len(cam_poses_write))
             print('Final sampled camera poses: %d'%len(cam_poses_write))
             for camPose in cam_poses_write:
@@ -471,22 +492,22 @@ class mitsubaScene3D(mitsubaBase):
     def render_im(self):
         self.spp = self.im_params_dict.get('spp', 1024)
         if_render = 'y'
-        im_files = sorted(glob.glob(str(self.scene_rendering_path / 'im_*.exr')))
+        im_files = sorted(glob.glob(str(self.scene_rendering_path / 'Image' / '*_*.exr')))
         if len(im_files) > 0:
-            if_render = input(red("%d im_*.exr files found at %s. Re-render? [y/n]"))
+            if_render = input(red("%d *_*.exr files found at %s. Re-render? [y/n]"))
         if if_render in ['N', 'n']:
             print(yellow('ABORTED rendering by Mitsuba'))
             return
         else:
-            shutil.rmtree(str(self.scene_rendering_path))
-            self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
+            shutil.rmtree(str(self.scene_rendering_path / 'Image'))
+            self.scene_rendering_path / 'Image'.mkdir(parents=True, exist_ok=True)
 
-        print(blue_text('Rendering RGB to... by Mitsuba: %s')%str(self.scene_rendering_path))
+        print(blue_text('Rendering RGB to... by Mitsuba: %s')%str(self.scene_rendering_path / 'Image'))
         for i, (origin, lookatvector, up) in tqdm(enumerate(self.origin_lookatvector_up_list)):
             sensor = self.get_sensor(origin, origin+lookatvector, up)
             image = mi.render(self.mi_scene, spp=self.spp, sensor=sensor)
-            im_rendering_path = str(self.scene_rendering_path / ('im_%d.exr'%i))
-            # im_rendering_path = str(self.scene_rendering_path / ('im_%d.rgbe'%i))
+            im_rendering_path = str(self.scene_rendering_path / 'Image' / ('%03d_0001.exr'%i))
+            # im_rendering_path = str(self.scene_rendering_path / 'Image' / ('im_%d.rgbe'%i))
             mi.util.write_bitmap(str(im_rendering_path), image)
             '''
             load exr: https://mitsuba.readthedocs.io/en/stable/src/how_to_guides/image_io_and_manipulation.html?highlight=load%20openexr#Reading-an-image-from-disk
@@ -495,11 +516,8 @@ class mitsubaScene3D(mitsubaBase):
             # im_rgbe = cv2.imread(str(im_rendering_path), -1)
             # dest_path = str(im_rendering_path).replace('.rgbe', '.hdr')
             # cv2.imwrite(dest_path, im_rgbe)
-
-            im_SDR = np.clip(np.array(image)**(1.0/2.2), 0., 1.)
-            im_SDR_uint8 = (255. * im_SDR).astype(np.uint8)
-            dest_path = str(im_rendering_path).replace('.exr', '.png')
-            Image.fromarray(im_SDR_uint8).save(dest_path)
+            
+            convert_write_png(hdr_image_path='', png_image_path=str(im_rendering_path).replace('.exr', '.png'), if_mask=False, im_hdr=np.array(image))
 
         print(blue_text('DONE.'))
 
@@ -509,14 +527,27 @@ class mitsubaScene3D(mitsubaBase):
         '''
         print(white_blue('[mitsubaScene] load_im_sdr'))
 
-        self.im_sdr_ext in ['jpg', 'png', 'exr']
-        # self.im_sdr_ext = 'png'
-        self.im_key = 'im_'
-
-        self.im_sdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_sdr_ext)) for i in range(len(self.pose_list))]
+        self.im_sdr_file_list = [self.scene_rendering_path / 'Image' / ('%03d_0001.%s'%(i, self.im_sdr_ext)) for i in self.frame_ids]
         self.im_sdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=self.im_sdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_sdr_file_list]
 
         print(blue_text('[mitsubaScene] DONE. load_im_sdr'))
+
+    def load_im_hdr(self):
+        '''
+        load im in HDR; RGB, (H, W, 3), [0., 1.]
+        '''
+        print(white_blue('[mitsubaScene] load_im_hdr'))
+
+        self.im_hdr_file_list = [self.scene_rendering_path / 'Image' / ('%03d_0001.%s'%(i, self.im_hdr_ext)) for i in self.frame_ids]
+        self.im_hdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=self.im_hdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_hdr_file_list]
+
+        for im_hdr_file, im_hdr in zip(self.im_hdr_file_list, self.im_hdr_list):
+            im_sdr_file = Path(str(im_hdr_file).replace(self.im_hdr_ext, self.im_sdr_ext))
+            if not im_sdr_file.exists():
+                print(yellow('[mitsubaScene] load_im_hdr: converting HDR to SDR and write to disk'), + '-> %s'%str(im_sdr_file))
+                convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=1.)
+
+        print(blue_text('[mitsubaScene] DONE. load_im_hdr'))
 
     def get_sensor(self, origin, target, up):
         from mitsuba import ScalarTransform4f as T

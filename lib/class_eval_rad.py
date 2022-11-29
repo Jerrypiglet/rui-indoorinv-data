@@ -7,6 +7,7 @@ from tqdm import tqdm
 import math
 
 from lib.class_openroomsScene3D import openroomsScene3D
+from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.global_vars import mi_variant_dict
 from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
 from lib.utils_misc import white_blue
@@ -17,13 +18,20 @@ class evaluator_scene_rad():
     '''
     def __init__(
         self, 
-        openrooms_scene: openroomsScene3D, 
+        scene_object, 
         host: str, 
         INV_NERF_ROOT: str, 
         ckpt_path: str, # relative to INV_NERF_ROOT / 'checkpoints'
         dataset_key: str, 
         rad_scale: float=1.
     ):
+        if dataset_key.split('-')[0] == 'OR':
+            assert type(scene_object) is openroomsScene3D
+        elif dataset_key.split('-')[0] == 'Indoor':
+            assert type(scene_object) is mitsubaScene3D
+        else:
+            assert False, 'Unknown dataset_key: %s'%dataset_key
+
         sys.path.insert(0, str(INV_NERF_ROOT))
         self.INV_NERF_ROOT = Path(INV_NERF_ROOT)
         ckpt_path = self.INV_NERF_ROOT / 'checkpoints' / ckpt_path
@@ -31,9 +39,9 @@ class evaluator_scene_rad():
         from train_rad_rui import ModelTrainer, add_model_specific_args
         from argparse import Namespace, ArgumentParser
         from configs.rad_config_openrooms import default_options
-        from configs.openrooms_scenes import openrooms_scenes_options
+        from configs.scene_options import scene_options
 
-        default_options['dataset'] = openrooms_scenes_options[dataset_key]
+        default_options['dataset'] = scene_options[dataset_key]
         parser = ArgumentParser()
         parser = add_model_specific_args(parser, default_options)
         hparams, _ = parser.parse_known_args()
@@ -46,10 +54,11 @@ class evaluator_scene_rad():
         self.model = ModelTrainer(
             hparams, 
             host=host, 
+            dataset_key=dataset_key, 
             if_overfit_train=False, 
             if_seg_obj=False, 
             mitsuba_variant=mi_variant_dict[host], 
-            openrooms_scene=openrooms_scene, 
+            scene_object=scene_object, 
         ).to(self.device)
 
         checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
@@ -60,7 +69,7 @@ class evaluator_scene_rad():
         self.model.eval()
 
         self.rad_scale = rad_scale
-        self.os = self.model.openrooms_scene
+        self.os = self.model.scene_object
 
     def or2nerf_th(self, x):
         """x:Bxe"""

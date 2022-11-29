@@ -17,7 +17,6 @@ INV_NERF_ROOT = {
     'mm1': '/home/ruizhu/Documents/Projects/inv-nerf', 
     'qc': '', 
 }[host]
-1
 sys.path.insert(0, PATH_HOME)
 from pathlib import Path
 import numpy as np
@@ -238,17 +237,17 @@ Evaluator for rad-MLP and inv-MLP
 eval_return_dict = {}
 if opt.eval_rad:
     evaluator_rad = evaluator_scene_rad(
-        openrooms_scene=openrooms_scene, 
+        scene_object=openrooms_scene, 
         host=host, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
         # ckpt_path='rad_3_v3pose_2048_main_xml_scene0008_00_more/last.ckpt', # 166, 208
         ckpt_path='rad_3_v5pose_2048_main_xml_scene0008_00_more/last-v1.ckpt', # 110
-        dataset_key=dataset_version, 
+        dataset_key='-'.join(['OR', dataset_version]), 
         rad_scale=1./5., 
     )
 
     # render one image by querying rad-MLP: images/demo_eval_radMLP_render.png
-    # evaluator_rad.render_im(0, if_plt=True) 
+    evaluator_rad.render_im(0, if_plt=True) 
 
     # sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
     eval_return_dict.update(

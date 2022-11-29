@@ -10,15 +10,19 @@ PATH_HOME = {
     'mm1': '', 
     'qc': '', 
 }[host]
-
 sys.path.insert(0, PATH_HOME)
+INV_NERF_ROOT = {
+    'apple': '/Users/jerrypiglet/Documents/Projects/inv-nerf', 
+    'mm1': '/home/ruizhu/Documents/Projects/inv-nerf', 
+    'qc': '', 
+}[host]
 from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
 
 from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
-from lib.class_visualizer_scene_2D import visualizer_scene_2D
+from lib.class_eval_rad import evaluator_scene_rad
 
 from lib.utils_misc import str2bool
 import argparse
@@ -32,22 +36,28 @@ parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default
 parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help='colormap for all points in fused geo')
 parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=True, default=False, help='if create color map for all points of Mitsuba; required: input_colors_tuple')
 # parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
+
 # differential renderer
 # parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
 # parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
+
+# evaluator for rad-MLP
+parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
+parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs')
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/scenes'
-xml_root = Path(PATH_HOME) / 'data/scenes'
-intrinsics_path = Path(PATH_HOME) / 'data/scenes/intrinsic_mitsubaScene.txt'
+base_root = Path(PATH_HOME) / 'data/indoor_synthetic'
+xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
+intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
 '''
-The kitchen scene: data/scenes/kitchen/scene_v3.xml
+The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
 scene_name = 'kitchen'
+split = 'train'; frame_ids = list(range(0, 189, 10))
 
 openrooms_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -56,26 +66,34 @@ openrooms_scene = mitsubaScene3D(
     scene_params_dict={
         'xml_filename': xml_filename, 
         'scene_name': scene_name, 
+        'split': split, 
+        'frame_ids': frame_ids, 
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': intrinsics_path, 
         'up_axis': 'y+', 
-        'pose_file': ('OpenRooms', 'cam.txt'), 
-        # 'pose_file': ('Blender', 'train.npy'), 
+        # 'pose_file': ('OpenRooms', 'cam.txt'), 
+        # 'pose_file': ('OpenRooms', 'cam.txt'), 
+        'pose_file': ('json', 'transforms.json'), # in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         }, 
     mi_params_dict={
         'if_also_dump_xml_with_lit_lamps_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
-        'if_sample_poses': True, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        'poses_num': 200, 
-        'if_render_im': True, # True to render im with Mitsuba
-        'if_get_segs': True, # True: to generate segs similar to those in openroomsScene2D.load_seg()
+        'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
+
+        # sample poses and render images 
+        'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
+        'poses_sample_num': 200, # Number of poses to sample; set to -1 if not sampling
+        'if_render_im': False, # True to render im with Mitsuba
+
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
+        # 'im_hdr', 
         'im_sdr', 
-        # 'seg', 'im_hdr', 
+        'poses', 
+        # 'seg', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
@@ -113,75 +131,38 @@ openrooms_scene = mitsubaScene3D(
         },
 )
 
-# '''
-# Matploblib 2D viewer
-# '''
-# if opt.vis_2d_plt:
-#     visualizer_2D = visualizer_scene_2D(
-#         openrooms_scene, 
-#         modality_list_vis=[
-#             'im', 
-#             'layout', 
-#             # 'shapes', 
-#             # 'depth', 'mi_depth', 
-#             # 'normal', 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-#             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
-#             # 'lighting_envmap', 
-#             # 'seg_area', 'seg_env', 'seg_obj', 
-#             # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
-#             ], 
-#         # frame_idx_list=[0, 1, 2, 3, 4], 
-#         frame_idx_list=[0], 
-#     )
-#     visualizer_2D.vis_2d_with_plt(
-#         lighting_params={
-#             'lighting_scale': 0.01, # rescaling the brightness of the envmap
-#             }, 
-#             )
+'''
+Evaluator for rad-MLP and inv-MLP
+'''
+eval_return_dict = {}
+if opt.eval_rad:
+    evaluator_rad = evaluator_scene_rad(
+        openrooms_scene=openrooms_scene, 
+        host=host, 
+        INV_NERF_ROOT = INV_NERF_ROOT, 
+        ckpt_path='kitchen/last.ckpt', # 110
+        dataset_key='-'.join(['Indoor', scene_name, split]), # has to be one of the keys from inv-nerf/configs/scene_options.py
+        rad_scale=1./5., 
+    )
 
-# '''
-# Matploblib 3D viewer
-# '''
-# if opt.vis_3d_plt:
-#     visualizer_3D_plt = visualizer_openroomsScene_3D_plt(
-#         openrooms_scene, 
-#         modality_list_vis = [
-#             'layout', 
-#             'poses', # camera center + optical axis
-#             # 'shapes', # boxes and labels (no meshes in plt visualization)
-#             # 'emitters', # emitter properties
-#             # 'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
-#             ], 
-#     )
-#     visualizer_3D_plt.vis_3d_with_plt()
+    # render one image by querying rad-MLP: images/demo_eval_radMLP_render.png
+    evaluator_rad.render_im(0, if_plt=True) 
 
-# '''
-# Differential renderers
-# '''
-# if opt.render_3d:
-#     renderer_3D = renderer_openroomsScene_3D(
-#         openrooms_scene, 
-#         renderer_option=opt.renderer_option, 
-#         host=host, 
-#         renderer_params={
-#             'pts_from': 'mi', 
-#         }
-#     )
+    # sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
+    # eval_return_dict.update(
+    #     evaluator_rad.sample_emitter(
+    #         emitter_params={
+    #             'max_plate': 64, 
+    #             'emitter_type_index_list': emitter_type_index_list, 
+    #             }))
     
-#     renderer_return_dict = renderer_3D.render(
-#         frame_idx=0, 
-#         if_show_rendering_plt=True, 
-#         render_params={
-#             'max_plate': 256, 
-#             'emitter_type_index_list': ('lamp', 0), 
-#         })
-    
-#     if opt.renderer_option == 'ZQ_emitter':
-#         ts = np.median(renderer_return_dict['ts'], axis=1)
-#         visibility = np.amax(renderer_return_dict['visibility'], axis=1)
-#         print('visibility', visibility.shape, np.sum(visibility)/float(visibility.shape[0]))
-#         # from scipy import stats
-#         # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
+    # sample non-emitter locations along envmap (hemisphere) directions radiance from rad-MLP: images/demo_envmap_o3d_sampling.png
+    eval_return_dict.update(
+        evaluator_rad.sample_lighting_envmap(
+            subsample_rate_pts=1000, 
+        )
+    )
+
 
 '''
 Open3D 3D viewer
@@ -190,13 +171,13 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
         openrooms_scene, 
         modality_list_vis=[
-            # 'dense_geo', 
+            # 'dense_geo', # fused from 2D
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            'layout', 
+            # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
-            # 'emitters', # emitter properties (e.g. SGs, half envmaps)
+            'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
@@ -233,10 +214,11 @@ if opt.vis_3d_o3d:
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
         },
-        # emitter_params={
-        #     'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
-        #     'scale_SG_length': 2., 
-        # },
+        emitter_params={
+            # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
+            # 'scale_SG_length': 2., 
+            'if_sampling_emitter': False, 
+        },
         mi_params={
             'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
