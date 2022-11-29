@@ -95,7 +95,7 @@ openrooms_scene = openroomsScene3D(
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
         },
     mi_params_dict={
-        'if_also_dump_xml_with_lit_lamps_only': True,  # True: to dump a second file containing lit-up lamps only
+        'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses

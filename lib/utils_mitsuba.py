@@ -27,7 +27,7 @@ def dump_OR_xml_for_mi(
     if_dump_mesh: bool=False, 
     dump_mesh_path: str='', 
     dump_mesh_dir: Path=Path('.'), 
-    if_also_dump_xml_with_lit_lamps_only: bool=False) -> Path:
+    if_also_dump_xml_with_lit_area_lights_only: bool=False) -> Path:
 
     t = 1000 * time.time() # current time in milliseconds
     np.random.seed(int(t) % 2**32)
@@ -174,7 +174,7 @@ def dump_OR_xml_for_mi(
     with open(str(xml_dump_path), 'w') as xmlOut:
         xmlOut.write(xmlString )
 
-    if if_also_dump_xml_with_lit_lamps_only:
+    if if_also_dump_xml_with_lit_area_lights_only:
         for shape in root.findall('shape'):
             root.remove(shape)
         for lamp in lit_up_lamp_list:

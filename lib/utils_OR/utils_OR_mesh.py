@@ -7,6 +7,9 @@ from pathlib import Path
 
 # original obj operations by Zhengqin
 def loadMesh(name):
+    '''
+    returns: faces: 1-based
+    '''
     vertices = []
     faces = []
     with open(str(name), 'r') as meshIn:

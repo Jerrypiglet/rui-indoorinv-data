@@ -663,12 +663,14 @@ class visualizer_scene_3D_o3d(object):
                     if if_emitter:
                         linewidth = 3
                         linestyle = '--'
-                        obj_color = [0.4, 0.4, 0.4] # dark grey for emitters; colormap see 
+                        obj_color = [1., 0., 0.] # red for emitters
                         '''
                         images/OR42_color_mapping_light.png
                         '''
                 else:
                     obj_color = [0.7, 0.7, 0.7]
+                    if if_emitter:
+                        obj_color = [1., 0., 0.] # red for emitters
 
 
             # trimesh.repair.fill_holes(shape_mesh)

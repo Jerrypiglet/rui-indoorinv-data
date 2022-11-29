@@ -23,22 +23,26 @@ class evaluator_scene_rad():
         INV_NERF_ROOT: str, 
         ckpt_path: str, # relative to INV_NERF_ROOT / 'checkpoints'
         dataset_key: str, 
+        split: str='', 
         rad_scale: float=1.
     ):
-        if dataset_key.split('-')[0] == 'OR':
+        sys.path.insert(0, str(INV_NERF_ROOT))
+        self.INV_NERF_ROOT = Path(INV_NERF_ROOT)
+
+        self.dataset_type = dataset_key.split('-')[0]
+        if self.dataset_type == 'OR':
             assert type(scene_object) is openroomsScene3D
-        elif dataset_key.split('-')[0] == 'Indoor':
+            from configs.rad_config_openrooms import default_options
+        elif self.dataset_type == 'Indoor':
             assert type(scene_object) is mitsubaScene3D
+            from configs.rad_config_indoor import default_options
         else:
             assert False, 'Unknown dataset_key: %s'%dataset_key
 
-        sys.path.insert(0, str(INV_NERF_ROOT))
-        self.INV_NERF_ROOT = Path(INV_NERF_ROOT)
         ckpt_path = self.INV_NERF_ROOT / 'checkpoints' / ckpt_path
 
         from train_rad_rui import ModelTrainer, add_model_specific_args
-        from argparse import Namespace, ArgumentParser
-        from configs.rad_config_openrooms import default_options
+        from argparse import ArgumentParser
         from configs.scene_options import scene_options
 
         default_options['dataset'] = scene_options[dataset_key]
@@ -62,7 +66,7 @@ class evaluator_scene_rad():
         ).to(self.device)
 
         checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
-        self.model.load_state_dict(checkpoint['state_dict'])
+        self.model.load_state_dict({k: v for k, v in checkpoint['state_dict'].items() if 'nerf.' in k})
         # print(checkpoint['state_dict'].keys())
         # print(checkpoint['state_dict']['nerf.linears.0.bias'][:2])
         # print(self.model.nerf.linears[0].bias[:2])
@@ -102,6 +106,7 @@ class evaluator_scene_rad():
         (rays_o, rays_d, ray_d_center) = self.os.cam_rays_list[frame_id]
         rays_o_np = rays_o.reshape(-1, 3)
         rays_d_np = rays_d.reshape(-1, 3)
+
         # rays_o_nerf = mi.Point3f(self.or2nerf_np(rays_o_th)) # concert to NeRF coordinates
         # rays_d_nerf = mi.Vector3f(self.or2nerf_np(rays_d_th))
         rays_d_nerf = self.or2nerf_th(torch.from_numpy(rays_d_np).to(self.device)) # convert to NeRF coordinates
@@ -112,6 +117,11 @@ class evaluator_scene_rad():
         # rays_d_nerf = self.or2nerf_th(rays_d_th)
 
         position, _, t_, valid = self.model.ray_intersect(rays_o_np, rays_d_np, if_mi_np=True)
+        if self.dataset_type == 'Indoor':
+            # Liwen's model was trained using scene.obj (smaller) instead of scene_v3.xml (bigger), between which there is scaling and translation. self.os.cam_rays_list are acquired from the scene of scene_v3.xml
+            scale_m2b = torch.from_numpy(np.array([0.206,0.206,0.206], dtype=np.float32).reshape((1, 3))).to(position.device)
+            trans_m2b = torch.from_numpy(np.array([-0.074684,0.23965,-0.30727], dtype=np.float32).reshape((1, 3))).to(position.device)
+            position = scale_m2b * position + trans_m2b
         rgbs = self.model.nerf(position.to(self.device), rays_d_nerf)['rgb'] # queried d is incoming directions!
 
         if if_plt:

@@ -156,7 +156,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         xml_dump_dir = self.PATH_HOME / 'mitsuba'
 
-        if_also_dump_xml_with_lit_lamps_only = mi_params_dict.get('if_also_dump_xml_with_lit_lamps_only', True)
+        if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
         variant = mi_params_dict.get('variant', '')
         if variant != '':
             mi.set_variant(variant)
@@ -171,13 +171,13 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             xml_dump_dir=xml_dump_dir, 
             origin_lookatvector_up_tuple=self.origin_lookatvector_up_list[0], # [debug] set to any frame_idx
             if_no_emitter_shape=False, 
-            if_also_dump_xml_with_lit_lamps_only=if_also_dump_xml_with_lit_lamps_only, 
+            if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only, 
             )
         print(blue_text('XML for Mitsuba dumped to: %s')%str(self.mi_xml_dump_path))
 
         self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
-        if if_also_dump_xml_with_lit_lamps_only:
-            self.mi_scene_lit_up_lamps_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
+        if if_also_dump_xml_with_lit_area_lights_only:
+            self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
 
         debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
         if debug_dump_mesh:
@@ -201,8 +201,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             image = mi.render(self.mi_scene, spp=64)
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'), image)
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
-            if if_also_dump_xml_with_lit_lamps_only:
-                image = mi.render(self.mi_scene_lit_up_lamps_only, spp=64)
+            if if_also_dump_xml_with_lit_area_lights_only:
+                image = mi.render(self.mi_scene_lit_up_area_lights_only, spp=64)
                 mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render_lit_up_lamps_only.exr'), image)
 
             print(blue_text('DONE.'))
@@ -215,7 +215,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         if_get_segs = mi_params_dict.get('if_get_segs', True)
         if if_get_segs:
             assert if_sample_rays_pts
-            self.mi_get_segs(if_also_dump_xml_with_lit_lamps_only=if_also_dump_xml_with_lit_lamps_only)
+            self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only)
             self.seg_from['mi'] = True
 
     def load_cam_rays(self, cam_params_dict={}):

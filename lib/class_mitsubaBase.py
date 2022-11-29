@@ -93,7 +93,7 @@ class mitsubaBase():
 
             self.mi_pts_list.append(mi_pts)
 
-    def mi_get_segs(self, if_also_dump_xml_with_lit_lamps_only=True):
+    def mi_get_segs(self, if_also_dump_xml_with_lit_area_lights_only=True):
         '''
         images/demo_mitsuba_ret_seg_2D.png
         '''
@@ -104,11 +104,11 @@ class mitsubaBase():
             mi_seg_env = self.mi_invalid_depth_mask_list[frame_idx]
             self.mi_seg_dict_of_lists['env'].append(mi_seg_env) # shine-through area of windows
 
-            if if_also_dump_xml_with_lit_lamps_only:
+            if if_also_dump_xml_with_lit_area_lights_only:
                 rays_o, rays_d, ray_d_center = self.cam_rays_list[frame_idx]
                 rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
                 rays_mi = mi.Ray3f(mi.Point3f(self.to_d(rays_o_flatten)), mi.Vector3f(self.to_d(rays_d_flatten)))
-                ret = self.mi_scene_lit_up_lamps_only.ray_intersect(rays_mi)
+                ret = self.mi_scene_lit_up_area_lights_only.ray_intersect(rays_mi)
                 
                 ret_t = ret.t.numpy().reshape(self.H, self.W)
                 invalid_depth_mask = np.logical_or(np.isnan(ret_t), np.isinf(ret_t))

@@ -57,9 +57,9 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
 scene_name = 'kitchen'
-split = 'train'; frame_ids = list(range(0, 189, 10))
+split = 'train'; frame_ids = list(range(0, 189, 30))
 
-openrooms_scene = mitsubaScene3D(
+mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root}, 
@@ -67,7 +67,7 @@ openrooms_scene = mitsubaScene3D(
         'xml_filename': xml_filename, 
         'scene_name': scene_name, 
         'split': split, 
-        'frame_ids': frame_ids, 
+        'frame_id_list': frame_ids, 
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': intrinsics_path, 
         'up_axis': 'y+', 
@@ -76,7 +76,7 @@ openrooms_scene = mitsubaScene3D(
         'pose_file': ('json', 'transforms.json'), # in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         }, 
     mi_params_dict={
-        'if_also_dump_xml_with_lit_lamps_only': True,  # True: to dump a second file containing lit-up lamps only
+        'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
@@ -90,7 +90,7 @@ openrooms_scene = mitsubaScene3D(
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        # 'im_hdr', 
+        'im_hdr', 
         'im_sdr', 
         'poses', 
         # 'seg', 
@@ -137,11 +137,12 @@ Evaluator for rad-MLP and inv-MLP
 eval_return_dict = {}
 if opt.eval_rad:
     evaluator_rad = evaluator_scene_rad(
-        openrooms_scene=openrooms_scene, 
         host=host, 
+        scene_object=mitsuba_scene, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
         ckpt_path='kitchen/last.ckpt', # 110
-        dataset_key='-'.join(['Indoor', scene_name, split]), # has to be one of the keys from inv-nerf/configs/scene_options.py
+        dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
+        split=split, 
         rad_scale=1./5., 
     )
 
@@ -169,7 +170,7 @@ Open3D 3D viewer
 '''
 if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
-        openrooms_scene, 
+        mitsuba_scene, 
         modality_list_vis=[
             # 'dense_geo', # fused from 2D
             'cameras', 
@@ -210,7 +211,7 @@ if opt.vis_3d_o3d:
         #     }, 
         shapes_params={
             'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
-            'if_meshes': False, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
+            'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
         },
@@ -220,11 +221,11 @@ if opt.vis_3d_o3d:
             'if_sampling_emitter': False, 
         },
         mi_params={
-            'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
+            'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 1,
-            'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
-            'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
+            'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
+            'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
 
             'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length

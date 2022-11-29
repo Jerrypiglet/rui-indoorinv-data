@@ -63,7 +63,7 @@ class mitsubaScene3D(mitsubaBase):
             [PosixPath, PosixPath, PosixPath]
             )
         self.xml_filename, self.scene_name, self.mitsuba_version, self.intrinsics_path = get_list_of_keys(scene_params_dict, ['xml_filename', 'scene_name', 'mitsuba_version', 'intrinsics_path'], [str, str, str, PosixPath])
-        self.split, self.frame_ids = get_list_of_keys(scene_params_dict, ['split', 'frame_ids'], [str, list])
+        self.split, self.frame_id_list = get_list_of_keys(scene_params_dict, ['split', 'frame_id_list'], [str, list])
         self.mitsuba_version, self.up_axis = get_list_of_keys(scene_params_dict, ['mitsuba_version', 'up_axis'], [str, str])
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
@@ -206,9 +206,12 @@ class mitsubaScene3D(mitsubaBase):
             mi.set_variant(mi_variant_dict[self.host])
 
         self.mi_scene = mi.load_file(str(self.xml_file))
+        if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
+        if if_also_dump_xml_with_lit_area_lights_only:
+            # self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
+            pass
 
     def process_mi_scene(self, mi_params_dict={}):
-
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
             '''
@@ -241,7 +244,7 @@ class mitsubaScene3D(mitsubaBase):
         if_get_segs = mi_params_dict.get('if_get_segs', True)
         if if_get_segs:
             assert if_sample_rays_pts
-            self.mi_get_segs(if_also_dump_xml_with_lit_lamps_only=False) # [TODO] enable masks for emitters
+            self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=False) # [TODO] enable masks for emitters
 
         if_render_im = self.mi_params_dict.get('if_render_im', False)
         if if_render_im:
@@ -324,21 +327,24 @@ class mitsubaScene3D(mitsubaBase):
                 Liwen's NeRF poses; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
             '''
             T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
-            scale_m2b = np.array([0.206,0.206,0.206]).reshape((3, 1))
-            trans_m2b = np.array([-0.074684,0.23965,-0.30727]).reshape((3, 1))
+            '''
+            [NOTE] scene.obj from Liwen is much smaller (s.t. scaling and translation here) compared to scene loaded from scene_v3.xml
+            '''
+            scale_m2b = np.array([0.206,0.206,0.206], dtype=np.float32).reshape((3, 1))
+            trans_m2b = np.array([-0.074684,0.23965,-0.30727], dtype=np.float32).reshape((3, 1))
             t_c2w_b_list, R_c2w_b_list = [], []
 
             if self.pose_format == 'Blender':
                 cam_params = np.load(self.pose_file)
                 assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
                 T_c_b2m = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., -1.]], dtype=np.float32)
-                for idx in self.frame_ids:
+                for idx in self.frame_id_list:
                     R_c2w_b_list.append(scipy.spatial.transform.Rotation.from_euler('xyz', [cam_params[idx][1][0], cam_params[idx][1][1], cam_params[idx][1][2]]).as_matrix())
                     t_c2w_b_list.append(cam_param[0].reshape((3, 1)).astype(np.float32))
             
             elif self.pose_format == 'json':
                 T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
-                for idx in self.frame_ids:
+                for idx in self.frame_id_list:
                     pose = np.array(self.meta['frames'][idx]['transform_matrix'])[:3, :4].astype(np.float32)
                     R_c2w_b_list.append(np.split(pose, (3,), axis=1)[0])
                     t_c2w_b_list.append(np.split(pose, (3,), axis=1)[1])
@@ -527,7 +533,7 @@ class mitsubaScene3D(mitsubaBase):
         '''
         print(white_blue('[mitsubaScene] load_im_sdr'))
 
-        self.im_sdr_file_list = [self.scene_rendering_path / 'Image' / ('%03d_0001.%s'%(i, self.im_sdr_ext)) for i in self.frame_ids]
+        self.im_sdr_file_list = [self.scene_rendering_path / 'Image' / ('%03d_0001.%s'%(i, self.im_sdr_ext)) for i in self.frame_id_list]
         self.im_sdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=self.im_sdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_sdr_file_list]
 
         print(blue_text('[mitsubaScene] DONE. load_im_sdr'))
@@ -538,8 +544,9 @@ class mitsubaScene3D(mitsubaBase):
         '''
         print(white_blue('[mitsubaScene] load_im_hdr'))
 
-        self.im_hdr_file_list = [self.scene_rendering_path / 'Image' / ('%03d_0001.%s'%(i, self.im_hdr_ext)) for i in self.frame_ids]
-        self.im_hdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=self.im_hdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_hdr_file_list]
+        self.im_hdr_file_list = [self.scene_rendering_path / 'Image' / ('%03d_0001.%s'%(i, self.im_hdr_ext)) for i in self.frame_id_list]
+        self.im_hdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=self.im_hdr_ext, target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
+        self.hdr_scale_list = [1.] * len(self.im_hdr_list)
 
         for im_hdr_file, im_hdr in zip(self.im_hdr_file_list, self.im_hdr_list):
             im_sdr_file = Path(str(im_hdr_file).replace(self.im_hdr_ext, self.im_sdr_ext))
@@ -597,32 +604,70 @@ class mitsubaScene3D(mitsubaBase):
         self.xyz_min = np.zeros(3,)+np.inf
 
         for shape in tqdm(shapes):
-            if not shape.get('type') != 'object': continue # [TODO] fix
-            if not len(shape.findall('string')) > 0: continue
-            _id = shape.findall('ref')[0].get('id')
-            # if 'walls' in _id.lower() or 'ceiling' in _id.lower():
-            #     continue
-            filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
-            obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
-            # if if_load_obj_mesh:
-            vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
+            random_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+            if_emitter = False
+            if shape.get('type') != 'obj':
+                assert shape.get('type') == 'rectangle'
+                '''
+                window as rectangle meshes: 
+                    images/demo_mitsubaScene_rectangle_windows_1.png
+                    images/demo_mitsubaScene_rectangle_windows_2.png
+                '''
+                transform_m = np.array(shape.findall('transform')[0].findall('matrix')[0].get('value').split(' ')).reshape(4, 4).astype(np.float32) # [[R,t], [0,0,0,1]]
+                vertices = (transform_m[:3, :3] @ np.array([
+                  [-1, -1, 0.], 
+                  [-1, 1, 0.], 
+                  [1, 1, 0.], 
+                  [1, -1, 0.], 
+                ], dtype=np.float32).T + transform_m[:3, 3:4]).T
+                faces = np.array([
+                    [2, 4, 3], 
+                    [1, 4, 2], 
+                    [2, 3, 4], 
+                    [1, 2, 4], 
+                ], dtype=np.int32) # a double-sided rectangle mesh
+                _id = 'rectangle_'+random_id
+                emitters = shape.findall('emitter')
+                if len(emitters) > 0:
+                    emitter = emitters[0]
+                    assert emitter.get('type') == 'area'
+                    rgb = emitter.findall('rgb')[0]
+                    assert rgb.get('name') == 'radiance'
+                    radiance = np.array(rgb.get('value').split(', ')).astype(np.float32).reshape(3,)
+                    if np.amax(radiance) > 1e-3:
+                        if_emitter = True
+                        _id = 'emitter-' + _id
+                        emitter_prop = {'intensity': radiance}
+            else:
+                if not len(shape.findall('string')) > 0: continue
+                _id = shape.findall('ref')[0].get('id')
+                # if 'walls' in _id.lower() or 'ceiling' in _id.lower():
+                #     continue
+                filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
+                obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
+                # if if_load_obj_mesh:
+                vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
+
             bverts, bfaces = computeBox(vertices)
             self.vertices_list.append(vertices)
             self.faces_list.append(faces)
             self.bverts_list.append(bverts)
             self.bfaces_list.append(bfaces)
-
             self.ids_list.append(_id)
-            self.shape_list_valid.append({
+            
+            shape_dict = {
                 'filename': filename.get('value'), 
-                'if_in_emitter_dict': False, 
+                'if_in_emitter_dict': if_emitter, 
                 'id': _id, 
-                'random_id': ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)), 
+                'random_id': random_id, 
                 # [IMPORTANT] currently relying on definition of walls and ceiling in XML file to identify those, becuase sometimes they can be complex meshes instead of thin rectangles
                 'is_wall': 'walls' in _id.lower(), 
                 'is_ceiling': 'ceiling' in _id.lower(), 
                 'is_layout': 'walls' in _id.lower() or 'ceiling' in _id.lower(), 
-            })
+            }
+            if if_emitter:
+                shape_dict.update({'emitter_prop': emitter_prop})
+            self.shape_list_valid.append(shape_dict)
 
             self.xyz_max = np.maximum(np.amax(vertices, axis=0), self.xyz_max)
             self.xyz_min = np.minimum(np.amin(vertices, axis=0), self.xyz_min)
