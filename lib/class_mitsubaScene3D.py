@@ -4,13 +4,12 @@ import numpy as np
 np.set_printoptions(suppress=True)
 
 from tqdm import tqdm
-import pickle
 import glob
-import cv2
 import scipy
 import shutil
 from lib.global_vars import mi_variant_dict
 import random
+random.seed(0)
 from lib.utils_io import read_cam_params, normalize_v
 import imageio
 from PIL import Image
@@ -30,7 +29,7 @@ from .class_mitsubaBase import mitsubaBase
 
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, mesh_to_skeleton, transform_v
 from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
-from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal
+from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, get_rectangle_mesh
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_ls_np
@@ -81,6 +80,7 @@ class mitsubaScene3D(mitsubaBase):
 
         self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
+        self.lighting_params_dict = lighting_params_dict
         self.emitter_params_dict = emitter_params_dict
         self.mi_params_dict = mi_params_dict
         self.im_params_dict = im_params_dict
@@ -104,6 +104,12 @@ class mitsubaScene3D(mitsubaBase):
         self.if_loaded_colors = False
         self.if_loaded_shapes = False
         self.if_loaded_layout = False
+
+        ''''
+        flags to set
+        '''
+        self.pts_from = {'mi': False, 'depth': False}
+        self.seg_from = {'mi': False, 'seg': False}
 
         '''
         load everything
@@ -144,6 +150,10 @@ class mitsubaScene3D(mitsubaBase):
         return hasattr(self, 'pose_list')
 
     @property
+    def if_has_depth_normal(self):
+        return all([_ in self.modality_list for _ in ['depth', 'normal']])
+
+    @property
     def if_has_layout(self):
         return all([_ in self.modality_list for _ in ['layout']])
 
@@ -179,8 +189,8 @@ class mitsubaScene3D(mitsubaBase):
             if _ == 'im_hdr': self.load_im_hdr()
 
     def get_modality(self, modality):
-        if modality in super().valid_modalities:
-            return super(mitsubaScene3D, self).get_modality(modality)
+        # if modality in super().valid_modalities:
+            # return super(mitsubaScene3D, self).get_modality(modality)
 
         if 'mi_' in modality:
             assert self.pts_from['mi']
@@ -191,7 +201,7 @@ class mitsubaScene3D(mitsubaBase):
             return self.mi_normal_global_list
         elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
             seg_key = modality.split('_')[-1] 
-            return self.seg_dict_of_lists[seg_key]
+            return self.mi_seg_dict_of_lists[seg_key]
         else:
             assert False, 'Unsupported modality: ' + modality
 
@@ -208,8 +218,10 @@ class mitsubaScene3D(mitsubaBase):
         self.mi_scene = mi.load_file(str(self.xml_file))
         if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
         if if_also_dump_xml_with_lit_area_lights_only:
-            # self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
-            pass
+            from lib.utils_mitsuba import dump_Indoor_area_lights_only_xml_for_mi
+            xml_file_lit_up_area_lights_only = dump_Indoor_area_lights_only_xml_for_mi(str(self.xml_file))
+            print(blue_text('XML (lit_up_area_lights_only) for Mitsuba dumped to: %s')%str(xml_file_lit_up_area_lights_only))
+            self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
 
     def process_mi_scene(self, mi_params_dict={}):
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
@@ -240,11 +252,13 @@ class mitsubaScene3D(mitsubaBase):
         if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
         if if_sample_rays_pts:
             self.mi_sample_rays_pts(self.cam_rays_list)
+            self.pts_from['mi'] = True
         
         if_get_segs = mi_params_dict.get('if_get_segs', True)
         if if_get_segs:
             assert if_sample_rays_pts
-            self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=False) # [TODO] enable masks for emitters
+            self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
+            self.seg_from['mi'] = True
 
         if_render_im = self.mi_params_dict.get('if_render_im', False)
         if if_render_im:
@@ -350,6 +364,8 @@ class mitsubaScene3D(mitsubaBase):
                     t_c2w_b_list.append(np.split(pose, (3,), axis=1)[1])
 
             for R_c2w_b, t_c2w_b in zip(R_c2w_b_list, t_c2w_b_list):
+                R_c2w_b = R_c2w_b / np.linalg.norm(R_c2w_b, axis=1, keepdims=True)
+                assert abs(1.-np.linalg.det(R_c2w_b))<1e-6
                 t_c2w_b = (t_c2w_b - trans_m2b) / scale_m2b
                 t = T_w_b2m @ t_c2w_b # -> t_c2w_w
 
@@ -600,12 +616,15 @@ class mitsubaScene3D(mitsubaBase):
         self.bverts_list = []
         self.bfaces_list = []
 
+        self.window_list = []
+        self.lamp_list = []
+
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
 
         for shape in tqdm(shapes):
             random_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-            if_emitter = False
+            if_emitter = False; if_window = False; if_area_light = False
             if shape.get('type') != 'obj':
                 assert shape.get('type') == 'rectangle'
                 '''
@@ -614,30 +633,19 @@ class mitsubaScene3D(mitsubaBase):
                     images/demo_mitsubaScene_rectangle_windows_2.png
                 '''
                 transform_m = np.array(shape.findall('transform')[0].findall('matrix')[0].get('value').split(' ')).reshape(4, 4).astype(np.float32) # [[R,t], [0,0,0,1]]
-                vertices = (transform_m[:3, :3] @ np.array([
-                  [-1, -1, 0.], 
-                  [-1, 1, 0.], 
-                  [1, 1, 0.], 
-                  [1, -1, 0.], 
-                ], dtype=np.float32).T + transform_m[:3, 3:4]).T
-                faces = np.array([
-                    [2, 4, 3], 
-                    [1, 4, 2], 
-                    [2, 3, 4], 
-                    [1, 2, 4], 
-                ], dtype=np.int32) # a double-sided rectangle mesh
+                (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4])
                 _id = 'rectangle_'+random_id
                 emitters = shape.findall('emitter')
                 if len(emitters) > 0:
+                    assert len(emitters) == 1
                     emitter = emitters[0]
                     assert emitter.get('type') == 'area'
                     rgb = emitter.findall('rgb')[0]
                     assert rgb.get('name') == 'radiance'
                     radiance = np.array(rgb.get('value').split(', ')).astype(np.float32).reshape(3,)
-                    if np.amax(radiance) > 1e-3:
-                        if_emitter = True
-                        _id = 'emitter-' + _id
-                        emitter_prop = {'intensity': radiance}
+                    if_emitter = True; if_area_light = True
+                    _id = 'emitter-' + _id
+                    emitter_prop = {'intensity': radiance, 'obj_type': 'obj', 'if_lit_up': np.amax(radiance) > 1e-3}
             else:
                 if not len(shape.findall('string')) > 0: continue
                 _id = shape.findall('ref')[0].get('id')
@@ -647,6 +655,7 @@ class mitsubaScene3D(mitsubaBase):
                 obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
                 # if if_load_obj_mesh:
                 vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
+                assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
 
             bverts, bfaces = computeBox(vertices)
             self.vertices_list.append(vertices)
@@ -667,136 +676,16 @@ class mitsubaScene3D(mitsubaBase):
             }
             if if_emitter:
                 shape_dict.update({'emitter_prop': emitter_prop})
+            if if_area_light:
+                self.lamp_list.append((shape_dict, vertices, faces))
             self.shape_list_valid.append(shape_dict)
 
             self.xyz_max = np.maximum(np.amax(vertices, axis=0), self.xyz_max)
             self.xyz_min = np.minimum(np.amin(vertices, axis=0), self.xyz_min)
 
+
         self.if_loaded_shapes = True
-
-    def load_shapes_(self, shape_params_dict={}):
-        '''
-        load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
-
-        images/demo_shapes_3D.png
-        images/demo_emitters_3D.png # the classroom scene
-
-        '''
-        if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', False)
-        if_load_emitter_mesh = shape_params_dict.get('if_load_emitter_mesh', False)
-        print(white_blue('[mitsubaScene3D] load_shapes for scene...'))
-
-        # load emitter properties from light*.dat files of **a specific N_ambient_representation**
-        self.emitter_dict_of_lists_world = load_emitter_dat_world(light_dir=self.scene_rendering_path, N_ambient_rep=self.emitter_params_dict['N_ambient_rep'], if_save_storage=self.if_save_storage)
-
-        # load general shapes and emitters, and fuse with previous emitter properties
-        # print(main_xml_file)
-        root = get_XML_root(self.xml_file)
-
-        self.shape_list_ori, self.emitter_list = parse_XML_for_shapes_global(
-            root=root, 
-            scene_xml_path=self.xml_file, 
-            root_uv_mapped=self.shapes_root, 
-            root_layoutMesh=self.layout_root, 
-            root_EnvDataset=self.envmaps_root, 
-            if_return_emitters=True, 
-            light_dat_lists=self.emitter_dict_of_lists_world)
-
-        assert self.shape_list_ori[0]['filename'].endswith('uv_mapped.obj')
-        assert self.shape_list_ori[1]['filename'].endswith('container.obj')
-        assert self.emitter_list[0]['emitter_prop']['if_env'] == True # first of emitter_list is the env
-
-        # start to load objects
-
-        self.vertices_list = []
-        self.faces_list = []
-        self.ids_list = []
-        self.bverts_list = []
-        
-        # light_axis_list = []
-        # self.num_vertices = 0
-        obj_path_list = []
-        self.shape_list_valid = []
-        self.window_list = []
-        self.lamp_list = []
-        
-        print(blue_text('[mitsubaScene3D] loading %d shapes and %d emitters...'%(len(self.shape_list_ori), len(self.emitter_list[1:]))))
-
-        self.emitter_env = self.emitter_list[0] # e.g. {'if_emitter': True, 'emitter_prop': {'emitter_type': 'envmap', 'if_env': True, 'emitter_filename': '.../EnvDataset/1611L.hdr', 'emitter_scale': 164.1757}}
-        assert self.emitter_env['if_emitter']
-        assert self.emitter_env['emitter_prop']['emitter_type'] == 'envmap'
-
-        for shape_idx, shape in tqdm(enumerate(self.shape_list_ori + self.emitter_list[1:])): # self.emitter_list[0] is the envmap
-            if 'container' in shape['filename']:
-                continue
-            
-        #     if_emitter = shape['if_emitter'] and 'combined_filename' in shape['emitter_prop'] and shape_idx >= len(shape_list)
-            if_emitter = shape['if_in_emitter_dict']
-            if if_emitter:
-                obj_path = shape['emitter_prop']['emitter_filename']
-        #         obj_path = shape['filename']
-            else:
-                obj_path = shape['filename']
-
-            bbox_file_path = obj_path.replace('.obj', '.pickle')
-            if 'layoutMesh' in bbox_file_path:
-                bbox_file_path = Path('layoutMesh') / Path(bbox_file_path).relative_to(self.root_path_dict['layout_root'])
-            elif 'uv_mapped' in bbox_file_path:
-                bbox_file_path = Path('uv_mapped') / Path(bbox_file_path).relative_to(self.root_path_dict['shapes_root'])
-            bbox_file_path = self.root_path_dict['shape_pickles_root'] / bbox_file_path
-
-            #  Path(bbox_file_path).exists(), 'Rerun once first with if_load_mesh=True, to dump pickle files for shapes to %s'%bbox_file_path
-            
-            if_load_mesh = if_load_obj_mesh if not if_emitter else if_load_emitter_mesh
-
-            if if_load_mesh or (not Path(bbox_file_path).exists()):
-                vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
-                bverts, bfaces = computeBox(vertices)
-                if not Path(bbox_file_path).exists():
-                    Path(bbox_file_path).parent.mkdir(parents=True, exist_ok=True)
-                    with open(bbox_file_path, "wb") as f:
-                        pickle.dump(dict(bverts=bverts, bfaces=bfaces), f)
-            else:
-                with open(bbox_file_path, "rb") as f:
-                    bbox_dict = pickle.load(f)
-                bverts, bfaces = bbox_dict['bverts'], bbox_dict['bfaces']
-
-            if if_load_mesh:
-                vertices_transformed, _ = transform_with_transforms_xml_list(shape['transforms_list'], vertices)
-            bverts_transformed, transforms_converted_list = transform_with_transforms_xml_list(shape['transforms_list'], bverts)
-
-            y_max = bverts_transformed[:, 1].max()
-            points_2d = bverts_transformed[abs(bverts_transformed[:, 1] - y_max) < 1e-5, :]
-            if points_2d.shape[0] != 4:
-                assert if_load_mesh
-                bverts_transformed, bfaces = computeBox(vertices_transformed) # dealing with cases like pillow, where its y axis after transformation does not align with world's (because pillows do not have to stand straight)
-            
-            # if not(any(ext in shape['filename'] for ext in ['window', 'door', 'lamp'])):
-        
-            obj_path_list.append(obj_path)
-    
-            if if_load_mesh:
-                self.vertices_list.append(vertices_transformed)
-                # self.faces_list.append(faces+self.num_vertices)
-                if '/uv_mapped.obj' in shape['filename']:
-                    faces = flip_ceiling_normal(faces, vertices)
-                self.faces_list.append(faces)
-                # self.num_vertices += vertices_transformed.shape[0]
-            else:
-                self.vertices_list.append(None)
-                self.faces_list.append(None)
-            self.bverts_list.append(bverts_transformed)
-            self.ids_list.append(shape['id'])
-            
-            self.shape_list_valid.append(shape)
-
-            if if_emitter:
-                if shape['emitter_prop']['obj_type'] == 'window':
-                    self.window_list.append((shape, vertices_transformed, faces))
-                elif shape['emitter_prop']['obj_type'] == 'obj':
-                    self.lamp_list.append((shape, vertices_transformed, faces))
-
-        print(blue_text('[mitsubaScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d lamps lit'%(
+        print(blue_text('[mitsubaScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
             len(self.shape_list_valid), 
             len([_ for _ in self.window_list if _[0]['emitter_prop']['if_lit_up']]), len(self.window_list), 
             len([_ for _ in self.lamp_list if _[0]['emitter_prop']['if_lit_up']]), len(self.lamp_list), 

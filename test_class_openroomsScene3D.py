@@ -35,7 +35,7 @@ parser = argparse.ArgumentParser()
 # visualizers
 parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
 parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize in open3D')
-parser.add_argument('--vis_2d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
+parser.add_argument('--vis_2d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to show (1) pixel-space modalities (2) projection onto one image (e.g. layout, object bboxes), with plt')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
 # options for visualizers
 parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help='colormap for all points in fused geo')
@@ -94,7 +94,7 @@ data/public_re_3/main_xml/scene0005_00_more/im_3.png
 '''
 meta_split = 'main_xml'
 scene_name = 'scene0005_00_more'
-frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
+# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
 # frame_ids = [3]
 # frame_ids = list(range(102))
 frame_ids = list(range(3, 102, 10))
@@ -107,8 +107,9 @@ dataset_version = 'public_re_3_v5pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
 emitter_type_index_list = [('lamp', 0)]
-frame_ids = list(range(0, 345, 10))
-# frame_ids = [41]
+# frame_ids = list(range(0, 345, 10))
+frame_ids = [41]
+# frame_ids =[0]
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
 xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
@@ -134,14 +135,17 @@ openrooms_scene = openroomsScene3D(
         ], 
     im_params_dict={
         'im_H_load': 480, 'im_W_load': 640, 
-        # 'im_H_resize': 240, 'im_W_resize': 320
+        # 'im_H_resize': 240, 'im_W_resize': 320, 
         'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
         'if_direct_lighting': False, # if load direct lighting envmaps and SGs inetad of total lighting
         }, 
     lighting_params_dict={
-        'env_row': 120, 'env_col': 160, 'SG_num': 12, 
-        # 'env_height': 16, 'env_width': 32, 
-        'env_height': 8, 'env_width': 16, 
+        'SG_num': 12,
+        'env_row': 120, 'env_col': 160,  
+        'env_height': 16, 'env_width': 32, 
+        # 'env_height': 8, 'env_width': 16, 
+        # 'env_row': 1, 'env_col': 1, 
+        # 'env_height': 120, 'env_width': 160, 
         'if_convert_lighting_SG_to_global': True, 
         'if_use_mi_geometry': True, 
     }, 
@@ -169,12 +173,14 @@ if opt.vis_2d_plt:
         openrooms_scene, 
         modality_list_vis=[
             'im', 
-            'layout', 
+            # 'layout', 
             # 'shapes', 
-            # 'depth', 'mi_depth', 
-            # 'normal', 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'depth', 
+            # 'mi_depth', 
+            # 'normal', 
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
-            # 'lighting_envmap', 
+            'lighting_envmap', 
             # 'seg_area', 'seg_env', 'seg_obj', 
             # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
@@ -183,7 +189,7 @@ if opt.vis_2d_plt:
     )
     visualizer_2D.vis_2d_with_plt(
         lighting_params={
-            'lighting_scale': 0.01, # rescaling the brightness of the envmap
+            'lighting_scale': 0.1, # rescaling the brightness of the envmap
             }, 
             )
 
@@ -220,7 +226,7 @@ if opt.render_3d:
         frame_idx=0, 
         if_show_rendering_plt=True, 
         render_params={
-            'max_plate': 256, 
+            'max_plate': 64, 
             'emitter_type_index_list': emitter_type_index_list, 
         })
     
@@ -244,23 +250,35 @@ if opt.eval_rad:
         ckpt_path='rad_3_v5pose_2048_main_xml_scene0008_00_more/last-v1.ckpt', # 110
         dataset_key='-'.join(['OR', dataset_version]), 
         rad_scale=1./5., 
+        spec=False, 
     )
 
-    # render one image by querying rad-MLP: images/demo_eval_radMLP_render.png
-    evaluator_rad.render_im(0, if_plt=True) 
+    '''
+    render one image by querying rad-MLP: images/demo_eval_radMLP_render.png
+    '''
+    # evaluator_rad.render_im(0, if_plt=True) 
 
-    # sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
-    eval_return_dict.update(
-        evaluator_rad.sample_emitter(
-            emitter_params={
-                'max_plate': 64, 
-                'emitter_type_index_list': emitter_type_index_list, 
-                }))
+    '''
+    sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
+    '''
+    # eval_return_dict.update(
+    #     evaluator_rad.sample_emitter(
+    #         emitter_params={
+    #             'max_plate': 64, 
+    #             'radiance_scale': 0.1, 
+    #             'emitter_type_index_list': emitter_type_index_list, 
+    #             }))
     
-    # sample non-emitter locations along envmap (hemisphere) directions radiance from rad-MLP: images/demo_envmap_o3d_sampling.png
+    '''
+    sample non-emitter locations along envmap (hemisphere) directions radiance from rad-MLP: images/demo_envmap_o3d_sampling.png
+    '''
     eval_return_dict.update(
-        evaluator_rad.sample_lighting_envmap(
-            subsample_rate_pts=1000, 
+        evaluator_rad.sample_lighting(
+            # sample_type='emission', # 'emission', 'incident'
+            sample_type='incident', # 'emission', 'incident'
+            subsample_rate_pts=1, 
+            lighting_scale=0.1, # rescaling the brightness of the envmap
+            if_vis_envmap_2d_plt=True, 
         )
     )
 
@@ -277,7 +295,7 @@ if opt.vis_3d_o3d:
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
-            'emitters', # emitter properties (e.g. SGs, half envmaps)
+            # 'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
@@ -338,7 +356,15 @@ if opt.vis_3d_o3d:
         if 'lighting_fused_list' in eval_return_dict:
             assert opt.eval_rad
             for lighting_fused_dict in eval_return_dict['lighting_fused_list']:
-                geometry_list = visualizer_3D_o3d.process_lighting(lighting_fused_dict, lighting_params=lighting_params_vis, lighting_source='lighting_envmap', lighting_color=[0., 0., 1.], if_X_multiplied=True)
+                geometry_list = visualizer_3D_o3d.process_lighting(
+                    lighting_fused_dict, 
+                    lighting_params=lighting_params_vis, 
+                    lighting_source='lighting_envmap', 
+                    lighting_color=[0., 0., 1.], 
+                    if_X_multiplied=True, 
+                    # if_use_pts_end=True,
+                    if_use_pts_end=False,
+                    )
                 visualizer_3D_o3d.add_extra_geometry(geometry_list, if_processed_geometry_list=True)
 
     visualizer_3D_o3d.run_o3d(
@@ -360,15 +386,17 @@ if opt.vis_3d_o3d:
             'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # if show labels (False: only show bboxes)
+            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
         },
         emitter_params={
             'if_half_envmap': False, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)
             'scale_SG_length': 2., 
             'if_sampling_emitter': True, # if sample and visualize points on emitter surface; show intensity as vectors along normals (RED for GT): images/demo_emitter_o3d_sampling.png
             'max_plate': 64, 
+            'radiance_scale': 0.1, 
         },
         mi_params={
-            'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
+            'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 1,
             'if_ceiling': False, # remove ceiling points to better see the furniture 

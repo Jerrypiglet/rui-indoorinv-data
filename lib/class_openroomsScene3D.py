@@ -28,7 +28,7 @@ from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world
-from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_ls_np
+from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import get_device
 
@@ -146,7 +146,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             return self.mi_normal_global_list
         elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
             seg_key = modality.split('_')[-1] 
-            return self.seg_dict_of_lists[seg_key]
+            return self.mi_seg_dict_of_lists[seg_key]
         else:
             assert False, 'Unsupported modality: ' + modality
 
@@ -177,7 +177,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
         if if_also_dump_xml_with_lit_area_lights_only:
-            self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'))
+            self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'))
 
         debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
         if debug_dump_mesh:
@@ -203,7 +203,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
             if if_also_dump_xml_with_lit_area_lights_only:
                 image = mi.render(self.mi_scene_lit_up_area_lights_only, spp=64)
-                mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render_lit_up_lamps_only.exr'), image)
+                mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render_lit_up_area_lights_only.exr'), image)
 
             print(blue_text('DONE.'))
 
@@ -275,17 +275,17 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         assert self.emitter_env['if_emitter']
         assert self.emitter_env['emitter_prop']['emitter_type'] == 'envmap'
 
-        for shape_idx, shape in tqdm(enumerate(self.shape_list_ori + self.emitter_list[1:])): # self.emitter_list[0] is the envmap
-            if 'container' in shape['filename']:
+        for shape_idx, shape_dict in tqdm(enumerate(self.shape_list_ori + self.emitter_list[1:])): # self.emitter_list[0] is the envmap
+            if 'container' in shape_dict['filename']:
                 continue
             
-        #     if_emitter = shape['if_emitter'] and 'combined_filename' in shape['emitter_prop'] and shape_idx >= len(shape_list)
-            if_emitter = shape['if_in_emitter_dict']
+        #     if_emitter = shape_dict['if_emitter'] and 'combined_filename' in shape_dict['emitter_prop'] and shape_idx >= len(shape_list)
+            if_emitter = shape_dict['if_in_emitter_dict']
             if if_emitter:
-                obj_path = shape['emitter_prop']['emitter_filename']
-        #         obj_path = shape['filename']
+                obj_path = shape_dict['emitter_prop']['emitter_filename']
+        #         obj_path = shape_dict['filename']
             else:
-                obj_path = shape['filename']
+                obj_path = shape_dict['filename']
 
             bbox_file_path = obj_path.replace('.obj', '.pickle')
             if 'layoutMesh' in bbox_file_path:
@@ -311,8 +311,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 bverts, bfaces = bbox_dict['bverts'], bbox_dict['bfaces']
 
             if if_load_mesh:
-                vertices_transformed, _ = transform_with_transforms_xml_list(shape['transforms_list'], vertices)
-            bverts_transformed, transforms_converted_list = transform_with_transforms_xml_list(shape['transforms_list'], bverts)
+                vertices_transformed, _ = transform_with_transforms_xml_list(shape_dict['transforms_list'], vertices)
+            bverts_transformed, transforms_converted_list = transform_with_transforms_xml_list(shape_dict['transforms_list'], bverts)
 
             y_max = bverts_transformed[:, 1].max()
             points_2d = bverts_transformed[abs(bverts_transformed[:, 1] - y_max) < 1e-5, :]
@@ -320,14 +320,14 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 assert if_load_mesh
                 bverts_transformed, bfaces = computeBox(vertices_transformed) # dealing with cases like pillow, where its y axis after transformation does not align with world's (because pillows do not have to stand straight)
             
-            # if not(any(ext in shape['filename'] for ext in ['window', 'door', 'lamp'])):
+            # if not(any(ext in shape_dict['filename'] for ext in ['window', 'door', 'lamp'])):
         
             obj_path_list.append(obj_path)
     
             if if_load_mesh:
                 self.vertices_list.append(vertices_transformed)
                 # self.faces_list.append(faces+self.num_vertices)
-                if '/uv_mapped.obj' in shape['filename']:
+                if '/uv_mapped.obj' in shape_dict['filename']:
                     faces = flip_ceiling_normal(faces, vertices)
                 self.faces_list.append(faces)
                 # self.num_vertices += vertices_transformed.shape[0]
@@ -335,17 +335,17 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 self.vertices_list.append(None)
                 self.faces_list.append(None)
             self.bverts_list.append(bverts_transformed)
-            self.ids_list.append(shape['id'])
+            self.ids_list.append(shape_dict['id'])
             
-            self.shape_list_valid.append(shape)
+            self.shape_list_valid.append(shape_dict)
 
             if if_emitter:
-                if shape['emitter_prop']['obj_type'] == 'window':
-                    self.window_list.append((shape, vertices_transformed, faces))
-                elif shape['emitter_prop']['obj_type'] == 'obj':
-                    self.lamp_list.append((shape, vertices_transformed, faces))
+                if shape_dict['emitter_prop']['obj_type'] == 'window':
+                    self.window_list.append((shape_dict, vertices_transformed, faces))
+                elif shape_dict['emitter_prop']['obj_type'] == 'obj':
+                    self.lamp_list.append((shape_dict, vertices_transformed, faces))
 
-        print(blue_text('[openroomsScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d lamps lit'%(
+        print(blue_text('[openroomsScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
             len(self.shape_list_valid), 
             len([_ for _ in self.window_list if _[0]['emitter_prop']['if_lit_up']]), len(self.window_list), 
             len([_ for _ in self.lamp_list if _[0]['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
@@ -392,7 +392,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         v_transformed = transform_v(np.asarray(self.layout_mesh.vertices), T_layout) # skeleton to TRANSFORMED coordinates
         self.layout_mesh_transformed = trimesh.Trimesh(vertices=v_transformed, faces=self.layout_mesh.faces) # original mesh to TRANSFORMED coordinates
 
-
         self.layout_box_3d_transformed = transform_v(self.layout_box_3d, T_layout)
         self.v_2d_transformed = transform_v(np.hstack((self.v_2d, np.zeros((6, 1), dtype=self.v_2d.dtype))), T_layout)[:, [0, 2]]
         self.layout_hull_2d_transformed = self.layout_box_3d_transformed[:4, [0, 2]]
@@ -436,7 +435,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         assert self.if_has_poses and self.if_has_im_sdr
         if not if_use_mi_geometry:
-            assert self.if_has_dense_geo
+            assert self.if_has_depth_normal
 
         print(white_blue('[openroomsScene] fuse_3D_geometry '), yellow('[use Mitsuba: %s]'%str(if_use_mi_geometry)), 'for %d frames... subsample_rate_pts: %d, subsample_HW_rates: (%d, %d)'%(len(self.frame_id_list), subsample_rate_pts, subsample_HW_rates[0], subsample_HW_rates[1]))
 
@@ -520,14 +519,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         return geo_fused_dict, X_flatten_mask_list, X_lighting_flatten_mask_list
 
-    def get_lighting_envmap_dirs_global(self, pose, normal):
-        env_height, env_width = get_list_of_keys(self.lighting_params_dict, ['env_height', 'env_width'], [int, int])
-        wi_num = env_height * env_width
-        ls_local = get_ls_np(env_height, env_width) # (3, 8, 16)
-        lighting_axis_local = ls_local[np.newaxis, np.newaxis].transpose(0, 1, 3, 4, 2).reshape(1, 1, -1, 3) # -> (1, 1, 8*16, 3)
-        axis_np_global = convert_lighting_axis_local_to_global_np(lighting_axis_local, pose, normal).reshape(-1, wi_num, 3) # (120*160, 3, 8, 16)
-        return axis_np_global.astype(np.float32)
-
     def _fuse_3D_lighting(self, lighting_source: str, subsample_rate_pts: int=1, if_use_mi_geometry: bool=False):
         '''
         fuse dense lighting (using corresponding surface geometry)
@@ -545,7 +536,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             assert self.if_has_mitsuba_all
             normal_list = self.mi_normal_list
         else:
-            assert self.if_has_dense_geo
+            assert self.if_has_depth_normal
             normal_list = self.normal_list
 
         assert lighting_source in ['lighting_SG', 'lighting_envmap'] # not supporting 'lighting_sampled' yet
@@ -575,7 +566,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 weight_np = lighting_global[:, :, :, 4:].reshape(-1, wi_num, 3)
 
             if lighting_source == 'lighting_envmap':
-                axis_np_global = self.get_lighting_envmap_dirs_global(self.pose_list[idx], normal_list[idx])
+                env_height, env_width = get_list_of_keys(self.lighting_params_dict, ['env_height', 'env_width'], [int, int])
+                axis_np_global = get_lighting_envmap_dirs_global(self.pose_list[idx], normal_list[idx], env_height, env_width)
 
             if lighting_source == 'lighting_SG':
                 lamb_np = lighting_global[:, :, :, 3:4].reshape(-1, wi_num, 1)
@@ -601,7 +593,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         assert X_global_lighting.shape[0] == axis_global.shape[0]
 
         lighting_SG_fused_dict = {
-            'X_global_lighting': X_global_lighting, 'normal_global_lighting': normal_global_lighting,
+            'pts_global_lighting': X_global_lighting, 'normal_global_lighting': normal_global_lighting,
             'axis': axis_global, 'weight': weight,}
         if lighting_source == 'lighting_SG':
             lighting_SG_fused_dict.update({'lamb': lamb_global, })

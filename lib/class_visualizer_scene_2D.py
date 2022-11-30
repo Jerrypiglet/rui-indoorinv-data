@@ -1,9 +1,12 @@
 from webbrowser import BackgroundBrowser
 import numpy as np
 import time
+import matplotlib.pyplot as plt
+
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
-import matplotlib.pyplot as plt
+from lib.class_mitsubaScene3D import mitsubaScene3D
+
 from lib.utils_vis import vis_index_map, colorize
 from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
 from lib.utils_OR.utils_OR_cam import project_3d_line
@@ -19,13 +22,11 @@ class visualizer_scene_2D(object):
         frame_idx_list: list=[0], 
     ):
 
-        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
+        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D or mitsubaScene3D!'
 
         self.os = openrooms_scene
 
-        self.modality_list_vis = list(set(modality_list_vis))
-        for _ in self.modality_list_vis:
-            assert _ in self.valid_modalities_2D_vis, 'Invalid modality: %s'%_
+        self.modality_list_vis = self.check_and_sort_modalities(list(set(modality_list_vis)))
 
         self.frame_idx_list = frame_idx_list
         self.N_frames = len(self.frame_idx_list)
@@ -54,6 +55,12 @@ class visualizer_scene_2D(object):
             'mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', 
             'layout', 'shapes', 
             ]
+
+    def check_and_sort_modalities(self, modalitiy_list):
+        modalitiy_list_new = [_ for _ in self.valid_modalities_2D_vis if _ in modalitiy_list]
+        for _ in modalitiy_list_new:
+            assert _ in self.valid_modalities_2D_vis, 'Invalid modality: %s'%_
+        return modalitiy_list_new
 
     def create_im_row_ax_list(self, subfig, start_idx: int=1, if_show_im: bool=False, title: str=''):
         assert self.os.if_has_im_sdr
@@ -141,7 +148,7 @@ class visualizer_scene_2D(object):
 
         '''
         assert self.os.if_has_im_sdr and self.os.if_has_poses
-        if modality in ['depth', 'normal']: assert self.os.if_has_dense_geo
+        if modality in ['depth', 'normal']: assert self.os.if_has_depth_normal
         if modality in ['albedo', 'roughness']: assert self.os.if_has_BRDF
         if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.os.if_has_seg
         if modality in ['mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']: assert self.os.if_has_mitsuba_scene
@@ -168,7 +175,10 @@ class visualizer_scene_2D(object):
                 continue
             if modality == 'mi_depth':
                 assert self.os.pts_from['mi']
-                vmin, vmax = np.amin(self.os.depth_list[frame_idx]), np.amax(self.os.depth_list[frame_idx])
+                if self.os.if_has_depth_normal:
+                    vmin, vmax = np.amin(self.os.depth_list[frame_idx]), np.amax(self.os.depth_list[frame_idx])
+                else:
+                    vmin, vmax = np.amin(self.os.mi_depth_list[frame_idx]), np.amax(self.os.mi_depth_list[frame_idx])
                 _im[_im==np.inf] = 0.
                 plot = ax.imshow(_im, vmin=0., vmax=vmax, cmap='jet')
                 plt.colorbar(plot, ax=ax)
@@ -197,8 +207,8 @@ class visualizer_scene_2D(object):
                 _im = np.clip(downsample_lighting_envmap(envmap_cam, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
 
             if modality == 'lighting_envmap':
-                if self.os.if_has_hdr_scale:
-                    _im = _im / self.os.hdr_scale_list[frame_idx]
+                # if self.os.if_has_hdr_scale:
+                #     _im = _im / self.os.hdr_scale_list[frame_idx]
                 lighting_scale = lighting_params.get('lighting_scale', 0.1)
                 _im = np.clip(downsample_lighting_envmap(_im, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
 

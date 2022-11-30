@@ -146,10 +146,6 @@ class openroomsScene2D(object):
         return modalitiy_list_new
 
     @property
-    def if_has_poses(self):
-        return all([_ in self.modality_list for _ in ['poses']])
-
-    @property
     def if_has_im_sdr(self):
         return all([_ in self.modality_list for _ in ['im_sdr']])
 
@@ -162,11 +158,15 @@ class openroomsScene2D(object):
         return all([_ in self.modality_list for _ in ['im_hdr']]) and self.if_scale_hdr
 
     @property
+    def if_has_poses(self):
+        return all([_ in self.modality_list for _ in ['poses']])
+
+    @property
     def if_has_seg(self):
         return all([_ in self.modality_list for _ in ['seg']])
 
     @property
-    def if_has_dense_geo(self):
+    def if_has_depth_normal(self):
         return all([_ in self.modality_list for _ in ['depth', 'normal']])
 
     @property

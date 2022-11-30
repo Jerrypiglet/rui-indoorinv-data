@@ -58,7 +58,7 @@ class renderer_openroomsScene_3D(object):
         if self.pts_from == 'mi':
             assert self.os.if_has_mitsuba_scene and self.os.pts_from['mi']
         if self.pts_from == 'depth':
-            assert self.os.if_has_dense_geo and self.os.pts_from['depth']
+            assert self.os.if_has_depth_normal and self.os.pts_from['depth']
 
     def render(
         self, 

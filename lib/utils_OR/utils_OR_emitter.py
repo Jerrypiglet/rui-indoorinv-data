@@ -125,7 +125,11 @@ def vis_envmap_plt(ax, im_envmap: np.ndarray, quad_labels: list=[]):
         ax.text(W/2., H, quad_labels[2], color='k', fontsize=10)
         ax.text(W/4.*3, H, quad_labels[3], color='k', fontsize=10)
 
-def sample_mesh_emitter(emitter_type: str, emitter_index: int, emitter_dict: dict, max_plate: int, if_clip_concave_normals: bool=False):
+def sample_mesh_emitter(emitter_type: str, emitter_index: int, emitter_dict: dict, max_plate: int, if_clip_concave_normals: bool=False, if_dense_sample: bool=False):
+    '''
+    Args: 
+        if_dense_sample: True to sample total of max_plate points over the mesh, instead of by default one point per-face
+    '''
     assert emitter_type == 'lamp', 'no support for windows for now'
     # lamp, vertices, faces = self.os.lamp_list[emitter_index]
     lamp, vertices, faces = emitter_dict[emitter_type][emitter_index]
@@ -176,6 +180,14 @@ def sample_mesh_emitter(emitter_type: str, emitter_index: int, emitter_dict: dic
         lpts = lpts[select_ind]
         lpts_normal = lpts_normal[select_ind]
         lpts_area = lpts_area[select_ind]
+    elif if_dense_sample:
+        import trimesh
+        mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1)
+        lpts, face_index = trimesh.sample.sample_surface(mesh, max_plate)
+        lpts = lpts.astype(np.float32)
+        lpts_normal = lpts_normal[face_index]
+        lpts_area = lpts_area[face_index]
+        prob = float(max_plate)  / float(plate_num)
     else:
         prob = 1
 

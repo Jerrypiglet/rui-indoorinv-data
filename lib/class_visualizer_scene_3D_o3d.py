@@ -1,4 +1,5 @@
 import numpy as np
+np.random.seed(0)
 from tqdm import tqdm
 import open3d as o3d
 import open3d.visualization.gui as gui
@@ -22,7 +23,7 @@ from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_mitsubaScene3D import mitsubaScene3D
 
-from lib.utils_misc import get_list_of_keys, gen_random_str
+from lib.utils_misc import get_list_of_keys, gen_random_str, yellow
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_OR.utils_OR_mesh import writeMesh
@@ -153,7 +154,6 @@ class visualizer_scene_3D_o3d(object):
         if_shader: bool=False, 
         **kwargs, 
     ):
-
         self.o3d_geometry_list = self.load_o3d_geometry_list(
             self.modality_list_vis, 
             **kwargs
@@ -278,22 +278,22 @@ class visualizer_scene_3D_o3d(object):
         pcd_color = None
 
         if pcd_color_mode == 'rgb':
-            assert self.os.if_has_im_sdr and self.os.if_has_dense_geo
+            assert self.os.if_has_im_sdr and self.os.if_has_depth_normal
             pcd_color = self.geo_fused_dict['rgb']
         
         elif pcd_color_mode == 'normal': # images/demo_pcd_color_normal.png
-            assert self.os.if_has_im_sdr and self.os.if_has_dense_geo
+            assert self.os.if_has_im_sdr and self.os.if_has_depth_normal
             pcd_color = (self.geo_fused_dict['normal'] + 1.) / 2.
         
         elif pcd_color_mode == 'dist_emitter0': # images/demo_pcd_color_dist.png
-            assert self.os.if_has_im_sdr and self.os.if_has_dense_geo and self.os.if_has_shapes
+            assert self.os.if_has_im_sdr and self.os.if_has_depth_normal and self.os.if_has_shapes
             emitter_0 = (self.os.lamp_list + self.os.window_list)[0]
             emitter_0_center = emitter_0['emitter_prop']['box3D_world']['center'].reshape((1, 3))
             dist_to_emitter_0 = np.linalg.norm(emitter_0_center - self.geo_fused_dict['X'], axis=1, keepdims=False)
             pcd_color = color_map_color(dist_to_emitter_0, vmin=np.amin(dist_to_emitter_0), vmax=np.amax(dist_to_emitter_0))
         
         elif pcd_color_mode == 'mi_visibility_emitter0': # images/demo_pcd_color_mi_visibility_emitter0.png
-            assert self.os.if_has_im_sdr and self.os.if_has_dense_geo and self.os.if_has_shapes
+            assert self.os.if_has_im_sdr and self.os.if_has_depth_normal and self.os.if_has_shapes
             assert self.os.if_has_mitsuba_scene
             emitter_0 = (self.os.lamp_list + self.os.window_list)[0]
             emitter_0_center = emitter_0['emitter_prop']['box3D_world']['center'].reshape((1, 3))
@@ -425,7 +425,7 @@ class visualizer_scene_3D_o3d(object):
 
     def collect_dense_geo(self, dense_geo_params: dict={}):
 
-        assert self.os.if_has_im_sdr and self.os.if_has_dense_geo
+        assert self.os.if_has_im_sdr and self.os.if_has_depth_normal
 
         geometry_list = []
 
@@ -526,7 +526,7 @@ class visualizer_scene_3D_o3d(object):
         geometry_list = self.process_lighting(lighting_envmap_fused_dict, lighting_params=lighting_params, lighting_source='lighting_envmap', lighting_color=[1., 0., 1.]) # pink
         return geometry_list
 
-    def process_lighting(self, lighting_fused_dict: dict, lighting_source: str, lighting_params: dict={}, lighting_color=[1., 0., 0.], if_X_multiplied: bool=False):
+    def process_lighting(self, lighting_fused_dict: dict, lighting_source: str, lighting_params: dict={}, lighting_color=[1., 0., 0.], if_X_multiplied: bool=False, if_use_pts_end: bool=False):
         '''
         if_X_multiplied: True if X_global_lighting is already multiplied by wi_num
         '''
@@ -540,9 +540,9 @@ class visualizer_scene_3D_o3d(object):
         #     lighting_scale = 1.
 
         # if lighting_source == 'lighting_SG':
-        #     xyz_pcd, normal_pcd, axis_pcd, weight_pcd, lamb_SG_pcd = get_list_of_keys(lighting_fused_dict, ['X_global_lighting', 'normal_global_lighting', 'axis', 'weight_SG', 'lamb_SG'])
+        #     xyz_pcd, normal_pcd, axis_pcd, weight_pcd, lamb_SG_pcd = get_list_of_keys(lighting_fused_dict, ['pts_global_lighting', 'normal_global_lighting', 'axis', 'weight_SG', 'lamb_SG'])
         # if lighting_source == 'lighting_envmap':
-        xyz_pcd, axis_pcd, weight_pcd = get_list_of_keys(lighting_fused_dict, ['X_global_lighting', 'axis', 'weight']) # [TODO] lamb is not visualized for now
+        xyz_pcd, axis_pcd, weight_pcd = get_list_of_keys(lighting_fused_dict, ['pts_global_lighting', 'axis', 'weight']) # [TODO] lamb is not visualized for now
 
         wi_num = axis_pcd.shape[1] # num of rays per-point
 
@@ -574,8 +574,11 @@ class visualizer_scene_3D_o3d(object):
             # ic(np.amax(length_pcd))
         
         length_pcd *= lighting_scale
-
         axis_pcd_end = xyz_pcd + length_pcd * axis_pcd.reshape((-1, 3))
+        if if_use_pts_end:
+            assert 'pts_end' in lighting_fused_dict
+            axis_pcd_end = lighting_fused_dict['pts_end']
+
         xyz_pcd, axis_pcd_end = xyz_pcd[axis_mask], axis_pcd_end[axis_mask]
         N_pts = xyz_pcd.shape[0]
         # print('Showing lighting for %d points...'%N_pts)
@@ -611,7 +614,7 @@ class visualizer_scene_3D_o3d(object):
 
     def collect_shapes(self, shapes_params: dict={}):
         '''
-        collect shapes and bboxes for objs (objs + emitters)
+        collect shapes and bboxes for objs + emitters (shapes)
 
         to visualize emitter properties, go to collect_emitters
 
@@ -624,53 +627,59 @@ class visualizer_scene_3D_o3d(object):
 
         if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_obj_mesh', False)
         if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_emitter_mesh', False)
+        if_ceiling = shapes_params.get('if_ceiling', False)
+        if_walls = shapes_params.get('if_walls', False)
 
         self.os.load_colors()
 
         geometry_list = []
 
-        emitters_obj_random_id_list = [shape['random_id'] for shape in self.os.shape_list_valid if shape['if_in_emitter_dict']]
+        # emitters_obj_random_id_list = [shape['random_id'] for shape in self.os.shape_list_valid if shape['if_in_emitter_dict']]
 
-        for shape_idx, (shape, vertices, faces, bverts) in tqdm(enumerate(zip(
+        for shape_idx, (shape_dict, vertices, faces, bverts) in tqdm(enumerate(zip(
             self.os.shape_list_valid, 
             self.os.vertices_list, 
             self.os.faces_list, 
             self.os.bverts_list, 
         ))):
 
-            if_emitter = shape['if_in_emitter_dict']
+            if_emitter = shape_dict['if_in_emitter_dict']
             cat_name = 'N/A'; cat_id = -1
 
-            if np.amax(bverts[:, 1]) <= np.amin(bverts[:, 1]):
-                obj_color = [0., 0., 0.] # black for invalid objects
-                cat_name = 'INVALID'
-                continue
-            else:
-                obj_path = shape['filename']
-                if 'uv_mapped.obj' in obj_path:
-                    continue # skipping layout as an object
-                if shape['random_id'] in emitters_obj_random_id_list and not if_emitter:
-                    continue # skip shape if it is also in the list as an emitter (so that we don't create two shapes for one emitters)
+            # if np.amax(bverts[:, 1]) <= np.amin(bverts[:, 1]):
+            #     obj_color = [0., 0., 0.] # black for invalid objects
+            #     cat_name = 'INVALID'
+            #     import ipdb; ipdb.set_trace()
+            #     continue
+            # else:
+            obj_path = shape_dict['filename']
+            if 'uv_mapped.obj' in obj_path and not(if_ceiling and if_walls):
+                continue # skipping layout as an object
+            # if shape_dict['random_id'] in emitters_obj_random_id_list and not if_emitter: # SKIP emitters
+            #     continue # skip shape if it is also in the list as an emitter (so that we don't create two shapes for one emitters)
+            if not if_walls and shape_dict.get('is_wall', False): continue
+            if not if_ceiling and shape_dict.get('is_ceiling', False): continue
 
-                if self.os.if_loaded_colors:
-                    cat_id_str = str(obj_path).split('/')[-3]
-                    assert cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
-                    cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
-                    obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
-                    obj_color = [float(x)/255. for x in obj_color]
-                    linestyle = '-'
-                    linewidth = 1
-                    if if_emitter:
-                        linewidth = 3
-                        linestyle = '--'
-                        obj_color = [1., 0., 0.] # red for emitters
-                        '''
-                        images/OR42_color_mapping_light.png
-                        '''
-                else:
-                    obj_color = [0.7, 0.7, 0.7]
-                    if if_emitter:
-                        obj_color = [1., 0., 0.] # red for emitters
+            if self.os.if_loaded_colors:
+                cat_id_str = str(obj_path).split('/')[-3]
+                assert cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
+                cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
+                obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
+                obj_color = [float(x)/255. for x in obj_color]
+                linestyle = '-'
+                linewidth = 1
+                if if_emitter:
+                    linewidth = 3
+                    linestyle = '--'
+                    obj_color = [1., np.random.random()*0.5, np.random.random()*0.5] # red-ish for emitters
+                    '''
+                    images/OR42_color_mapping_light.png
+                    '''
+            else:
+                obj_color = [0.7, 0.7, 0.7]
+                if if_emitter:
+                    obj_color = [1., np.random.random()*0.5, np.random.random()*0.5] # red-ish for emitters
+                    print(yellow(str(obj_color)), shape_dict['random_id'])
 
 
             # trimesh.repair.fill_holes(shape_mesh)
@@ -684,9 +693,8 @@ class visualizer_scene_3D_o3d(object):
             geometry_list.append(shape_bbox)
 
             '''
-            applicable if necessary
+            [optional] load mashes & labels
             '''
-
             if_mesh = if_obj_meshes if not if_emitter else if_emitter_meshes
             if if_mesh:
                 assert np.amax(faces-1) < vertices.shape[0]
@@ -698,14 +706,14 @@ class visualizer_scene_3D_o3d(object):
                     target_number_of_triangles = int(len(shape_mesh.triangles)*shapes_params.get('simply_ratio', 1.))
                     target_number_of_triangles = max(10000, min(50, target_number_of_triangles))
                     shape_mesh = shape_mesh.simplify_quadric_decimation(target_number_of_triangles=target_number_of_triangles)
-                    print('[%s-%s] Mesh simplified to %d->%d triangles.'%(cat_name, shape['random_id'], N_triangles, len(shape_mesh.triangles)))
+                    print('[%s-%s] Mesh simplified to %d->%d triangles.'%(cat_name, shape_dict['random_id'], N_triangles, len(shape_mesh.triangles)))
 
                 shape_mesh.paint_uniform_color(obj_color)
                 shape_mesh.compute_vertex_normals()
                 shape_mesh.compute_triangle_normals()
-                geometry_list.append([shape_mesh, 'shape_emitter_'+shape['random_id'] if if_emitter else 'shape_obj_'+shape['random_id']])
+                geometry_list.append([shape_mesh, 'shape_emitter_'+shape_dict['random_id'] if if_emitter else 'shape_obj_'+shape_dict['random_id']])
 
-            print('[collect_shapes] --', if_emitter, shape_idx, obj_path, cat_name, cat_id, shape['random_id'])
+            print('[collect_shapes] --', if_emitter, shape_idx, obj_path, cat_name, cat_id, shape_dict['random_id'])
 
             # shape_label = o3d.visualization.gui.Label3D([0., 0., 0.], np.mean(bverts, axis=0).reshape((3, 1)), cat_name)
             # geometry_list.append(shape_label)
@@ -755,6 +763,7 @@ class visualizer_scene_3D_o3d(object):
 
     def collect_emitters(self, emitter_params: dict={}):
         '''
+        emitter PHYSICAL PROPERTIES (emitter shapes visualized by self.collect_shapes)
         images/demo_emitters_o3d.png
         images/demo_envmap_o3d.png # added envmap hemisphere
         '''
@@ -762,61 +771,61 @@ class visualizer_scene_3D_o3d(object):
 
         if_half_envmap = emitter_params.get('if_half_envmap', True)
         scale_SG_length = emitter_params.get('scale_SG_length', 2.)
-        if_sampling_emitter = emitter_params.get('if_sampling_emitter', True)
-        max_plate = emitter_params.get('max_plate', 64)
 
         self.os.load_colors()
 
         geometry_list = []
 
-        for shape_idx, (shape, bverts) in enumerate(zip(
+        for shape_idx, (shape_dict, bverts) in enumerate(zip(
             self.os.shape_list_valid, 
             self.os.bverts_list, 
         )):
 
-            if not shape['if_in_emitter_dict']:
-                continue
-
-            # print('--', if_emitter, shape_idx, cat_id, cat_name, obj_path)
-
-            light_center = np.mean(bverts, 0).flatten()
+            if not shape_dict['if_in_emitter_dict']: continue # EMITTERS only
 
             '''
             WINDOWS
             '''
-            if 'axis_world' in shape['emitter_prop']: # if window
+            if shape_dict['emitter_prop']['obj_type'] == 'window': # if window
+                light_center = np.mean(bverts, 0).flatten()
                 label_SG_list = ['', 'Sky', 'Grd']
                 for label_SG, color, scale in zip(label_SG_list, ['k', 'b', 'g'], [1*scale_SG_length, 0.5*scale_SG_length, 0.5*scale_SG_length]):
-                    light_axis = np.asarray(shape['emitter_prop']['axis%s_world'%label_SG]).flatten()
+                    light_axis = np.asarray(shape_dict['emitter_prop']['axis%s_world'%label_SG]).flatten()
                 
                     light_axis_world = np.asarray(light_axis).reshape(3,) # transform back to world system
                     light_axis_world = light_axis_world / np.linalg.norm(light_axis_world)
                     # light_axis_world = np.array([1., 0., 0.])
-                    light_axis_end = np.asarray(light_center).reshape(3,) + light_axis_world * np.log(shape['emitter_prop']['intensity'+label_SG])
+                    light_axis_end = np.asarray(light_center).reshape(3,) + light_axis_world * np.log(shape_dict['emitter_prop']['intensity'+label_SG])
                     light_axis_end = light_axis_end.flatten()
 
                     a_light = get_arrow_o3d(light_center, light_axis_end, scale=scale, color=color)
                     geometry_list.append(a_light)
 
                 if if_half_envmap:
-                    env_map_path = shape['emitter_prop']['envMapPath']
+                    env_map_path = shape_dict['emitter_prop']['envMapPath']
                     im_envmap_ori = load_HDR(Path(env_map_path))
                     im_envmap_ori_SDR, im_envmap_ori_scale = to_nonHDR(im_envmap_ori)
 
-                    sphere_envmap = get_sphere(hemisphere_normal=shape['emitter_prop']['box3D_world']['zAxis'].reshape((3,)), envmap=im_envmap_ori_SDR)
+                    sphere_envmap = get_sphere(hemisphere_normal=shape_dict['emitter_prop']['box3D_world']['zAxis'].reshape((3,)), envmap=im_envmap_ori_SDR)
                     geometry_list.append([sphere_envmap, 'envmap'])
 
         '''
         LAMPS samples as area lights: images/demo_emitter_o3d_sampling.png
         '''
+        if_sampling_emitter = emitter_params.get('if_sampling_emitter', True)
         if if_sampling_emitter:
+            max_plate = emitter_params.get('max_plate', 64)
+            radiance_scale = emitter_params.get('radiance_scale', 1.)
             from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
             emitter_dict = {'lamp': self.os.lamp_list, 'window': self.os.window_list}
             for emitter_type in ['lamp']:
                 for emitter_index in range(len(emitter_dict[emitter_type])):
                     lpts_dict = sample_mesh_emitter(emitter_type, emitter_index=emitter_index, emitter_dict=emitter_dict, max_plate=max_plate)
                     # for lpts, lpts_normal, lpts_intensity in zip(lpts_dict['lpts'], lpts_dict['lpts_normal'], lpts_dict['lpts_intensity']):
-                    lpts_end = lpts_dict['lpts'] + lpts_dict['lpts_normal'] * np.log(lpts_dict['lpts_intensity'].sum(-1)) * 0.1
+                    o_ = lpts_dict['lpts']
+                    d_ = lpts_dict['lpts_normal'] / np.linalg.norm(lpts_dict['lpts_normal'], axis=-1, keepdims=True)
+                    lpts_end = o_ + d_ * np.linalg.norm(lpts_dict['lpts_intensity'], axis=-1) * radiance_scale
+                    print('GT intensity', lpts_dict['lpts_intensity'], np.linalg.norm(lpts_dict['lpts_intensity'], axis=-1))
                     emitter_rays = o3d.geometry.LineSet()
                     emitter_rays.points = o3d.utility.Vector3dVector(np.vstack((lpts_dict['lpts'], lpts_end)))
                     emitter_rays.colors = o3d.utility.Vector3dVector([[1., 0., 0.]]*lpts_dict['lpts'].shape[0]) # RED for GT
@@ -874,8 +883,8 @@ class visualizer_scene_3D_o3d(object):
         if_pts = mi_params.get('if_pts', True)
         pts_subsample = mi_params.get('pts_subsample', 10)
         if_pts_colorize_rgb = mi_params.get('if_pts_colorize_rgb', True)
-        if_ceiling = mi_params.get('if_ceiling', False)
-        if_walls = mi_params.get('if_walls', False)
+        if_ceiling = mi_params.get('if_ceiling', True)
+        if_walls = mi_params.get('if_walls', True)
 
         if_normal = mi_params.get('if_normal', True)
         normal_subsample = mi_params.get('normal_subsample', 10)

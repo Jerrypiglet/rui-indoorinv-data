@@ -149,6 +149,10 @@ Comparing depth, normal maps, and segs from mitsuba sampling VS OptixRenderer: *
 
 ![](images/demo_mitsuba_ret_depth_normals_2D.png)
 ![](images/demo_mitsuba_ret_seg_2D.png)
+(the room with 3 lamps)
+![](images/demo_mitsuba_ret_seg_2D_3lamps.png)
+(Indoor-kitchen scene: one window and 3 oven-top lamps as area lights)
+![](images/demo_mitsuba_ret_all_2D.png)
 
 ### Open3D viewer
 ```bash
@@ -173,19 +177,21 @@ Use ``--vis_3d_o3d True`` to use the Open3D visualizer. The result is something 
 
 Examples:
 
-dense_geo:
+**dense_geo**:
 ![](images/demo_pcd_color.png)
 
-lighting_SG:
+**lighting_SG**:
 ![](images/demo_lighting_SG_o3d.png)
 
-lighting_envmap:
+**lighting_envmap**:
 ![](images/demo_lighting_envmap_o3d.png)
 
-shapes:
+**shapes**:
 ![](images/demo_shapes_o3d.png)
+(Indoor-kitchen scene: one window and 3 oven-top lamps as area lights)
+![](images/demo_shapes_o3d_kitchen_emitters.png)
 
-mi:
+**mi**:
 ![](images/demo_mitsuba_ret_pts_1.png)
 ![](images/demo_mitsuba_ret_normals.png)
 ![](images/demo_mi_o3d_1.png)
@@ -267,11 +273,22 @@ Re-render the image from rad-MLP (via querying camera rays)
 public_re_3_v5pose_2048:
 ![](images/demo_eval_radMLP_render_110.png)
 
-Evaluate emitter surface radiance (GT (red) and est. (blue) from querying emitter surface rays)
+Evaluate **emission**: emitter surface radiance (GT (red) and est. (blue) from querying emitter surface rays)
 ![](images/demo_emitter_o3d_sampling.png)
+
+Evaluate **incident radiance** (same idea as generating envmap in OptixRenderer):
+``` bash
+python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_rad True --vis_2d_plt False --if_add_rays_from_eval True
+```
+![](images/demo_emitter_o3d_sampling_incident.png)
+
+Indoor-kitchen scene:
+![](images/demo_eval_radMLP_render_kitchen_0.png)
 
 # Todolist
 - [x] vis envmap
+- [ ] change dump_OR_xml_for_mi() to be FULLY compatible with Mitsuba 3'
+- [ ] how to get **mi_rays_ret_expanded**?
 - [ ] room coverage count
 - [ ] o3d: show layout bbox without meshes
 - [ ] unit test scrpt without X

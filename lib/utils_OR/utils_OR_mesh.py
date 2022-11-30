@@ -185,6 +185,24 @@ def flip_ceiling_normal(faces, vertices):
 
     return faces
 
+def get_rectangle_mesh(R: np.ndarray, t: np.ndarray):
+    assert R.shape==(3, 3) and t.shape==(3, 1)
+    vertices = (R @ np.array([
+        [-1, -1, 0.], 
+        [-1, 1, 0.], 
+        [1, 1, 0.], 
+        [1, -1, 0.], 
+    ], dtype=np.float32).T + t).T
+    faces = np.array([
+        [2, 4, 3], 
+        [1, 4, 2], 
+        # [2, 3, 4], 
+        # [1, 2, 4], 
+    ], dtype=np.int32) # a single-sided rectangle mesh; uncomment two faces to get double-sided mesh
+
+    return (vertices, faces)
+
+
 def mesh_to_contour(mesh, if_input_is_v_e=False, if_input_is_Trimesh=False, vertical_dim=-1):
     if if_input_is_v_e:
         v, e = mesh

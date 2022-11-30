@@ -96,6 +96,7 @@ def dump_OR_xml_for_mi(
                     lit_up_lamp_list.append(lamp)
             if if_no_emitter_shape:
                 root.remove(shape)
+                import ipdb; ipdb.set_trace()
                 continue
 
         replace_str_xml(shape.findall('string')[0], lookup_dict)
@@ -130,11 +131,14 @@ def dump_OR_xml_for_mi(
             shape.set('id', shape_id)
         shape_ids.append(shape_id)
 
-        for emitter in shape.findall('emitter'):
-            shape.remove(emitter) # removing emitter associated with shapes for now
+        # for emitter in shape.findall('emitter'):
+        #     shape.remove(emitter) # removing emitter associated with shapes for now
 
-            # for rgb in emitter.findall('rgb'):
-            #     rgb.set('name', 'a random name')
+        # for compatibility with Mitsuba
+        for emitter in shape.findall('emitter'):
+            rgbs = emitter.findall('rgb')
+            for rgb in rgbs:
+                rgb.set('name', 'radiance')
 
     if if_dump_mesh:
         write_one_mesh_from_v_f_lists(dump_mesh_path, vertices_list, faces_list, ids_list)
@@ -180,7 +184,40 @@ def dump_OR_xml_for_mi(
         for lamp in lit_up_lamp_list:
             root.append(lamp)
         xmlString = transformToXml(root)
-        with open(str(xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'), 'w') as xmlOut:
+        with open(str(xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'), 'w') as xmlOut:
             xmlOut.write(xmlString )
 
+    return xml_dump_path
+
+def dump_Indoor_area_lights_only_xml_for_mi(
+    xml_file: str, 
+):
+    '''
+        Dump xml_with_lit_area_lights_only to *_lit_up_area_lights_only.xml
+        work with the Indoor dataset (e.g. kitchen scene)
+    '''
+    xml_dump_path = str(xml_file).replace('.xml', '_lit_up_area_lights_only.xml')
+    tree = et.parse(xml_file)
+    root = copy.deepcopy(tree.getroot())
+    shapes = root.findall('shape')
+    for shape in shapes:
+        if_has_lit_up_area_light = False
+        emitters = shape.findall('emitter')
+        if len(emitters) > 0:
+            assert len(emitters) == 1
+            emitter = emitters[0]
+            assert emitter.get('type') == 'area'
+            rgb = emitter.findall('rgb')[0]
+            assert rgb.get('name') == 'radiance'
+            radiance = np.array(rgb.get('value').split(', ')).astype(np.float32).reshape(3,)
+            if np.amax(radiance) > 1e-3:
+                if_has_lit_up_area_light = True
+
+        if not if_has_lit_up_area_light:
+            root.remove(shape)
+
+    xmlString = transformToXml(root)
+    with open(xml_dump_path, 'w') as xmlOut:
+        xmlOut.write(xmlString )
+    
     return xml_dump_path

@@ -21,6 +21,7 @@ import numpy as np
 np.set_printoptions(suppress=True)
 
 from lib.class_mitsubaScene3D import mitsubaScene3D
+from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_eval_rad import evaluator_scene_rad
 
@@ -30,7 +31,7 @@ parser = argparse.ArgumentParser()
 # visualizers
 # parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
 parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize in open3D')
-# parser.add_argument('--vis_2d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
+parser.add_argument('--vis_2d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to show (1) pixel-space modalities (2) projection onto one image (e.g. layout, object bboxes), with plt')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
 # options for visualizers
 parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help='colormap for all points in fused geo')
@@ -57,7 +58,10 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
 scene_name = 'kitchen'
-split = 'train'; frame_ids = list(range(0, 189, 30))
+emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
+# split = 'train'; frame_ids = list(range(0, 189, 40))
+# split = 'train'; frame_ids = list(range(0, 10, 1))
+split = 'train'; frame_ids = [0]
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -86,12 +90,11 @@ mitsuba_scene = mitsubaScene3D(
         'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
         'poses_sample_num': 200, # Number of poses to sample; set to -1 if not sampling
         'if_render_im': False, # True to render im with Mitsuba
-
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'im_hdr', 
-        'im_sdr', 
+        # 'im_hdr', 
+        # 'im_sdr', 
         'poses', 
         # 'seg', 
         # 'albedo', 'roughness', 
@@ -105,6 +108,7 @@ mitsuba_scene = mitsubaScene3D(
         # 'im_H_resize': 480, 'im_W_resize': 640, 
         'im_H_load': 320, 'im_W_load': 640, 
         'im_H_resize': 160, 'im_W_resize': 320, 
+        # 'im_H_resize': 32, 'im_W_resize': 64, 
         # 'spp': 2048, 
         'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
@@ -121,8 +125,12 @@ mitsuba_scene = mitsubaScene3D(
         'phiMax': 60, 
         'if_vis_plt': False, # images/demo_sample_pose.png
     }, 
-    # lighting_params_dict={
-    # }, 
+    lighting_params_dict={
+        'env_row': 120, 'env_col': 160, 'SG_num': 12, 
+        'env_height': 2, 'env_width': 4, 
+        # 'env_height': 8, 'env_width': 16, 
+        # 'env_height': 64, 'env_width': 128, 
+    }, 
     shape_params_dict={
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
@@ -130,6 +138,34 @@ mitsuba_scene = mitsubaScene3D(
     emitter_params_dict={
         },
 )
+
+'''
+Matploblib 2D viewer
+'''
+if opt.vis_2d_plt:
+    visualizer_2D = visualizer_scene_2D(
+        mitsuba_scene, 
+        modality_list_vis=[
+            'im', 
+            # 'layout', 
+            # 'shapes', 
+            # 'depth', 
+            'mi_depth', 
+            # 'normal', 
+            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
+            # 'lighting_envmap', 
+            # 'seg_area', 'seg_env', 'seg_obj', 
+            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            ], 
+        frame_idx_list=[0, 1, 2, 3, 4], 
+        # frame_idx_list=[0], 
+    )
+    visualizer_2D.vis_2d_with_plt(
+        lighting_params={
+            'lighting_scale': 0.01, # rescaling the brightness of the envmap
+            }, 
+            )
 
 '''
 Evaluator for rad-MLP and inv-MLP
@@ -143,27 +179,35 @@ if opt.eval_rad:
         ckpt_path='kitchen/last.ckpt', # 110
         dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
         split=split, 
-        rad_scale=1./5., 
+        rad_scale=1., 
     )
 
-    # render one image by querying rad-MLP: images/demo_eval_radMLP_render.png
-    evaluator_rad.render_im(0, if_plt=True) 
+    '''
+    render one image by querying rad-MLP: images/demo_eval_radMLP_render.png
+    '''
+    # evaluator_rad.render_im(7, if_plt=True) 
 
-    # sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
+    '''
+    sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
+    '''
     # eval_return_dict.update(
     #     evaluator_rad.sample_emitter(
     #         emitter_params={
-    #             'max_plate': 64, 
+    #             'max_plate': 32, 
+    #             'radiance_scale': radiance_scale, 
     #             'emitter_type_index_list': emitter_type_index_list, 
     #             }))
     
-    # sample non-emitter locations along envmap (hemisphere) directions radiance from rad-MLP: images/demo_envmap_o3d_sampling.png
+    '''
+    sample non-emitter locations along envmap (hemisphere) directions radiance from rad-MLP: images/demo_envmap_o3d_sampling.png
+    '''
     eval_return_dict.update(
-        evaluator_rad.sample_lighting_envmap(
-            subsample_rate_pts=1000, 
+        evaluator_rad.sample_lighting(
+            # sample_type='emission', # 'emission', 'incident'
+            sample_type='incident', # 'emission', 'incident'
+            subsample_rate_pts=500, 
         )
     )
-
 
 '''
 Open3D 3D viewer
@@ -177,12 +221,49 @@ if opt.vis_3d_o3d:
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
-            'emitters', # emitter properties (e.g. SGs, half envmaps)
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
+            'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
+
+    lighting_params_vis={
+        # 'subsample_lighting_pts_rate': 500, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        # 'lighting_keep_ratio': 0.05, 
+        # 'lighting_further_clip_ratio': 0.1, 
+        'lighting_scale': 10, 
+        # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
+        # 'lighting_further_clip_ratio': 0.3, 
+        'lighting_keep_ratio': 0., # - good for lighting_envmap
+        'lighting_further_clip_ratio': 0., 
+        # 'lighting_keep_ratio': 0., # - debug
+        # 'lighting_further_clip_ratio': 0., 
+        'lighting_autoscale': False, 
+        }
+
+    if opt.if_add_rays_from_eval:
+        if 'emitter_rays_list' in eval_return_dict:
+            assert opt.eval_rad
+            for (lpts, lpts_end) in eval_return_dict['emitter_rays_list']:
+                visualizer_3D_o3d.add_extra_geometry([
+                    ('rays', {
+                        'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 0., 1.]]*lpts.shape[0]), # BLUE for EST
+                    }),
+                ]) 
+        if 'lighting_fused_list' in eval_return_dict:
+            assert opt.eval_rad
+            for lighting_fused_dict in eval_return_dict['lighting_fused_list']:
+                geometry_list = visualizer_3D_o3d.process_lighting(
+                    lighting_fused_dict, 
+                    lighting_params=lighting_params_vis, 
+                    lighting_source='lighting_envmap', 
+                    lighting_color=[0., 0., 1.], 
+                    if_X_multiplied=True, 
+                    if_use_pts_end=True,
+                    )
+                visualizer_3D_o3d.add_extra_geometry(geometry_list, if_processed_geometry_list=True)
+
 
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
@@ -197,35 +278,28 @@ if opt.vis_3d_o3d:
         #     'subsample_normal_rate_x': 2, 
         #     'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
         #     }, 
-        # lighting_params={
-        #     'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
-        #     # 'lighting_scale': 1., 
-        #     # 'lighting_keep_ratio': 0.05, 
-        #     # 'lighting_further_clip_ratio': 0.1, 
-        #     'lighting_scale': 0.5, 
-        #     # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
-        #     # 'lighting_further_clip_ratio': 0.3, 
-        #     'lighting_keep_ratio': 0.1, # - good for lighting_envmap
-        #     'lighting_further_clip_ratio': 0.2, 
-        #     'lighting_autoscale': True, 
-        #     }, 
+        lighting_params=lighting_params_vis, 
         shapes_params={
             'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
-            'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
+            'if_meshes': False, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
+            'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
         },
         emitter_params={
             # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
             # 'scale_SG_length': 2., 
-            'if_sampling_emitter': False, 
+            'if_sampling_emitter': True, 
+            'radiance_scale': radiance_scale, 
+            'max_plate': 32, 
         },
         mi_params={
-            'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
+            'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
-            'pts_subsample': 1,
-            'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
-            'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
+            'pts_subsample': 10,
+            # 'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
+            # 'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
 
             'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
