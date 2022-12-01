@@ -598,6 +598,7 @@ class mitsubaScene3D(mitsubaBase):
             },
         })
 
+
     def load_shapes(self, shape_params_dict={}):
         '''
         load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 

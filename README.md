@@ -289,6 +289,7 @@ Indoor-kitchen scene:
 - [x] vis envmap
 - [ ] change dump_OR_xml_for_mi() to be FULLY compatible with Mitsuba 3'
 - [ ] how to get **mi_rays_ret_expanded**?
+- [ ] Check OptixRendererLight rays (images/demo_eval_radMLP_rample_lighting_openrooms_1.png)
 - [ ] room coverage count
 - [ ] o3d: show layout bbox without meshes
 - [ ] unit test scrpt without X

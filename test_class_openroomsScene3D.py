@@ -130,7 +130,7 @@ openrooms_scene = openroomsScene3D(
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
-        'lighting_envmap', 
+        # 'lighting_envmap', 
         # 'layout', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
@@ -138,17 +138,19 @@ openrooms_scene = openroomsScene3D(
     im_params_dict={
         'im_H_load': 480, 'im_W_load': 640, 
         # 'im_H_resize': 240, 'im_W_resize': 320, 
-        'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
+        # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
+        'im_H_resize': 6, 'im_W_resize': 8, # to use for rendering so that im dimensions == lighting dimensions
         'if_direct_lighting': False, # if load direct lighting envmaps and SGs inetad of total lighting
         }, 
     lighting_params_dict={
         'SG_num': 12,
         'env_row': 120, 'env_col': 160,  
-        'env_height': 16, 'env_width': 32, 
+        # 'env_height': 16, 'env_width': 32, 
         # 'env_height': 8, 'env_width': 16,
 
-        'env_row': 6, 'env_col': 8,  # load from imenv_128x256_{}.hdr
-        'env_height': 128, 'env_width': 256, 
+        # 'env_row': 6, 'env_col': 8,  # load from imenv_128x256_{}.hdr
+        # 'env_height': 128, 'env_width': 256, 
+        'env_height': 64, 'env_width': 128, 
         
         'if_convert_lighting_SG_to_global': True, 
         'if_use_mi_geometry': True, 

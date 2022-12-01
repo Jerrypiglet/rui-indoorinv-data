@@ -93,8 +93,8 @@ mitsuba_scene = mitsubaScene3D(
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        # 'im_hdr', 
-        # 'im_sdr', 
+        'im_hdr', 
+        'im_sdr', 
         'poses', 
         # 'seg', 
         # 'albedo', 'roughness', 
@@ -107,7 +107,8 @@ mitsuba_scene = mitsubaScene3D(
     im_params_dict={
         # 'im_H_resize': 480, 'im_W_resize': 640, 
         'im_H_load': 320, 'im_W_load': 640, 
-        'im_H_resize': 160, 'im_W_resize': 320, 
+        # 'im_H_resize': 160, 'im_W_resize': 320, 
+        'im_H_resize': 1, 'im_W_resize': 2, 
         # 'im_H_resize': 32, 'im_W_resize': 64, 
         # 'spp': 2048, 
         'spp': 16, 
@@ -127,9 +128,9 @@ mitsuba_scene = mitsubaScene3D(
     }, 
     lighting_params_dict={
         'env_row': 120, 'env_col': 160, 'SG_num': 12, 
-        'env_height': 2, 'env_width': 4, 
+        # 'env_height': 2, 'env_width': 4, 
         # 'env_height': 8, 'env_width': 16, 
-        # 'env_height': 64, 'env_width': 128, 
+        'env_height': 64, 'env_width': 128, 
     }, 
     shape_params_dict={
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time

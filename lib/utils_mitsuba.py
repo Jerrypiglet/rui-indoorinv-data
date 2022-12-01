@@ -5,6 +5,7 @@ import time
 import numpy as np
 import random
 from pathlib import Path
+import mitsuba as mi
 
 from lib.utils_OR.utils_OR_xml import transformToXml, loadMesh, transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_mesh import write_one_mesh_from_v_f_lists, write_mesh_list_from_v_f_lists, flip_ceiling_normal
@@ -221,3 +222,26 @@ def dump_Indoor_area_lights_only_xml_for_mi(
         xmlOut.write(xmlString )
     
     return xml_dump_path
+
+def get_rad_meter_sensor(origin, direction, spp):
+    '''
+    https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_sensors.html#radiance-meter-radiancemeter
+    '''
+    return mi.load_dict({
+        'type': 'radiancemeter',
+        'origin': origin.flatten(),
+        'direction': direction.flatten(),
+        'sampler': {
+            'type': 'independent',
+            'sample_count': spp
+        }, 
+        'film': {
+            'type': 'hdrfilm',
+            'width': 1,
+            'height': 1,
+            'pixel_format': 'rgb',
+            'rfilter': {
+                'type': 'box'
+            }
+        },
+    })

@@ -10,9 +10,11 @@ import mitsuba as mi
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.global_vars import mi_variant_dict
+
 from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
 from lib.utils_misc import get_list_of_keys, white_blue
 from lib.utils_OR.utils_OR_lighting import get_lighting_envmap_dirs_global
+from lib.utils_mitsuba import get_rad_meter_sensor
 
 class evaluator_scene_rad():
     '''
@@ -188,6 +190,8 @@ class evaluator_scene_rad():
         sample non-emitter locations along hemisphere directions for incident radiance, from rad-MLP: images/demo_envmap_o3d_sampling.png
         Args:
             sample_type: 'emission' for querying radiance emitted FROM all points; 'incident' for incident radiance TOWARDS all points
+        Results:
+            images/demo_eval_radMLP_rample_lighting_openrooms_1.png
         '''
         
         assert sample_type in ['emission', 'incident']
@@ -217,10 +221,10 @@ class evaluator_scene_rad():
             assert samples_d.shape[1] == env_num
             samples_d = samples_d.reshape(-1, 3) # (HW*env_num, 3)
             samples_o = self.os.mi_pts_list[idx] # (H, W, 3)
-            # samples_o = np.expand_dims(samples_o.reshape(-1, 3)[seg_obj], axis=1)
+            samples_o = np.expand_dims(samples_o.reshape(-1, 3)[seg_obj], axis=1)
             # samples_o = np.broadcast_to(samples_o, (samples_o.shape[0], env_num, 3))
             # samples_o = samples_o.view(-1, 3)
-            samples_o = np.repeat(, env_num, axis=1).reshape(-1, 3) # (HW*env_num, 3)
+            samples_o = np.repeat(samples_o, env_num, axis=1).reshape(-1, 3) # (HW*env_num, 3)
             if sample_type == 'emission':
                 rays_d = samples_d
                 rays_o = samples_o
@@ -233,6 +237,42 @@ class evaluator_scene_rad():
                 # --- [V1] hack by adding a small offset to samples_o to reduce self-intersection: images/demo_incident_rays_V1.png
                 xs_mi = mi.Point3f(samples_o + samples_d * 1e-4) # (HW*env_num, 3) [TODO] how to better handle self-intersection?
                 incident_rays_mi = mi.Ray3f(xs_mi, ds_mi)
+
+                batch_sensor_dict = {
+                    'type': 'batch', 
+                    'film': {
+                        'type': 'hdrfilm',
+                        'width': 10,
+                        'height': 1,
+                        'pixel_format': 'rgb',
+                    },
+                    }
+                mi_rad_list = []
+                for _, (d, x) in tqdm(enumerate(zip(samples_d, samples_o))):
+                    sensor = get_rad_meter_sensor(x, d, spp=32)
+                    # print(x.shape, d.shape, sensor)
+                    # batch_sensor_dict[str(_)] = sensor
+                    image = mi.render(self.os.mi_scene, sensor=sensor)
+                    mi_rad_list.append(image.numpy().flatten())
+
+                # batch_sensor = mi.load_dict(batch_sensor_dict)
+                mi_lighting_envmap = np.stack(mi_rad_list).reshape((self.os.H, self.os.W, self.os.lighting_params_dict['env_height'], self.os.lighting_params_dict['env_width'], 3))
+                mi_lighting_envmap = mi_lighting_envmap.transpose((0, 1, 4, 2, 3))
+                from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
+                lighting_envmap_vis = np.clip(downsample_lighting_envmap(mi_lighting_envmap, lighting_scale=lighting_scale, downsize_ratio=1)**(1./2.2), 0., 1.)
+                plt.figure()
+                plt.imshow(lighting_envmap_vis)
+                plt.show()
+
+
+                # scene = mi.load_file('/Users/jerrypiglet/Documents/Projects/dvgomm1/data/indoor_synthetic/kitchen/scene_v3.xml')
+                # sensor = get_rad_meter_sensor(samples_o, samples_d, spp=1)
+                # image = mi.render(self.os.mi_scene, sensor=sensor)
+                # image = mi.render(self.os.mi_scene, sensor=sensor)
+                # image = mi.render(self.os.mi_scene, sensor=batch_sensor)
+                # mi.util.write_bitmap("tmp.exr", image)
+                # import ipdb; ipdb.set_trace()
+
 
                 # --- [V2] try to expand mi_rays_ret to env_num rays per-point; HOW TO?
                 # mi_rays_ret = self.os.mi_rays_ret_list[idx] # (HW,) # [TODO how to get mi_rays_ret_expanded?
