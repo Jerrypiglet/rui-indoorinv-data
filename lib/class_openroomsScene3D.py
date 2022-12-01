@@ -133,9 +133,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'mi': self.load_mi(self.mi_params_dict)
 
-    def get_modality(self, modality):
+    def get_modality(self, modality, source: str='GT'):
         if modality in super().valid_modalities:
-            return super(openroomsScene3D, self).get_modality(modality)
+            return super(openroomsScene3D, self).get_modality(modality, source=source)
 
         if 'mi_' in modality:
             assert self.pts_from['mi']

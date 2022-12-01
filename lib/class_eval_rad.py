@@ -198,6 +198,7 @@ class evaluator_scene_rad():
             # assert self.os.if_has_depth_normal; normal_list = self.os.normal_list
         batch_size = self.model.hparams.batch_size * 10
         lighting_fused_list = []
+        lighting_envmap_list = []
 
         print(white_blue('[evaluator_scene_rad] sampling %s for %d frames... subsample_rate_pts: %d'%('lighting_envmap', len(self.os.frame_id_list), subsample_rate_pts)))
 
@@ -216,7 +217,10 @@ class evaluator_scene_rad():
             assert samples_d.shape[1] == env_num
             samples_d = samples_d.reshape(-1, 3) # (HW*env_num, 3)
             samples_o = self.os.mi_pts_list[idx] # (H, W, 3)
-            samples_o = np.repeat(np.expand_dims(samples_o.reshape(-1, 3)[seg_obj], axis=1), env_num, axis=1).reshape(-1, 3) # (HW*env_num, 3)
+            # samples_o = np.expand_dims(samples_o.reshape(-1, 3)[seg_obj], axis=1)
+            # samples_o = np.broadcast_to(samples_o, (samples_o.shape[0], env_num, 3))
+            # samples_o = samples_o.view(-1, 3)
+            samples_o = np.repeat(, env_num, axis=1).reshape(-1, 3) # (HW*env_num, 3)
             if sample_type == 'emission':
                 rays_d = samples_d
                 rays_o = samples_o
@@ -286,22 +290,23 @@ class evaluator_scene_rad():
             rad_all = np.concatenate(rad_list)
             assert rad_all.shape[0] == rays_o.shape[0]
 
-            rad_envmap = None
+            lighting_envmap = rad_all.reshape((self.os.H, self.os.W, self.os.lighting_params_dict['env_height'], self.os.lighting_params_dict['env_width'], 3))
+            lighting_envmap = lighting_envmap.transpose((0, 1, 4, 2, 3))
+            lighting_envmap_list.append(lighting_envmap)
+
             if if_vis_envmap_2d_plt:
                 assert subsample_rate_pts == 1
                 assert not if_mask_off_emitters
-                rad_envmap = rad_all.reshape((self.os.H, self.os.W, self.os.lighting_params_dict['env_height'], self.os.lighting_params_dict['env_width'], 3))
-                rad_envmap = rad_envmap.transpose((0, 1, 4, 2, 3))
                 plt.figure(figsize=(15, 15))
                 plt.subplot(311)
                 plt.imshow(self.os.im_sdr_list[idx])
                 plt.subplot(312)
-                rad_im = rad_envmap[self.os.H//4, self.os.W//4*3].transpose(1, 2, 0)
+                rad_im = lighting_envmap[self.os.H//4, self.os.W//4*3].transpose(1, 2, 0)
                 plt.imshow(np.clip((rad_im*lighting_scale)**(1./2.2), 0., 1.))
                 plt.subplot(313)
                 from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
-                # rad_envmap_vis = np.clip(downsample_lighting_envmap(rad_envmap, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
-                # plt.imshow(rad_envmap_vis)
+                lighting_envmap_vis = np.clip(downsample_lighting_envmap(lighting_envmap, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
+                plt.imshow(lighting_envmap_vis)
                 plt.show()
 
             if subsample_rate_pts != 1:
@@ -311,7 +316,10 @@ class evaluator_scene_rad():
             lighting_fused_dict = {'pts_global_lighting': samples_o, 'axis': samples_d, 'weight': rad_all, 'pts_end': rays_o}
             lighting_fused_list.append(lighting_fused_dict)
 
-        return {'lighting_fused_list': lighting_fused_list, 'rad_envmap': rad_envmap}
+        return {
+            'lighting_fused_list': lighting_fused_list, 
+            'lighting_envmap': lighting_envmap_list, 
+            }
 
     def process_for_Indoor(self, position):
         assert isinstance(position, torch.Tensor)

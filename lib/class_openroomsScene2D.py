@@ -128,6 +128,7 @@ class openroomsScene2D(object):
         load everything
         '''
         self.load_modalities()
+        self.est = {}
 
     @property
     def valid_modalities(self):
@@ -144,6 +145,22 @@ class openroomsScene2D(object):
         for _ in modalitiy_list_new:
             assert _ in self.valid_modalities, 'Invalid modality: %s'%_
         return modalitiy_list_new
+
+    def add_modality(self, x, modality: str, source: str='GT'):
+        assert source in ['GT', 'EST']
+        assert modality in self.valid_modalities
+        if source == 'EST':
+            self.est[modality] = x
+            if modality in self.modality_list:
+                assert type(x)==type(self.get_modality(modality, 'GT'))
+                if isinstance(x, list):
+                    assert len(x) == len(self.get_modality(modality, 'GT'))
+        elif source == 'GT':
+            setattr(self, modality, x)
+            if self.get_modality(modality, 'EST') is not None:
+                assert type(x)==type(self.get_modality(modality, 'EST'))
+                if isinstance(x, list):
+                    assert len(x) == len(self.get_modality(modality, 'EST'))
 
     @property
     def if_has_im_sdr(self):
@@ -189,7 +206,8 @@ class openroomsScene2D(object):
     def frame_num(self):
         return len(self.frame_id_list)
 
-    def get_modality(self, modality):
+    def get_modality(self, modality, source: str='GT'):
+        assert source in ['GT', 'EST']
         if modality == 'im_sdr': 
             return self.im_sdr_list
         elif modality == 'im_hdr': 
@@ -209,7 +227,7 @@ class openroomsScene2D(object):
         elif modality == 'lighting_SG': 
             return self.lighting_SG_local_list
         elif modality == 'lighting_envmap': 
-            return self.lighting_envmap_list
+            return self.lighting_envmap_list if source=='GT' else self.est[modality]
         elif modality == 'semseg': 
             return self.semseg_list
         elif modality == 'matseg': 
@@ -221,7 +239,8 @@ class openroomsScene2D(object):
         elif modality == 'seg_obj': 
             return self.seg_dict_of_lists['obj']
         else:
-            assert False, 'Unsupported modality: ' + modality
+            return None
+            # assert False, 'Unsupported modality: ' + modality
 
     def load_modalities(self):
         for _ in self.modality_list:
@@ -474,22 +493,22 @@ class openroomsScene2D(object):
 
         env_height, env_width = self.lighting_params_dict['env_height'], self.lighting_params_dict['env_width']
         env_row, env_col = self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col']
-
-        # if self.openrooms_version == 'public_re' and (env_height, env_width) == (8, 16):
-        #     lighting_envmap_files = [self.scene_rendering_path / ('%s8x16_%d.hdr'%(imenv_key, i)) for i in self.frame_id_list]
-        # else:
-        lighting_envmap_files = [self.scene_rendering_path / ('%s%d.hdr'%(self.imenv_key, i)) for i in self.frame_id_list]
+        
+        version_key = ''
+        if (env_row, env_col, env_height, env_width) == (120, 160, 8, 16):
+            version_key = '8x16_'
+        elif (env_row, env_col, env_height, env_width) == (6, 8, 128, 256):
+            version_key = '128x256_'
+        lighting_envmap_files = [self.scene_rendering_path / ('%s%s%d.hdr'%(self.imenv_key, version_key, i)) for i in self.frame_id_list]
 
         self.lighting_envmap_list = []
 
         for idx, lighting_envmap_file in enumerate(tqdm(lighting_envmap_files)):
-            envmap = load_envmap(str(lighting_envmap_file), env_height=env_height, env_width=env_width)[0].transpose(1, 2, 0, 3, 4) # -> (120, 160, 3, 8, 16)
+            envmap = load_envmap(str(lighting_envmap_file), env_height=env_height, env_width=env_width, env_row=env_row, env_col=env_col, allow_resize=False)[0].transpose(1, 2, 0, 3, 4) # -> (120, 160, 3, 8, 16)
             # if 'im_hdr' in self.modality_list and self.if_scale_hdr:
             #     hdr_scale = self.hdr_scale_list[idx]
             #     envmap = envmap * hdr_scale
-    
             self.lighting_envmap_list.append(envmap)
-
             assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
 
         print(blue_text('[openroomsScene] DONE. load_lighting_envmap'))

@@ -19,7 +19,7 @@ class visualizer_scene_2D(object):
         self, 
         openrooms_scene, 
         modality_list_vis: list, 
-        frame_idx_list: list=[0], 
+        frame_idx_list, # 0-based indexing, [0, ..., os.frame_num-1]
     ):
 
         assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D or mitsubaScene3D!'
@@ -27,8 +27,11 @@ class visualizer_scene_2D(object):
         self.os = openrooms_scene
 
         self.modality_list_vis = self.check_and_sort_modalities(list(set(modality_list_vis)))
-
-        self.frame_idx_list = frame_idx_list
+        if frame_idx_list is None:
+            self.frame_idx_list = list(range(self.os.frame_num))
+        else:
+            assert isinstance(frame_idx_list, list)
+            self.frame_idx_list = frame_idx_list
         self.N_frames = len(self.frame_idx_list)
         assert self.N_frames >= 1
 
@@ -93,8 +96,9 @@ class visualizer_scene_2D(object):
 
         compatible_modalities = ['im'] + self.valid_modalities_2D_vis
         # modality_list_show = [_ for _ in compatible_modalities if _ in ['im']+self.modality_list_vis]
-        modality_list_show = [_ for _ in self.modality_list_vis if _ in compatible_modalities]
-        if 'im' not in modality_list_show: modality_list_show = ['im']+modality_list_show
+        modality_list_show = [(_, 'GT') for _ in self.modality_list_vis if _ in compatible_modalities]
+        modality_list_show = modality_list_show + [(_[0], 'EST') for _ in modality_list_show if _[0] in self.os.est]
+        if ('im', 'GT') not in modality_list_show: modality_list_show = [('im', 'GT')]+modality_list_show
 
         start_idx = 1
         # plt.figure(figsize=(6*self.N_cols, 4*self.N_rows))
@@ -102,7 +106,8 @@ class visualizer_scene_2D(object):
         subfigs = fig.subfigures(nrows=len(modality_list_show), ncols=1) # https://stackoverflow.com/questions/27426668/row-titles-for-matplotlib-subplot
 
         for subfig in subfigs:
-            modality = modality_list_show.pop(0)
+            modality, source = modality_list_show.pop(0)
+            assert isinstance(modality, str) and source in ['GT', 'EST']
             modality_title_appendix = ''
 
             if modality == 'im':
@@ -121,7 +126,7 @@ class visualizer_scene_2D(object):
                         ax.set_ylim(height*1.5, -height*.5)
                 else:
                     # other modalities
-                    self.vis_2d_modality(fig=subfig, ax_list=ax_list, modality=modality, **kwargs)
+                    self.vis_2d_modality(fig=subfig, ax_list=ax_list, modality=modality, source=source, **kwargs)
 
                     if modality == 'albedo':
                         modality_title_appendix = '(in SDR space)'
@@ -130,7 +135,7 @@ class visualizer_scene_2D(object):
                     if modality in ['mi_depth', 'mi_normal', 'mi_seg']:
                         modality_title_appendix = '(from Mitsuba)'
 
-            subfig.suptitle(modality+' '+modality_title_appendix)
+            subfig.suptitle(source+'-'+modality+' '+modality_title_appendix)
 
         plt.show()
 
@@ -139,6 +144,7 @@ class visualizer_scene_2D(object):
         fig, 
         ax_list, 
         modality, 
+        source: str='GT', 
         lighting_params={
             'lighting_scale': 0.1, 
             }, 
@@ -153,7 +159,7 @@ class visualizer_scene_2D(object):
         if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.os.if_has_seg
         if modality in ['mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']: assert self.os.if_has_mitsuba_scene
 
-        _list = self.os.get_modality(modality)
+        _list = self.os.get_modality(modality, source=source)
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
             _im = _list[frame_idx]
 

@@ -47,6 +47,7 @@ parser.add_argument('--renderer_option', type=str, default='PhySG', help='differ
 # evaluator for rad-MLP
 parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
 parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs')
+parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs')
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -108,8 +109,9 @@ meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
 emitter_type_index_list = [('lamp', 0)]
 # frame_ids = list(range(0, 345, 10))
-frame_ids = [41]
+# frame_ids = [36, 41]
 # frame_ids =[0]
+frame_ids = [3]
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
 xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
@@ -125,12 +127,12 @@ openrooms_scene = openroomsScene3D(
         'im_sdr', 
         'poses', 
         'seg', 'im_hdr', 
-        'albedo', 'roughness', 
+        # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
-        # 'lighting_envmap', 
-        'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
+        'lighting_envmap', 
+        # 'layout', 
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
     im_params_dict={
@@ -143,9 +145,11 @@ openrooms_scene = openroomsScene3D(
         'SG_num': 12,
         'env_row': 120, 'env_col': 160,  
         'env_height': 16, 'env_width': 32, 
-        # 'env_height': 8, 'env_width': 16, 
-        # 'env_row': 1, 'env_col': 1, 
-        # 'env_height': 120, 'env_width': 160, 
+        # 'env_height': 8, 'env_width': 16,
+
+        'env_row': 6, 'env_col': 8,  # load from imenv_128x256_{}.hdr
+        'env_height': 128, 'env_width': 256, 
+        
         'if_convert_lighting_SG_to_global': True, 
         'if_use_mi_geometry': True, 
     }, 
@@ -164,78 +168,6 @@ openrooms_scene = openroomsScene3D(
         'if_get_segs': True, # True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
 )
-
-'''
-Matploblib 2D viewer
-'''
-if opt.vis_2d_plt:
-    visualizer_2D = visualizer_scene_2D(
-        openrooms_scene, 
-        modality_list_vis=[
-            'im', 
-            # 'layout', 
-            # 'shapes', 
-            # 'depth', 
-            # 'mi_depth', 
-            # 'normal', 
-            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
-            'lighting_envmap', 
-            # 'seg_area', 'seg_env', 'seg_obj', 
-            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
-            ], 
-        # frame_idx_list=[0, 1, 2, 3, 4], 
-        frame_idx_list=[0], 
-    )
-    visualizer_2D.vis_2d_with_plt(
-        lighting_params={
-            'lighting_scale': 0.1, # rescaling the brightness of the envmap
-            }, 
-            )
-
-'''
-Matploblib 3D viewer
-'''
-if opt.vis_3d_plt:
-    visualizer_3D_plt = visualizer_openroomsScene_3D_plt(
-        openrooms_scene, 
-        modality_list_vis = [
-            'layout', 
-            'poses', # camera center + optical axis
-            # 'shapes', # boxes and labels (no meshes in plt visualization)
-            # 'emitters', # emitter properties
-            # 'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
-            ], 
-    )
-    visualizer_3D_plt.vis_3d_with_plt()
-
-'''
-Differential renderers
-'''
-if opt.render_3d:
-    renderer_3D = renderer_openroomsScene_3D(
-        openrooms_scene, 
-        renderer_option=opt.renderer_option, 
-        host=host, 
-        renderer_params={
-            'pts_from': 'mi', 
-        }
-    )
-    
-    renderer_return_dict = renderer_3D.render(
-        frame_idx=0, 
-        if_show_rendering_plt=True, 
-        render_params={
-            'max_plate': 64, 
-            'emitter_type_index_list': emitter_type_index_list, 
-        })
-    
-    if opt.renderer_option == 'ZQ_emitter':
-        ts = np.median(renderer_return_dict['ts'], axis=1)
-        visibility = np.amax(renderer_return_dict['visibility'], axis=1)
-        print('visibility', visibility.shape, np.sum(visibility)/float(visibility.shape[0]))
-        # from scipy import stats
-        # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
 
 '''
 Evaluator for rad-MLP and inv-MLP
@@ -278,9 +210,90 @@ if opt.eval_rad:
             sample_type='incident', # 'emission', 'incident'
             subsample_rate_pts=1, 
             lighting_scale=0.1, # rescaling the brightness of the envmap
-            if_vis_envmap_2d_plt=True, 
+            if_vis_envmap_2d_plt=False, 
         )
     )
+
+
+'''
+Differential renderers
+'''
+if opt.render_3d:
+    renderer_3D = renderer_openroomsScene_3D(
+        openrooms_scene, 
+        renderer_option=opt.renderer_option, 
+        host=host, 
+        renderer_params={
+            'pts_from': 'mi', 
+        }
+    )
+    
+    renderer_return_dict = renderer_3D.render(
+        frame_idx=0, 
+        if_show_rendering_plt=True, 
+        render_params={
+            'max_plate': 64, 
+            'emitter_type_index_list': emitter_type_index_list, 
+        })
+    
+    if opt.renderer_option == 'ZQ_emitter':
+        ts = np.median(renderer_return_dict['ts'], axis=1)
+        visibility = np.amax(renderer_return_dict['visibility'], axis=1)
+        print('visibility', visibility.shape, np.sum(visibility)/float(visibility.shape[0]))
+        # from scipy import stats
+        # visibility = stats.mode(renderer_return_dict['visibility'], axis=1)[0].flatten()
+
+
+'''
+Matploblib 2D viewer
+'''
+if opt.vis_2d_plt:
+    visualizer_2D = visualizer_scene_2D(
+        openrooms_scene, 
+        modality_list_vis=[
+            'im', 
+            # 'layout', 
+            # 'shapes', 
+            # 'depth', 
+            # 'mi_depth', 
+            # 'normal', 
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
+            'lighting_envmap', 
+            # 'seg_area', 'seg_env', 'seg_obj', 
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            ], 
+        # frame_idx_list=[0, 1, 2, 3, 4], 
+        # frame_idx_list=[0], 
+        frame_idx_list=None, # to use ALL frames in the scene
+    )
+    if opt.if_add_est_from_eval:
+        for modality in ['lighting_envmap']:
+            if modality in eval_return_dict:
+                openrooms_scene.add_modality(eval_return_dict[modality], modality, 'EST')
+
+    visualizer_2D.vis_2d_with_plt(
+        lighting_params={
+            'lighting_scale': 0.1, # rescaling the brightness of the envmap
+            }, 
+            )
+
+'''
+Matploblib 3D viewer
+'''
+if opt.vis_3d_plt:
+    visualizer_3D_plt = visualizer_openroomsScene_3D_plt(
+        openrooms_scene, 
+        modality_list_vis = [
+            'layout', 
+            'poses', # camera center + optical axis
+            # 'shapes', # boxes and labels (no meshes in plt visualization)
+            # 'emitters', # emitter properties
+            # 'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
+            ], 
+    )
+    visualizer_3D_plt.vis_3d_with_plt()
+
 
 '''
 Open3D 3D viewer

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from ..utils_openrooms import get_T_local_to_camopengl_np
 
-def downsample_lighting_envmap(lighting_envmap, downsize_ratio: int=8, lighting_scale: float=1.):
+def downsample_lighting_envmap(lighting_envmap, downsize_ratio: int=20, lighting_scale: float=1.):
     H_grid, W_grid, _, h, w = lighting_envmap.shape
     xx, yy = np.meshgrid(np.arange(0, H_grid, downsize_ratio), np.arange(0, W_grid, downsize_ratio))
     _ = lighting_envmap[xx.T, yy.T, :, :, :] # (30, 40, 3, 8, 16)

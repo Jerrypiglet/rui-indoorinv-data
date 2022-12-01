@@ -199,7 +199,7 @@ def load_h5(path: Path) -> np.ndarray:
 #     normal_torch: (3, H, W)
 #     '''
 
-def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=160, SG_num=12):
+def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=160, SG_num=12, allow_resize=True):
     # print('>>>>load_envmap', Path)
     
     if not Path(path).exists():
@@ -214,6 +214,8 @@ def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=1
     #     if_dump = True
     if '_8x16' in path:
         env_heightOrig, env_widthOrig = 8, 16
+    elif '_128x256' in path:
+        env_heightOrig, env_widthOrig = 128, 256
     else:
         env_heightOrig, env_widthOrig = 16, 32
 
@@ -224,12 +226,12 @@ def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=1
     env = cv2.imread(str(path), -1 ) 
     assert env is not None
 
-    env = env.reshape(env_row, env_heightOrig, env_col,
-        env_widthOrig, 3) # (1920, 5120, 3) -> (120, 16, 160, 32, 3)
+    env = env.reshape(env_row, env_heightOrig, env_col, env_widthOrig, 3) # (1920, 5120, 3) -> (120, 16, 160, 32, 3)
     env = np.ascontiguousarray(env.transpose([4, 0, 2, 1, 3] ) ) # -> (3, 120, 160, 16, 32)
 
     scale = env_heightOrig / env_height
     if scale > 1:
+        assert allow_resize
         env = block_reduce(env, block_size = (1, 1, 1, 2, 2), func = np.mean )
 
     envInd = np.ones([1, 1, 1], dtype=np.float32 )
