@@ -248,6 +248,7 @@ class evaluator_scene_rad():
                     },
                     }
                 mi_rad_list = []
+                print(samples_d.shape[0])
                 for _, (d, x) in tqdm(enumerate(zip(samples_d, samples_o))):
                     sensor = get_rad_meter_sensor(x, d, spp=32)
                     # print(x.shape, d.shape, sensor)

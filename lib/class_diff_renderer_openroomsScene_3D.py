@@ -1,5 +1,4 @@
 import numpy as np
-from tqdm import tqdm
 
 import mitsuba as mi
 # from lib.global_vars import mi_variant
@@ -16,7 +15,7 @@ from lib.utils_rendering_ZQ import rendering_layer_per_point
 from lib.utils_rendering_ZQ_emitter import rendering_layer_per_point_from_emitter
 from lib.utils_misc import get_device, yellow
 
-class renderer_openroomsScene_3D(object):
+class diff_renderer_openroomsScene_3D(object):
     '''
     A class for differentiable renderers of OpenRooms (public/public-re versions) scene contents.
 

@@ -1,4 +1,34 @@
-# OpenRooms_RAW_loader
+
+<!--Generate the TOC via: -->
+<!-- (bash) ../gh-md-toc --insert README.md-->
+<!--See https://github.com/ekalinin/github-markdown-toc#readme-->
+
+<!--ts-->
+* [Description](#description)
+* [Dependencies](#dependencies)
+   * [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
+* [Dataset structure](#dataset-structure)
+* [Notes on coordinate systems](#notes-on-coordinate-systems)
+* [Usage](#usage)
+   * [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
+   * [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
+      * [Matplotlib viewer](#matplotlib-viewer)
+      * [Open3D viewer](#open3d-viewer)
+   * [3D differentiable renderer](#3d-differentiable-renderer)
+      * [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
+      * [Direct-lighting-only renderer](#direct-lighting-only-renderer)
+   * [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
+   * [Evaluator for rad-MLP and inv-MLP](#evaluator-for-rad-mlp-and-inv-mlp)
+      * [rad-MLP](#rad-mlp)
+* [Todolist](#todolist)
+
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+<!-- Added by: jerrypiglet, at: Mon Dec  5 15:43:37 PST 2022 -->
+
+<!--te-->
+
+# Description
+``[TODO] to be updated...``
 
 A dataloader and visualizer for OpenRooms modalities. Given one scene of multi-view observation, the following modalities are supported:
 - 2D Per-pixel Properties:
@@ -256,6 +286,11 @@ Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True
 ```
 ![](images/demo_render_ZQ_emitter_rays_1.png)
 ![](images/demo_render_ZQ_emitter_rays_2.png)
+
+## Renderer via Mitsuba or Blender
+``` bash
+python test_class_mitsubaScene3D.py --render_2d --renderer mi
+```
 
 ## Evaluator for rad-MLP and inv-MLP
 ### rad-MLP

@@ -19,4 +19,6 @@ test_files/
 test_scripts/*.hdr
 test_scripts/*.obj
 
-tmp.py
+tmp*
+README.md.orig*
+README.md.toc*

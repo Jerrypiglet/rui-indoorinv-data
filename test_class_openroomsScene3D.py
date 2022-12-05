@@ -26,7 +26,7 @@ from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
-from lib.class_renderer_openroomsScene_3D import renderer_openroomsScene_3D
+from lib.class_diff_renderer_openroomsScene_3D import diff_renderer_openroomsScene_3D
 from lib.class_eval_rad import evaluator_scene_rad
 
 from lib.utils_misc import str2bool
@@ -147,10 +147,11 @@ openrooms_scene = openroomsScene3D(
         'env_row': 120, 'env_col': 160,  
         # 'env_height': 16, 'env_width': 32, 
         # 'env_height': 8, 'env_width': 16,
-
         # 'env_row': 6, 'env_col': 8,  # load from imenv_128x256_{}.hdr
+
         # 'env_height': 128, 'env_width': 256, 
-        'env_height': 64, 'env_width': 128, 
+        # 'env_height': 64, 'env_width': 128, 
+        'env_height': 2, 'env_width': 4, 
         
         'if_convert_lighting_SG_to_global': True, 
         'if_use_mi_geometry': True, 
@@ -221,7 +222,7 @@ if opt.eval_rad:
 Differential renderers
 '''
 if opt.render_3d:
-    renderer_3D = renderer_openroomsScene_3D(
+    renderer_3D = diff_renderer_openroomsScene_3D(
         openrooms_scene, 
         renderer_option=opt.renderer_option, 
         host=host, 

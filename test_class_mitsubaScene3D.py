@@ -24,6 +24,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_eval_rad import evaluator_scene_rad
+from lib.class_renderer_mitsubaScene_3D import mi_renderer_mitsubaScene_3D
 
 from lib.utils_misc import str2bool
 import argparse
@@ -39,8 +40,12 @@ parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=Tru
 # parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
 
 # differential renderer
-# parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
+# parser.add_argument('--render_diff', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
 # parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
+
+# renderer (mi/blender)
+parser.add_argument('--render_2d', type=str2bool, nargs='?', const=True, default=False, help='render 2D modalities')
+parser.add_argument('--renderer', type=str, default='blender', help='mi, blender')
 
 # evaluator for rad-MLP
 parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
@@ -85,11 +90,6 @@ mitsuba_scene = mitsubaScene3D(
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
         'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
-
-        # sample poses and render images 
-        'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        'poses_sample_num': 200, # Number of poses to sample; set to -1 if not sampling
-        'if_render_im': False, # True to render im with Mitsuba
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
@@ -129,8 +129,8 @@ mitsuba_scene = mitsubaScene3D(
     lighting_params_dict={
         'env_row': 120, 'env_col': 160, 'SG_num': 12, 
         # 'env_height': 2, 'env_width': 4, 
-        # 'env_height': 8, 'env_width': 16, 
-        'env_height': 64, 'env_width': 128, 
+        'env_height': 8, 'env_width': 16, 
+        # 'env_height': 64, 'env_width': 128, 
     }, 
     shape_params_dict={
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
@@ -139,6 +139,33 @@ mitsuba_scene = mitsubaScene3D(
     emitter_params_dict={
         },
 )
+
+'''
+Mitsuba/Blender 2D renderer
+'''
+if opt.render_2d:
+    assert opt.renderer in ['mi', 'blender']
+    modality_list = [
+        'im', # both hdr and sdr
+        'poses', 
+        # 'seg', 
+        # 'albedo', 'roughness', 
+        # 'depth', 'normal', 
+        # 'lighting_envmap', 
+        ]
+    if opt.renderer == 'mi':
+        renderer = mi_renderer_mitsubaScene_3D(
+            mitsuba_scene, 
+            modality_list=modality_list, 
+            im_params_dict={}, 
+            cam_params_dict={}, 
+            mi_params_dict={
+                # sample poses and render images 
+                # 'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
+                'poses_sample_num': 200, # Number of poses to sample; set to -1 if not sampling
+                },
+        )
+    renderer.render()
 
 '''
 Matploblib 2D viewer
