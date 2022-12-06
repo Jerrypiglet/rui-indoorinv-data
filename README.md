@@ -4,23 +4,23 @@
 <!--See https://github.com/ekalinin/github-markdown-toc#readme-->
 
 <!--ts-->
-* [Description](#description)
-* [Dependencies](#dependencies)
-   * [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
-* [Dataset structure](#dataset-structure)
-* [Notes on coordinate systems](#notes-on-coordinate-systems)
-* [Usage](#usage)
-   * [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
-   * [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
-      * [Matplotlib viewer](#matplotlib-viewer)
-      * [Open3D viewer](#open3d-viewer)
-   * [3D differentiable renderer](#3d-differentiable-renderer)
-      * [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
-      * [Direct-lighting-only renderer](#direct-lighting-only-renderer)
-   * [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
-   * [Evaluator for rad-MLP and inv-MLP](#evaluator-for-rad-mlp-and-inv-mlp)
-      * [rad-MLP](#rad-mlp)
-* [Todolist](#todolist)
+- [Description](#description)
+- [Dependencies](#dependencies)
+  - [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
+- [Dataset structure](#dataset-structure)
+- [Notes on coordinate systems](#notes-on-coordinate-systems)
+- [Usage](#usage)
+  - [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
+  - [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
+    - [Matplotlib viewer](#matplotlib-viewer)
+    - [Open3D viewer](#open3d-viewer)
+  - [3D differentiable renderer](#3d-differentiable-renderer)
+    - [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
+    - [Direct-lighting-only renderer](#direct-lighting-only-renderer)
+  - [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
+  - [Evaluator for rad-MLP and inv-MLP](#evaluator-for-rad-mlp-and-inv-mlp)
+    - [rad-MLP](#rad-mlp)
+- [Todolist](#todolist)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 <!-- Added by: jerrypiglet, at: Mon Dec  5 15:43:37 PST 2022 -->
@@ -58,31 +58,55 @@ A dataloader and visualizer for OpenRooms modalities. Given one scene of multi-v
 
 # Dependencies
 
-``` bash
-conda create --name or-py38 python=3.8 pip
-conda activate or-py38
+``` **bash**
+conda create --name or-py310 python=3.10 pip
+conda activate or-py310
 pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113 # not tested with other versions of PyTorch
+[Mac] pip install --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cpu
 pip install -r requirements.txt
 ```
+Install bpy on mac (hopefully ``pip install bpy`` will simply work; if not, :):
 
-Install OpenEXR on mac:
+``` bash
+brew install libomp
+mkdir ~/blender-git
+cd ~/blender-git
+git clone https://git.blender.org/blender.git
+cd blender
+make update
+mkdir ../build
+cd ../build
+
+# ../blender/CMakeLists.txt
+include_directories("/usr/local/include" "/opt/homebrew/opt/libomp/include")
+link_directories("/usr/local/lib" "/opt/homebrew/opt/libomp/lib")
+
+ccmake ../blender
+  WITH_PYTHON_INSTALL=OFF
+  WITH_AUDASPACE=OFF
+  WITH_PYTHON_MODULE=ON
+
+make -j10
+python ../blender/build_files/utils/make_bpy_wheel.py ./bin/
+pip install bin/bpy-***.whl # --force-reinstall if installed before
+```
+
+<!-- Install OpenEXR on mac:
 
 ``` bash
 brew install openexr
 brew install IlmBase
-export CFLAGS="-I/Users/jerrypiglet/miniconda3/envs/dvgo-py38/lib/python3.8/site-packages/mitsuba/include/OpenEXR"
+export CFLAGS="-I/Users/jerrypiglet/miniconda3/envs/or-py310/lib/python3.10/site-packages/mitsuba/include/OpenEXR"
 # export LDFLAGS="-L/opt/homebrew/lib"
 pip install OpenEXR
-```
-
-
+``` -->
 
 Hopefully that was everything. 
 ## Mitsuba 3 based inference, and notes on installation on ARM64 Mac
 On Mac, make sure you are using a arm64 Python binary, installed with arm64 conda for example. Check your python binary type via:
 
 ``` bash
-file /Users/jerrypiglet/miniconda3/envs/dvgo-py38/bin/python
+file /Users/jerrypiglet/miniconda3/envs/or-py310/bin/python
 ```
 
 Then install llvm via:
@@ -282,7 +306,7 @@ set ``--vis_3d_o3d True --if_set_pcd_color_mi True`` to visualize the Mistuba po
 
 Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True``:
 ``` bash
-(dvgo-py38) ➜  OpenRooms_RAW_loader git:(mm1) PYTORCH_ENABLE_MPS_FALLBACK=1 python test_class_openroomsScene3D.py --vis_3d_o3d True --render_3d True --vis_3d_plt False --if_add_rays_from_renderer --renderer_option ZQ_emitter
+(or-py310) ➜  OpenRooms_RAW_loader git:(mm1) PYTORCH_ENABLE_MPS_FALLBACK=1 python test_class_openroomsScene3D.py --vis_3d_o3d True --render_3d True --vis_3d_plt False --if_add_rays_from_renderer --renderer_option ZQ_emitter
 ```
 ![](images/demo_render_ZQ_emitter_rays_1.png)
 ![](images/demo_render_ZQ_emitter_rays_2.png)

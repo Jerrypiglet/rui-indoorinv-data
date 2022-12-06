@@ -37,6 +37,36 @@ class rendererBase():
     def valid_modalities(self):
         ...
 
+    @property
+    def modality_folder_maping(self):
+        return {
+            'im': 'Image', 
+            'depth': 'Depth',
+            'normal': 'Normal',
+            # 'Alpha',
+            # 'IndexOB',
+            'albedo': 'DiffCol',
+            # 'GlossCol',
+            'emission': 'Emit', 
+            'roughness': 'Roughness', 
+            # 'Metallic'
+            }
+
+    @property
+    def modality_filename_maping(self):
+        return {
+            'im': ['*_0001.exr', '%03d_0001.exr'], 
+            'depth': ['', ''], 
+            'normal': ['', ''],
+            # 'Alpha',
+            # 'IndexOB',
+            'albedo': ['', ''],
+            # 'GlossCol',
+            'emission': ['', ''], 
+            'roughness': ['', ''], 
+            # 'Metallic'
+            }
+
     def check_and_sort_modalities(self, modalitiy_list):
         modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
         for _ in modalitiy_list_new:
@@ -46,3 +76,26 @@ class rendererBase():
     @abstractmethod
     def render(self):
         ...
+
+    def render_modality_check(self, modality):
+        assert modality in self.modality_folder_maping
+        folder_name = self.modality_folder_maping[modality]
+        render_folder_path = self.scene_rendering_path / folder_name
+        assert modality in self.modality_filename_maping
+        filename_pattern = self.modality_filename_maping[modality][0]
+
+        if_render = 'y'
+        files = sorted(glob.glob(str(render_folder_path / filename_pattern)))
+        if len(files) > 0:
+            if_render = input(red("[%s] %d %s files found at %s. Re-render? [y/n]"%(modality, len(files), filename_pattern, str(render_folder_path))))
+        if if_render in ['N', 'n']:
+            print(yellow('ABORTED rendering by Mitsuba'))
+            return
+        else:
+            if render_folder_path.exists():
+                shutil.rmtree(str(render_folder_path))
+            render_folder_path.mkdir(parents=True, exist_ok=True)
+            print(yellow('Files removed from %s'%str(render_folder_path)))
+
+        return folder_name, render_folder_path
+

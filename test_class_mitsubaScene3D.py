@@ -24,7 +24,8 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_eval_rad import evaluator_scene_rad
-from lib.class_renderer_mitsubaScene_3D import mi_renderer_mitsubaScene_3D
+from lib.class_renderer_mi_mitsubaScene_3D import renderer_mi_mitsubaScene_3D
+from lib.class_renderer_blender_mitsubaScene_3D import renderer_blender_mitsubaScene_3D
 
 from lib.utils_misc import str2bool
 import argparse
@@ -64,9 +65,9 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 xml_filename = 'scene_v3.xml'
 scene_name = 'kitchen'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
-# split = 'train'; frame_ids = list(range(0, 189, 40))
+split = 'train'; frame_ids = list(range(0, 189, 40))
 # split = 'train'; frame_ids = list(range(0, 10, 1))
-split = 'train'; frame_ids = [0]
+# split = 'train'; frame_ids = [0]
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -80,7 +81,7 @@ mitsuba_scene = mitsubaScene3D(
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': intrinsics_path, 
         'up_axis': 'y+', 
-        # 'pose_file': ('OpenRooms', 'cam.txt'), 
+        # 'pose_file': ('Blender', 'train.npy'), 
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
         'pose_file': ('json', 'transforms.json'), # in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         }, 
@@ -90,19 +91,22 @@ mitsuba_scene = mitsubaScene3D(
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
         'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
+        # sample poses and render images 
+        # 'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
+        'poses_sample_num': 200, # Number of poses to sample; set to -1 if not sampling
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'im_hdr', 
-        'im_sdr', 
+        # 'im_hdr', 
+        # 'im_sdr', 
         'poses', 
         # 'seg', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
-        'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'layout', 
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
     im_params_dict={
         # 'im_H_resize': 480, 'im_W_resize': 640, 
@@ -154,17 +158,25 @@ if opt.render_2d:
         # 'lighting_envmap', 
         ]
     if opt.renderer == 'mi':
-        renderer = mi_renderer_mitsubaScene_3D(
+        renderer = renderer_mi_mitsubaScene_3D(
             mitsuba_scene, 
             modality_list=modality_list, 
             im_params_dict={}, 
             cam_params_dict={}, 
-            mi_params_dict={
-                # sample poses and render images 
-                # 'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-                'poses_sample_num': 200, # Number of poses to sample; set to -1 if not sampling
-                },
+            mi_params_dict={},
         )
+    if opt.renderer == 'blender':
+        renderer = renderer_blender_mitsubaScene_3D(
+            mitsuba_scene, 
+            modality_list=modality_list, 
+            host=host, 
+            FORMAT='OPEN_EXR', 
+            # FORMAT='PNG', 
+            im_params_dict={}, 
+            cam_params_dict={}, 
+            mi_params_dict={},
+        )
+    host=host, 
     renderer.render()
 
 '''

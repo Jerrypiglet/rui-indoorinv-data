@@ -288,7 +288,7 @@ class mitsubaScene3D(mitsubaBase):
             if self.pose_file.exists():
                 if_resample = input(red("pose file exists: %s. Resample pose? [y/n]"%str(self.pose_file)))
             if if_resample in ['Y', 'y']:
-                self.mi_renderer.sample_poses(self.mi_params_dict.get('pose_sample_num'), cam_params_dict)
+                self.sample_poses(self.mi_params_dict.get('pose_sample_num'), cam_params_dict)
             else:
                 print(yellow('ABORTED resample pose.'))
         else:
@@ -328,7 +328,7 @@ class mitsubaScene3D(mitsubaBase):
                 Liwen's Blender convention: (N, 2, 3), [t, euler angles]
                 Blender x y z == Mitsuba x z -y; Mitsuba x y z == Blender x z -y
             Json:
-                Liwen's NeRF poses; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+                Liwen's NeRF poses: [R, t]; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
             '''
             T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
             '''
@@ -336,30 +336,32 @@ class mitsubaScene3D(mitsubaBase):
             '''
             scale_m2b = np.array([0.206,0.206,0.206], dtype=np.float32).reshape((3, 1))
             trans_m2b = np.array([-0.074684,0.23965,-0.30727], dtype=np.float32).reshape((3, 1))
-            t_c2w_b_list, R_c2w_b_list = [], []
+            self.t_c2w_b_list, self.R_c2w_b_list = [], []
 
             if self.pose_format == 'Blender':
                 cam_params = np.load(self.pose_file)
                 assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
-                T_c_b2m = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., -1.]], dtype=np.float32)
+                self.T_c_b2m = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., -1.]], dtype=np.float32)
                 for idx in self.frame_id_list:
-                    R_c2w_b_list.append(scipy.spatial.transform.Rotation.from_euler('xyz', [cam_params[idx][1][0], cam_params[idx][1][1], cam_params[idx][1][2]]).as_matrix())
-                    t_c2w_b_list.append(cam_param[0].reshape((3, 1)).astype(np.float32))
+                    R_ = scipy.spatial.transform.Rotation.from_euler('xyz', [cam_params[idx][1][0], cam_params[idx][1][1], cam_params[idx][1][2]])
+                    self.R_c2w_b_list.append(R_.as_matrix())
+                    assert np.allclose(R_.as_euler('xyz'), cam_params[idx][1])
+                    self.t_c2w_b_list.append(cam_params[idx][0].reshape((3, 1)).astype(np.float32))
             
             elif self.pose_format == 'json':
-                T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
+                self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
                 for idx in self.frame_id_list:
                     pose = np.array(self.meta['frames'][idx]['transform_matrix'])[:3, :4].astype(np.float32)
-                    R_c2w_b_list.append(np.split(pose, (3,), axis=1)[0])
-                    t_c2w_b_list.append(np.split(pose, (3,), axis=1)[1])
+                    self.R_c2w_b_list.append(np.split(pose, (3,), axis=1)[0])
+                    self.t_c2w_b_list.append(np.split(pose, (3,), axis=1)[1])
 
-            for R_c2w_b, t_c2w_b in zip(R_c2w_b_list, t_c2w_b_list):
+            for R_c2w_b, t_c2w_b in zip(self.R_c2w_b_list, self.t_c2w_b_list):
                 R_c2w_b = R_c2w_b / np.linalg.norm(R_c2w_b, axis=1, keepdims=True)
                 assert abs(1.-np.linalg.det(R_c2w_b))<1e-6
                 t_c2w_b = (t_c2w_b - trans_m2b) / scale_m2b
                 t = T_w_b2m @ t_c2w_b # -> t_c2w_w
 
-                R = T_w_b2m @ R_c2w_b @ T_c_b2m # https://i.imgur.com/nkzfvwt.png
+                R = T_w_b2m @ R_c2w_b @ self.T_c_b2m # https://i.imgur.com/nkzfvwt.png
 
                 _, __, at_vector = np.split(R, 3, axis=-1)
                 at_vector = normalize_v(at_vector)
@@ -415,33 +417,6 @@ class mitsubaScene3D(mitsubaBase):
                 convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=1.)
 
         print(blue_text('[mitsubaScene] DONE. load_im_hdr'))
-
-    def get_sensor(self, origin, target, up):
-        from mitsuba import ScalarTransform4f as T
-        return mi.load_dict({
-            'type': 'perspective',
-            'fov': np.arctan(self.K[0][2]/self.K[0][0])/np.pi*180.*2.,
-            'fov_axis': 'x',
-            'to_world': T.look_at(
-                origin=mi.ScalarPoint3f(origin.flatten()),
-                target=mi.ScalarPoint3f(target.flatten()),
-                up=mi.ScalarPoint3f(up.flatten()),  
-            ),
-            'sampler': {
-                'type': 'independent',
-                'sample_count': int(self.spp), 
-            },
-            'film': {
-                'type': 'hdrfilm',
-                'width': self.im_W_load,
-                'height': self.im_H_load,
-                'rfilter': {
-                    'type': 'tent',
-                },
-                'pixel_format': 'rgb',
-            },
-        })
-
 
     def load_shapes(self, shape_params_dict={}):
         '''
@@ -579,3 +554,123 @@ class mitsubaScene3D(mitsubaBase):
         '''
         self.if_loaded_colors = False
         return
+
+    
+    def sample_poses(self, pose_sample_num: int):
+        '''
+        sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)
+        '''
+        assert False, 'not tested'
+        from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
+        assert self.up_axis == 'y+', 'not supporting other axes for now'
+        if not self.if_loaded_layout: self.load_layout()
+
+        lverts = self.layout_box_3d_transformed
+        boxes = [[bverts, bfaces] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) if not shape['is_layout']]
+        cads = [[vertices, faces] for vertices, faces, shape in zip(self.vertices_list, self.faces_list, self.shape_list_valid) if not shape['is_layout']]
+
+        self.cam_params_dict['samplePoint'] = pose_sample_num
+        origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
+            scene_dict={
+                'lverts': lverts, 
+                'boxes': boxes, 
+                'cads': cads, 
+            }, 
+            program_dict={}, 
+            param_dict=self.cam_params_dict, 
+            path_dict={},
+        ) # [pointLoc; target; up]
+
+        pose_list = []
+        origin_lookatvector_up_list = []
+        for cam_param in origin_lookat_up_list:
+            origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+            origin = origin.flatten()
+            lookat = lookat.flatten()
+            up = up.flatten()
+            at_vector = normalize_v(lookat - origin)
+            assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
+            t = origin.reshape((3, 1)).astype(np.float32)
+            R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
+            pose_list.append(np.hstack((R, t)))
+            origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+
+        # self.pose_list = pose_list[:pose_sample_num]
+        # return
+
+        H, W = self.im_H_load//4, self.im_W_load//4
+        scale_factor = [t / s for t, s in zip((H, W), (self.im_H_load, self.im_W_load))]
+        K = resize_intrinsics(self.K, scale_factor)
+        tmp_cam_rays_list = self.get_cam_rays_list(H, W, K, pose_list)
+        normal_costs = []
+        depth_costs = []
+        normal_list = []
+        depth_list = []
+        for _, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(tmp_cam_rays_list)):
+            rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
+
+            xs_mi = mi.Point3f(self.to_d(rays_o_flatten))
+            ds_mi = mi.Vector3f(self.to_d(rays_d_flatten))
+            rays_mi = mi.Ray3f(xs_mi, ds_mi)
+            ret = self.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+            rays_v_flatten = ret.t.numpy()[:, np.newaxis] * rays_d_flatten
+
+            mi_depth = np.sum(rays_v_flatten.reshape(H, W, 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
+            invalid_depth_mask = np.logical_or(np.isnan(mi_depth), np.isinf(mi_depth))
+            mi_depth[invalid_depth_mask] = 0
+            depth_list.append(mi_depth)
+
+            mi_normal = ret.n.numpy().reshape(H, W, 3)
+            mi_normal[invalid_depth_mask, :] = 0
+            normal_list.append(mi_normal)
+
+            mi_normal = mi_normal.astype(np.float32)
+            mi_normal_gradx = np.abs(mi_normal[:, 1:] - mi_normal[:, 0:-1])[~invalid_depth_mask[:, 1:]]
+            mi_normal_grady = np.abs(mi_normal[1:, :] - mi_normal[0:-1, :])[~invalid_depth_mask[1:, :]]
+            ncost = (np.mean(mi_normal_gradx) + np.mean(mi_normal_grady)) / 2.
+        
+            dcost = np.mean(np.log(mi_depth + 1)[~invalid_depth_mask])
+
+            assert not np.isnan(ncost) and not np.isnan(dcost)
+            normal_costs.append(ncost)
+            # depth_costs.append(dcost)
+
+        normal_costs = np.array(normal_costs, dtype=np.float32)
+        # depth_costs = np.array(depth_costs, dtype=np.float32)
+        # normal_costs = (normal_costs - normal_costs.min()) \
+        #         / (normal_costs.max() - normal_costs.min())
+        # depth_costs = (depth_costs - depth_costs.min()) \
+        #         / (depth_costs.max() - depth_costs.min())
+        # totalCosts = normal_costs + 0.3 * depth_costs
+        totalCosts = normal_costs
+        camIndex = np.argsort(totalCosts)[::-1]
+
+        tmp_rendering_path = self.PATH_HOME / 'mitsuba' / 'tmp_sample_poses_rendering'
+        if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path))
+        tmp_rendering_path.mkdir(parents=True, exist_ok=True)
+        print(blue_text('Dumping tmp normal and depth by Mitsuba: %s')%str(tmp_rendering_path))
+        for i in tqdm(camIndex):
+            imageio.imwrite(str(tmp_rendering_path / ('normal_%04d.png'%i)), (np.clip((normal_list[camIndex[i]] + 1.)/2., 0., 1.)*255.).astype(np.uint8))
+            imageio.imwrite(str(tmp_rendering_path / ('depth_%04d.png'%i)), (np.clip(depth_list[camIndex[i]] / np.amax(depth_list[camIndex[i]]+1e-6), 0., 1.)*255.).astype(np.uint8))
+        print(blue_text('DONE.'))
+        # print(normal_costs[camIndex])
+
+        self.pose_list = [pose_list[_] for _ in camIndex[:pose_sample_num]]
+        self.origin_lookatvector_up_list = [origin_lookatvector_up_list[_] for _ in camIndex[:pose_sample_num]]
+
+        # if self.pose_file.exists():
+        #     txt = input(red("pose_list loaded. Overrite cam.txt? [y/n]"))
+        #     if txt in ['N', 'n']:
+        #         return
+    
+        with open(str(self.pose_file), 'w') as camOut:
+            cam_poses_write = [origin_lookat_up_list[_] for _ in camIndex[:pose_sample_num]]
+            camOut.write('%d\n'%len(cam_poses_write))
+            print('Final sampled camera poses: %d'%len(cam_poses_write))
+            for camPose in cam_poses_write:
+                for n in range(0, 3):
+                    camOut.write('%.3f %.3f %.3f\n'%\
+                        (camPose[n, 0], camPose[n, 1], camPose[n, 2]))
+        print(blue_text('cam.txt written to %s.'%str(self.pose_file)))
+
+
