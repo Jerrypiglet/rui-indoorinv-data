@@ -419,7 +419,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         self.if_loaded_colors = True
 
-    def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False):
+    def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False, if_lighting=False):
         '''
         fuse depth maps (and RGB, normals) into point clouds in global coordinates of OpenCV convention
 
@@ -443,7 +443,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         rgb_global_list = []
         normal_global_list = []
         X_flatten_mask_list = []
-        X_lighting_flatten_mask_list = []
 
         for frame_idx in tqdm(range(len(self.frame_id_list))):
             H_color, W_color = self.im_H_resize, self.im_W_resize
@@ -456,12 +455,14 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 z_ = self.depth_list[frame_idx]
 
             if if_use_mi_geometry:
-                obj_mask = self.mi_seg_dict_of_lists['obj'][frame_idx] + self.mi_seg_dict_of_lists['area'][frame_idx] # geometry is defined for objects + emitters
+                seg_dict_of_lists = self.mi_seg_dict_of_lists
             else:
-                obj_mask = self.seg_dict_of_lists['obj'][frame_idx] + self.seg_dict_of_lists['area'][frame_idx] # geometry is defined for objects + emitters
+                seg_dict_of_lists = self.seg_dict_of_lists
+            if if_lighting:
+                obj_mask = seg_dict_of_lists['obj'][frame_idx]
+            else:
+                obj_mask = seg_dict_of_lists['obj'][frame_idx] + seg_dict_of_lists['area'][frame_idx] # geometry is defined for objects + emitters
             assert obj_mask.shape[:2] == (H_color, W_color)
-            lighting_mask = self.seg_dict_of_lists['obj'][frame_idx] # lighting is defined for non-emitter objects only
-            assert lighting_mask.shape[:2] == (H_color, W_color)
 
             if subsample_HW_rates != (1, 1):
                 x_ = x_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
@@ -469,11 +470,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 z_ = z_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
                 H_color, W_color = H_color//subsample_HW_rates[0], W_color//subsample_HW_rates[1]
                 obj_mask = obj_mask[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
-                lighting_mask = lighting_mask[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
                 
             z_ = z_.flatten()
             X_flatten_mask = np.logical_and(z_ > 0, obj_mask.flatten() > 0)
-            X_lighting_flatten_mask = np.logical_and(z_ > 0, lighting_mask.flatten() > 0)
             
             z_ = z_[X_flatten_mask]
             x_ = x_.flatten()[X_flatten_mask]
@@ -481,7 +480,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             if self.if_debug_info:
                 print('Valid pixels percentage: %.4f'%(sum(X_flatten_mask)/float(H_color*W_color)))
             X_flatten_mask_list.append(X_flatten_mask)
-            X_lighting_flatten_mask_list.append(X_lighting_flatten_mask)
 
             X_ = np.stack([x_, y_, z_], axis=-1)
             t = self.pose_list[frame_idx][:3, -1].reshape((3, 1))
@@ -517,7 +515,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         geo_fused_dict = {'X': X_global, 'rgb': rgb_global, 'normal': normal_global}
 
-        return geo_fused_dict, X_flatten_mask_list, X_lighting_flatten_mask_list
+        return geo_fused_dict, X_flatten_mask_list
 
     def _fuse_3D_lighting(self, lighting_source: str, subsample_rate_pts: int=1, if_use_mi_geometry: bool=False):
         '''
@@ -541,7 +539,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         assert lighting_source in ['lighting_SG', 'lighting_envmap'] # not supporting 'lighting_sampled' yet
 
-        geo_fused_dict, _, X_lighting_flatten_mask_list = self._fuse_3D_geometry(subsample_rate_pts=subsample_rate_pts, subsample_HW_rates=self.im_lighting_HW_ratios, if_use_mi_geometry=if_use_mi_geometry)
+        geo_fused_dict, X_lighting_flatten_mask_list = self._fuse_3D_geometry(subsample_rate_pts=subsample_rate_pts, subsample_HW_rates=self.im_lighting_HW_ratios, if_use_mi_geometry=if_use_mi_geometry, if_lighting=True)
         X_global_lighting, normal_global_lighting = geo_fused_dict['X'], geo_fused_dict['normal']
 
         if lighting_source == 'lighting_SG':
@@ -568,6 +566,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             if lighting_source == 'lighting_envmap':
                 env_height, env_width = get_list_of_keys(self.lighting_params_dict, ['env_height', 'env_width'], [int, int])
                 axis_np_global = get_lighting_envmap_dirs_global(self.pose_list[idx], normal_list[idx], env_height, env_width)
+                env_row, env_col = get_list_of_keys(self.lighting_params_dict, ['env_row', 'env_col'], [int, int])
+                weight_np = self.lighting_envmap_list[idx].transpose(0, 1, 3, 4, 2).reshape(env_row*env_col, env_height*env_width, 3)
 
             if lighting_source == 'lighting_SG':
                 lamb_np = lighting_global[:, :, :, 3:4].reshape(-1, wi_num, 1)

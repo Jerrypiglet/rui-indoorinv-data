@@ -231,6 +231,7 @@ def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=1
 
     scale = env_heightOrig / env_height
     if scale > 1:
+        import ipdb; ipdb.set_trace()
         assert allow_resize
         env = block_reduce(env, block_size = (1, 1, 1, 2, 2), func = np.mean )
 

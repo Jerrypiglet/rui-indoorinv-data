@@ -128,30 +128,30 @@ openrooms_scene = openroomsScene3D(
         'poses', 
         'seg', 'im_hdr', 
         # 'albedo', 'roughness', 
-        # 'depth', 'normal', 
+        'depth', 'normal', 
         # 'lighting_SG', 
-        # 'lighting_envmap', 
+        'lighting_envmap', 
         # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
     im_params_dict={
         'im_H_load': 480, 'im_W_load': 640, 
         # 'im_H_resize': 240, 'im_W_resize': 320, 
-        # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
-        'im_H_resize': 6, 'im_W_resize': 8, # to use for rendering so that im dimensions == lighting dimensions
+        'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
+        # 'im_H_resize': 6, 'im_W_resize': 8, # to use for rendering so that im dimensions == lighting dimensions
         'if_direct_lighting': False, # if load direct lighting envmaps and SGs inetad of total lighting
         }, 
     lighting_params_dict={
         'SG_num': 12,
         'env_row': 120, 'env_col': 160,  
         # 'env_height': 16, 'env_width': 32, 
-        # 'env_height': 8, 'env_width': 16,
+        'env_height': 8, 'env_width': 16,
         # 'env_row': 6, 'env_col': 8,  # load from imenv_128x256_{}.hdr
 
         # 'env_height': 128, 'env_width': 256, 
         # 'env_height': 64, 'env_width': 128, 
-        'env_height': 2, 'env_width': 4, 
+        # 'env_height': 2, 'env_width': 4, 
         
         'if_convert_lighting_SG_to_global': True, 
         'if_use_mi_geometry': True, 
@@ -308,11 +308,11 @@ if opt.vis_3d_o3d:
             # 'dense_geo', 
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
-            # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
+            'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             # 'emitters', # emitter properties (e.g. SGs, half envmaps)
-            'mi', # mitsuba sampled rays, pts
+            # 'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -330,6 +330,7 @@ if opt.vis_3d_o3d:
         # 'lighting_keep_ratio': 0., # - debug
         # 'lighting_further_clip_ratio': 0., 
         'lighting_autoscale': False, 
+        'lighting_if_show_hemisphere': True, # mainly to show hemisphere: images/demo_lighting_envmap_hemisphere_o3d.png
         }
 
     if opt.if_set_pcd_color_mi:
@@ -390,7 +391,7 @@ if opt.vis_3d_o3d:
             'if_cam_traj': False, 
             }, 
         dense_geo_params={
-            'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
+            'subsample_pcd_rate': 100, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
             'if_ceiling': False, # remove ceiling points to better see the furniture 
             'if_walls': False, # remove wall points to better see the furniture 
             'if_normal': False, # turn off normals to avoid clusters

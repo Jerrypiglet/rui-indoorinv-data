@@ -435,7 +435,7 @@ class visualizer_scene_3D_o3d(object):
         if_normal = dense_geo_params.get('if_normal', False)
         subsample_normal_rate_x = dense_geo_params.get('subsample_normal_rate_x', 5) # subsample_normal_rate_x is multiplicative to subsample_pcd_rate
 
-        self.geo_fused_dict, _, _ = self.os._fuse_3D_geometry(subsample_rate=subsample_pcd_rate)
+        self.geo_fused_dict, _ = self.os._fuse_3D_geometry(subsample_rate=subsample_pcd_rate)
 
         xyz_pcd, rgb_pcd, normal_pcd = get_list_of_keys(self.geo_fused_dict, ['X', 'rgb', 'normal'])
         # N_pcd = xyz_pcd.shape[0]
@@ -486,7 +486,6 @@ class visualizer_scene_3D_o3d(object):
         geometry_list += [pcd]
 
         if if_normal:
-
             normal_length = np.amin(xyz_pcd_max - xyz_pcd_min) / 5.
             if pcd_mask is not None:
                 normal_pcd = normal_pcd[pcd_mask]
@@ -523,6 +522,10 @@ class visualizer_scene_3D_o3d(object):
         subsample_lighting_pts_rate = lighting_params.get('subsample_lighting_pts_rate', 1)
         lighting_envmap_fused_dict = self.os._fuse_3D_lighting(subsample_rate_pts=subsample_lighting_pts_rate, lighting_source='lighting_envmap')
 
+        lighting_if_show_hemisphere = lighting_params.get('lighting_if_show_hemisphere', False)
+        if lighting_if_show_hemisphere:
+            lighting_envmap_fused_dict['weight'] = np.ones_like(lighting_envmap_fused_dict['weight'], dtype=np.float32)
+
         geometry_list = self.process_lighting(lighting_envmap_fused_dict, lighting_params=lighting_params, lighting_source='lighting_envmap', lighting_color=[1., 0., 1.]) # pink
         return geometry_list
 
@@ -536,6 +539,14 @@ class visualizer_scene_3D_o3d(object):
         lighting_keep_ratio = lighting_params.get('lighting_keep_ratio', 0.05)
         lighting_further_clip_ratio = lighting_params.get('lighting_further_clip_ratio', 0.1)
         lighting_autoscale = lighting_params.get('lighting_autoscale', True)
+
+        lighting_if_show_hemisphere = lighting_params.get('lighting_if_show_hemisphere', False) # images/demo_lighting_envmap_hemisphere_o3d.png
+        if lighting_if_show_hemisphere:
+            lighting_keep_ratio = 0.
+            lighting_further_clip_ratio = 0.
+            lighting_autoscale = False
+            lighting_scale = 10.
+
         # if lighting_autoscale:
         #     lighting_scale = 1.
 

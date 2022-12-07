@@ -119,7 +119,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         self.modal_file_outputs = []
         render_folder_path_list = []
         for _ in self.modality_list:
-            folder_name, render_folder_path = self.render_modality_check(_, force=True) # _: 'im', folder_name: 'Image'
+            folder_name, render_folder_path = self.render_modality_check(_, force=False) # _: 'im', folder_name: 'Image'
             modal_file_output = self.tree.nodes.new(type="CompositorNodeOutputFile")
             modal_file_output.label = _
             self.links.new(self.render_layers.outputs[folder_name], modal_file_output.inputs[0]) # (self.render_layers.outputs[folder_name], bpy.data.scenes['Scene'].node_tree.nodes["File Output"].inputs[0])
