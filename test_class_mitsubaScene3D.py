@@ -66,8 +66,8 @@ xml_filename = 'scene_v3.xml'
 scene_name = 'kitchen'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 189, 40))
-split = 'train'; frame_ids = list(range(0, 4, 1))
-# split = 'train'; frame_ids = [0]
+# split = 'train'; frame_ids = list(range(0, 4, 1))
+split = 'train'; frame_ids = [0]
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -97,22 +97,22 @@ mitsuba_scene = mitsubaScene3D(
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        # 'im_hdr', 
-        # 'im_sdr', 
+        'im_hdr', 
+        'im_sdr', 
         'poses', 
         # 'seg', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
-        # 'lighting_envmap', 
+        'lighting_envmap', 
         # 'layout', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
     im_params_dict={
         # 'im_H_resize': 480, 'im_W_resize': 640, 
         'im_H_load': 320, 'im_W_load': 640, 
-        # 'im_H_resize': 160, 'im_W_resize': 320, 
-        'im_H_resize': 1, 'im_W_resize': 2, 
+        'im_H_resize': 160, 'im_W_resize': 320, 
+        # 'im_H_resize': 1, 'im_W_resize': 2, 
         # 'im_H_resize': 32, 'im_W_resize': 64, 
         # 'spp': 2048, 
         'spp': 16, 
@@ -131,10 +131,11 @@ mitsuba_scene = mitsubaScene3D(
         'if_vis_plt': False, # images/demo_sample_pose.png
     }, 
     lighting_params_dict={
-        'env_row': 120, 'env_col': 160, 'SG_num': 12, 
+        'SG_num': 12, 
+        'env_row': 8, 'env_col': 16, 
         # 'env_height': 2, 'env_width': 4, 
-        'env_height': 8, 'env_width': 16, 
-        # 'env_height': 64, 'env_width': 128, 
+        # 'env_height': 8, 'env_width': 16, 
+        'env_height': 128, 'env_width': 256, 
     }, 
     shape_params_dict={
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
@@ -150,13 +151,13 @@ Mitsuba/Blender 2D renderer
 if opt.render_2d:
     assert opt.renderer in ['mi', 'blender']
     modality_list = [
-        'im', # both hdr and sdr
+        # 'im', # both hdr and sdr
         # 'poses', 
         # 'seg', 
         # 'albedo', 
         # 'roughness', 
         # 'depth', 'normal', 
-        # 'lighting_envmap', 
+        'lighting_envmap', 
         ]
     if opt.renderer == 'mi':
         renderer = renderer_mi_mitsubaScene_3D(
@@ -191,20 +192,21 @@ if opt.vis_2d_plt:
             # 'layout', 
             # 'shapes', 
             # 'depth', 
-            'mi_depth', 
+            # 'mi_depth', 
             # 'normal', 
-            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
-            # 'lighting_envmap', 
+            'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
             # 'seg_area', 'seg_env', 'seg_obj', 
-            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
-        frame_idx_list=[0, 1, 2, 3, 4], 
-        # frame_idx_list=[0], 
+        # frame_idx_list=[0, 1, 2, 3, 4], 
+        frame_idx_list=[0], 
     )
     visualizer_2D.vis_2d_with_plt(
         lighting_params={
-            'lighting_scale': 0.01, # rescaling the brightness of the envmap
+            'lighting_scale': 1., # rescaling the brightness of the envmap
+            'downsize_ratio': 1, 
             }, 
             )
 

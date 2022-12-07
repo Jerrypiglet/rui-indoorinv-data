@@ -49,6 +49,7 @@ class rendererBase():
             # 'GlossCol',
             'emission': 'Emit', 
             'roughness': 'Roughness', 
+            'lighting_envmap': 'LightingEnvmap', 
             # 'Metallic'
             }
 
@@ -56,6 +57,7 @@ class rendererBase():
     def modality_filename_maping(self):
         return {
             'im': ['*_0001.exr', '%03d_0001.exr'], 
+            'lighting_envmap': ['*_0001.exr', '%03d_0001.exr'], 
             'depth': ['', ''], 
             'normal': ['', ''],
             # 'Alpha',
@@ -101,4 +103,5 @@ class rendererBase():
             print(yellow('Files removed from %s'%str(render_folder_path)))
 
         return folder_name, render_folder_path
+
 

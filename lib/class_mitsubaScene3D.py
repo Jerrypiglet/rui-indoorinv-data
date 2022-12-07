@@ -86,6 +86,7 @@ class mitsubaScene3D(mitsubaBase):
 
         self.im_sdr_ext = im_params_dict.get('im_sdr_ext', 'png')
         self.im_hdr_ext = im_params_dict.get('im_hdr_ext', 'exr')
+        self.lighting_envmap_ext = im_params_dict.get('lighting_envmap_ext', 'exr')
 
         self.near = cam_params_dict.get('near', 0.1)
         self.far = cam_params_dict.get('far', 10.)
@@ -117,13 +118,14 @@ class mitsubaScene3D(mitsubaBase):
         self.load_poses(self.cam_params_dict)
 
         self.load_modalities_3D()
+        self.est = {}
 
         self.get_cam_rays(self.cam_params_dict)
         self.process_mi_scene(self.mi_params_dict)
 
     @property
     def valid_modalities(self):
-        return ['layout', 'shapes', 'im_hdr', 'im_sdr']
+        return ['layout', 'shapes', 'im_hdr', 'im_sdr', 'lighting_envmap']
 
     def check_and_sort_modalities(self, modalitiy_list):
         modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
@@ -142,6 +144,10 @@ class mitsubaScene3D(mitsubaBase):
     @property
     def if_has_poses(self):
         return hasattr(self, 'pose_list')
+
+    @property
+    def if_has_lighting_envmap(self):
+        return hasattr(self, 'lighting_envmap_list')
 
     @property
     def if_has_depth_normal(self):
@@ -181,8 +187,10 @@ class mitsubaScene3D(mitsubaBase):
             if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'im_sdr': self.load_im_sdr()
             if _ == 'im_hdr': self.load_im_hdr()
+            if _ == 'lighting_envmap': self.load_lighting_envmap()
 
-    def get_modality(self, modality):
+    def get_modality(self, modality, source: str='GT'):
+        assert source in ['GT'], 'no support for EST modality yet.'
         # if modality in super().valid_modalities:
             # return super(mitsubaScene3D, self).get_modality(modality)
 
@@ -193,6 +201,8 @@ class mitsubaScene3D(mitsubaBase):
             return self.mi_depth_list
         elif modality == 'mi_normal': 
             return self.mi_normal_global_list
+        elif modality == 'lighting_envmap': 
+            return self.lighting_envmap_list
         elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
             seg_key = modality.split('_')[-1] 
             return self.mi_seg_dict_of_lists[seg_key]
@@ -413,10 +423,31 @@ class mitsubaScene3D(mitsubaBase):
         for im_hdr_file, im_hdr in zip(self.im_hdr_file_list, self.im_hdr_list):
             im_sdr_file = Path(str(im_hdr_file).replace(self.im_hdr_ext, self.im_sdr_ext))
             if not im_sdr_file.exists():
-                print(yellow('[mitsubaScene] load_im_hdr: converting HDR to SDR and write to disk'), + '-> %s'%str(im_sdr_file))
+                print(yellow('[mitsubaScene] load_im_hdr: converting HDR to SDR and write to disk'))
+                print('-> %s'%str(im_sdr_file))
                 convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=1.)
 
         print(blue_text('[mitsubaScene] DONE. load_im_hdr'))
+
+    def load_lighting_envmap(self):
+        '''
+        load im in HDR; RGB, N * (H, W, 3), [0., 1.]
+        '''
+        print(white_blue('[mitsubaScene] load_lighting_envmap'))
+
+        self.lighting_envmap_list = []
+
+        env_row, env_col, env_height, env_width = get_list_of_keys(self.lighting_params_dict, ['env_row', 'env_col', 'env_height', 'env_width'], [int, int, int, int])
+        for i in tqdm(self.frame_id_list):
+            envmap = np.zeros((env_row, env_col, 3, env_height, env_width), dtype=np.float32)
+            for env_idx in tqdm(range(env_row*env_col)):
+                lighting_envmap_file_path = self.scene_rendering_path / 'LightingEnvmap' / ('%03d_%03d.%s'%(i, env_idx, self.lighting_envmap_ext))
+                lighting_envmap = load_img(lighting_envmap_file_path, ext=self.lighting_envmap_ext, target_HW=(env_height, env_width))
+                envmap[env_idx//env_col, env_idx-env_col*(env_idx//env_col)] = lighting_envmap.transpose((2, 0, 1))
+            self.lighting_envmap_list.append(envmap)
+        assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
+
+        print(blue_text('[mitsubaScene] DONE. load_lighting_envmap'))
 
     def load_shapes(self, shape_params_dict={}):
         '''
@@ -555,7 +586,24 @@ class mitsubaScene3D(mitsubaBase):
         self.if_loaded_colors = False
         return
 
-    
+    def get_envmap_axes(self):
+        from utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np
+        assert self.if_has_mitsuba_all
+        normal_list = self.mi_normal_list
+        resample_ratio = self.H // self.lighting_params_dict['env_row']
+        assert resample_ratio == self.W // self.lighting_params_dict['env_col']
+        assert resample_ratio > 0
+
+        lighting_local_xyz = np.tile(np.eye(3, dtype=np.float32)[np.newaxis, np.newaxis, ...], (self.H, self.W, 1, 1))
+        lighting_global_xyz_list, lighting_global_pts_list = [], []
+        for _idx in self.frame_id_list:
+            lighting_global_xyz = convert_lighting_axis_local_to_global_np(lighting_local_xyz, self.pose_list[_idx], normal_list[_idx])[::resample_ratio, ::resample_ratio]
+            lighting_global_pts = np.tile(np.expand_dims(self.mi_pts_list[_idx], 2), (1, 1, 3, 1))[::resample_ratio, ::resample_ratio]
+            assert lighting_global_xyz.shape == lighting_global_pts.shape == (self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col'], 3, 3)
+            lighting_global_xyz_list.append(lighting_global_xyz)
+            lighting_global_pts_list.append(lighting_global_pts)
+        return lighting_global_xyz_list, lighting_global_pts_list
+
     def sample_poses(self, pose_sample_num: int):
         '''
         sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)

@@ -347,6 +347,7 @@ Indoor-kitchen scene:
 # Todolist
 - [x] vis envmap
 - [ ] change dump_OR_xml_for_mi() to be FULLY compatible with Mitsuba 3'
+- [ ] renderer_blender_mitsubaScene_3D: render with multiple cameras at once
 - [ ] how to get **mi_rays_ret_expanded**?
 - [ ] Check OptixRendererLight rays (images/demo_eval_radMLP_rample_lighting_openrooms_1.png)
 - [ ] room coverage count

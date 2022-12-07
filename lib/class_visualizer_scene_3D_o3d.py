@@ -1,6 +1,7 @@
 import numpy as np
 np.random.seed(0)
 from tqdm import tqdm
+from math import prod
 import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
@@ -535,17 +536,38 @@ class visualizer_scene_3D_o3d(object):
         '''
         assert lighting_source in ['lighting_SG', 'lighting_envmap'] # not supporting 'lighting_sampled' yet
 
+        geometry_list = []
+
         lighting_scale = lighting_params.get('lighting_scale', 1.) # if autoscale, act as extra scale
         lighting_keep_ratio = lighting_params.get('lighting_keep_ratio', 0.05)
         lighting_further_clip_ratio = lighting_params.get('lighting_further_clip_ratio', 0.1)
         lighting_autoscale = lighting_params.get('lighting_autoscale', True)
 
-        lighting_if_show_hemisphere = lighting_params.get('lighting_if_show_hemisphere', False) # images/demo_lighting_envmap_hemisphere_o3d.png
+        lighting_if_show_hemisphere = lighting_params.get('lighting_if_show_hemisphere', False) # images/demo_lighting_envmap_hemisphere_axes_o3d.png
         if lighting_if_show_hemisphere:
             lighting_keep_ratio = 0.
             lighting_further_clip_ratio = 0.
             lighting_autoscale = False
             lighting_scale = 10.
+
+            # show local xyz axis for frame 0
+            from utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np
+            _idx = 0
+            assert self.os.if_has_mitsuba_all
+            normal_list = self.os.mi_normal_list
+            lighting_local_xyz = np.tile(np.eye(3, dtype=np.float32)[np.newaxis, np.newaxis, ...], (self.os.H, self.os.W, 1, 1))
+            lighting_global_xyz = convert_lighting_axis_local_to_global_np(lighting_local_xyz, self.os.pose_list[_idx], normal_list[_idx])[::8, ::8]
+            lighting_global_pts = np.tile(np.expand_dims(self.os.mi_pts_list[_idx], 2), (1, 1, 3, 1))[::8, ::8]
+            assert lighting_global_xyz.shape == lighting_global_pts.shape
+            for _axis_idx, _axis_color in enumerate([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]):
+                lighting_axes = o3d.geometry.LineSet()
+                _N_pts = prod(lighting_global_xyz.shape[:2])
+                _lighting_global_pts = lighting_global_pts[:, :, _axis_idx].reshape(-1, 3)
+                _lighting_global_xyz = lighting_global_xyz[:, :, _axis_idx].reshape(-1, 3)
+                lighting_axes.points = o3d.utility.Vector3dVector(np.vstack((_lighting_global_pts, _lighting_global_pts+_lighting_global_xyz*lighting_scale/50.)))
+                lighting_axes.colors = o3d.utility.Vector3dVector([_axis_color for _ in range(_N_pts)])
+                lighting_axes.lines = o3d.utility.Vector2iVector([[_, _+_N_pts] for _ in range(_N_pts)])
+                geometry_list += [lighting_axes]
 
         # if lighting_autoscale:
         #     lighting_scale = 1.
@@ -599,7 +621,7 @@ class visualizer_scene_3D_o3d(object):
         lighting_arrows.colors = o3d.utility.Vector3dVector([lighting_color for _ in range(N_pts)])
         lighting_arrows.lines = o3d.utility.Vector2iVector([[_, _+N_pts] for _ in range(N_pts)])
         
-        geometry_list = [lighting_arrows]
+        geometry_list += [lighting_arrows]
 
         return geometry_list
 

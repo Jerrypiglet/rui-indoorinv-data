@@ -558,7 +558,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                     lighting_global = self.lighting_SG_global_list[idx] # (120, 160, 12(SG_num), 7)
                 else:
                     lighting_global = np.concatenate(
-                        (convert_lighting_axis_local_to_global_np(self.lighting_params_dict, self.lighting_SG_local_list[idx][:, :, :, :3], self.pose_list[idx], normal_list[idx]), 
+                        (convert_lighting_axis_local_to_global_np(self.lighting_SG_local_list[idx][:, :, :, :3], self.pose_list[idx], normal_list[idx]), 
                         self.lighting_SG_local_list[idx][:, :, :, 3:]), axis=3) # (120, 160, 12(SG_num), 7); axis, lamb, weight: 3, 1, 3
                 axis_np_global = lighting_global[:, :, :, :3].reshape(-1, wi_num, 3)
                 weight_np = lighting_global[:, :, :, 4:].reshape(-1, wi_num, 3)

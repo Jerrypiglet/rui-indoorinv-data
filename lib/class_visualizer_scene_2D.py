@@ -34,6 +34,7 @@ class visualizer_scene_2D(object):
             self.frame_idx_list = frame_idx_list
         self.N_frames = len(self.frame_idx_list)
         assert self.N_frames >= 1
+        assert all([_ < self.N_frames for _ in self.frame_idx_list]), '[visualizer_scene_2D] frame_idx exceeds total num of frames loaded!'
 
         self.N_cols = self.N_frames
         assert self.N_cols <= 6 # max 6 images due to space in a row
@@ -147,6 +148,7 @@ class visualizer_scene_2D(object):
         source: str='GT', 
         lighting_params={
             'lighting_scale': 0.1, 
+            'downsize_ratio': 1, 
             }, 
         ):
         '''
@@ -216,7 +218,8 @@ class visualizer_scene_2D(object):
                 # if self.os.if_has_hdr_scale:
                 #     _im = _im / self.os.hdr_scale_list[frame_idx]
                 lighting_scale = lighting_params.get('lighting_scale', 0.1)
-                _im = np.clip(downsample_lighting_envmap(_im, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
+                downsize_ratio = lighting_params.get('downsize_ratio', 1)
+                _im = np.clip(downsample_lighting_envmap(_im, lighting_scale=lighting_scale, downsize_ratio=downsize_ratio)**(1./2.2), 0., 1.)
 
             ax.imshow(_im)
 

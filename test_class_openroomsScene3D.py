@@ -254,7 +254,7 @@ if opt.vis_2d_plt:
     visualizer_2D = visualizer_scene_2D(
         openrooms_scene, 
         modality_list_vis=[
-            'im', 
+            # 'im', 
             # 'layout', 
             # 'shapes', 
             # 'depth', 
@@ -330,7 +330,7 @@ if opt.vis_3d_o3d:
         # 'lighting_keep_ratio': 0., # - debug
         # 'lighting_further_clip_ratio': 0., 
         'lighting_autoscale': False, 
-        'lighting_if_show_hemisphere': True, # mainly to show hemisphere: images/demo_lighting_envmap_hemisphere_o3d.png
+        'lighting_if_show_hemisphere': True, # mainly to show hemisphere: images/demo_lighting_envmap_hemisphere_axes_o3d.png
         }
 
     if opt.if_set_pcd_color_mi:

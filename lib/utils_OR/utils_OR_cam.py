@@ -75,6 +75,25 @@ def project_3d_line(x1x2, cam_R, cam_t, cam_K, cam_center, cam_zaxis, dist_cam_p
     # else:
     #     return np.vstack([p[0, :]/(p[2, :]+1e-8), p[1, :]/(p[2, :]+1e-8)]).T, x1x2
 
+def get_T_local_to_camopengl_np(normal):
+    '''
+    args:
+        normal: (H, W, 3), normalized
+    return:
+        camx, camy, normal
+
+    '''
+    # assert normal.shape[:2] == (self.imHeight, self.imWidth)
+    up = np.array([0, 1, 0], dtype=np.float32)[np.newaxis, np.newaxis] # (1, 1, 3)
+    camy_proj = np.sum(up * normal, axis=2, keepdims=True) * normal # (H, W, 3)
+    cam_y = up - camy_proj
+    cam_y = cam_y / (np.linalg.norm(cam_y, axis=2, keepdims=True) + 1e-6) # (H, W, 3)
+    cam_x = - np.cross(cam_y, normal, axis=2)
+    cam_x = cam_x / (np.linalg.norm(cam_x, axis=2, keepdims=True) + 1e-6) # (H, W, 3)
+    T_local_to_camopengl =  np.stack((cam_x, cam_y, normal), axis=-1)# concat as cols: local2cam; (H, W, 3, 3)
+
+    return T_local_to_camopengl
+    
 # def project_v_homo(v, cam_transformation4x4, cam_K):
 #     # https://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/img30.gif
 #     # https://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/node3.html
@@ -88,3 +107,4 @@ def project_3d_line(x1x2, cam_R, cam_t, cam_K, cam_center, cam_zaxis, dist_cam_p
 #     v_transformed = v_transformed * (v_transformed_nonhomo[2:3, :] > 0.)
 #     p = cam_K_homo @ v_transformed
 #     return np.vstack([p[0, :]/p[2, :], p[1, :]/p[2, :]]).T
+

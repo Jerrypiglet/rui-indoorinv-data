@@ -509,8 +509,8 @@ class openroomsScene2D(object):
             #     hdr_scale = self.hdr_scale_list[idx]
             #     envmap = envmap * hdr_scale
             self.lighting_envmap_list.append(envmap)
-            assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
 
+        assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
         print(blue_text('[openroomsScene] DONE. load_lighting_envmap'))
 
     def load_semseg(self):

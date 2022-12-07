@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from ..utils_openrooms import get_T_local_to_camopengl_np
+from .utils_OR_cam import get_T_local_to_camopengl_np
 
 def downsample_lighting_envmap(lighting_envmap, downsize_ratio: int=20, lighting_scale: float=1.):
     H_grid, W_grid, _, h, w = lighting_envmap.shape

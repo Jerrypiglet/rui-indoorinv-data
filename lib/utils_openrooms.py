@@ -96,8 +96,6 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
     return pose_list, origin_lookatvector_up_list
 
 
-
-
 def _convert_local_to_cam_coords(normal):
     '''
     args:
@@ -118,21 +116,3 @@ def _convert_local_to_cam_coords(normal):
 
     return T_cam2local_flattened
 
-def get_T_local_to_camopengl_np(normal):
-    '''
-    args:
-        normal: (H, W, 3), normalized
-    return:
-        camx, camy, normal
-
-    '''
-    # assert normal.shape[:2] == (self.imHeight, self.imWidth)
-    up = np.array([0, 1, 0], dtype=np.float32)[np.newaxis, np.newaxis] # (1, 1, 3)
-    camy_proj = np.sum(up * normal, axis=2, keepdims=True) * normal # (H, W, 3)
-    cam_y = up - camy_proj
-    cam_y = cam_y / (np.linalg.norm(cam_y, axis=2, keepdims=True) + 1e-6) # (H, W, 3)
-    cam_x = - np.cross(cam_y, normal, axis=2)
-    cam_x = cam_x / (np.linalg.norm(cam_x, axis=2, keepdims=True) + 1e-6) # (H, W, 3)
-    T_local_to_camopengl =  np.stack((cam_x, cam_y, normal), axis=-1)# concat as cols: local2cam; (H, W, 3, 3)
-
-    return T_local_to_camopengl
