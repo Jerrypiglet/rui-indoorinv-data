@@ -77,7 +77,7 @@ class rendererBase():
     def render(self):
         ...
 
-    def render_modality_check(self, modality):
+    def render_modality_check(self, modality, force=False):
         assert modality in self.modality_folder_maping
         folder_name = self.modality_folder_maping[modality]
         render_folder_path = self.scene_rendering_path / folder_name
@@ -86,8 +86,11 @@ class rendererBase():
 
         if_render = 'y'
         files = sorted(glob.glob(str(render_folder_path / filename_pattern)))
-        if len(files) > 0:
-            if_render = input(red("[%s] %d %s files found at %s. Re-render? [y/n]"%(modality, len(files), filename_pattern, str(render_folder_path))))
+        if force:
+            if_render = 'y'
+        else:
+            if len(files) > 0:
+                if_render = input(red("[%s] %d %s files found at %s. Re-render? [y/n]"%(modality, len(files), filename_pattern, str(render_folder_path))))
         if if_render in ['N', 'n']:
             print(yellow('ABORTED rendering by Mitsuba'))
             return

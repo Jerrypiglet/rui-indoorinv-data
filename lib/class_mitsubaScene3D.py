@@ -334,14 +334,13 @@ class mitsubaScene3D(mitsubaBase):
             '''
             [NOTE] scene.obj from Liwen is much smaller (s.t. scaling and translation here) compared to scene loaded from scene_v3.xml
             '''
-            scale_m2b = np.array([0.206,0.206,0.206], dtype=np.float32).reshape((3, 1))
-            trans_m2b = np.array([-0.074684,0.23965,-0.30727], dtype=np.float32).reshape((3, 1))
+            self.scale_m2b = np.array([0.206,0.206,0.206], dtype=np.float32).reshape((3, 1))
+            self.trans_m2b = np.array([-0.074684,0.23965,-0.30727], dtype=np.float32).reshape((3, 1))
             self.t_c2w_b_list, self.R_c2w_b_list = [], []
 
             if self.pose_format == 'Blender':
                 cam_params = np.load(self.pose_file)
                 assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
-                self.T_c_b2m = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., -1.]], dtype=np.float32)
                 for idx in self.frame_id_list:
                     R_ = scipy.spatial.transform.Rotation.from_euler('xyz', [cam_params[idx][1][0], cam_params[idx][1][1], cam_params[idx][1][2]])
                     self.R_c2w_b_list.append(R_.as_matrix())
@@ -349,16 +348,17 @@ class mitsubaScene3D(mitsubaBase):
                     self.t_c2w_b_list.append(cam_params[idx][0].reshape((3, 1)).astype(np.float32))
             
             elif self.pose_format == 'json':
-                self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
                 for idx in self.frame_id_list:
                     pose = np.array(self.meta['frames'][idx]['transform_matrix'])[:3, :4].astype(np.float32)
-                    self.R_c2w_b_list.append(np.split(pose, (3,), axis=1)[0])
-                    self.t_c2w_b_list.append(np.split(pose, (3,), axis=1)[1])
+                    R_, t_ = np.split(pose, (3,), axis=1)
+                    R_ = R_ / np.linalg.norm(R_, axis=1, keepdims=True)
+                    self.R_c2w_b_list.append(R_)
+                    self.t_c2w_b_list.append(t_)
 
+            self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
             for R_c2w_b, t_c2w_b in zip(self.R_c2w_b_list, self.t_c2w_b_list):
-                R_c2w_b = R_c2w_b / np.linalg.norm(R_c2w_b, axis=1, keepdims=True)
                 assert abs(1.-np.linalg.det(R_c2w_b))<1e-6
-                t_c2w_b = (t_c2w_b - trans_m2b) / scale_m2b
+                t_c2w_b = (t_c2w_b - self.trans_m2b) / self.scale_m2b
                 t = T_w_b2m @ t_c2w_b # -> t_c2w_w
 
                 R = T_w_b2m @ R_c2w_b @ self.T_c_b2m # https://i.imgur.com/nkzfvwt.png

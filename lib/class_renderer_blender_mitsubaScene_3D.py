@@ -19,6 +19,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         - for Python 3.8 or other versions (but may not support features like Metal on Mac): 
             git checkout blender-v2.92-release && make update
             cmake -DPYTHON_VERSION=3.8 ../blender
+    Intall Mitsuba addon for dumping Mitsuba scene into Blender: https://github.com/mitsuba-renderer/mitsuba-blender
+        - First need to export the Mitsuba scene to **{XML file name}.blend** in Blender app: https://github.com/mitsuba-renderer/mitsuba-blender/wiki/Importing-a-Mitsuba-Scene
     '''
     def __init__(
         self, 
@@ -35,9 +37,14 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             modality_list, 
             *args, **kwargs
         )
+        assert self.os.pose_format in ['Blender', 'json'], 'support pose file for scaled Blender scene only!'
+
+        self.blend_file = Path(str(self.os.xml_file).replace('.xml', '.blend'))
+        assert self.blend_file.exists(), 'Blender file %s does not exist! See class documentation for export instructions.'%(self.blend_file.name)
 
         assert FORMAT == 'OPEN_EXR', 'only support this for now'
 
+        bpy.ops.wm.open_mainfile(filepath=str(self.blend_file))
         scene = bpy.context.scene
         # Background
         scene.render.dither_intensity = 0.0
@@ -46,7 +53,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         scene.render.resolution_y = self.os.im_H_load
         scene.render.resolution_percentage = 100
 
-        self.cam = scene.objects['Camera']
+        self.cam = scene.objects['Camera'] # the sensor in XML has to has 'id="Camera"'
         obj_idx = 1
         for obj in bpy.context.scene.objects:
             if obj.type in ('MESH'):
@@ -109,27 +116,41 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         ]
 
     def render(self):
+        self.modal_file_outputs = []
+        render_folder_path_list = []
         for _ in self.modality_list:
-            folder_name, render_folder_path = self.render_modality_check(_)
+            folder_name, render_folder_path = self.render_modality_check(_, force=True) # _: 'im', folder_name: 'Image'
             modal_file_output = self.tree.nodes.new(type="CompositorNodeOutputFile")
             modal_file_output.label = _
-            self.links.new(self.render_layers.outputs[folder_name], modal_file_output.inputs[0])
+            self.links.new(self.render_layers.outputs[folder_name], modal_file_output.inputs[0]) # (self.render_layers.outputs[folder_name], bpy.data.scenes['Scene'].node_tree.nodes["File Output"].inputs[0])
             modal_file_output.base_path = str(render_folder_path)
+            self.modal_file_outputs.append(modal_file_output)
+            render_folder_path_list.append(render_folder_path)
 
-            if _ == 'im': self.render_im(modal_file_output, render_folder_path)
+            # if _ == 'im': 
+        for _, render_folder_path in zip(self.modality_list, render_folder_path_list):
+            self.render_im(render_folder_path)
         
-    def render_im(self, modal_file_output, render_folder_path):
+    def render_im(self, render_folder_path):
         self.spp = self.im_params_dict.get('spp', 1024)
 
         print(blue_text('Rendering RGB to... by Mitsuba: %s')%str(render_folder_path))
         for i, (R_c2w_b, t_c2w_b) in enumerate(zip(self.os.R_c2w_b_list, self.os.t_c2w_b_list)):
-            im_rendering_path = str(render_folder_path / ('%03d_0001'%i))
+            t_c2w_b = (t_c2w_b - self.os.trans_m2b) / self.os.scale_m2b # convert to Mitsuba scene scale (to match the dumped Blender scene from Mitsuba)
+            # R_c2w_b = R_c2w_b @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., 1.]], dtype=np.float32)
+            frame_id = self.os.frame_id_list[i]
+            im_rendering_path = str(render_folder_path / ('%03d_0001'%frame_id))
             self.scene.render.filepath = str(im_rendering_path)
             self.cam.location = t_c2w_b.reshape(3, )
             euler_ = scipy.spatial.transform.Rotation.from_matrix(R_c2w_b).as_euler('xyz')
-            # self.cam.rotation_euler[0] = euler_[0]
-            # self.cam.rotation_euler[2] = euler_[2]
-            modal_file_output.file_slots[0].path = '%03d'%i + '_'
+            assert np.abs(euler_[1]) < 1e-4, 'by default, no roll; otherwise something might be wrong loading the poses and converting to ruler angles'
+
+            self.cam.rotation_euler[0] = euler_[0]
+            assert self.cam.rotation_euler[1] < 1e-4, 'default camera has no roll'
+            self.cam.rotation_euler[2] = euler_[2]
+            
+            for modal_file_output in self.modal_file_outputs:
+                modal_file_output.file_slots[0].path = '%03d'%frame_id + '_'
             bpy.ops.render.render(write_still=True)  # render still
 
         print(blue_text('DONE.'))

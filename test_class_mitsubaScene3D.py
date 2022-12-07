@@ -65,8 +65,8 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 xml_filename = 'scene_v3.xml'
 scene_name = 'kitchen'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
-split = 'train'; frame_ids = list(range(0, 189, 40))
-# split = 'train'; frame_ids = list(range(0, 10, 1))
+# split = 'train'; frame_ids = list(range(0, 189, 40))
+split = 'train'; frame_ids = list(range(0, 4, 1))
 # split = 'train'; frame_ids = [0]
 
 mitsuba_scene = mitsubaScene3D(
@@ -81,9 +81,9 @@ mitsuba_scene = mitsubaScene3D(
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': intrinsics_path, 
         'up_axis': 'y+', 
-        # 'pose_file': ('Blender', 'train.npy'), 
+        # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
-        'pose_file': ('json', 'transforms.json'), # in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+        'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         }, 
     mi_params_dict={
         'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
@@ -151,9 +151,10 @@ if opt.render_2d:
     assert opt.renderer in ['mi', 'blender']
     modality_list = [
         'im', # both hdr and sdr
-        'poses', 
+        # 'poses', 
         # 'seg', 
-        # 'albedo', 'roughness', 
+        # 'albedo', 
+        # 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_envmap', 
         ]

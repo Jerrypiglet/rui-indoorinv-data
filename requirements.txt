@@ -23,9 +23,10 @@ numpy-quaternion
 # sympy
 h5py
 sympy
-pyquaternion# pyquaternion
+pyquaternion
 ipdb
 # openexr
 jupyterlab
 mitsuba
 pytorch_lightning
+bpy

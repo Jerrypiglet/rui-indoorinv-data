@@ -47,15 +47,14 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
         
     def render_im(self):
         self.spp = self.im_params_dict.get('spp', 1024)
-        render_folder_path = self.render_modality_check('im')
+        folder_name, render_folder_path = self.render_modality_check('im')
 
         print(blue_text('Rendering RGB to... by Mitsuba: %s')%str(render_folder_path))
-        for i, (origin, lookatvector, up) in tqdm(enumerate(self.origin_lookatvector_up_list)):
+        for i, (origin, lookatvector, up) in tqdm(enumerate(self.os.origin_lookatvector_up_list)):
             sensor = self.get_sensor(origin, origin+lookatvector, up)
-            image = mi.render(self.mi_scene, spp=self.spp, sensor=sensor)
+            image = mi.render(self.os.mi_scene, spp=self.spp, sensor=sensor)
             im_rendering_path = str(render_folder_path / ('%03d_0001.exr'%i))
             # im_rendering_path = str(render_folder_path / ('im_%d.rgbe'%i))
-            import ipdb; ipdb.set_trace()
             mi.util.write_bitmap(str(im_rendering_path), image)
             '''
             load exr: https://mitsuba.readthedocs.io/en/stable/src/how_to_guides/image_io_and_manipulation.html?highlight=load%20openexr#Reading-an-image-from-disk
@@ -73,7 +72,7 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
         from mitsuba import ScalarTransform4f as T
         return mi.load_dict({
             'type': 'perspective',
-            'fov': np.arctan(self.K[0][2]/self.K[0][0])/np.pi*180.*2.,
+            'fov': np.arctan(self.os.K[0][2]/self.os.K[0][0])/np.pi*180.*2.,
             'fov_axis': 'x',
             'to_world': T.look_at(
                 origin=mi.ScalarPoint3f(origin.flatten()),
@@ -86,8 +85,8 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
             },
             'film': {
                 'type': 'hdrfilm',
-                'width': self.im_W_load,
-                'height': self.im_H_load,
+                'width': self.os.im_W_load,
+                'height': self.os.im_H_load,
                 'rfilter': {
                     'type': 'tent',
                 },
