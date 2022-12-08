@@ -9,6 +9,7 @@ import bpy
 import scipy
 from lib.utils_misc import blue_text, yellow, red
 from lib.utils_io import convert_write_png
+from lib.utils_misc import get_list_of_keys, white_blue, blue_text
 
 from .class_rendererBase import rendererBase
 
@@ -70,7 +71,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         scene.view_layers["ViewLayer"].use_pass_object_index = True
         scene.view_layers["ViewLayer"].use_pass_z = True
         scene.view_layers["ViewLayer"].use_pass_diffuse_color = True
-        scene.view_layers["ViewLayer"].use_pass_potision = True
+        scene.view_layers["ViewLayer"].use_pass_position = True
 
         scene.use_nodes = True
         self.tree = scene.node_tree
@@ -122,7 +123,9 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         self.spp = self.im_params_dict.get('spp', 1024)
 
         if 'lighting_envmap' in self.modality_list:
-            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', force=True) # _: 'im', folder_name: 'Image'
+            env_height, env_width, env_row, env_col = get_list_of_keys(self.os.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
+            folder_name_appendix = '-%dx%dx%dx%d'%(env_row, env_col, env_height, env_width)
+            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix=folder_name_appendix, force=False) # _: 'im', folder_name: 'Image'
             self.render_lighting_envmap(render_folder_path)
             return
             
@@ -133,7 +136,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         render_folder_path_list = []
         _modality_list = list(set(self.modality_list) - set(['lighting_envmap']))
         for _ in _modality_list:
-            folder_name, render_folder_path = self.render_modality_check(_, force=True) # _: 'im', folder_name: 'Image'
+            folder_name, render_folder_path = self.render_modality_check(_, force=False) # _: 'im', folder_name: 'Image'
             modal_file_output = self.tree.nodes.new(type="CompositorNodeOutputFile")
             modal_file_output.label = _
             self.links.new(self.render_layers.outputs[folder_name], modal_file_output.inputs[0]) # (self.render_layers.outputs[folder_name], bpy.data.scenes['Scene'].node_tree.nodes["File Output"].inputs[0])
@@ -182,6 +185,11 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         self.cam.data.cycles.panorama_type = 'EQUIRECTANGULAR'
         self.cam.data.cycles.latitude_min = 0.
 
+        modal_file_output = self.tree.nodes.new(type="CompositorNodeOutputFile")
+        modal_file_output.label = 'Position'
+        self.links.new(self.render_layers.outputs['Position'], modal_file_output.inputs[0]) # (self.render_layers.outputs[folder_name], bpy.data.scenes['Scene'].node_tree.nodes["File Output"].inputs[0])
+        modal_file_output.base_path = str(render_folder_path)
+
         T_w_m2b = np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]], dtype=np.float32) # Mitsuba world to Blender world
         T_c_m2b = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
 
@@ -205,6 +213,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                 self.cam.rotation_euler[0] = euler_[0]
                 self.cam.rotation_euler[1] = euler_[1]
                 self.cam.rotation_euler[2] = euler_[2]
+
+                modal_file_output.file_slots[0].path = '%03d_%03d'%(frame_id, env_idx) + '_'
 
                 bpy.ops.render.render(write_still=True)  # render still
 

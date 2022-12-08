@@ -1,6 +1,7 @@
 from webbrowser import BackgroundBrowser
 import numpy as np
 import time
+import imageio
 import matplotlib.pyplot as plt
 
 from lib.class_openroomsScene2D import openroomsScene2D
@@ -148,7 +149,6 @@ class visualizer_scene_2D(object):
         source: str='GT', 
         lighting_params={
             'lighting_scale': 0.1, 
-            'downsize_ratio': 1, 
             }, 
         ):
         '''
@@ -218,8 +218,15 @@ class visualizer_scene_2D(object):
                 # if self.os.if_has_hdr_scale:
                 #     _im = _im / self.os.hdr_scale_list[frame_idx]
                 lighting_scale = lighting_params.get('lighting_scale', 0.1)
-                downsize_ratio = lighting_params.get('downsize_ratio', 1)
+                # downsize_ratio = lighting_params.get('downsize_ratio', 1)
+                if source == 'GT':
+                    downsize_ratio = self.os.lighting_params_dict.get('env_downsample_rate', 1)
+                else:
+                    downsize_ratio = 1
                 _im = np.clip(downsample_lighting_envmap(_im, lighting_scale=lighting_scale, downsize_ratio=downsize_ratio)**(1./2.2), 0., 1.)
+                _filename = 'test_files/output_lighting_envmap_%s_%04d.png'%(source, frame_idx)
+                imageio.imwrite(_filename, (_im*255.).astype(np.uint8))
+                print('image saved to: %s'%_filename)
 
             ax.imshow(_im)
 

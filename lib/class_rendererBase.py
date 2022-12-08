@@ -79,9 +79,9 @@ class rendererBase():
     def render(self):
         ...
 
-    def render_modality_check(self, modality, force=False):
+    def render_modality_check(self, modality, folder_name_appendix='', force=False):
         assert modality in self.modality_folder_maping
-        folder_name = self.modality_folder_maping[modality]
+        folder_name = self.modality_folder_maping[modality] + folder_name_appendix
         render_folder_path = self.scene_rendering_path / folder_name
         assert modality in self.modality_filename_maping
         filename_pattern = self.modality_filename_maping[modality][0]
@@ -98,7 +98,9 @@ class rendererBase():
             return
         else:
             if render_folder_path.exists():
-                shutil.rmtree(str(render_folder_path))
+                if_remove = input(red("[%s] %d %s files found at %s. Remove? [y/n]"%(modality, len(files), filename_pattern, str(render_folder_path))))
+                if if_remove:
+                    shutil.rmtree(str(render_folder_path))
             render_folder_path.mkdir(parents=True, exist_ok=True)
             print(yellow('Files removed from %s'%str(render_folder_path)))
 

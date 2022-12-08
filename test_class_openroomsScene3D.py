@@ -111,7 +111,7 @@ emitter_type_index_list = [('lamp', 0)]
 # frame_ids = list(range(0, 345, 10))
 # frame_ids = [36, 41]
 # frame_ids =[0]
-frame_ids = [3]
+frame_ids = [0, 3]
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
 xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
@@ -144,11 +144,11 @@ openrooms_scene = openroomsScene3D(
         }, 
     lighting_params_dict={
         'SG_num': 12,
-        'env_row': 120, 'env_col': 160,  
-        # 'env_height': 16, 'env_width': 32, 
-        'env_height': 8, 'env_width': 16,
-        # 'env_row': 6, 'env_col': 8,  # load from imenv_128x256_{}.hdr
+        'env_row': 120, 'env_col': 160, # resolution to load; FIXED
+        'env_downsample_rate': 20, # (120, 160) -> (6, 8)
 
+        # 'env_height': 8, 'env_width': 16,
+        'env_height': 16, 'env_width': 32, 
         # 'env_height': 128, 'env_width': 256, 
         # 'env_height': 64, 'env_width': 128, 
         # 'env_height': 2, 'env_width': 4, 
@@ -319,7 +319,6 @@ if opt.vis_3d_o3d:
 
     lighting_params_vis={
         'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
-        # 'lighting_scale': 1., 
         # 'lighting_keep_ratio': 0.05, 
         # 'lighting_further_clip_ratio': 0.1, 
         'lighting_scale': 2., 
@@ -330,7 +329,7 @@ if opt.vis_3d_o3d:
         # 'lighting_keep_ratio': 0., # - debug
         # 'lighting_further_clip_ratio': 0., 
         'lighting_autoscale': False, 
-        'lighting_if_show_hemisphere': True, # mainly to show hemisphere: images/demo_lighting_envmap_hemisphere_axes_o3d.png
+        'lighting_if_show_hemisphere': True, # mainly to show hemisphere and local axes: images/demo_lighting_envmap_hemisphere_axes_o3d.png
         }
 
     if opt.if_set_pcd_color_mi:

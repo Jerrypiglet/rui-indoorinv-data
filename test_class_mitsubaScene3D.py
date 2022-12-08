@@ -51,6 +51,7 @@ parser.add_argument('--renderer', type=str, default='blender', help='mi, blender
 # evaluator for rad-MLP
 parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
 parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs')
+parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs')
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -67,7 +68,8 @@ scene_name = 'kitchen'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 189, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
-split = 'train'; frame_ids = [0]
+# split = 'train'; frame_ids = [0, 3]
+split = 'train'; frame_ids = list(range(0, 189, 1))
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -97,14 +99,14 @@ mitsuba_scene = mitsubaScene3D(
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'im_hdr', 
-        'im_sdr', 
         'poses', 
+        # 'im_hdr', 
+        # 'im_sdr', 
+        # 'lighting_envmap', 
         # 'seg', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
-        'lighting_envmap', 
         # 'layout', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
@@ -132,10 +134,13 @@ mitsuba_scene = mitsubaScene3D(
     }, 
     lighting_params_dict={
         'SG_num': 12, 
-        'env_row': 8, 'env_col': 16, 
+        'env_row': 8, 'env_col': 16, # resolution to load; FIXED
+        'env_downsample_rate': 2, # (8, 16) -> (4, 8)
+
         # 'env_height': 2, 'env_width': 4, 
         # 'env_height': 8, 'env_width': 16, 
-        'env_height': 128, 'env_width': 256, 
+        # 'env_height': 128, 'env_width': 256, 
+        'env_height': 256, 'env_width': 512, 
     }, 
     shape_params_dict={
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
@@ -181,34 +186,6 @@ if opt.render_2d:
     host=host, 
     renderer.render()
 
-'''
-Matploblib 2D viewer
-'''
-if opt.vis_2d_plt:
-    visualizer_2D = visualizer_scene_2D(
-        mitsuba_scene, 
-        modality_list_vis=[
-            'im', 
-            # 'layout', 
-            # 'shapes', 
-            # 'depth', 
-            # 'mi_depth', 
-            # 'normal', 
-            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
-            'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
-            # 'seg_area', 'seg_env', 'seg_obj', 
-            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
-            ], 
-        # frame_idx_list=[0, 1, 2, 3, 4], 
-        frame_idx_list=[0], 
-    )
-    visualizer_2D.vis_2d_with_plt(
-        lighting_params={
-            'lighting_scale': 1., # rescaling the brightness of the envmap
-            'downsize_ratio': 1, 
-            }, 
-            )
 
 '''
 Evaluator for rad-MLP and inv-MLP
@@ -248,9 +225,44 @@ if opt.eval_rad:
         evaluator_rad.sample_lighting(
             # sample_type='emission', # 'emission', 'incident'
             sample_type='incident', # 'emission', 'incident'
-            subsample_rate_pts=500, 
+            subsample_rate_pts=1, 
+            if_use_loaded_envmap_position=True, # assuming lighting envmap endpoint position dumped by Blender renderer
         )
     )
+
+'''
+Matploblib 2D viewer
+'''
+if opt.vis_2d_plt:
+    visualizer_2D = visualizer_scene_2D(
+        mitsuba_scene, 
+        modality_list_vis=[
+            'im', 
+            # 'layout', 
+            # 'shapes', 
+            # 'depth', 
+            # 'mi_depth', 
+            # 'normal', 
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
+            'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
+            # 'seg_area', 'seg_env', 'seg_obj', 
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            ], 
+        # frame_idx_list=[0, 1, 2, 3, 4], 
+        frame_idx_list=[0, 1], 
+    )
+    if opt.if_add_est_from_eval:
+        for modality in ['lighting_envmap']:
+            if modality in eval_return_dict:
+                mitsuba_scene.add_modality(eval_return_dict[modality], modality, 'EST')
+
+    visualizer_2D.vis_2d_with_plt(
+        lighting_params={
+            'lighting_scale': 1., # rescaling the brightness of the envmap
+            }, 
+            )
+
 
 '''
 Open3D 3D viewer
@@ -262,20 +274,23 @@ if opt.vis_3d_o3d:
             # 'dense_geo', # fused from 2D
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
-            # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
+            'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
-            'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
+            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
+            # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
 
     lighting_params_vis={
-        # 'subsample_lighting_pts_rate': 500, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        'if_use_mi_geometry': True, 
+        'if_use_loaded_envmap_position': True, # assuming lighting envmap endpoint position dumped by Blender renderer
+        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        'subsample_lighting_wi_rate': 500, # subsample on lighting directions: too many directions (e.g. 128x256)
         # 'lighting_keep_ratio': 0.05, 
         # 'lighting_further_clip_ratio': 0.1, 
-        'lighting_scale': 10, 
+        'lighting_scale': 2, 
         # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
         # 'lighting_further_clip_ratio': 0.3, 
         'lighting_keep_ratio': 0., # - good for lighting_envmap
@@ -283,6 +298,7 @@ if opt.vis_3d_o3d:
         # 'lighting_keep_ratio': 0., # - debug
         # 'lighting_further_clip_ratio': 0., 
         'lighting_autoscale': False, 
+        'lighting_if_show_hemisphere': True, # mainly to show hemisphere and local axes: images/demo_lighting_envmap_hemisphere_axes_o3d.png
         }
 
     if opt.if_add_rays_from_eval:

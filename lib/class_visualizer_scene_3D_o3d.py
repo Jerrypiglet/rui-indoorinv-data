@@ -506,9 +506,9 @@ class visualizer_scene_3D_o3d(object):
         the classroom scene: images/demo_lighting_SG_o3d.png
         '''
         assert self.os.if_has_lighting_SG
+        if_use_mi_geometry = lighting_params.get('if_use_mi_geometry', True)
 
         subsample_lighting_pts_rate = lighting_params.get('subsample_lighting_pts_rate', 1)
-        if_use_mi_geometry = lighting_params.get('if_use_mi_geometry', True)
         lighting_SG_fused_dict = self.os._fuse_3D_lighting(subsample_rate_pts=subsample_lighting_pts_rate, if_use_mi_geometry=if_use_mi_geometry, lighting_source='lighting_SG')
 
         geometry_list = self.process_lighting(lighting_SG_fused_dict, lighting_params=lighting_params, lighting_source='lighting_SG')
@@ -519,9 +519,14 @@ class visualizer_scene_3D_o3d(object):
         the classroom scene: images/demo_lighting_envmap_o3d.png
         '''
         assert self.os.if_has_lighting_envmap
+        if_use_mi_geometry = lighting_params.get('if_use_mi_geometry', True)
 
         subsample_lighting_pts_rate = lighting_params.get('subsample_lighting_pts_rate', 1)
-        lighting_envmap_fused_dict = self.os._fuse_3D_lighting(subsample_rate_pts=subsample_lighting_pts_rate, lighting_source='lighting_envmap')
+        subsample_lighting_wi_rate = lighting_params.get('subsample_lighting_wi_rate', 1)
+        if_use_loaded_envmap_position = lighting_params.get('if_use_loaded_envmap_position', False)
+        lighting_envmap_fused_dict = self.os._fuse_3D_lighting(
+            subsample_rate_pts=subsample_lighting_pts_rate, subsample_rate_wi=subsample_lighting_wi_rate, 
+            if_use_mi_geometry=if_use_mi_geometry, if_use_loaded_envmap_position=if_use_loaded_envmap_position, lighting_source='lighting_envmap')
 
         lighting_if_show_hemisphere = lighting_params.get('lighting_if_show_hemisphere', False)
         if lighting_if_show_hemisphere:
@@ -556,8 +561,8 @@ class visualizer_scene_3D_o3d(object):
             assert self.os.if_has_mitsuba_all
             normal_list = self.os.mi_normal_list
             lighting_local_xyz = np.tile(np.eye(3, dtype=np.float32)[np.newaxis, np.newaxis, ...], (self.os.H, self.os.W, 1, 1))
-            lighting_global_xyz = convert_lighting_axis_local_to_global_np(lighting_local_xyz, self.os.pose_list[_idx], normal_list[_idx])[::8, ::8]
-            lighting_global_pts = np.tile(np.expand_dims(self.os.mi_pts_list[_idx], 2), (1, 1, 3, 1))[::8, ::8]
+            lighting_global_xyz = convert_lighting_axis_local_to_global_np(lighting_local_xyz, self.os.pose_list[_idx], normal_list[_idx])[::16, ::16]
+            lighting_global_pts = np.tile(np.expand_dims(self.os.mi_pts_list[_idx], 2), (1, 1, 3, 1))[::16, ::16]
             assert lighting_global_xyz.shape == lighting_global_pts.shape
             for _axis_idx, _axis_color in enumerate([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]):
                 lighting_axes = o3d.geometry.LineSet()

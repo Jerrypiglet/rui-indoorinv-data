@@ -225,7 +225,6 @@ def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=1
 
     env = cv2.imread(str(path), -1 ) 
     assert env is not None
-
     env = env.reshape(env_row, env_heightOrig, env_col, env_widthOrig, 3) # (1920, 5120, 3) -> (120, 16, 160, 32, 3)
     env = np.ascontiguousarray(env.transpose([4, 0, 2, 1, 3] ) ) # -> (3, 120, 160, 16, 32)
 

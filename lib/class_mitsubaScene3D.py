@@ -22,6 +22,8 @@ import mitsuba as mi
 
 from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
 from lib.utils_io import load_matrix, resize_intrinsics
+
+from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
 
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle
@@ -83,6 +85,8 @@ class mitsubaScene3D(mitsubaBase):
         self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
         self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
         self.H, self.W = self.im_H_resize, self.im_W_resize
+        self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
+        assert self.im_lighting_HW_ratios[0] > 0 and self.im_lighting_HW_ratios[1] > 0
 
         self.im_sdr_ext = im_params_dict.get('im_sdr_ext', 'png')
         self.im_hdr_ext = im_params_dict.get('im_hdr_ext', 'exr')
@@ -90,6 +94,7 @@ class mitsubaScene3D(mitsubaBase):
 
         self.near = cam_params_dict.get('near', 0.1)
         self.far = cam_params_dict.get('far', 10.)
+        self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
 
         self.host = host
         self.device = get_device(self.host)
@@ -132,6 +137,22 @@ class mitsubaScene3D(mitsubaBase):
         for _ in modalitiy_list_new:
             assert _ in self.valid_modalities, 'Invalid modality: %s'%_
         return modalitiy_list_new
+
+    def add_modality(self, x, modality: str, source: str='GT'):
+        assert source in ['GT', 'EST']
+        assert modality in self.valid_modalities
+        if source == 'EST':
+            self.est[modality] = x
+            if modality in self.modality_list:
+                assert type(x)==type(self.get_modality(modality, 'GT'))
+                if isinstance(x, list):
+                    assert len(x) == len(self.get_modality(modality, 'GT'))
+        elif source == 'GT':
+            setattr(self, modality, x)
+            if self.get_modality(modality, 'EST') is not None:
+                assert type(x)==type(self.get_modality(modality, 'EST'))
+                if isinstance(x, list):
+                    assert len(x) == len(self.get_modality(modality, 'EST'))
 
     @property
     def if_has_im_sdr(self):
@@ -190,9 +211,7 @@ class mitsubaScene3D(mitsubaBase):
             if _ == 'lighting_envmap': self.load_lighting_envmap()
 
     def get_modality(self, modality, source: str='GT'):
-        assert source in ['GT'], 'no support for EST modality yet.'
-        # if modality in super().valid_modalities:
-            # return super(mitsubaScene3D, self).get_modality(modality)
+        assert source in ['GT', 'EST']
 
         if 'mi_' in modality:
             assert self.pts_from['mi']
@@ -202,7 +221,7 @@ class mitsubaScene3D(mitsubaBase):
         elif modality == 'mi_normal': 
             return self.mi_normal_global_list
         elif modality == 'lighting_envmap': 
-            return self.lighting_envmap_list
+            return self.lighting_envmap_list if source=='GT' else self.est[modality]
         elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
             seg_key = modality.split('_')[-1] 
             return self.mi_seg_dict_of_lists[seg_key]
@@ -263,7 +282,6 @@ class mitsubaScene3D(mitsubaBase):
             assert if_sample_rays_pts
             self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
             self.seg_from['mi'] = True
-
 
     def load_intrinsics(self):
         '''
@@ -340,7 +358,6 @@ class mitsubaScene3D(mitsubaBase):
             Json:
                 Liwen's NeRF poses: [R, t]; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
             '''
-            T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
             '''
             [NOTE] scene.obj from Liwen is much smaller (s.t. scaling and translation here) compared to scene loaded from scene_v3.xml
             '''
@@ -369,9 +386,9 @@ class mitsubaScene3D(mitsubaBase):
             for R_c2w_b, t_c2w_b in zip(self.R_c2w_b_list, self.t_c2w_b_list):
                 assert abs(1.-np.linalg.det(R_c2w_b))<1e-6
                 t_c2w_b = (t_c2w_b - self.trans_m2b) / self.scale_m2b
-                t = T_w_b2m @ t_c2w_b # -> t_c2w_w
+                t = self.T_w_b2m @ t_c2w_b # -> t_c2w_w
 
-                R = T_w_b2m @ R_c2w_b @ self.T_c_b2m # https://i.imgur.com/nkzfvwt.png
+                R = self.T_w_b2m @ R_c2w_b @ self.T_c_b2m # https://i.imgur.com/nkzfvwt.png
 
                 _, __, at_vector = np.split(R, 3, axis=-1)
                 at_vector = normalize_v(at_vector)
@@ -431,20 +448,40 @@ class mitsubaScene3D(mitsubaBase):
 
     def load_lighting_envmap(self):
         '''
-        load im in HDR; RGB, N * (H, W, 3), [0., 1.]
+        load lighting enemap and camra ray endpoint in HDR; 
+
+        yields: 
+            self.lighting_envmap_list: [(env_row, env_col, 3, env_height, env_width)]
+            self.lighting_envmap_position_list: [(env_row, env_col, 3, env_height, env_width)]
+
+        rendered with Blender: lib/class_renderer_blender_mitsubaScene_3D->renderer_blender_mitsubaScene_3D(); 
         '''
         print(white_blue('[mitsubaScene] load_lighting_envmap'))
 
         self.lighting_envmap_list = []
+        self.lighting_envmap_position_list = []
 
         env_row, env_col, env_height, env_width = get_list_of_keys(self.lighting_params_dict, ['env_row', 'env_col', 'env_height', 'env_width'], [int, int, int, int])
+        folder_name_appendix = '-%dx%dx%dx%d'%(env_row, env_col, env_height, env_width)
+        lighting_envmap_folder_path = self.scene_rendering_path / ('LightingEnvmap'+folder_name_appendix)
+        assert lighting_envmap_folder_path.exists(), 'lighting envmap does not exist for: %s'%folder_name_appendix
+
         for i in tqdm(self.frame_id_list):
             envmap = np.zeros((env_row, env_col, 3, env_height, env_width), dtype=np.float32)
+            envmap_position = np.zeros((env_row, env_col, 3, env_height, env_width), dtype=np.float32)
             for env_idx in tqdm(range(env_row*env_col)):
-                lighting_envmap_file_path = self.scene_rendering_path / 'LightingEnvmap' / ('%03d_%03d.%s'%(i, env_idx, self.lighting_envmap_ext))
+                lighting_envmap_file_path = lighting_envmap_folder_path / ('%03d_%03d.%s'%(i, env_idx, self.lighting_envmap_ext))
                 lighting_envmap = load_img(lighting_envmap_file_path, ext=self.lighting_envmap_ext, target_HW=(env_height, env_width))
                 envmap[env_idx//env_col, env_idx-env_col*(env_idx//env_col)] = lighting_envmap.transpose((2, 0, 1))
+
+                lighting_envmap_position_m_file_path = lighting_envmap_folder_path / ('%03d_%03d_0001.%s'%(i, env_idx, self.lighting_envmap_ext))
+                lighting_envmap_position_m = load_img(lighting_envmap_position_m_file_path, ext=self.lighting_envmap_ext, target_HW=(env_height, env_width)) # (H, W, 3), in Blender coords
+                lighting_envmap_position = (lighting_envmap_position_m.reshape(-1, 3) @ (self.T_w_b2m.T)).reshape(env_height, env_width, 3)
+                envmap_position[env_idx//env_col, env_idx-env_col*(env_idx//env_col)] = lighting_envmap_position.transpose((2, 0, 1))
+                
             self.lighting_envmap_list.append(envmap)
+            self.lighting_envmap_position_list.append(envmap_position)
+
         assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
 
         print(blue_text('[mitsubaScene] DONE. load_lighting_envmap'))
@@ -590,15 +627,15 @@ class mitsubaScene3D(mitsubaBase):
         from utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np
         assert self.if_has_mitsuba_all
         normal_list = self.mi_normal_list
-        resample_ratio = self.H // self.lighting_params_dict['env_row']
-        assert resample_ratio == self.W // self.lighting_params_dict['env_col']
-        assert resample_ratio > 0
+        # resample_ratio = self.H // self.lighting_params_dict['env_row']
+        # assert resample_ratio == self.W // self.lighting_params_dict['env_col']
+        # assert resample_ratio > 0
 
         lighting_local_xyz = np.tile(np.eye(3, dtype=np.float32)[np.newaxis, np.newaxis, ...], (self.H, self.W, 1, 1))
         lighting_global_xyz_list, lighting_global_pts_list = [], []
-        for _idx in self.frame_id_list:
-            lighting_global_xyz = convert_lighting_axis_local_to_global_np(lighting_local_xyz, self.pose_list[_idx], normal_list[_idx])[::resample_ratio, ::resample_ratio]
-            lighting_global_pts = np.tile(np.expand_dims(self.mi_pts_list[_idx], 2), (1, 1, 3, 1))[::resample_ratio, ::resample_ratio]
+        for _idx in range(len(self.frame_id_list)):
+            lighting_global_xyz = convert_lighting_axis_local_to_global_np(lighting_local_xyz, self.pose_list[_idx], normal_list[_idx])[::self.im_lighting_HW_ratios[0], ::self.im_lighting_HW_ratios[1]]
+            lighting_global_pts = np.tile(np.expand_dims(self.mi_pts_list[_idx], 2), (1, 1, 3, 1))[::self.im_lighting_HW_ratios[0], ::self.im_lighting_HW_ratios[1]]
             assert lighting_global_xyz.shape == lighting_global_pts.shape == (self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col'], 3, 3)
             lighting_global_xyz_list.append(lighting_global_xyz)
             lighting_global_pts_list.append(lighting_global_pts)

@@ -12,7 +12,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.global_vars import mi_variant_dict
 
 from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
-from lib.utils_misc import get_list_of_keys, white_blue
+from lib.utils_misc import get_list_of_keys, white_blue, blue_text
 from lib.utils_OR.utils_OR_lighting import get_lighting_envmap_dirs_global
 from lib.utils_mitsuba import get_rad_meter_sensor
 
@@ -181,6 +181,7 @@ class evaluator_scene_rad():
         sample_type: str='emission', 
         subsample_rate_pts: int=1, 
         if_use_mi_geometry: bool=True, 
+        if_use_loaded_envmap_position: bool=False, 
         if_mask_off_emitters: bool=False, 
         if_vis_envmap_2d_plt: bool=False, 
         lighting_scale: float=1., 
@@ -206,25 +207,34 @@ class evaluator_scene_rad():
 
         print(white_blue('[evaluator_scene_rad] sampling %s for %d frames... subsample_rate_pts: %d'%('lighting_envmap', len(self.os.frame_id_list), subsample_rate_pts)))
 
-        for idx in tqdm(range(len(self.os.frame_id_list))):
-            seg_obj = self.os.mi_seg_dict_of_lists['obj'][idx].reshape(-1) # (H, W), bool, [IMPORTANT] mask off emitter area!!
+        for frame_idx in tqdm(range(len(self.os.frame_id_list))):
+            seg_obj = self.os.mi_seg_dict_of_lists['obj'][frame_idx] # (H, W), bool, [IMPORTANT] mask off emitter area!!
             if not if_mask_off_emitters:
                 seg_obj = np.ones_like(seg_obj).astype(np.bool)
 
-            env_height, env_width = get_list_of_keys(self.os.lighting_params_dict, ['env_height', 'env_width'], [int, int])
+            env_height, env_width, env_row, env_col = get_list_of_keys(self.os.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
+            downsize_ratio = self.os.lighting_params_dict.get('env_downsample_rate', 1) # over loaded envmap rows/cols
+            wi_num = env_height * env_width
+
             '''
             [emission] directions from a surface point to hemisphere directions
             '''
-            env_num = self.os.lighting_params_dict['env_height'] * self.os.lighting_params_dict['env_width']
+            if if_use_loaded_envmap_position:
+                assert if_use_mi_geometry
+                samples_d = self.os.process_loaded_envmap_axis_2d_for_frame(frame_idx).reshape(env_row, env_col, env_height*env_width, 3)[::downsize_ratio, ::downsize_ratio] # (env_row//downsize_ratio, env_col//downsize_ratio, wi_num, 3)
+            else:
+                samples_d = get_lighting_envmap_dirs_global(self.os.pose_list[frame_idx], normal_list[frame_idx], env_height, env_width) # (HW, wi_num, 3)
+                samples_d = samples_d.reshape(env_row, env_col, env_height*env_width, 3)[::downsize_ratio, ::downsize_ratio] # (env_row//downsize_ratio, env_col//downsize_ratio, wi_num, 3)
             
-            samples_d = get_lighting_envmap_dirs_global(self.os.pose_list[idx], normal_list[idx], env_height, env_width)[seg_obj] # (HW, env_num, 3)
-            assert samples_d.shape[1] == env_num
-            samples_d = samples_d.reshape(-1, 3) # (HW*env_num, 3)
-            samples_o = self.os.mi_pts_list[idx] # (H, W, 3)
-            samples_o = np.expand_dims(samples_o.reshape(-1, 3)[seg_obj], axis=1)
-            # samples_o = np.broadcast_to(samples_o, (samples_o.shape[0], env_num, 3))
+            seg_obj = seg_obj[::self.os.im_lighting_HW_ratios[0], ::self.os.im_lighting_HW_ratios[1]][::downsize_ratio, ::downsize_ratio]
+            assert seg_obj.shape[:2] == samples_d.shape[:2]
+
+            samples_d = samples_d[seg_obj].reshape(-1, 3) # (HW*wi_num, 3)
+            samples_o = self.os.mi_pts_list[frame_idx][::self.os.im_lighting_HW_ratios[0], ::self.os.im_lighting_HW_ratios[1]][::downsize_ratio, ::downsize_ratio] # (H, W, 3)
+            samples_o = np.expand_dims(samples_o[seg_obj].reshape(-1, 3), axis=1)
+            # samples_o = np.broadcast_to(samples_o, (samples_o.shape[0], wi_num, 3))
             # samples_o = samples_o.view(-1, 3)
-            samples_o = np.repeat(samples_o, env_num, axis=1).reshape(-1, 3) # (HW*env_num, 3)
+            samples_o = np.repeat(samples_o, wi_num, axis=1).reshape(-1, 3) # (HW*wi_num, 3)
             if sample_type == 'emission':
                 rays_d = samples_d
                 rays_o = samples_o
@@ -233,37 +243,37 @@ class evaluator_scene_rad():
                 # [mitsuba.Interaction3f] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html#mitsuba.Interaction3f
                 # [mitsuba.SurfaceInteraction3f] https://mitsuba.readthedocs.io/en/latest/src/api_reference.html#mitsuba.SurfaceInteraction3f
 
-                ds_mi = mi.Vector3f(samples_d) # (HW*env_num, 3)
+                ds_mi = mi.Vector3f(samples_d) # (HW*wi_num, 3)
                 # --- [V1] hack by adding a small offset to samples_o to reduce self-intersection: images/demo_incident_rays_V1.png
-                xs_mi = mi.Point3f(samples_o + samples_d * 1e-4) # (HW*env_num, 3) [TODO] how to better handle self-intersection?
+                xs_mi = mi.Point3f(samples_o + samples_d * 1e-4) # (HW*wi_num, 3) [TODO] how to better handle self-intersection?
                 incident_rays_mi = mi.Ray3f(xs_mi, ds_mi)
 
-                batch_sensor_dict = {
-                    'type': 'batch', 
-                    'film': {
-                        'type': 'hdrfilm',
-                        'width': 10,
-                        'height': 1,
-                        'pixel_format': 'rgb',
-                    },
-                    }
-                mi_rad_list = []
-                print(samples_d.shape[0])
-                for _, (d, x) in tqdm(enumerate(zip(samples_d, samples_o))):
-                    sensor = get_rad_meter_sensor(x, d, spp=32)
-                    # print(x.shape, d.shape, sensor)
-                    # batch_sensor_dict[str(_)] = sensor
-                    image = mi.render(self.os.mi_scene, sensor=sensor)
-                    mi_rad_list.append(image.numpy().flatten())
+                # batch_sensor_dict = {
+                #     'type': 'batch', 
+                #     'film': {
+                #         'type': 'hdrfilm',
+                #         'width': 10,
+                #         'height': 1,
+                #         'pixel_format': 'rgb',
+                #     },
+                #     }
+                # mi_rad_list = []
+                # print(samples_d.shape[0])
+                # for _, (d, x) in tqdm(enumerate(zip(samples_d, samples_o))):
+                #     sensor = get_rad_meter_sensor(x, d, spp=32)
+                #     # print(x.shape, d.shape, sensor)
+                #     # batch_sensor_dict[str(_)] = sensor
+                #     image = mi.render(self.os.mi_scene, sensor=sensor)
+                #     mi_rad_list.append(image.numpy().flatten())
 
-                # batch_sensor = mi.load_dict(batch_sensor_dict)
-                mi_lighting_envmap = np.stack(mi_rad_list).reshape((self.os.H, self.os.W, self.os.lighting_params_dict['env_height'], self.os.lighting_params_dict['env_width'], 3))
-                mi_lighting_envmap = mi_lighting_envmap.transpose((0, 1, 4, 2, 3))
-                from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
-                lighting_envmap_vis = np.clip(downsample_lighting_envmap(mi_lighting_envmap, lighting_scale=lighting_scale, downsize_ratio=1)**(1./2.2), 0., 1.)
-                plt.figure()
-                plt.imshow(lighting_envmap_vis)
-                plt.show()
+                # # batch_sensor = mi.load_dict(batch_sensor_dict)
+                # mi_lighting_envmap = np.stack(mi_rad_list).reshape((self.os.H, self.os.W, env_height//downsize_ratio, env_width//downsize_ratio, 3))
+                # mi_lighting_envmap = mi_lighting_envmap.transpose((0, 1, 4, 2, 3))
+                # from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
+                # lighting_envmap_vis = np.clip(downsample_lighting_envmap(mi_lighting_envmap, lighting_scale=lighting_scale, downsize_ratio=1)**(1./2.2), 0., 1.)
+                # plt.figure()
+                # plt.imshow(lighting_envmap_vis)
+                # plt.show()
 
 
                 # scene = mi.load_file('/Users/jerrypiglet/Documents/Projects/dvgomm1/data/indoor_synthetic/kitchen/scene_v3.xml')
@@ -275,19 +285,19 @@ class evaluator_scene_rad():
                 # import ipdb; ipdb.set_trace()
 
 
-                # --- [V2] try to expand mi_rays_ret to env_num rays per-point; HOW TO?
-                # mi_rays_ret = self.os.mi_rays_ret_list[idx] # (HW,) # [TODO how to get mi_rays_ret_expanded?
+                # --- [V2] try to expand mi_rays_ret to wi_num rays per-point; HOW TO?
+                # mi_rays_ret = self.os.mi_rays_ret_list[frame_idx] # (HW,) # [TODO how to get mi_rays_ret_expanded?
                 # mi_rays_ret_expanded = mi.SurfaceInteraction3f(
-                #     # t=mi.Float(mi_rays_ret.t.numpy()[..., np.newaxis].repeat(env_num, 1).flatten()), 
+                #     # t=mi.Float(mi_rays_ret.t.numpy()[..., np.newaxis].repeat(wi_num, 1).flatten()), 
                 #     # time=mi_rays_ret.time, 
                 #     wavelengths=mi_rays_ret.wavelengths, 
-                #     ps=mi.Point3f(mi_rays_ret.p.numpy()[:, np.newaxis, :].repeat(env_num, 1).reshape(-1, 3)), 
-                #     # n=mi.Normal3f(mi_rays_ret.n.numpy()[:, np.newaxis, :].repeat(env_num, 1).reshape(-1, 3)), 
+                #     ps=mi.Point3f(mi_rays_ret.p.numpy()[:, np.newaxis, :].repeat(wi_num, 1).reshape(-1, 3)), 
+                #     # n=mi.Normal3f(mi_rays_ret.n.numpy()[:, np.newaxis, :].repeat(wi_num, 1).reshape(-1, 3)), 
                 # )
-                # --- [V3] expansive: re-generating camera rays where each pixel has env_num rays: images/demo_incident_rays_V3.png
-                # (cam_rays_o, cam_rays_d, _) = self.os.cam_rays_list[idx]
-                # cam_rays_o_flatten_expanded = cam_rays_o[:, :, np.newaxis, :].repeat(env_num, 2).reshape(-1, 3)
-                # cam_rays_d_flatten_expanded = cam_rays_d[:, :, np.newaxis, :].repeat(env_num, 2).reshape(-1, 3)
+                # --- [V3] expansive: re-generating camera rays where each pixel has wi_num rays: images/demo_incident_rays_V3.png
+                # (cam_rays_o, cam_rays_d, _) = self.os.cam_rays_list[frame_idx]
+                # cam_rays_o_flatten_expanded = cam_rays_o[:, :, np.newaxis, :].repeat(wi_num, 2).reshape(-1, 3)
+                # cam_rays_d_flatten_expanded = cam_rays_d[:, :, np.newaxis, :].repeat(wi_num, 2).reshape(-1, 3)
                 # cam_rays_xs_mi = mi.Point3f(cam_rays_o_flatten_expanded)
                 # cam_rays_ds_mi = mi.Vector3f(cam_rays_d_flatten_expanded)
                 # cam_rays_mi = mi.Ray3f(cam_rays_xs_mi, cam_rays_ds_mi)
@@ -300,9 +310,9 @@ class evaluator_scene_rad():
                 # >>>> debug to look for self-intersections (e.g. images/demo_self_intersection.png); use spawn rays instead to avoid self-intersection: https://mitsuba.readthedocs.io/en/stable/src/rendering/scripting_renderer.html#Spawning-rays
                 # plt.figure()
                 # plt.subplot(121)
-                # plt.imshow(self.os.im_sdr_list[idx])
+                # plt.imshow(self.os.im_sdr_list[frame_idx])
                 # plt.subplot(122)
-                # plt.imshow(np.amin(ret.t.numpy().reshape((self.os.H, self.os.W, env_num)), axis=-1), cmap='jet')
+                # plt.imshow(np.amin(ret.t.numpy().reshape((self.os.H, self.os.W, wi_num)), axis=-1), cmap='jet')
                 # plt.colorbar()
                 # plt.title('[demo of self-intersection] distance to destination point (min among all rays')
                 # plt.show()
@@ -314,8 +324,10 @@ class evaluator_scene_rad():
                 rays_o = rays_o[::subsample_rate_pts]
 
             # batching to prevent memory overflow
+            batch_num = math.ceil(rays_d.shape[0]*1.0/batch_size)
+            print(blue_text('Querying rad-MLP for %d batches of rays...')%batch_num)
             rad_list = []
-            for b_id in tqdm(range(math.ceil(rays_d.shape[0]*1.0/batch_size))):
+            for b_id in tqdm(range(batch_num)):
                 b0 = b_id*batch_size
                 b1 = min((b_id+1)*batch_size, rays_d.shape[0])
                 rays_d_select = rays_d[b0:b1]
@@ -331,7 +343,7 @@ class evaluator_scene_rad():
             rad_all = np.concatenate(rad_list)
             assert rad_all.shape[0] == rays_o.shape[0]
 
-            lighting_envmap = rad_all.reshape((self.os.H, self.os.W, self.os.lighting_params_dict['env_height'], self.os.lighting_params_dict['env_width'], 3))
+            lighting_envmap = rad_all.reshape((env_row//downsize_ratio, env_col//downsize_ratio, env_height, env_width, 3))
             lighting_envmap = lighting_envmap.transpose((0, 1, 4, 2, 3))
             lighting_envmap_list.append(lighting_envmap)
 
@@ -340,7 +352,7 @@ class evaluator_scene_rad():
                 assert not if_mask_off_emitters
                 plt.figure(figsize=(15, 15))
                 plt.subplot(311)
-                plt.imshow(self.os.im_sdr_list[idx])
+                plt.imshow(self.os.im_sdr_list[frame_idx])
                 plt.subplot(312)
                 rad_im = lighting_envmap[self.os.H//4, self.os.W//4*3].transpose(1, 2, 0)
                 plt.imshow(np.clip((rad_im*lighting_scale)**(1./2.2), 0., 1.))

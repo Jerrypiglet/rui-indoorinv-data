@@ -314,6 +314,7 @@ Visualize scene-lamp rays for one scene point ``--if_add_rays_from_renderer True
 ## Renderer via Mitsuba or Blender
 ``` bash
 python test_class_mitsubaScene3D.py --render_2d --renderer mi
+python test_class_mitsubaScene3D.py --render_2d --renderer blender
 ```
 
 ## Evaluator for rad-MLP and inv-MLP
@@ -333,21 +334,23 @@ public_re_3_v5pose_2048:
 ![](images/demo_eval_radMLP_render_110.png)
 
 Evaluate **emission**: emitter surface radiance (GT (red) and est. (blue) from querying emitter surface rays)
-![](images/demo_emitter_o3d_sampling.png)
+![](images/demo_emitter_o3d_sampling_emission.png)
 
 Evaluate **incident radiance** (same idea as generating envmap in OptixRenderer):
 ``` bash
-python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_rad True --vis_2d_plt False --if_add_rays_from_eval True
+python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_rad True --vis_2d_plt True --if_add_rays_from_eval True --if_add_est_from_eval True
 ```
-![](images/demo_emitter_o3d_sampling_incident.png)
+![](images/demo_eval_radMLP_incident_openrooms_0.png)
 
 Indoor-kitchen scene:
 ![](images/demo_eval_radMLP_render_kitchen_0.png)
+![](images/demo_eval_radMLP_incident_kitchen_0.png)
 
 # Todolist
 - [x] vis envmap
 - [ ] change dump_OR_xml_for_mi() to be FULLY compatible with Mitsuba 3'
 - [ ] renderer_blender_mitsubaScene_3D: render with multiple cameras at once
+- [ ] mitsubaScene3D: inhereit openroomsScene2D
 - [ ] how to get **mi_rays_ret_expanded**?
 - [ ] Check OptixRendererLight rays (images/demo_eval_radMLP_rample_lighting_openrooms_1.png)
 - [ ] room coverage count

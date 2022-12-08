@@ -4,6 +4,7 @@ np.set_printoptions(suppress=True)
 from tqdm import tqdm
 from collections import defaultdict
 import torch
+from pathlib import Path
 # Import the library using the alias "mi"
 import mitsuba as mi
 # Set the variant of the renderer
@@ -11,7 +12,8 @@ import mitsuba as mi
 # mi.set_variant(mi_variant)
 
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import green
+from lib.utils_misc import green, blue_text, get_list_of_keys, white_blue, yellow
+from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 
 class mitsubaBase():
     '''
@@ -20,8 +22,10 @@ class mitsubaBase():
     def __init__(
         self, 
         device: str='', 
+        if_debug_info: bool=False, 
     ): 
         self.device = device
+        self.if_debug_info = if_debug_info
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
@@ -118,6 +122,207 @@ class mitsubaBase():
 
             mi_seg_obj = np.logical_and(np.logical_not(mi_seg_area), np.logical_not(mi_seg_env))
             self.mi_seg_dict_of_lists['obj'].append(mi_seg_obj) # non-emitter objects
+
+    def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False, if_lighting=False):
+        '''
+        fuse depth maps (and RGB, normals) into point clouds in global coordinates of OpenCV convention
+
+        optionally dump pcd and cams to pickles
+
+        Args:
+            subsample_rate_pts: int, sample 1/subsample_rate_pts of points to dump
+            if_use_mi_geometry: True: use geometrt from Mistuba if possible
+
+        Returns:
+            - fused geometry as dict
+            - all camera poses
+        '''
+        assert self.if_has_poses and self.if_has_im_sdr
+        if not if_use_mi_geometry:
+            assert self.if_has_depth_normal
+
+        print(white_blue('[mitsubaBase] fuse_3D_geometry '), yellow('[use Mitsuba: %s]'%str(if_use_mi_geometry)), 'for %d frames... subsample_rate_pts: %d, subsample_HW_rates: (%d, %d)'%(len(self.frame_id_list), subsample_rate_pts, subsample_HW_rates[0], subsample_HW_rates[1]))
+
+        X_global_list = []
+        rgb_global_list = []
+        normal_global_list = []
+        X_flatten_mask_list = []
+
+        H_color, W_color = self.H, self.W
+        for frame_idx in tqdm(range(len(self.frame_id_list))):
+            t = self.pose_list[frame_idx][:3, -1].reshape((3, 1))
+            R = self.pose_list[frame_idx][:3, :3]
+
+            if if_use_mi_geometry:
+                X_cam_ = (np.linalg.inv(R) @ (self.mi_pts_list[frame_idx].reshape(-1, 3).T - t)).T.reshape(H_color, W_color, 3)
+                x_, y_, z_ = np.split(X_cam_, 3, axis=-1)
+            else:
+                uu, vv = np.meshgrid(range(W_color), range(H_color))
+                x_ = (uu - self.K[0][2]) * self.depth_list[frame_idx] / self.K[0][0]
+                y_ = (vv - self.K[1][2]) * self.depth_list[frame_idx] / self.K[1][1]
+                z_ = self.depth_list[frame_idx]
+
+            if if_use_mi_geometry:
+                seg_dict_of_lists = self.mi_seg_dict_of_lists
+            else:
+                seg_dict_of_lists = self.seg_dict_of_lists
+            if if_lighting:
+                obj_mask = seg_dict_of_lists['obj'][frame_idx]
+            else:
+                obj_mask = seg_dict_of_lists['obj'][frame_idx] + seg_dict_of_lists['area'][frame_idx] # geometry is defined for objects + emitters
+            assert obj_mask.shape[:2] == (H_color, W_color)
+
+            if subsample_HW_rates != (1, 1):
+                x_ = x_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
+                y_ = y_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
+                z_ = z_[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
+                H_color, W_color = H_color//subsample_HW_rates[0], W_color//subsample_HW_rates[1]
+                obj_mask = obj_mask[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
+                
+            z_ = z_.flatten()
+            # X_flatten_mask = np.logical_and(np.logical_and(z_ > 0, obj_mask.flatten() > 0), ~np.isinf(z_))
+            X_flatten_mask = np.logical_and(~np.isinf(z_), obj_mask.flatten() > 0)
+            
+            z_ = z_[X_flatten_mask]
+            x_ = x_.flatten()[X_flatten_mask]
+            y_ = y_.flatten()[X_flatten_mask]
+            if self.if_debug_info:
+                print('Valid pixels percentage: %.4f'%(sum(X_flatten_mask)/float(H_color*W_color)))
+            X_flatten_mask_list.append(X_flatten_mask)
+
+            X_ = np.stack([x_, y_, z_], axis=-1)
+
+            X_global = (R @ X_.T + t).T
+            X_global_list.append(X_global)
+
+            rgb_global = self.im_sdr_list[frame_idx]
+            if subsample_HW_rates != ():
+                rgb_global = rgb_global[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
+            rgb_global = rgb_global.reshape(-1, 3)[X_flatten_mask]
+            rgb_global_list.append(rgb_global)
+            
+            if if_use_mi_geometry:
+                normal = self.mi_normal_list[frame_idx]
+            else:
+                normal = self.normal_list[frame_idx]
+            if subsample_HW_rates != ():
+                normal = normal[::subsample_HW_rates[0], ::subsample_HW_rates[1]]
+            normal = normal.reshape(-1, 3)[X_flatten_mask]
+            normal = np.stack([normal[:, 0], -normal[:, 1], -normal[:, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
+            normal_global = (R @ normal.T).T
+            normal_global_list.append(normal_global)
+
+        print(blue_text('[openroomsScene] DONE. fuse_3D_geometry'))
+
+        X_global = np.vstack(X_global_list)[::subsample_rate_pts]
+        rgb_global = np.vstack(rgb_global_list)[::subsample_rate_pts]
+        normal_global = np.vstack(normal_global_list)[::subsample_rate_pts]
+
+        assert X_global.shape[0] == rgb_global.shape[0] == normal_global.shape[0]
+
+        geo_fused_dict = {'X': X_global, 'rgb': rgb_global, 'normal': normal_global}
+
+        return geo_fused_dict, X_flatten_mask_list
+
+    def _fuse_3D_lighting(self, lighting_source: str, subsample_rate_pts: int=1, subsample_rate_wi: int=1, if_use_mi_geometry: bool=False, if_use_loaded_envmap_position: bool=False):
+        '''
+        fuse dense lighting (using corresponding surface geometry)
+
+        Args:
+            subsample_rate_pts: int, sample 1/subsample_rate_pts of points to dump
+
+        Returns:
+            - fused lighting and their associated pcd as dict
+        '''
+
+        print(white_blue('[mitsubaBase] fuse_3D_lighting [%s] for %d frames... subsample_rate_pts: %d'%(lighting_source, len(self.frame_id_list), subsample_rate_pts)))
+
+        if if_use_mi_geometry:
+            assert self.if_has_mitsuba_all
+            normal_list = self.mi_normal_list
+        else:
+            assert self.if_has_depth_normal
+            normal_list = self.normal_list
+
+        assert lighting_source in ['lighting_SG', 'lighting_envmap'] # not supporting 'lighting_sampled' yet
+
+        geo_fused_dict, X_lighting_flatten_mask_list = self._fuse_3D_geometry(subsample_rate_pts=subsample_rate_pts, subsample_HW_rates=self.im_lighting_HW_ratios, if_use_mi_geometry=if_use_mi_geometry, if_lighting=True)
+        X_global_lighting, normal_global_lighting = geo_fused_dict['X'], geo_fused_dict['normal']
+
+        if lighting_source == 'lighting_SG':
+            assert self.if_has_lighting_SG and self.if_has_poses
+        if lighting_source == 'lighting_envmap':
+            assert self.if_has_lighting_envmap and self.if_has_poses
+
+        axis_global_list = []
+        weight_list = []
+        lamb_list = []
+
+        for frame_idx in tqdm(range(len(self.frame_id_list))):
+            print(blue_text('[mitsubaBase] fuse_3D_lighting [%s] for frame %d...'%(lighting_source, frame_idx)))
+            if lighting_source == 'lighting_SG':
+                wi_num = self.lighting_params_dict['SG_params']
+                if self.if_convert_lighting_SG_to_global:
+                    lighting_global = self.lighting_SG_global_list[frame_idx] # (120, 160, 12(SG_num), 7)
+                else:
+                    lighting_global = np.concatenate(
+                        (convert_lighting_axis_local_to_global_np(self.lighting_SG_local_list[frame_idx][:, :, :, :3], self.pose_list[frame_idx], normal_list[frame_idx]), 
+                        self.lighting_SG_local_list[frame_idx][:, :, :, 3:]), axis=3) # (120, 160, 12(SG_num), 7); axis, lamb, weight: 3, 1, 3
+                axis_np_global = lighting_global[:, :, :, :3].reshape(-1, wi_num, 3)
+                weight_np = lighting_global[:, :, :, 4:].reshape(-1, wi_num, 3)
+
+            if lighting_source == 'lighting_envmap':
+                env_row, env_col, env_height, env_width = get_list_of_keys(self.lighting_params_dict, ['env_row', 'env_col', 'env_height', 'env_width'], [int, int, int, int])
+                if if_use_loaded_envmap_position:
+                    assert if_use_mi_geometry, 'not ready for non-mitsubaScene'
+                    axis_np_global = self.process_loaded_envmap_axis_2d_for_frame(frame_idx).reshape((env_row*env_col, env_height*env_width, 3))
+                else:
+                    print('[_fuse_3D_lighting->get_lighting_envmap_dirs_global] This might be slow...')
+                    axis_np_global = get_lighting_envmap_dirs_global(self.pose_list[frame_idx], normal_list[frame_idx], env_height, env_width) # (HW, wi, 3)
+                weight_np = self.lighting_envmap_list[frame_idx].transpose(0, 1, 3, 4, 2).reshape(env_row*env_col, env_height*env_width, 3)
+
+            if lighting_source == 'lighting_SG':
+                lamb_np = lighting_global[:, :, :, 3:4].reshape(-1, wi_num, 1)
+
+            X_flatten_mask = X_lighting_flatten_mask_list[frame_idx]
+            axis_np_global = axis_np_global[X_flatten_mask]
+            weight_np = weight_np[X_flatten_mask]
+            if lighting_source == 'lighting_SG':
+                lamb_np = lamb_np[X_flatten_mask]
+
+            axis_global_list.append(axis_np_global)
+            weight_list.append(weight_np)
+            if lighting_source == 'lighting_SG':
+                lamb_list.append(lamb_np)
+
+        print(blue_text('[mitsubaBase] DONE. fuse_3D_lighting'))
+
+        axis_global = np.vstack(axis_global_list)[::subsample_rate_pts, ::subsample_rate_wi]
+        weight = np.vstack(weight_list)[::subsample_rate_pts, ::subsample_rate_wi]
+        if lighting_source == 'lighting_SG':
+            lamb_global = np.vstack(lamb_list)[::subsample_rate_pts, ::subsample_rate_wi]
+        assert X_global_lighting.shape[0] == axis_global.shape[0]
+
+        lighting_SG_fused_dict = {
+            'pts_global_lighting': X_global_lighting, 'normal_global_lighting': normal_global_lighting,
+            'axis': axis_global, 'weight': weight,}
+        if lighting_source == 'lighting_SG':
+            lighting_SG_fused_dict.update({'lamb': lamb_global, })
+
+        return lighting_SG_fused_dict
+
+    def process_loaded_envmap_axis_2d_for_frame(self, frame_idx):
+        assert hasattr(self, 'lighting_envmap_position_list')
+        env_height, env_width = get_list_of_keys(self.lighting_params_dict, ['env_height', 'env_width'], [int, int])
+        lighting_envmap_position = self.lighting_envmap_position_list[frame_idx] # (env_row, env_col, 3, env_height, env_width)
+        lighting_envmap_position = lighting_envmap_position.transpose(0, 1, 3, 4, 2)
+        lighting_envmap_o = self.mi_pts_list[frame_idx][::self.im_lighting_HW_ratios[0], ::self.im_lighting_HW_ratios[1]][:, :, np.newaxis, np.newaxis]
+        lighting_envmap_o = np.tile(lighting_envmap_o, (1, 1, env_height, env_width, 1))
+        assert lighting_envmap_o.shape == lighting_envmap_position.shape
+        axis_np_global = lighting_envmap_position - lighting_envmap_o
+        axis_np_global = axis_np_global / (np.linalg.norm(axis_np_global, axis=-1, keepdims=True)+1e-6)
+        return axis_np_global
+
 
     # def mi_get_segs_(self, if_also_dump_xml_with_lit_area_lights_only=True):
     #     '''
