@@ -345,6 +345,7 @@ python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_rad True --vis_2d
 Indoor-kitchen scene:
 ![](images/demo_eval_radMLP_render_kitchen_0.png)
 ![](images/demo_eval_radMLP_incident_kitchen_0.png)
+[Google Drive](https://drive.google.com/open?id=1NEBVcbFIPkra0GOWxIlOxPYXet9q38g8)
 
 # Todolist
 - [x] vis envmap

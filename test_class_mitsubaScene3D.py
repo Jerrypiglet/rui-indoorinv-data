@@ -68,8 +68,8 @@ scene_name = 'kitchen'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 189, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
-# split = 'train'; frame_ids = [0, 3]
-split = 'train'; frame_ids = list(range(0, 189, 1))
+split = 'train'; frame_ids = [0]
+# split = 'train'; frame_ids = list(range(0, 189, 1))
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 

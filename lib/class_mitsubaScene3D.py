@@ -474,7 +474,7 @@ class mitsubaScene3D(mitsubaBase):
                 lighting_envmap = load_img(lighting_envmap_file_path, ext=self.lighting_envmap_ext, target_HW=(env_height, env_width))
                 envmap[env_idx//env_col, env_idx-env_col*(env_idx//env_col)] = lighting_envmap.transpose((2, 0, 1))
 
-                lighting_envmap_position_m_file_path = lighting_envmap_folder_path / ('%03d_%03d_0001.%s'%(i, env_idx, self.lighting_envmap_ext))
+                lighting_envmap_position_m_file_path = lighting_envmap_folder_path / ('%03d_position_0001_%03d.%s'%(i, env_idx, self.lighting_envmap_ext))
                 lighting_envmap_position_m = load_img(lighting_envmap_position_m_file_path, ext=self.lighting_envmap_ext, target_HW=(env_height, env_width)) # (H, W, 3), in Blender coords
                 lighting_envmap_position = (lighting_envmap_position_m.reshape(-1, 3) @ (self.T_w_b2m.T)).reshape(env_height, env_width, 3)
                 envmap_position[env_idx//env_col, env_idx-env_col*(env_idx//env_col)] = lighting_envmap_position.transpose((2, 0, 1))

@@ -98,7 +98,10 @@ class rendererBase():
             return
         else:
             if render_folder_path.exists():
-                if_remove = input(red("[%s] %d %s files found at %s. Remove? [y/n]"%(modality, len(files), filename_pattern, str(render_folder_path))))
+                if force:
+                    if_remove = True
+                else:
+                    if_remove = input(red("[%s] %d %s files found at %s. Remove? [y/n]"%(modality, len(files), filename_pattern, str(render_folder_path))))
                 if if_remove:
                     shutil.rmtree(str(render_folder_path))
             render_folder_path.mkdir(parents=True, exist_ok=True)

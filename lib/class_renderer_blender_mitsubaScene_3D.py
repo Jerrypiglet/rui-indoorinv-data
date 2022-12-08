@@ -1,8 +1,7 @@
-import shutil
-import glob
 from tqdm import tqdm
 import numpy as np
 np.set_printoptions(suppress=True)
+import time
 
 from pathlib import Path
 import bpy
@@ -83,32 +82,49 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
 
         # Set up renderer params
         self.scene = bpy.data.scenes["Scene"]
-        self.scene.render.engine = 'CYCLES'
+        self.scene.render.film_transparent = True
+        self.spp = self.im_params_dict.get('spp', 128)
         self.scene.render.use_motion_blur = False
-        self.scene.cycles.device = {
+
+        self.scene.render.engine = 'CYCLES'
+        cycles_device = {
             'apple': 'CPU', 
             'mm1': 'GPU', 
             'qc': 'GPU', 
         }[host]
-
-        self.scene.render.film_transparent = True
-        self.scene.view_layers[0].cycles.use_denoising = True
-
-        self.spp = self.im_params_dict.get('spp', 128)
-        self.scene.cycles.samples = self.spp
-
-        cycles_prefs = bpy.context.preferences.addons['cycles'].preferences
-        # cycles_prefs.compute_device_type = 'CUDA'
-        cycles_prefs.compute_device_type = {
+        compute_device_type = {
             'apple': 'METAL', 
             'mm1': 'CUDA', 
             'qc': 'CUDA', 
         }[host]
-        cycles_prefs.get_devices()
-        for di, device in enumerate(cycles_prefs.devices):
-            device.use = (di == 0)
 
-        
+        self.scene.view_layers[0].cycles.use_denoising = True
+        self.scene.cycles.samples = self.spp
+
+        print("----------------------------------------------")
+        print('setting up gpu/metal ......')
+
+        scene.render.engine = 'CYCLES'
+        bpy.context.scene.cycles.device = cycles_device
+        for scene in bpy.data.scenes:
+            print(scene.name)
+            scene.cycles.device = cycles_device
+
+        bpy.context.preferences.addons["cycles"].preferences.compute_device_type = compute_device_type
+
+        bpy.context.preferences.addons["cycles"].preferences.get_devices()
+        print('==== compute_device_type: ', white_blue(bpy.context.preferences.addons["cycles"].preferences.compute_device_type))
+
+        bpy.context.preferences.addons["cycles"].preferences.get_devices()
+        for d in bpy.context.preferences.addons["cycles"].preferences.devices:
+            d.use = True
+            if d.type == 'CPU':
+                d.use = False
+            print("Device '{}' type {} :".format(d.name, d.type), white_blue(str(d.use)) if d.use else red(str(d.use)))
+        print('setting up gpu/metal done')
+        print("----------------------------------------------")
+        import ipdb; ipdb.set_trace()
+
     @property
     def valid_modalities(self):
         return [
@@ -125,7 +141,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         if 'lighting_envmap' in self.modality_list:
             env_height, env_width, env_row, env_col = get_list_of_keys(self.os.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
             folder_name_appendix = '-%dx%dx%dx%d'%(env_row, env_col, env_height, env_width)
-            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix=folder_name_appendix, force=False) # _: 'im', folder_name: 'Image'
+            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix=folder_name_appendix, force=True) # _: 'im', folder_name: 'Image'
             self.render_lighting_envmap(render_folder_path)
             return
             
@@ -172,6 +188,58 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
 
         print(blue_text('DONE.'))
 
+    # def render_lighting_envmap(self, render_folder_path):
+    # '''
+    # too slow to render with a for loop; disabled
+    # '''
+    #     print(blue_text('Rendering lighting_envmap to... by Mitsuba: %s')%str(render_folder_path))
+    #     lighting_global_xyz_list, lighting_global_pts_list = self.os.get_envmap_axes() # each of (env_row, env_col, 3, 3)
+    #     env_row, env_col = self.os.lighting_params_dict['env_row'], self.os.lighting_params_dict['env_col']
+    #     env_height, env_width = self.os.lighting_params_dict['env_height'], self.os.lighting_params_dict['env_width']
+    #     self.scene.render.resolution_x = env_width
+    #     self.scene.render.resolution_y = env_height
+    #     # [panoramic-cameras] https://docs.blender.org/manual/en/latest/render/cycles/object_settings/cameras.html#panoramic-cameras
+    #     self.cam.data.type = 'PANO'
+    #     # [CyclesCameraSettings]https://docs.blender.org/api/2.80/bpy.types.CyclesCameraSettings.html#bpy.types.CyclesCameraSettings
+    #     self.cam.data.cycles.panorama_type = 'EQUIRECTANGULAR'
+    #     self.cam.data.cycles.latitude_min = 0.
+
+    #     modal_file_output = self.tree.nodes.new(type="CompositorNodeOutputFile")
+    #     modal_file_output.label = 'Position'
+    #     self.links.new(self.render_layers.outputs['Position'], modal_file_output.inputs[0]) # (self.render_layers.outputs[folder_name], bpy.data.scenes['Scene'].node_tree.nodes["File Output"].inputs[0])
+    #     modal_file_output.base_path = str(render_folder_path)
+
+    #     T_w_m2b = np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]], dtype=np.float32) # Mitsuba world to Blender world
+    #     T_c_m2b = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
+
+    #     tic = time.time()
+    #     for frame_id in tqdm(self.os.frame_id_list):
+    #         lighting_global_xyz, lighting_global_pts = lighting_global_xyz_list[frame_id].reshape(-1, 3, 3), lighting_global_pts_list[frame_id].reshape(-1, 3, 3)
+    #         assert lighting_global_xyz.shape[0] == env_row*env_col
+    #         assert lighting_global_pts.shape[0] == env_row*env_col
+
+    #         for env_idx, (xyz, pts) in tqdm(enumerate(zip(lighting_global_xyz, lighting_global_pts))):
+    #             im_rendering_path = str(render_folder_path / ('%03d_%03d'%(frame_id, env_idx)))
+    #             self.scene.render.filepath = str(im_rendering_path)
+                
+    #             pts_b = (T_w_m2b @ (pts.T)).T #  # Mitsuba -> Blender => xyz axes in blender coords
+    #             self.cam.location = pts_b[0].reshape(3, ) # pts_b[0], pts_b[1], pts_b[2] should be the same
+
+    #             at_vector_m = xyz[0]; up_m = xyz[2] # follow OpenRooms local hemisphere camera: images/openrooms_hemisphere.jpeg
+    #             R_m = np.stack((np.cross(-up_m, at_vector_m), -up_m, at_vector_m), -1)
+    #             assert np.abs(np.linalg.det(R_m)-1) < 1e-5
+    #             R_b = T_w_m2b @ R_m @ T_c_m2b # Mitsuba -> Blender
+    #             euler_ = scipy.spatial.transform.Rotation.from_matrix(R_b).as_euler('xyz')
+    #             self.cam.rotation_euler[0] = euler_[0]
+    #             self.cam.rotation_euler[1] = euler_[1]
+    #             self.cam.rotation_euler[2] = euler_[2]
+
+    #             modal_file_output.file_slots[0].path = '%03d_%03d'%(frame_id, env_idx) + '_'
+
+    #             bpy.ops.render.render(write_still=True)  # render still
+
+    #     print(blue_text('DONE. (old) %.2f s.'%(time.time()-tic)))
+
     def render_lighting_envmap(self, render_folder_path):
         print(blue_text('Rendering lighting_envmap to... by Mitsuba: %s')%str(render_folder_path))
         lighting_global_xyz_list, lighting_global_pts_list = self.os.get_envmap_axes() # each of (env_row, env_col, 3, 3)
@@ -193,30 +261,60 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         T_w_m2b = np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]], dtype=np.float32) # Mitsuba world to Blender world
         T_c_m2b = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
 
+        bFirstCamera = True
+        # bpy.ops.object.select_all(action='DESELECT')
+        # # Select the object
+        # # https://wiki.blender.org/wiki/Reference/Release_Notes/2.80/Python_API/Scene_and_Object_API
+        # bpy.data.objects['Camera'].select_set(True) # Blender 2.8x
+        # bpy.ops.object.delete() 
+        bpy.context.scene.collection.objects.unlink(self.cam)
+        bpy.context.scene.render.use_persistent_data = True
+        bpy.context.scene.render.use_multiview = True
+        bpy.context.scene.render.views_format = 'MULTIVIEW'
+        bpy.context.scene.render.views[0].use = False # 'left
+        bpy.context.scene.render.views[1].use = False # 'right
+
+        tic = time.time()
         for frame_id in tqdm(self.os.frame_id_list):
             lighting_global_xyz, lighting_global_pts = lighting_global_xyz_list[frame_id].reshape(-1, 3, 3), lighting_global_pts_list[frame_id].reshape(-1, 3, 3)
             assert lighting_global_xyz.shape[0] == env_row*env_col
             assert lighting_global_pts.shape[0] == env_row*env_col
 
-            for env_idx, (xyz, pts) in tqdm(enumerate(zip(lighting_global_xyz, lighting_global_pts))):
-                im_rendering_path = str(render_folder_path / ('%03d_%03d'%(frame_id, env_idx)))
-                self.scene.render.filepath = str(im_rendering_path)
+            im_rendering_path = str(render_folder_path / ('%03d'%(frame_id)))
+            self.scene.render.filepath = str(im_rendering_path)
+
+            for env_idx, (xyz, pts) in tqdm(enumerate(zip(lighting_global_xyz[:5], lighting_global_pts[:5]))):
+
+                # Create the camera object
+                cam_new = bpy.data.objects.new('_%03d'%env_idx, self.cam.data)
                 
                 pts_b = (T_w_m2b @ (pts.T)).T #  # Mitsuba -> Blender => xyz axes in blender coords
-                self.cam.location = pts_b[0].reshape(3, ) # pts_b[0], pts_b[1], pts_b[2] should be the same
+                cam_new.location = pts_b[0].reshape(3, ) # pts_b[0], pts_b[1], pts_b[2] should be the same
 
                 at_vector_m = xyz[0]; up_m = xyz[2] # follow OpenRooms local hemisphere camera: images/openrooms_hemisphere.jpeg
                 R_m = np.stack((np.cross(-up_m, at_vector_m), -up_m, at_vector_m), -1)
                 assert np.abs(np.linalg.det(R_m)-1) < 1e-5
                 R_b = T_w_m2b @ R_m @ T_c_m2b # Mitsuba -> Blender
                 euler_ = scipy.spatial.transform.Rotation.from_matrix(R_b).as_euler('xyz')
-                self.cam.rotation_euler[0] = euler_[0]
-                self.cam.rotation_euler[1] = euler_[1]
-                self.cam.rotation_euler[2] = euler_[2]
+                cam_new.rotation_euler[0] = euler_[0]
+                cam_new.rotation_euler[1] = euler_[1]
+                cam_new.rotation_euler[2] = euler_[2]
 
-                modal_file_output.file_slots[0].path = '%03d_%03d'%(frame_id, env_idx) + '_'
+                bpy.context.scene.collection.objects.link(cam_new)
+                bpy.context.scene.camera = cam_new
+                # Get the first render view and override it
+                # renderView = bpy.context.scene.render.views[0]
+                renderView = bpy.context.scene.render.views.new(cam_new.name)
 
-                bpy.ops.render.render(write_still=True)  # render still
+                # Set the camera in the render view
+                renderView.name          = cam_new.name
+                renderView.camera_suffix = cam_new.name
+                renderView.file_suffix   = cam_new.name
+                renderView.use = True
 
-        print(blue_text('DONE.'))
+                modal_file_output.file_slots[0].path = '%03d_position_'%(frame_id)
 
+            # import ipdb; ipdb.set_trace()
+            bpy.ops.render.render(write_still=True)  # render still
+
+        print(blue_text('DONE. (new) %.2f s.'%(time.time()-tic)))
