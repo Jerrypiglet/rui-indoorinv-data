@@ -50,8 +50,8 @@ parser.add_argument('--renderer', type=str, default='blender', help='mi, blender
 
 # evaluator for rad-MLP
 parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
-parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs')
-parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs')
+parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=False, help='if add rays from evaluating MLPs (e.g. emitter radiance rays')
+parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=False, help='if add estimations from evaluating MLPs (e.g. en=nvmaps')
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -100,15 +100,15 @@ mitsuba_scene = mitsubaScene3D(
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'poses', 
-        # 'im_hdr', 
-        # 'im_sdr', 
+        'im_hdr', 
+        'im_sdr', 
         # 'lighting_envmap', 
         # 'seg', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
         # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
     im_params_dict={
         # 'im_H_resize': 480, 'im_W_resize': 640, 
@@ -210,25 +210,25 @@ if opt.eval_rad:
     '''
     sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
     '''
-    # eval_return_dict.update(
-    #     evaluator_rad.sample_emitter(
-    #         emitter_params={
-    #             'max_plate': 32, 
-    #             'radiance_scale': radiance_scale, 
-    #             'emitter_type_index_list': emitter_type_index_list, 
-    #             }))
+    eval_return_dict.update(
+        evaluator_rad.sample_emitter(
+            emitter_params={
+                'max_plate': 32, 
+                'radiance_scale': radiance_scale, 
+                'emitter_type_index_list': emitter_type_index_list, 
+                }))
     
     '''
     sample non-emitter locations along envmap (hemisphere) directions radiance from rad-MLP: images/demo_envmap_o3d_sampling.png
     '''
-    eval_return_dict.update(
-        evaluator_rad.sample_lighting(
-            # sample_type='emission', # 'emission', 'incident'
-            sample_type='incident', # 'emission', 'incident'
-            subsample_rate_pts=1, 
-            if_use_loaded_envmap_position=True, # assuming lighting envmap endpoint position dumped by Blender renderer
-        )
-    )
+    # eval_return_dict.update(
+    #     evaluator_rad.sample_lighting(
+    #         # sample_type='emission', # 'emission', 'incident'
+    #         sample_type='incident', # 'emission', 'incident'
+    #         subsample_rate_pts=1, 
+    #         if_use_loaded_envmap_position=True, # assuming lighting envmap endpoint position dumped by Blender renderer
+    #     )
+    # )
 
 '''
 Matploblib 2D viewer
@@ -245,12 +245,12 @@ if opt.vis_2d_plt:
             # 'normal', 
             # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
-            'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
+            # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
             # 'seg_area', 'seg_env', 'seg_obj', 
-            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         # frame_idx_list=[0, 1, 2, 3, 4], 
-        frame_idx_list=[0, 1], 
+        frame_idx_list=[0], 
     )
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:
@@ -274,11 +274,11 @@ if opt.vis_3d_o3d:
             # 'dense_geo', # fused from 2D
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
-            'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
+            # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
-            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
-            # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
-            'mi', # mitsuba sampled rays, pts
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
+            'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
+            # 'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -340,7 +340,7 @@ if opt.vis_3d_o3d:
         lighting_params=lighting_params_vis, 
         shapes_params={
             'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
-            'if_meshes': False, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
+            'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
             'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
@@ -354,7 +354,7 @@ if opt.vis_3d_o3d:
             'max_plate': 32, 
         },
         mi_params={
-            'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
+            'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 10,
             # 'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 

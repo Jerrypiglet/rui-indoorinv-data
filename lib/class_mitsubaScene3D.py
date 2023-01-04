@@ -195,6 +195,11 @@ class mitsubaScene3D(mitsubaBase):
         return self.mi_params_dict['if_get_segs']
 
     @property
+    def if_has_seg(self):
+        return False, 'Segs not saved to labels. Use mi_seg_area, mi_seg_env, mi_seg_obj instead.'
+        # return all([_ in self.modality_list for _ in ['seg']])
+
+    @property
     def if_has_mitsuba_all(self):
         return all([self.if_has_mitsuba_scene, self.if_has_mitsuba_rays_pts, self.if_has_mitsuba_segs, ])
 

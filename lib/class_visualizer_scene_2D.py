@@ -33,9 +33,9 @@ class visualizer_scene_2D(object):
         else:
             assert isinstance(frame_idx_list, list)
             self.frame_idx_list = frame_idx_list
-        self.N_frames = len(self.frame_idx_list)
+        self.N_frames = len(self.os.frame_id_list)
         assert self.N_frames >= 1
-        assert all([_ < self.N_frames for _ in self.frame_idx_list]), '[visualizer_scene_2D] frame_idx exceeds total num of frames loaded!'
+        assert all([_ < self.N_frames for _ in self.os.frame_id_list]), '[visualizer_scene_2D] frame_idx exceeds total num of frames loaded!'
 
         self.N_cols = self.N_frames
         assert self.N_cols <= 6 # max 6 images due to space in a row

@@ -20,6 +20,7 @@
   - [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
   - [Evaluator for rad-MLP and inv-MLP](#evaluator-for-rad-mlp-and-inv-mlp)
     - [rad-MLP](#rad-mlp)
+    - [inv-MLP](#inv-mlp)
 - [Todolist](#todolist)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
@@ -319,7 +320,7 @@ python test_class_mitsubaScene3D.py --render_2d --renderer blender
 
 ## Evaluator for rad-MLP and inv-MLP
 ### rad-MLP
-```opt.eval_rad``` for evaluating rad-MLP loaded from ckpt.
+Tested with repo **inv-nerf** (branch rui_emission). ```opt.eval_rad``` for evaluating rad-MLP loaded from ckpt.
 
 [mm1 3c87ce2] added sampling rad-MLP for est emitter radiance: public_re_3_v3pose_2048 and public_re_3_v5pose_2048
 
@@ -346,6 +347,8 @@ Indoor-kitchen scene:
 ![](images/demo_eval_radMLP_render_kitchen_0.png)
 ![](images/demo_eval_radMLP_incident_kitchen_0.png)
 [Google Drive](https://drive.google.com/open?id=1NEBVcbFIPkra0GOWxIlOxPYXet9q38g8)
+
+### inv-MLP
 
 # Todolist
 - [x] vis envmap
