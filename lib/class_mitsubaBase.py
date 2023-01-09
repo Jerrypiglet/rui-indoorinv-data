@@ -12,7 +12,7 @@ import mitsuba as mi
 # mi.set_variant(mi_variant)
 
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import green, blue_text, get_list_of_keys, white_blue, yellow
+from lib.utils_misc import green, green_text, blue_text, get_list_of_keys, white_blue, yellow
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 
 class mitsubaBase():
@@ -101,6 +101,8 @@ class mitsubaBase():
 
             self.mi_pts_list.append(mi_pts)
 
+        print(green_text('DONE. [mi_sample_rays_pts] for %d frames...'%len(cam_rays_list)))
+
     def mi_get_segs(self, if_also_dump_xml_with_lit_area_lights_only=True):
         '''
         images/demo_mitsuba_ret_seg_2D.png; 
@@ -113,6 +115,8 @@ class mitsubaBase():
         self.mi_seg_dict_of_lists = defaultdict(list)
         assert len(self.mi_rays_ret_list) == len(self.mi_invalid_depth_mask_list)
 
+        print(green('[mi_get_segs] for %d frames...'%len(self.mi_rays_ret_list)))
+
         for frame_idx, ret in tqdm(enumerate(self.mi_rays_ret_list)):
             mi_seg_env = self.mi_invalid_depth_mask_list[frame_idx]
             self.mi_seg_dict_of_lists['env'].append(mi_seg_env) # shine-through area of windows
@@ -122,6 +126,8 @@ class mitsubaBase():
 
             mi_seg_obj = np.logical_and(np.logical_not(mi_seg_area), np.logical_not(mi_seg_env))
             self.mi_seg_dict_of_lists['obj'].append(mi_seg_obj) # non-emitter objects
+
+        print(green_text('DONE. [mi_get_segs] for %d frames...'%len(self.mi_rays_ret_list)))
 
     def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False, if_lighting=False):
         '''

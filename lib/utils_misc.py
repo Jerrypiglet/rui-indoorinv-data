@@ -81,6 +81,10 @@ def green(text):
     coloredd = colored(text, 'blue', 'on_green')
     return coloredd
 
+def green_text(text):
+    coloredd = colored(text, 'green')
+    return coloredd
+
 def print_green(text):
     print(green(text))
 
