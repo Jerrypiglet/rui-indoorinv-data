@@ -129,7 +129,7 @@ For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-
   - intrinsic.txt
   - colors
   - semanticLabelName_OR42.txt
-  - openrooms_public_re_2
+  - OpenRooms_public_scene_dataset_2
     - scenes
       - xml1
         - scene0552_00_more

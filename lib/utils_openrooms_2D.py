@@ -43,7 +43,7 @@ def load_OR_public_poses_to_Rt(scene_xml_dir: Path, frame_id_list: list, if_inve
     '''
     load OpenRooms public pose files (cam.txt and transform.dat) and transform to R, t
 
-    if_1_based: openrooms_public is 1-based, while rendering and openrooms_public_re is 0-based
+    if_1_based: openrooms_public is 1-based, while rendering and OpenRooms_public_scene_dataset is 0-based
     '''
     assert if_inverse_y == False, 'not handling if_inverse_y=True for now'
     transformFile = scene_xml_dir / 'transform.dat'

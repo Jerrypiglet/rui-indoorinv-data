@@ -4,13 +4,16 @@ np.set_printoptions(suppress=True)
 from tqdm import tqdm
 from collections import defaultdict
 import torch
+import time
 from pathlib import Path
+import imageio
 # Import the library using the alias "mi"
 import mitsuba as mi
 # Set the variant of the renderer
 # from lib.global_vars import mi_variant
 # mi.set_variant(mi_variant)
 
+from lib.utils_io import load_img
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import green, green_text, blue_text, get_list_of_keys, white_blue, yellow
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
@@ -103,7 +106,7 @@ class mitsubaBase():
 
         print(green_text('DONE. [mi_sample_rays_pts] for %d frames...'%len(cam_rays_list)))
 
-    def mi_get_segs(self, if_also_dump_xml_with_lit_area_lights_only=True):
+    def mi_get_segs(self, if_also_dump_xml_with_lit_area_lights_only=True, if_dump=True):
         '''
         images/demo_mitsuba_ret_seg_2D.png; 
         Update:
@@ -118,10 +121,22 @@ class mitsubaBase():
         print(green('[mi_get_segs] for %d frames...'%len(self.mi_rays_ret_list)))
 
         for frame_idx, ret in tqdm(enumerate(self.mi_rays_ret_list)):
+            ts = time.time()
             mi_seg_env = self.mi_invalid_depth_mask_list[frame_idx]
             self.mi_seg_dict_of_lists['env'].append(mi_seg_env) # shine-through area of windows
+            
+            # [class mitsuba.ShapePtr] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html#mitsuba.ShapePtr
+            # slow...
+            mi_seg_area_file_folder = self.scene_rendering_path / 'mi_seg_emitter'
+            mi_seg_area_file_folder.mkdir(parents=True, exist_ok=True)
+            mi_seg_area_file_path = mi_seg_area_file_folder / ('mi_seg_emitter_%d.png'%(self.frame_id_list[frame_idx]))
+            if mi_seg_area_file_path.exists():
+                mi_seg_area = load_img(mi_seg_area_file_path, (self.H, self.W), ext='png', target_HW=self.im_target_HW)/255.
+            else:
+                mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self.H, self.W)
+                imageio.imwrite(str(mi_seg_area_file_path), (mi_seg_area*255.).astype(np.uint8))
+                print(green_text('[mi_get_segs] mi_seg_area -> %s'%str(mi_seg_area_file_path)))
 
-            mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self.H, self.W) # [class mitsuba.ShapePtr] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html#mitsuba.ShapePtr
             self.mi_seg_dict_of_lists['area'].append(mi_seg_area) # lit-up lamps
 
             mi_seg_obj = np.logical_and(np.logical_not(mi_seg_area), np.logical_not(mi_seg_env))

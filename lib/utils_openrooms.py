@@ -50,7 +50,7 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
     # ... Transformations for layout is in transforms[0] while transformations for objects is in their 'transform' as desginated in the XML file (reading the transformations: see parse_XML_for_shapes()->shape_dict['transforms_list')
     # ... as a result, here we DO NOT transform cameras according to the layout transformations.
 
-    if_1_based: openrooms_public is 1-based, while rendering and openrooms_public_re is 0-based
+    if_1_based: openrooms_public is 1-based, while rendering and OpenRooms_public_scene_dataset is 0-based
     '''
     assert if_inverse_y == False, 'not handling if_inverse_y=True for now'
 
