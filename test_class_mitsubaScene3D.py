@@ -66,9 +66,9 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 xml_filename = 'scene_v3.xml'
 scene_name = 'kitchen'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
-# split = 'train'; frame_ids = list(range(0, 189, 40))
+split = 'train'; frame_ids = list(range(0, 189, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
-split = 'train'; frame_ids = [0]
+# split = 'train'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(0, 189, 1))
 
 mitsuba_scene = mitsubaScene3D(
@@ -103,8 +103,8 @@ mitsuba_scene = mitsubaScene3D(
         'im_hdr', 
         'im_sdr', 
         # 'lighting_envmap', 
-        # 'seg', 
-        # 'albedo', 'roughness', 
+        'albedo', 'roughness', 
+        'emission', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
         # 'layout', 
@@ -240,17 +240,20 @@ if opt.vis_2d_plt:
             'im', 
             # 'layout', 
             # 'shapes', 
+            'albedo', 
+            'roughness', 
+            'emission', 
             # 'depth', 
-            # 'mi_depth', 
             # 'normal', 
+            # 'mi_depth', 
             # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
             # 'seg_area', 'seg_env', 'seg_obj', 
-            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
-        # frame_idx_list=[0, 1, 2, 3, 4], 
-        frame_idx_list=[0], 
+        frame_idx_list=[0, 1, 2, 3, 4], 
+        # frame_idx_list=[0], 
     )
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:

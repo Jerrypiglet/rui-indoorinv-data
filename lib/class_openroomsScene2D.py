@@ -389,8 +389,8 @@ class openroomsScene2D(object):
 
         print(white_blue('[openroomsScene] load_albedo for %d frames...'%len(self.frame_id_list)))
 
-        albedo_files = [self.scene_rendering_path / ('imbaseColor_%d.png'%i) for i in self.frame_id_list]
-        self.albedo_list = [load_img(albedo_file, (self.im_H_load, self.im_W_load, 3), ext='png', target_HW=self.im_target_HW).astype(np.float32)/255. for albedo_file in albedo_files]
+        self.albedo_file_list = [self.scene_rendering_path / ('imbaseColor_%d.png'%i) for i in self.frame_id_list]
+        self.albedo_list = [load_img(albedo_file, (self.im_H_load, self.im_W_load, 3), ext='png', target_HW=self.im_target_HW).astype(np.float32)/255. for albedo_file in self.albedo_file_list]
         self.albedo_list = [albedo**2.2 for albedo in self.albedo_list]
         
         print(blue_text('[openroomsScene] DONE. load_albedo'))
@@ -404,8 +404,8 @@ class openroomsScene2D(object):
 
         print(white_blue('[openroomsScene] load_roughness for %d frames...'%len(self.frame_id_list)))
 
-        roughness_files = [self.scene_rendering_path / ('imroughness_%d.png'%i) for i in self.frame_id_list]
-        self.roughness_list = [load_img(roughness_file, (self.im_H_load, self.im_W_load, 3), ext='png', target_HW=self.im_target_HW)[:, :, 0:1].astype(np.float32)/255. for roughness_file in roughness_files]
+        self.roughness_file_list = [self.scene_rendering_path / ('imroughness_%d.png'%i) for i in self.frame_id_list]
+        self.roughness_list = [load_img(roughness_file, (self.im_H_load, self.im_W_load, 3), ext='png', target_HW=self.im_target_HW)[:, :, 0:1].astype(np.float32)/255. for roughness_file in self.roughness_file_list]
 
         print(blue_text('[openroomsScene] DONE. load_roughness'))
 
@@ -418,8 +418,8 @@ class openroomsScene2D(object):
 
         print(white_blue('[openroomsScene] load_depth for %d frames...'%len(self.frame_id_list)))
 
-        depth_files = [self.scene_rendering_path / ('imdepth_%d.dat'%i) for i in self.frame_id_list]
-        self.depth_list = [load_binary(depth_file, (self.im_H_load, self.im_W_load), target_HW=self.im_target_HW, resize_method='area')for depth_file in depth_files] # TODO: better resize method for depth for anti-aliasing purposes and better boundaries, and also using segs?
+        self.depth_file_list = [self.scene_rendering_path / ('imdepth_%d.dat'%i) for i in self.frame_id_list]
+        self.depth_list = [load_binary(depth_file, (self.im_H_load, self.im_W_load), target_HW=self.im_target_HW, resize_method='area')for depth_file in self.depth_file_list] # TODO: better resize method for depth for anti-aliasing purposes and better boundaries, and also using segs?
         
         print(blue_text('[openroomsScene] DONE. load_depth'))
 
@@ -435,8 +435,8 @@ class openroomsScene2D(object):
 
         print(white_blue('[openroomsScene] load_normal for %d frames...'%len(self.frame_id_list)))
 
-        normal_files = [self.scene_rendering_path / ('imnormal_%d.png'%i) for i in self.frame_id_list]
-        self.normal_list = [load_img(normal_file, (self.im_H_load, self.im_W_load, 3), ext='png', target_HW=self.im_target_HW).astype(np.float32)/255.*2.-1. for normal_file in normal_files] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
+        self.normal_file_list = [self.scene_rendering_path / ('imnormal_%d.png'%i) for i in self.frame_id_list]
+        self.normal_list = [load_img(normal_file, (self.im_H_load, self.im_W_load, 3), ext='png', target_HW=self.im_target_HW).astype(np.float32)/255.*2.-1. for normal_file in self.normal_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
         self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
         
         print(blue_text('[openroomsScene] DONE. load_normal'))
@@ -454,11 +454,11 @@ class openroomsScene2D(object):
         print(white_blue('[openroomsScene] load_lighting_SG for %d frames...'%len(self.frame_id_list)))
         print(red('THIS MIGHT BE SLOW...'))
 
-        lighting_SG_files = [self.scene_rendering_path / ('%s%d.h5'%(self.imsgEnv_key, i)) for i in self.frame_id_list]
+        self.lighting_SG_file_list = [self.scene_rendering_path / ('%s%d.h5'%(self.imsgEnv_key, i)) for i in self.frame_id_list]
 
         self.lighting_SG_local_list = []
 
-        for frame_idx, lighting_SG_file in enumerate(tqdm(lighting_SG_files)):
+        for frame_idx, lighting_SG_file in enumerate(tqdm(self.lighting_SG_file_list)):
             lighting_SG = load_h5(lighting_SG_file)
             # if 'im_hdr' in self.modality_list and self.if_scale_hdr:
             #     hdr_scale = self.hdr_scale_list[frame_idx]
@@ -499,11 +499,11 @@ class openroomsScene2D(object):
             version_key = '8x16_'
         elif (env_row, env_col, env_height, env_width) == (6, 8, 128, 256):
             version_key = '128x256_'
-        lighting_envmap_files = [self.scene_rendering_path / ('%s%s%d.hdr'%(self.imenv_key, version_key, i)) for i in self.frame_id_list]
+        self.lighting_envmap_file_list = [self.scene_rendering_path / ('%s%s%d.hdr'%(self.imenv_key, version_key, i)) for i in self.frame_id_list]
 
         self.lighting_envmap_list = []
 
-        for idx, lighting_envmap_file in enumerate(tqdm(lighting_envmap_files)):
+        for idx, lighting_envmap_file in enumerate(tqdm(self.lighting_envmap_file_list)):
             envmap = load_envmap(str(lighting_envmap_file), env_height=env_height, env_width=env_width, env_row=env_row, env_col=env_col, allow_resize=False)[0].transpose(1, 2, 0, 3, 4) # -> (120, 160, 3, 8, 16)
             # if 'im_hdr' in self.modality_list and self.if_scale_hdr:
             #     hdr_scale = self.hdr_scale_list[idx]
@@ -522,10 +522,10 @@ class openroomsScene2D(object):
 
         print(white_blue('[openroomsScene] load_semseg for %d frames...'%len(self.frame_id_list)))
 
-        semseg_files = [self.scene_rendering_path / ('imsemLabel_%d.npy'%i) for i in self.frame_id_list]
+        self.semseg_file_list = [self.scene_rendering_path / ('imsemLabel_%d.npy'%i) for i in self.frame_id_list]
         self.semseg_list = [
             load_img(semseg_file, (self.im_H_load, self.im_W_load), ext='npy', target_HW=self.im_target_HW, resize_method='nearest')
-            for semseg_file in semseg_files]
+            for semseg_file in self.semseg_file_list]
         
         print(blue_text('[openroomsScene] DONE. load_semseg'))
 
@@ -540,7 +540,7 @@ class openroomsScene2D(object):
 
         print(white_blue('[openroomsScene] load_matseg for %d frames...'%len(self.frame_id_list)))
 
-        imcadmatobj_files = [self.scene_rendering_path / ('imcadmatobj_%d.dat'%i) for i in self.frame_id_list]
+        self.imcadmatobj_file_list = [self.scene_rendering_path / ('imcadmatobj_%d.dat'%i) for i in self.frame_id_list]
         self.imcadmatobj_list = [
             load_binary(
                 imcadmatobj_file, 
@@ -548,7 +548,7 @@ class openroomsScene2D(object):
                 target_HW=self.im_target_HW, 
                 channels=3, dtype=np.int32, resize_method='nearest'
                 ) 
-            for imcadmatobj_file in imcadmatobj_files]
+            for imcadmatobj_file in self.imcadmatobj_file_list]
 
         self.matseg_list = []
         for mask in self.imcadmatobj_list:

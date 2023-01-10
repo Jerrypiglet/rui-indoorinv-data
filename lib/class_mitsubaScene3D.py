@@ -12,6 +12,7 @@ random.seed(0)
 from lib.utils_io import read_cam_params, normalize_v
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
+from collections import defaultdict
 
 import string
 # Import the library using the alias "mi"
@@ -90,6 +91,7 @@ class mitsubaScene3D(mitsubaBase):
 
         self.im_sdr_ext = im_params_dict.get('im_sdr_ext', 'png')
         self.im_hdr_ext = im_params_dict.get('im_hdr_ext', 'exr')
+        self.emission_ext = im_params_dict.get('emission_ext', 'exr')
         self.lighting_envmap_ext = im_params_dict.get('lighting_envmap_ext', 'exr')
 
         self.near = cam_params_dict.get('near', 0.1)
@@ -130,7 +132,16 @@ class mitsubaScene3D(mitsubaBase):
 
     @property
     def valid_modalities(self):
-        return ['layout', 'shapes', 'im_hdr', 'im_sdr', 'lighting_envmap']
+        return [
+            'im_hdr', 'im_sdr', 
+            'albedo', 
+            'roughness', 
+            # 'depth', 
+            # 'normal', 
+            'emission', 
+            'layout', 'shapes', 
+            'lighting_envmap', 
+            ]
 
     def check_and_sort_modalities(self, modalitiy_list):
         modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
@@ -175,6 +186,10 @@ class mitsubaScene3D(mitsubaBase):
         return all([_ in self.modality_list for _ in ['depth', 'normal']])
 
     @property
+    def if_has_BRDF(self):
+        return all([_ in self.modality_list for _ in ['albedo', 'roughness']])
+
+    @property
     def if_has_layout(self):
         return all([_ in self.modality_list for _ in ['layout']])
 
@@ -207,12 +222,21 @@ class mitsubaScene3D(mitsubaBase):
     def if_has_colors(self): # no semantic label colors
         return False
 
+    @property
+    def frame_num(self):
+        return len(self.frame_id_list)
+
     def load_modalities_3D(self):
         for _ in self.modality_list:
-            if _ == 'layout': self.load_layout()
-            if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'im_sdr': self.load_im_sdr()
             if _ == 'im_hdr': self.load_im_hdr()
+            if _ == 'emission': self.load_emission()
+            if _ == 'albedo': self.load_albedo()
+            if _ == 'roughness': self.load_roughness()
+            # if _ == 'depth': self.load_depth()
+            # if _ == 'normal': self.load_normal()
+            if _ == 'layout': self.load_layout()
+            if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'lighting_envmap': self.load_lighting_envmap()
 
     def get_modality(self, modality, source: str='GT'):
@@ -230,6 +254,12 @@ class mitsubaScene3D(mitsubaBase):
         elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
             seg_key = modality.split('_')[-1] 
             return self.mi_seg_dict_of_lists[seg_key]
+        elif modality == 'emission': 
+            return self.emission_list
+        elif modality == 'albedo': 
+            return self.albedo_list
+        elif modality == 'roughness': 
+            return self.roughness_list
         else:
             assert False, 'Unsupported modality: ' + modality
 
@@ -421,6 +451,7 @@ class mitsubaScene3D(mitsubaBase):
         self.pose_list = [np.hstack((
             np.eye(3, dtype=np.float32), ((self.xyz_max+self.xyz_min)/2.).reshape(3, 1)
             ))]
+
     def load_im_sdr(self):
         '''
         load im in SDR; RGB, (H, W, 3), [0., 1.]
@@ -450,6 +481,78 @@ class mitsubaScene3D(mitsubaBase):
                 convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=1.)
 
         print(blue_text('[mitsubaScene] DONE. load_im_hdr'))
+
+    def load_emission(self):
+        '''
+        return emission in HDR; (H, W, 3)
+        '''
+        print(white_blue('[mitsubaScene] load_emission for %d frames...'%len(self.frame_id_list)))
+
+        self.emission_file_list = [self.scene_rendering_path / 'Emit' / ('%03d_0001.%s'%(i, self.emission_ext)) for i in self.frame_id_list]
+        self.emission_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=self.emission_ext, target_HW=self.im_target_HW) for _ in self.emission_file_list]
+
+        print(blue_text('[mitsubaScene] DONE. load_emission'))
+
+    def load_albedo(self):
+        '''
+        albedo; loaded in [0., 1.] HDR
+        (H, W, 3), [0., 1.]
+        '''
+        if hasattr(self, 'albedo_list'): return
+
+        print(white_blue('[mistubaScene] load_albedo for %d frames...'%len(self.frame_id_list)))
+
+        self.albedo_file_list = [self.scene_rendering_path / 'DiffCol' / ('%03d_0001.%s'%(i, self.emission_ext)) for i in self.frame_id_list]
+        self.albedo_list = [load_img(albedo_file, (self.im_H_load, self.im_W_load, 3), ext='exr', target_HW=self.im_target_HW).astype(np.float32) for albedo_file in self.albedo_file_list]
+        
+        print(blue_text('[mistubaScene] DONE. load_albedo'))
+
+    def load_roughness(self):
+        '''
+        roughness; smaller, the more specular;
+        (H, W, 1), [0., 1.]
+        '''
+        if hasattr(self, 'roughness_list'): return
+
+        print(white_blue('[mistubaScene] load_roughness for %d frames...'%len(self.frame_id_list)))
+
+        self.roughness_file_list = [self.scene_rendering_path / 'Roughness' / ('%03d_0001.%s'%(i, self.emission_ext)) for i in self.frame_id_list]
+        self.roughness_list = [load_img(roughness_file, (self.im_H_load, self.im_W_load, 3), ext='exr', target_HW=self.im_target_HW)[:, :, 0:1].astype(np.float32) for roughness_file in self.roughness_file_list]
+
+        print(blue_text('[mistubaScene] DONE. load_roughness'))
+
+    # def load_depth(self):
+    #     '''
+    #     depth;
+    #     (H, W), ideally in [0., inf]
+    #     '''
+    #     if hasattr(self, 'depth_list'): return
+
+    #     print(white_blue('[mistubaScene] load_depth for %d frames...'%len(self.frame_id_list)))
+
+    #     depth_files = [self.scene_rendering_path / ('imdepth_%d.dat'%i) for i in self.frame_id_list]
+    #     self.depth_list = [load_binary(depth_file, (self.im_H_load, self.im_W_load), target_HW=self.im_target_HW, resize_method='area')for depth_file in depth_files] # TODO: better resize method for depth for anti-aliasing purposes and better boundaries, and also using segs?
+        
+    #     print(blue_text('[mistubaScene] DONE. load_depth'))
+
+    #     self.pts_from['depth'] = True
+        
+
+    # def load_normal(self):
+    #     '''
+    #     normal, in camera coordinates (OpenGL convention: right-up-backward);
+    #     (H, W, 3), [-1., 1.]
+    #     '''
+    #     if hasattr(self, 'normal_list'): return
+
+    #     print(white_blue('[mistubaScene] load_normal for %d frames...'%len(self.frame_id_list)))
+
+    #     normal_files = [self.scene_rendering_path / ('imnormal_%d.png'%i) for i in self.frame_id_list]
+    #     self.normal_list = [load_img(normal_file, (self.im_H_load, self.im_W_load, 3), ext='png', target_HW=self.im_target_HW).astype(np.float32)/255.*2.-1. for normal_file in normal_files] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
+    #     self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
+        
+    #     print(blue_text('[mistubaScene] DONE. load_normal'))
+
 
     def load_lighting_envmap(self):
         '''

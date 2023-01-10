@@ -33,9 +33,11 @@ class visualizer_scene_2D(object):
         else:
             assert isinstance(frame_idx_list, list)
             self.frame_idx_list = frame_idx_list
-        self.N_frames = len(self.os.frame_id_list)
+        assert max(self.frame_idx_list) < self.os.frame_num
+
+        self.N_frames = min(len(self.frame_idx_list), len(self.os.frame_id_list))
         assert self.N_frames >= 1
-        assert all([_ < self.N_frames for _ in self.os.frame_id_list]), '[visualizer_scene_2D] frame_idx exceeds total num of frames loaded!'
+        # assert all([_ < self.N_frames for _ in self.os.frame_id_list]), '[visualizer_scene_2D] frame_idx exceeds total num of frames loaded:%d!'%self.N_frames
 
         self.N_cols = self.N_frames
         assert self.N_cols <= 6 # max 6 images due to space in a row
@@ -56,7 +58,9 @@ class visualizer_scene_2D(object):
             'albedo', 'roughness', 'depth', 'normal', 
             'lighting_SG', # convert to lighting_envmap and vis
             'lighting_envmap', 
-            'semseg', 'matseg', 'seg_area', 'seg_env', 'seg_obj', 
+            'seg_area', 'seg_env', 'seg_obj', 
+            'emission', 
+            'semseg', 'matseg', 
             'mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', 
             'layout', 'shapes', 
             ]
@@ -130,7 +134,7 @@ class visualizer_scene_2D(object):
                     # other modalities
                     self.vis_2d_modality(fig=subfig, ax_list=ax_list, modality=modality, source=source, **kwargs)
 
-                    if modality == 'albedo':
+                    if modality in ['albedo', 'emission']:
                         modality_title_appendix = '(in SDR space)'
                     if modality == 'matseg':
                         modality_title_appendix = '(red for invalid areas (e.g. emitters)'
@@ -192,9 +196,9 @@ class visualizer_scene_2D(object):
                 plt.colorbar(plot, ax=ax)
                 continue
 
-            if modality == 'albedo':
+            if modality in ['albedo', 'emission']:
                 # convert albedo to SDR for better vis
-               _im = _im ** (1./2.2) 
+               _im = np.clip(_im ** (1./2.2), 0., 1.)
 
             if modality == 'matseg':
                 _im = vis_index_map(_im['mat_aggre_map'])
