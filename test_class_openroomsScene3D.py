@@ -1,7 +1,7 @@
 import sys
 
-# host = 'mm1'
-host = 'apple'
+host = 'mm1'
+# host = 'apple'
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
     'mm1': '/home/ruizhu/Documents/Projects/OpenRooms_RAW_loader', 
@@ -127,7 +127,7 @@ openrooms_scene = openroomsScene3D(
         'im_sdr', 
         'poses', 
         'seg', 'im_hdr', 
-        # 'albedo', 'roughness', 
+        'albedo', 'roughness', 
         'depth', 'normal', 
         # 'lighting_SG', 
         'lighting_envmap', 
@@ -142,7 +142,6 @@ openrooms_scene = openroomsScene3D(
         # 'lighting_envmap', 
         'albedo': 'imbaseColor_%d.png', 
         'roughness': 'imroughness_%d.png', 
-        'emission': 'im_%d.hdr', 
         'depth': 'imdepth_%d.dat', 
         'normal': 'imnormal_%d.png', 
         # 'lighting_SG', 
@@ -269,12 +268,14 @@ if opt.vis_2d_plt:
     visualizer_2D = visualizer_scene_2D(
         openrooms_scene, 
         modality_list_vis=[
-            # 'im', 
+            'im', 
             # 'layout', 
             # 'shapes', 
-            # 'depth', 
+            'albedo', 
+            'roughness', 
+            'depth', 
+            'normal', 
             # 'mi_depth', 
-            # 'normal', 
             # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             'lighting_envmap', 

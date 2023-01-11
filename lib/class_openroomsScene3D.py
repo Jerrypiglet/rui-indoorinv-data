@@ -41,6 +41,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         root_path_dict: dict, 
         scene_params_dict: dict, 
         modality_list: list, 
+        modality_filename_dict: dict, 
         im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640}, 
         BRDF_params_dict: dict={}, 
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
@@ -51,6 +52,17 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         if_debug_info: bool=False, 
         host: str='', 
     ):
+        openroomsScene2D.__init__(
+            self, 
+            if_debug_info = if_debug_info, 
+            root_path_dict = root_path_dict, 
+            scene_params_dict = scene_params_dict, 
+            modality_list = list(set(modality_list)), 
+            modality_filename_dict=modality_filename_dict, 
+            im_params_dict = im_params_dict, 
+            BRDF_params_dict = BRDF_params_dict, 
+            lighting_params_dict = lighting_params_dict, 
+        )
 
         self.if_loaded_colors = False
 
@@ -61,17 +73,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         self.host = host
         self.device = get_device(self.host)
-
-        openroomsScene2D.__init__(
-            self, 
-            if_debug_info = if_debug_info, 
-            root_path_dict = root_path_dict, 
-            scene_params_dict = scene_params_dict, 
-            modality_list = list(set(modality_list)), 
-            im_params_dict = im_params_dict, 
-            BRDF_params_dict = BRDF_params_dict, 
-            lighting_params_dict = lighting_params_dict, 
-        )
 
         self.modality_list = self.check_and_sort_modalities(list(set(self.modality_list)))
         self.shapes_root, self.layout_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'layout_root', 'envmaps_root'], [PosixPath, PosixPath, PosixPath])

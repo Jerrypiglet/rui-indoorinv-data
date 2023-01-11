@@ -20,7 +20,7 @@ from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global
 
 class mitsubaBase():
     '''
-    A class used to visualize/render Mitsuba scene in XML format
+    Base class used to load/visualize/render Mitsuba scene from XML file
     '''
     def __init__(
         self, 
@@ -130,9 +130,14 @@ class mitsubaBase():
             mi_seg_area_file_folder = self.scene_rendering_path / 'mi_seg_emitter'
             mi_seg_area_file_folder.mkdir(parents=True, exist_ok=True)
             mi_seg_area_file_path = mi_seg_area_file_folder / ('mi_seg_emitter_%d.png'%(self.frame_id_list[frame_idx]))
+            if_get_from_scratch = False
             if mi_seg_area_file_path.exists():
-                mi_seg_area = load_img(mi_seg_area_file_path, (self.im_H_load, self.im_W_load), ext='png', target_HW=self.im_target_HW)/255.
-            else:
+                mi_seg_area = load_img(mi_seg_area_file_path, (self.im_H_load, self.im_W_load), ext='png', target_HW=self.im_target_HW, if_attempt_load=True)/255.
+                if mi_seg_area == False:
+                    if_get_from_scratch = True
+                    mi_seg_area_file_path.unlink()
+
+            if if_get_from_scratch:
                 mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self.H, self.W)
                 imageio.imwrite(str(mi_seg_area_file_path), (mi_seg_area*255.).astype(np.uint8))
                 print(green_text('[mi_get_segs] mi_seg_area -> %s'%str(mi_seg_area_file_path)))
@@ -343,28 +348,3 @@ class mitsubaBase():
         axis_np_global = lighting_envmap_position - lighting_envmap_o
         axis_np_global = axis_np_global / (np.linalg.norm(axis_np_global, axis=-1, keepdims=True)+1e-6)
         return axis_np_global
-
-
-    # def mi_get_segs_(self, if_also_dump_xml_with_lit_area_lights_only=True):
-    #     '''
-    #     images/demo_mitsuba_ret_seg_2D.png
-    #     '''
-    #     self.mi_seg_dict_of_lists = defaultdict(list)
-
-    #     for frame_idx, mi_depth in enumerate(self.mi_depth_list):
-    #         # self.mi_seg_dict_of_lists['area'].append(seg_area)
-    #         mi_seg_env = self.mi_invalid_depth_mask_list[frame_idx]
-    #         self.mi_seg_dict_of_lists['env'].append(mi_seg_env) # shine-through area of windows
-
-    #         if if_also_dump_xml_with_lit_area_lights_only:
-    #             rays_o, rays_d, ray_d_center = self.cam_rays_list[frame_idx]
-    #             rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
-    #             rays_mi = mi.Ray3f(mi.Point3f(self.to_d(rays_o_flatten)), mi.Vector3f(self.to_d(rays_d_flatten)))
-    #             ret = self.mi_scene_lit_up_area_lights_only.ray_intersect(rays_mi)
-    #             ret_t = ret.t.numpy().reshape(self.H, self.W)
-    #             invalid_depth_mask = np.logical_or(np.isnan(ret_t), np.isinf(ret_t))
-    #             mi_seg_area = np.logical_not(invalid_depth_mask)
-    #             self.mi_seg_dict_of_lists['area'].append(mi_seg_area) # lit-up lamps
-
-    #             mi_seg_obj = np.logical_and(np.logical_not(mi_seg_area), np.logical_not(mi_seg_env))
-    #             self.mi_seg_dict_of_lists['obj'].append(mi_seg_obj) # non-emitter objects

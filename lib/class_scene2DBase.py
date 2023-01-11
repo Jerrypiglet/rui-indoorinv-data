@@ -22,7 +22,7 @@ from lib.utils_io import load_matrix, load_img, convert_write_png
 
 class scene2DBase():
     '''
-    A class used to load per-pixel modalities
+    Base class used to load 2D per-pixel modalities
     '''
     def __init__(
         self, 
@@ -61,9 +61,6 @@ class scene2DBase():
         self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
         self.H, self.W = self.im_H_resize, self.im_W_resize
 
-        # self.im_sdr_ext = im_params_dict.get('im_sdr_ext', 'png')
-        # self.im_hdr_ext = im_params_dict.get('im_hdr_ext', 'exr')
-
         # lighting params
         self.lighting_params_dict = lighting_params_dict
 
@@ -99,8 +96,6 @@ class scene2DBase():
             return self.im_sdr_list
         elif modality == 'im_hdr': 
             return self.im_hdr_list
-        # elif modality == 'seg': 
-        #     return self.seg_dict_of_lists
         elif modality == 'poses': 
             return self.pose_list
         elif modality == 'albedo': 
@@ -111,20 +106,8 @@ class scene2DBase():
             return self.depth_list
         elif modality == 'normal': 
             return self.normal_list
-        # elif modality == 'lighting_SG': 
-        #     return self.lighting_SG_local_list
         elif modality == 'lighting_envmap': 
             return self.lighting_envmap_list if source=='GT' else self.est[modality]
-        # elif modality == 'semseg': 
-        #     return self.semseg_list
-        # elif modality == 'matseg': 
-        #     return self.matseg_list
-        # elif modality == 'seg_area': 
-        #     return self.seg_dict_of_lists['area']
-        # elif modality == 'seg_env': 
-        #     return self.seg_dict_of_lists['env']
-        # elif modality == 'seg_obj': 
-        #     return self.seg_dict_of_lists['obj']
         else:
             return None
             # assert False, 'Unsupported modality: ' + modality

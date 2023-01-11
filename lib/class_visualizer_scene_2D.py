@@ -1,6 +1,6 @@
 from webbrowser import BackgroundBrowser
 import numpy as np
-import time
+from pathlib import Path
 import imageio
 import matplotlib.pyplot as plt
 
@@ -228,6 +228,7 @@ class visualizer_scene_2D(object):
                 else:
                     downsize_ratio = 1
                 _im = np.clip(downsample_lighting_envmap(_im, lighting_scale=lighting_scale, downsize_ratio=downsize_ratio)**(1./2.2), 0., 1.)
+                Path('test_files').mkdir(parents=True, exist_ok=True)
                 _filename = 'test_files/output_lighting_envmap_%s_%04d.png'%(source, frame_idx)
                 imageio.imwrite(_filename, (_im*255.).astype(np.uint8))
                 print('image saved to: %s'%_filename)

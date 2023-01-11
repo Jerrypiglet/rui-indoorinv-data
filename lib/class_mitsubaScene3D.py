@@ -157,51 +157,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             'lighting_envmap', 
             ]
 
-    # def check_and_sort_modalities(self, modalitiy_list):
-    #     modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
-    #     for _ in modalitiy_list_new:
-    #         assert _ in self.valid_modalities, 'Invalid modality: %s'%_
-    #     return modalitiy_list_new
-
-    # def add_modality(self, x, modality: str, source: str='GT'):
-    #     assert source in ['GT', 'EST']
-    #     assert modality in self.valid_modalities
-    #     if source == 'EST':
-    #         self.est[modality] = x
-    #         if modality in self.modality_list:
-    #             assert type(x)==type(self.get_modality(modality, 'GT'))
-    #             if isinstance(x, list):
-    #                 assert len(x) == len(self.get_modality(modality, 'GT'))
-    #     elif source == 'GT':
-    #         setattr(self, modality, x)
-    #         if self.get_modality(modality, 'EST') is not None:
-    #             assert type(x)==type(self.get_modality(modality, 'EST'))
-    #             if isinstance(x, list):
-    #                 assert len(x) == len(self.get_modality(modality, 'EST'))
-
-    # @property
-    # def if_has_im_sdr(self):
-    #     return hasattr(self, 'im_sdr_list')
-
-    # @property
-    # def if_has_im_hdr(self):
-    #     return hasattr(self, 'im_hdr_list')
-
     @property
     def if_has_poses(self):
         return hasattr(self, 'pose_list')
-
-    # @property
-    # def if_has_lighting_envmap(self):
-    #     return hasattr(self, 'lighting_envmap_list')
-
-    # @property
-    # def if_has_depth_normal(self):
-    #     return all([_ in self.modality_list for _ in ['depth', 'normal']])
-
-    # @property
-    # def if_has_BRDF(self):
-    #     return all([_ in self.modality_list for _ in ['albedo', 'roughness']])
 
     @property
     def if_has_emission(self):
@@ -258,7 +216,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 import ipdb; ipdb.set_trace()
 
     def get_modality(self, modality, source: str='GT'):
-        # assert source in ['GT', 'EST']
 
         _ = scene2DBase.get_modality_(self, modality, source)
         if _ is not None:
@@ -271,17 +228,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             return self.mi_depth_list
         elif modality == 'mi_normal': 
             return self.mi_normal_global_list
-        # elif modality == 'lighting_envmap': 
-        #     return self.lighting_envmap_list if source=='GT' else self.est[modality]
         elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
             seg_key = modality.split('_')[-1] 
             return self.mi_seg_dict_of_lists[seg_key]
         elif modality == 'emission': 
             return self.emission_list
-        # elif modality == 'albedo': 
-        #     return self.albedo_list
-        # elif modality == 'roughness': 
-        #     return self.roughness_list
         else:
             assert False, 'Unsupported modality: ' + modality
 
@@ -473,36 +424,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.pose_list = [np.hstack((
             np.eye(3, dtype=np.float32), ((self.xyz_max+self.xyz_min)/2.).reshape(3, 1)
             ))]
-
-    # def load_im_sdr(self):
-    #     '''
-    #     load im in SDR; RGB, (H, W, 3), [0., 1.]
-    #     '''
-    #     print(white_blue('[mitsubaScene] load_im_sdr'))
-
-    #     self.im_sdr_file_list = [self.scene_rendering_path / 'Image' / ('%03d_0001.%s'%(i, self.im_sdr_ext)) for i in self.frame_id_list]
-    #     self.im_sdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=self.im_sdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_sdr_file_list]
-
-    #     print(blue_text('[mitsubaScene] DONE. load_im_sdr'))
-
-    # def load_im_hdr(self):
-    #     '''
-    #     load im in HDR; RGB, (H, W, 3), [0., 1.]
-    #     '''
-    #     print(white_blue('[mitsubaScene] load_im_hdr'))
-
-    #     self.im_hdr_file_list = [self.scene_rendering_path / 'Image' / ('%03d_0001.%s'%(i, self.im_hdr_ext)) for i in self.frame_id_list]
-    #     self.im_hdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=self.im_hdr_ext, target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
-    #     self.hdr_scale_list = [1.] * len(self.im_hdr_list)
-
-    #     for im_hdr_file, im_hdr in zip(self.im_hdr_file_list, self.im_hdr_list):
-    #         im_sdr_file = Path(str(im_hdr_file).replace(self.im_hdr_ext, self.im_sdr_ext))
-    #         if not im_sdr_file.exists():
-    #             print(yellow('[mitsubaScene] load_im_hdr: converting HDR to SDR and write to disk'))
-    #             print('-> %s'%str(im_sdr_file))
-    #             convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=1.)
-
-    #     print(blue_text('[mitsubaScene] DONE. load_im_hdr'))
 
     def load_emission(self):
         '''

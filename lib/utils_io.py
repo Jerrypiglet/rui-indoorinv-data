@@ -32,7 +32,7 @@ def load_matrix(path: Path, if_inverse_y: bool=False) -> np.ndarray:
             assert False, 'wrong input matrix dimension when if_inverse_y=True!'
     return m
 
-def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tuple[int, int]=(), resize_method: str='area') -> np.ndarray:
+def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tuple[int, int]=(), resize_method: str='area', if_attempt_load: bool=False) -> np.ndarray:
     '''
     Load an image from a file, trying to maintain its datatype (gray, 16bit, rgb)
     set target_HW to some shape to resize after loading
@@ -60,7 +60,11 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
     if expected_shape != ():
-        assert tuple(im.shape) == expected_shape, '%s != %s'%(str(tuple(im.shape)), str(expected_shape))
+        if tuple(im.shape) != expected_shape:
+            if if_attempt_load:
+                return False
+            else:
+                raise RuntimeError('%s != %s'%(str(tuple(im.shape)), str(expected_shape)))
 
     if target_HW != ():
         im = resize_img(im, target_HW, resize_method)
