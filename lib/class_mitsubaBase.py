@@ -37,7 +37,7 @@ class mitsubaBase():
 
     def get_cam_rays_list(self, H, W, K, pose_list):
         cam_rays_list = []
-        for pose in pose_list:
+        for _, pose in enumerate(pose_list):
             rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=True)
             cam_rays_list.append((rays_o, rays_d, ray_d_center))
         return cam_rays_list
@@ -131,7 +131,7 @@ class mitsubaBase():
             mi_seg_area_file_folder.mkdir(parents=True, exist_ok=True)
             mi_seg_area_file_path = mi_seg_area_file_folder / ('mi_seg_emitter_%d.png'%(self.frame_id_list[frame_idx]))
             if mi_seg_area_file_path.exists():
-                mi_seg_area = load_img(mi_seg_area_file_path, (self.H, self.W), ext='png', target_HW=self.im_target_HW)/255.
+                mi_seg_area = load_img(mi_seg_area_file_path, (self.im_H_load, self.im_W_load), ext='png', target_HW=self.im_target_HW)/255.
             else:
                 mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self.H, self.W)
                 imageio.imwrite(str(mi_seg_area_file_path), (mi_seg_area*255.).astype(np.uint8))

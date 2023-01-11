@@ -135,12 +135,27 @@ openrooms_scene = openroomsScene3D(
         'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
+    modality_filename_dict = {
+        # 'poses', 
+        'im_hdr': 'im_%d.hdr', 
+        'im_sdr': 'im_%d.png', 
+        # 'lighting_envmap', 
+        'albedo': 'imbaseColor_%d.png', 
+        'roughness': 'imroughness_%d.png', 
+        'emission': 'im_%d.hdr', 
+        'depth': 'imdepth_%d.dat', 
+        'normal': 'imnormal_%d.png', 
+        # 'lighting_SG', 
+        # 'layout', 
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+    }, 
     im_params_dict={
         'im_H_load': 480, 'im_W_load': 640, 
         # 'im_H_resize': 240, 'im_W_resize': 320, 
         'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
         # 'im_H_resize': 6, 'im_W_resize': 8, # to use for rendering so that im dimensions == lighting dimensions
         'if_direct_lighting': False, # if load direct lighting envmaps and SGs inetad of total lighting
+        # 'im_hdr_ext': 'hdr', 
         }, 
     lighting_params_dict={
         'SG_num': 12,

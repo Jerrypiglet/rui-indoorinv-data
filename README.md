@@ -24,7 +24,7 @@
 - [Todolist](#todolist)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
-<!-- Added by: jerrypiglet, at: Mon Dec  5 15:43:37 PST 2022 -->
+<!-- Added by: ruizhu, at: Tue Jan 10 16:11:23 PST 2023 -->
 
 <!--te-->
 
@@ -145,7 +145,7 @@ For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-
         - light_%d # per-frame emitter source info; should not be useful
           - ...
         - box{light_id}.dat # emitter info in 3D
-cc        - imenv_%d.hdr # per-pixel lighting envmaps in 2D
+        - imenv_%d.hdr # per-pixel lighting envmaps in 2D
 
 # Notes on coordinate systems
 This will help clarifying the usage of camera poses ([$R$|$t$] for **camera-to-world** transformation) and camera intrinsics.
@@ -163,7 +163,7 @@ This will load per-pixel modalities in 2D, and visualize them in a Matplotlib pl
 ![](images/demo_all_2D.png)
 ![](images/demo_segs_2D.png)
 
-Supported modalities (all in pixel/camera space): 
+Supported modalities for OpenRooms (all in pixel/camera space): 
 - depth
 - normal # camera coordinates in OpenGL convention (right-up-backward)
 - albedo
@@ -173,6 +173,12 @@ Supported modalities (all in pixel/camera space):
 - seg_obj # non-emitter objects: images/demo_segs_2D.png
 - matseg # images/demo_semseg_matseg_2D.png
 - semseg # images/demo_semseg_matseg_2D.png
+
+Mitsuba scene:
+``` bash
+python test_class_mitsubaScene3D.py --vis_2d_plt True --vis_3d_o3d False
+```
+![](images/demo_all_2D_mitsuba.png)
 
 ## 3D dataloader and visualizer
 

@@ -17,7 +17,9 @@ from lib.utils_rendering_openrooms import renderingLayer
 from tqdm import tqdm
 import pickle
 
-class openroomsScene2D(object):
+from .class_scene2DBase import scene2DBase
+
+class openroomsScene2D(scene2DBase):
     '''
     A class used to **load** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties for inverse rendering).
     For high-level semantic properties (e.g. layout, objects, emitters, use class: openroomsScene3D)
@@ -33,12 +35,24 @@ class openroomsScene2D(object):
         if_debug_info: bool=False, 
         ):
 
+        scene2DBase.__init__(
+            self, 
+            parent_class_name=str(self.__class__.__name__), 
+            root_path_dict=root_path_dict, 
+            scene_params_dict=scene_params_dict, 
+            modality_list=modality_list, 
+            im_params_dict=im_params_dict, 
+            BRDF_params_dict=BRDF_params_dict, 
+            lighting_params_dict=lighting_params_dict, 
+            if_debug_info=if_debug_info, 
+            )
+
         '''
         scene properties
         - frame_id_list are integers as seen in frame file names (e.g. im_1.png -> 1)
         '''
-        self.if_save_storage = scene_params_dict.get('if_save_storage', False) # set to True to enable removing duplicated renderer files (e.g. only one copy of geometry files in main, or emitter files only in main and mainDiffMat)
-        self.if_debug_info = if_debug_info
+        # self.if_save_storage = scene_params_dict.get('if_save_storage', False) # set to True to enable removing duplicated renderer files (e.g. only one copy of geometry files in main, or emitter files only in main and mainDiffMat)
+        # self.if_debug_info = if_debug_info
 
         self.meta_split, self.scene_name = get_list_of_keys(scene_params_dict, ['meta_split', 'scene_name'])
         assert self.meta_split in ['main_xml', 'mainDiffMat_xml', 'mainDiffLight_xml', 'main_xml1', 'mainDiffMat_xml1', 'mainDiffLight_xml1']
@@ -62,17 +76,21 @@ class openroomsScene2D(object):
             self.frame_id_list = sorted([int(Path(_).stem.replace('im_', '')) for _ in im_hdr_list])
             print(white_blue('... got frame_id_list: [%s]'%(', '.join([str(_) for _ in self.frame_id_list]))))
         
-        self.num_frames = len(self.frame_id_list)
-
         '''
         paths
         '''
 
-        self.root_path_dict = root_path_dict
-        self.PATH_HOME, self.rendering_root, self.xml_scene_root, self.semantic_labels_root = get_list_of_keys(
+        # self.root_path_dict = root_path_dict
+        # self.PATH_HOME, self.rendering_root, self.xml_scene_root, self.semantic_labels_root = get_list_of_keys(
+        #     self.root_path_dict, 
+        #     ['PATH_HOME', 'rendering_root', 'xml_scene_root', 'semantic_labels_root'], 
+        #     [PosixPath, PosixPath, PosixPath, PosixPath]
+        #     )
+
+        self.semantic_labels_root = get_list_of_keys(
             self.root_path_dict, 
-            ['PATH_HOME', 'rendering_root', 'xml_scene_root', 'semantic_labels_root'], 
-            [PosixPath, PosixPath, PosixPath, PosixPath]
+            ['semantic_labels_root'], 
+            [PosixPath]
             )
 
         self.scene_rendering_path = self.rendering_root / self.meta_split / self.scene_name
@@ -83,8 +101,8 @@ class openroomsScene2D(object):
         im properties
         '''
 
-        self.im_sdr_ext = im_params_dict.get('im_sdr_ext', 'png')
-        self.im_hdr_ext = im_params_dict.get('im_hdr_ext', 'hdr')
+        # self.im_sdr_ext = im_params_dict.get('im_sdr_ext', 'png')
+        # self.im_hdr_ext = im_params_dict.get('im_hdr_ext', 'hdr')
         self.if_scale_hdr = im_params_dict.get('if_scale_hdr', True) # scale HDR images with segs
         self.if_scale_hdr_per_frame = im_params_dict.get('if_scale_hdr_per_frame', False) # True: individually scale each HDR frame; False: get one global HDR scale
         self.if_clip_HDR_to_01 = im_params_dict.get('if_clip_HDR_to_01', False) # only useful when scaling HDR
@@ -95,10 +113,10 @@ class openroomsScene2D(object):
         self.imenv_key = {True: 'imenvDirect_', False: 'imenv_'}[if_direct_lighting]
 
         # self.im_params_dict = im_params_dict
-        self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
-        self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
-        self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
-        self.H, self.W = self.im_H_resize, self.im_W_resize
+        # self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
+        # self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
+        # self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
+        # self.H, self.W = self.im_H_resize, self.im_W_resize
 
         '''
         BRDF, lighting properties
@@ -106,7 +124,7 @@ class openroomsScene2D(object):
         self.clip_roughness_min_to = BRDF_params_dict.get('clip_roughness_min_to', 0.)
         assert self.clip_roughness_min_to >= 0. and self.clip_roughness_min_to <= 1.
 
-        self.lighting_params_dict = lighting_params_dict
+        # self.lighting_params_dict = lighting_params_dict
         self.if_convert_lighting_SG_to_global = lighting_params_dict.get('if_convert_lighting_SG_to_global', False)
         # self.rL = renderingLayer(imWidth=self.lighting_params_dict['env_col'], imHeight=self.lighting_params_dict['env_row'], isCuda=False)
         self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
@@ -114,7 +132,7 @@ class openroomsScene2D(object):
         '''
         modalities to load
         '''
-        self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
+        # self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
         if 'im_hdr' in self.modality_list and self.if_scale_hdr:
             assert 'seg' in self.modality_list
 
@@ -128,7 +146,10 @@ class openroomsScene2D(object):
         load everything
         '''
         self.load_modalities()
-        self.est = {}
+        # self.est = {}
+
+    def num_frames(self):
+        return len(self.frame_id_list)
 
     @property
     def valid_modalities(self):
@@ -140,35 +161,35 @@ class openroomsScene2D(object):
             'semseg', 'matseg', 
             ]
 
-    def check_and_sort_modalities(self, modalitiy_list):
-        modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
-        for _ in modalitiy_list_new:
-            assert _ in self.valid_modalities, 'Invalid modality: %s'%_
-        return modalitiy_list_new
+    # def check_and_sort_modalities(self, modalitiy_list):
+    #     modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
+    #     for _ in modalitiy_list_new:
+    #         assert _ in self.valid_modalities, 'Invalid modality: %s'%_
+    #     return modalitiy_list_new
 
-    def add_modality(self, x, modality: str, source: str='GT'):
-        assert source in ['GT', 'EST']
-        assert modality in self.valid_modalities
-        if source == 'EST':
-            self.est[modality] = x
-            if modality in self.modality_list:
-                assert type(x)==type(self.get_modality(modality, 'GT'))
-                if isinstance(x, list):
-                    assert len(x) == len(self.get_modality(modality, 'GT'))
-        elif source == 'GT':
-            setattr(self, modality, x)
-            if self.get_modality(modality, 'EST') is not None:
-                assert type(x)==type(self.get_modality(modality, 'EST'))
-                if isinstance(x, list):
-                    assert len(x) == len(self.get_modality(modality, 'EST'))
+    # def add_modality(self, x, modality: str, source: str='GT'):
+    #     assert source in ['GT', 'EST']
+    #     assert modality in self.valid_modalities
+    #     if source == 'EST':
+    #         self.est[modality] = x
+    #         if modality in self.modality_list:
+    #             assert type(x)==type(self.get_modality(modality, 'GT'))
+    #             if isinstance(x, list):
+    #                 assert len(x) == len(self.get_modality(modality, 'GT'))
+    #     elif source == 'GT':
+    #         setattr(self, modality, x)
+    #         if self.get_modality(modality, 'EST') is not None:
+    #             assert type(x)==type(self.get_modality(modality, 'EST'))
+    #             if isinstance(x, list):
+    #                 assert len(x) == len(self.get_modality(modality, 'EST'))
 
-    @property
-    def if_has_im_sdr(self):
-        return all([_ in self.modality_list for _ in ['im_sdr']])
+    # @property
+    # def if_has_im_sdr(self):
+    #     return all([_ in self.modality_list for _ in ['im_sdr']])
 
-    @property
-    def if_has_im_hdr(self):
-        return all([_ in self.modality_list for _ in ['im_hdr']])
+    # @property
+    # def if_has_im_hdr(self):
+    #     return all([_ in self.modality_list for _ in ['im_hdr']])
 
     @property
     def if_has_hdr_scale(self):
@@ -182,17 +203,17 @@ class openroomsScene2D(object):
     def if_has_seg(self):
         return all([_ in self.modality_list for _ in ['seg']])
 
-    @property
-    def if_has_depth_normal(self):
-        return all([_ in self.modality_list for _ in ['depth', 'normal']])
+    # @property
+    # def if_has_depth_normal(self):
+    #     return all([_ in self.modality_list for _ in ['depth', 'normal']])
 
-    @property
-    def if_has_BRDF(self):
-        return all([_ in self.modality_list for _ in ['albedo', 'roughness']])
+    # @property
+    # def if_has_BRDF(self):
+    #     return all([_ in self.modality_list for _ in ['albedo', 'roughness']])
 
-    @property
-    def if_has_lighting_envmap(self):
-        return all([_ in self.modality_list for _ in ['lighting_envmap']])
+    # @property
+    # def if_has_lighting_envmap(self):
+    #     return all([_ in self.modality_list for _ in ['lighting_envmap']])
 
     @property
     def if_has_lighting_SG(self):
@@ -207,27 +228,33 @@ class openroomsScene2D(object):
         return len(self.frame_id_list)
 
     def get_modality(self, modality, source: str='GT'):
-        assert source in ['GT', 'EST']
-        if modality == 'im_sdr': 
-            return self.im_sdr_list
-        elif modality == 'im_hdr': 
-            return self.im_hdr_list
-        elif modality == 'seg': 
+        # assert source in ['GT', 'EST']
+
+        _ = scene2DBase.get_modality_(self, modality, source)
+        if _ is not None:
+            return _
+
+        # if modality == 'im_sdr': 
+        #     return self.im_sdr_list
+        # elif modality == 'im_hdr': 
+        #     return self.im_hdr_list
+        # elif modality == 'seg': 
+        if modality == 'seg': 
             return self.seg_dict_of_lists
-        elif modality == 'poses': 
-            return self.pose_list
-        elif modality == 'albedo': 
-            return self.albedo_list
-        elif modality == 'roughness': 
-            return self.roughness_list
-        elif modality == 'depth': 
-            return self.depth_list
-        elif modality == 'normal': 
-            return self.normal_list
+        # elif modality == 'poses': 
+        #     return self.pose_list
+        # elif modality == 'albedo': 
+        #     return self.albedo_list
+        # elif modality == 'roughness': 
+        #     return self.roughness_list
+        # elif modality == 'depth': 
+        #     return self.depth_list
+        # elif modality == 'normal': 
+        #     return self.normal_list
         elif modality == 'lighting_SG': 
             return self.lighting_SG_local_list
-        elif modality == 'lighting_envmap': 
-            return self.lighting_envmap_list if source=='GT' else self.est[modality]
+        # elif modality == 'lighting_envmap': 
+        #     return self.lighting_envmap_list if source=='GT' else self.est[modality]
         elif modality == 'semseg': 
             return self.semseg_list
         elif modality == 'matseg': 
@@ -239,22 +266,16 @@ class openroomsScene2D(object):
         elif modality == 'seg_obj': 
             return self.seg_dict_of_lists['obj']
         else:
-            return None
-            # assert False, 'Unsupported modality: ' + modality
+            assert False, 'Unsupported modality: ' + modality
 
     def load_modalities(self):
         for _ in self.modality_list:
             # assert _ in ['im_hdr', 'im_sdr', 'albedo', 'roughness', 'depth', 'normal', 'seg', 'lighting_SG', 'lighting_envmap', 'poses']
-            if _ == 'im_sdr': self.load_im_sdr()
+            result_ = scene2DBase.load_modality_(self, _)
+            if not (result_ == False):
+                continue
             if _ == 'seg': self.load_seg()
-            if _ == 'im_hdr': self.load_im_hdr()
-            if _ == 'poses': self.load_poses()
-            if _ == 'albedo': self.load_albedo()
-            if _ == 'roughness': self.load_roughness()
-            if _ == 'depth': self.load_depth()
-            if _ == 'normal': self.load_normal()
             if _ == 'lighting_SG': self.load_lighting_SG()
-            if _ == 'lighting_envmap': self.load_lighting_envmap()
             if _ == 'semseg': self.load_semseg()
             if _ == 'matseg': self.load_matseg()
 
@@ -272,19 +293,19 @@ class openroomsScene2D(object):
             scale_factor = [t / s for t, s in zip((self.im_H_resize, self.im_W_resize), (self.im_H_load, self.im_W_load))]
             self.K = resize_intrinsics(self.K, scale_factor)
         
-    def load_im_sdr(self):
-        '''
-        load im in SDR; RGB, (H, W, 3), [0., 1.]
-        '''
-        print(white_blue('[openroomsScene] load_im_sdr for %d frames...'%len(self.frame_id_list)))
+    # def load_im_sdr(self):
+    #     '''
+    #     load im in SDR; RGB, (H, W, 3), [0., 1.]
+    #     '''
+    #     print(white_blue('[openroomsScene] load_im_sdr for %d frames...'%len(self.frame_id_list)))
 
-        self.im_sdr_ext in ['jpg', 'png']
+    #     self.im_sdr_ext in ['jpg', 'png']
 
-        self.im_sdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_sdr_ext)) for i in self.frame_id_list]
-        self.im_sdr_list = [load_img(_, (self.im_H_load, self.im_W_load, 3), ext=self.im_sdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_sdr_file_list]
-        # check_list_of_tensors_size(self.im_sdr_list, (self.im_H_load, self.im_W_load, 3))
+    #     self.im_sdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_sdr_ext)) for i in self.frame_id_list]
+    #     self.im_sdr_list = [load_img(_, (self.im_H_load, self.im_W_load, 3), ext=self.im_sdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_sdr_file_list]
+    #     # check_list_of_tensors_size(self.im_sdr_list, (self.im_H_load, self.im_W_load, 3))
 
-        print(blue_text('[openroomsScene] DONE. load_im_sdr'))
+    #     print(blue_text('[openroomsScene] DONE. load_im_sdr'))
 
     def load_im_hdr(self):
         '''
@@ -293,8 +314,11 @@ class openroomsScene2D(object):
 
         print(white_blue('[openroomsScene] load_im_hdr for %d frames...'%len(self.frame_id_list)))
 
-        self.im_hdr_ext in ['hdr'] # .rgbe not supported for now
-        self.im_hdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, self.im_hdr_ext)) for i in self.frame_id_list]
+        # self.im_hdr_ext in ['hdr'] # .rgbe not supported for now
+        filename = self.modality_filename_dict['im_hdr']
+        im_hdr_ext = filename.split('.')[-1]
+
+        self.im_hdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, im_hdr_ext)) for i in self.frame_id_list]
         self.im_hdr_list = [load_HDR(_, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
 
         if self.if_scale_hdr:
@@ -424,7 +448,6 @@ class openroomsScene2D(object):
         print(blue_text('[openroomsScene] DONE. load_depth'))
 
         self.pts_from['depth'] = True
-        
 
     def load_normal(self):
         '''

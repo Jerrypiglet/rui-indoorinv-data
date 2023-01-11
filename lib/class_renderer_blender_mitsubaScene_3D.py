@@ -123,7 +123,6 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             print("Device '{}' type {} :".format(d.name, d.type), white_blue(str(d.use)) if d.use else red(str(d.use)))
         print('setting up gpu/metal done')
         print("----------------------------------------------")
-        import ipdb; ipdb.set_trace()
 
     @property
     def valid_modalities(self):

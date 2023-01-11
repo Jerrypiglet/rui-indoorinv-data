@@ -3,8 +3,8 @@ work with Mitsuba/Blender scenes
 '''
 import sys
 
-# host = 'mm1'
-host = 'apple'
+host = 'mm1'
+# host = 'apple'
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
     'mm1': '', 
@@ -66,10 +66,11 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 xml_filename = 'scene_v3.xml'
 scene_name = 'kitchen'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
-split = 'train'; frame_ids = list(range(0, 189, 40))
+# split = 'train'; frame_ids = list(range(0, 189, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
 # split = 'train'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(0, 189, 1))
+split = 'val'; frame_ids = list(range(10))
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -105,11 +106,25 @@ mitsuba_scene = mitsubaScene3D(
         # 'lighting_envmap', 
         'albedo', 'roughness', 
         'emission', 
-        # 'depth', 'normal', 
+        'depth', 'normal', 
         # 'lighting_SG', 
         # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
+    modality_filename_dict = {
+        # 'poses', 
+        'im_hdr': 'Image/%03d_0001.exr', 
+        'im_sdr': 'Image/%03d_0001.png', 
+        # 'lighting_envmap', 
+        'albedo': 'DiffCol/%03d_0001.exr', 
+        'roughness': 'Roughness/%03d_0001.exr', 
+        'emission': 'Emit/%03d_0001.exr', 
+        'depth': 'Depth/%03d_0001.exr', 
+        'normal': 'Normal/%03d_0001.exr', 
+        # 'lighting_SG', 
+        # 'layout', 
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+    }, 
     im_params_dict={
         # 'im_H_resize': 480, 'im_W_resize': 640, 
         'im_H_load': 320, 'im_W_load': 640, 
@@ -119,6 +134,7 @@ mitsuba_scene = mitsubaScene3D(
         # 'spp': 2048, 
         'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
+        # 'im_hdr_ext': 'exr', 
         }, 
     cam_params_dict={
         'near': 0.1, 'far': 10., 
@@ -243,8 +259,8 @@ if opt.vis_2d_plt:
             'albedo', 
             'roughness', 
             'emission', 
-            # 'depth', 
-            # 'normal', 
+            'depth', 
+            'normal', 
             # 'mi_depth', 
             # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
