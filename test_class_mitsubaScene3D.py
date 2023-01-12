@@ -162,6 +162,16 @@ mitsuba_scene = mitsubaScene3D(
     shape_params_dict={
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
+
+        'if_sample_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
+        'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
+        'sample_mesh_min': 10, 
+        'sample_mesh_max': 100, 
+
+        'if_simplify_mesh': True,  # default True: simply triangles
+        'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
+        'simplify_mesh_min': 100, 
+        'simplify_mesh_max': 1000, 
         },
     emitter_params_dict={
         },
@@ -343,7 +353,6 @@ if opt.vis_3d_o3d:
                     )
                 visualizer_3D_o3d.add_extra_geometry(geometry_list, if_processed_geometry_list=True)
 
-
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
@@ -359,12 +368,13 @@ if opt.vis_3d_o3d:
         #     }, 
         lighting_params=lighting_params_vis, 
         shapes_params={
-            'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
+            # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
             'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_sampled_pts': False, # [OPTIONAL] is show samples pts from mitsuba_scene.sample_pts_list if available
         },
         emitter_params={
             # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)

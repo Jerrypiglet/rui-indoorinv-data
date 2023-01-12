@@ -420,7 +420,7 @@ if opt.vis_3d_o3d:
             }, 
         lighting_params=lighting_params_vis, 
         shapes_params={
-            'simply_ratio': 0.1, # simply num of triangles to #triangles * simply_ratio
+            'simply_mesh_ratio_vis': 0.1, # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png

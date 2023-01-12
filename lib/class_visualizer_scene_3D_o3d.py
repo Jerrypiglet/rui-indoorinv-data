@@ -8,9 +8,9 @@ import open3d.visualization.rendering as rendering
 import open3d.visualization as vis
 
 import trimesh
-from sympy import Point3D, Line3D, Plane, sympify, Rational
-from copy import deepcopy
-import torch
+# from sympy import Point3D, Line3D, Plane, sympify, Rational
+# from copy import deepcopy
+# import torch
 from pathlib import Path
 import copy
 
@@ -739,19 +739,12 @@ class visualizer_scene_3D_o3d(object):
                 shape_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
                 shape_mesh = shape_mesh.as_open3d
 
-                N_triangles = len(shape_mesh.triangles)
-                if shapes_params.get('simply_ratio', 1.) != 1.: # not simplying for mesh with very few faces
-                    target_number_of_triangles = int(len(shape_mesh.triangles)*shapes_params.get('simply_ratio', 1.))
-                    target_number_of_triangles = max(10000, min(50, target_number_of_triangles))
-                    shape_mesh = shape_mesh.simplify_quadric_decimation(target_number_of_triangles=target_number_of_triangles)
-                    print('[%s-%s] Mesh simplified to %d->%d triangles.'%(cat_name, shape_dict['random_id'], N_triangles, len(shape_mesh.triangles)))
-
                 shape_mesh.paint_uniform_color(obj_color)
                 shape_mesh.compute_vertex_normals()
                 shape_mesh.compute_triangle_normals()
                 geometry_list.append([shape_mesh, 'shape_emitter_'+shape_dict['random_id'] if if_emitter else 'shape_obj_'+shape_dict['random_id']])
 
-            print('[collect_shapes] --', if_emitter, shape_idx, obj_path, cat_name, cat_id, shape_dict['random_id'])
+            # print('[collect_shapes] --', if_emitter, shape_idx, obj_path, cat_name, cat_id, shape_dict['random_id'])
 
             # shape_label = o3d.visualization.gui.Label3D([0., 0., 0.], np.mean(bverts, axis=0).reshape((3, 1)), cat_name)
             # geometry_list.append(shape_label)
@@ -796,6 +789,13 @@ class visualizer_scene_3D_o3d(object):
 
             voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud(pcd_bverts_all, voxel_size=1.)
             geometry_list.append(voxel_grid)
+
+        if_sampled_pts = shapes_params.get('if_sampled_pts', False)
+        if if_sampled_pts and hasattr(self.os, 'sample_pts_list'):
+            sample_pts = np.concatenate(self.os.sample_pts_list)
+            self.add_extra_geometry([
+                ('pts', {'pts': sample_pts, }),
+            ]) 
 
         return geometry_list
 

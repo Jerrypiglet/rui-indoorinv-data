@@ -12,7 +12,8 @@ random.seed(0)
 from lib.utils_io import read_cam_params, normalize_v
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
-from collections import defaultdict
+# from collections import defaultdict
+import trimesh
 
 import string
 # Import the library using the alias "mi"
@@ -28,7 +29,7 @@ from lib.utils_io import load_matrix, resize_intrinsics
 from .class_mitsubaBase import mitsubaBase
 from .class_scene2DBase import scene2DBase
 
-from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle
+from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, sample_mesh, simplify_mesh
 from lib.utils_OR.utils_OR_xml import get_XML_root
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, get_rectangle_mesh
 from lib.utils_misc import get_device
@@ -541,8 +542,17 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
         '''
         if self.if_loaded_shapes: return
-        # if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', False)
-        # if_load_emitter_mesh = shape_params_dict.get('if_load_emitter_mesh', False)
+        
+        if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
+        sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
+        sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
+        sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
+
+        if_simplify_mesh = shape_params_dict.get('if_simplify_mesh', False)
+        simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
+        simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
+        simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
+
         print(white_blue('[mitsubaScene3D] load_shapes for scene...'))
         root = get_XML_root(self.xml_file)
         shapes = root.findall('shape')
@@ -553,6 +563,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.ids_list = []
         self.bverts_list = []
         self.bfaces_list = []
+
+        if if_sample_mesh:
+            self.sample_pts_list = []
 
         self.window_list = []
         self.lamp_list = []
@@ -592,7 +605,20 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
                 obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
                 # if if_load_obj_mesh:
-                vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
+                vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py; faces is 1-based!
+
+                # --sample mesh--
+                if if_sample_mesh:
+                    sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
+                    self.sample_pts_list.append(sample_pts)
+                    # print(sample_pts.shape[0])
+
+                # --simplify mesh--
+                if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
+                    vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max)
+                    if N_triangles != target_number_of_triangles:
+                        print('[%s-%s] Mesh simplified to %d->%d triangles.'%(_id, random_id, N_triangles, target_number_of_triangles))
+
                 assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
 
             bverts, bfaces = computeBox(vertices)

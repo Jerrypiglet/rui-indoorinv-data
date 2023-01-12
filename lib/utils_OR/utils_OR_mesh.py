@@ -8,7 +8,7 @@ from pathlib import Path
 # original obj operations by Zhengqin
 def loadMesh(name):
     '''
-    returns: faces: 1-based
+    returns: faces: 1-based!
     '''
     vertices = []
     faces = []
@@ -31,7 +31,6 @@ def loadMesh(name):
     faces = np.concatenate(faces, axis=0).astype(np.int32)
     return vertices, faces
 
-
 def writeMesh(name, vertices, faces):
     assert np.amin(faces)>=1, 'faces has to be 1-based!'
     with open(name, 'w') as meshOut:
@@ -41,6 +40,29 @@ def writeMesh(name, vertices, faces):
         for n in range(0,faces.shape[0]):
             meshOut.write('f %d %d %d\n' %
                     (faces[n, 0], faces[n, 1], faces[n, 2]))
+
+# --sample mesh--
+def sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max):
+    assert np.amin(faces) == 1
+    shape_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1)
+    N_pts = vertices.shape[0]
+    target_number_of_pts = int(N_pts*sample_mesh_ratio)
+    target_number_of_pts = min(N_pts, min(max(sample_mesh_min, target_number_of_pts), sample_mesh_max)) # 100~1000 or N_triangles triangles
+    sample_pts, face_index = trimesh.sample.sample_surface(shape_tri_mesh, target_number_of_pts)
+    return sample_pts, face_index
+
+def simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max):
+    assert np.amin(faces) == 1
+    shape_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
+    N_triangles = len(shape_tri_mesh.triangles)
+    target_number_of_triangles = int(N_triangles*simplify_mesh_ratio)
+    target_number_of_triangles = min(N_triangles, min(max(simplify_mesh_min, target_number_of_triangles), simplify_mesh_max)) # 100~1000 or N_triangles triangles
+    if target_number_of_triangles != N_triangles:
+        shape_tri_mesh = shape_tri_mesh.simplify_quadratic_decimation(target_number_of_triangles)
+        vertices, faces = shape_tri_mesh.vertices, shape_tri_mesh.faces+1
+
+    return vertices, faces, (N_triangles, target_number_of_triangles)
+
 
 def write_one_mesh_from_v_f_lists(mesh_path: str, vertices_list: list, faces_list: list, ids_list: list=[]):
     assert len(vertices_list) == len(faces_list)
