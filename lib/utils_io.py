@@ -62,7 +62,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
     if expected_shape != ():
         if tuple(im.shape) != expected_shape:
             if if_attempt_load:
-                return False
+                return None
             else:
                 raise RuntimeError('%s != %s'%(str(tuple(im.shape)), str(expected_shape)))
 

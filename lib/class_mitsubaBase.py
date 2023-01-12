@@ -55,6 +55,8 @@ class mitsubaBase():
             return
 
         self.mi_rays_ret_list = []
+        self.mi_rays_t_list = []
+
         self.mi_depth_list = []
         self.mi_invalid_depth_mask_list = []
         self.mi_normal_list = [] # in local OpenGL coords
@@ -76,7 +78,10 @@ class mitsubaBase():
             self.mi_rays_ret_list.append(ret)
 
             # rays_v_flatten = ret.p.numpy() - rays_o_flatten
-            rays_v_flatten = ret.t.numpy()[:, np.newaxis] * rays_d_flatten
+            rays_t = ret.t.numpy()
+            self.mi_rays_t_list.append(rays_t)
+
+            rays_v_flatten = rays_t[:, np.newaxis] * rays_d_flatten
             mi_depth = np.sum(rays_v_flatten.reshape(self.H, self.W, 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
             invalid_depth_mask = np.logical_or(np.isnan(mi_depth), np.isinf(mi_depth))
             self.mi_invalid_depth_mask_list.append(invalid_depth_mask)
@@ -133,7 +138,7 @@ class mitsubaBase():
             if_get_from_scratch = False
             if mi_seg_area_file_path.exists():
                 mi_seg_area = load_img(mi_seg_area_file_path, (self.im_H_load, self.im_W_load), ext='png', target_HW=self.im_target_HW, if_attempt_load=True)/255.
-                if mi_seg_area == False:
+                if mi_seg_area is None:
                     if_get_from_scratch = True
                     mi_seg_area_file_path.unlink()
 
