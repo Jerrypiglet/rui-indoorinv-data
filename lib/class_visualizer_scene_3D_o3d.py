@@ -24,7 +24,7 @@ from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_mitsubaScene3D import mitsubaScene3D
 
-from lib.utils_misc import get_list_of_keys, gen_random_str, yellow
+from lib.utils_misc import get_list_of_keys, gen_random_str, yellow, white_red
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_OR.utils_OR_mesh import writeMesh
@@ -717,7 +717,7 @@ class visualizer_scene_3D_o3d(object):
                 obj_color = [0.7, 0.7, 0.7]
                 if if_emitter:
                     obj_color = [1., np.random.random()*0.5, np.random.random()*0.5] # red-ish for emitters
-                    print(yellow(str(obj_color)), shape_dict['random_id'])
+                    # print(yellow(str(obj_color)), shape_dict['random_id'])
 
 
             # trimesh.repair.fill_holes(shape_mesh)
@@ -861,9 +861,9 @@ class visualizer_scene_3D_o3d(object):
                     lpts_dict = sample_mesh_emitter(emitter_type, emitter_index=emitter_index, emitter_dict=emitter_dict, max_plate=max_plate)
                     # for lpts, lpts_normal, lpts_intensity in zip(lpts_dict['lpts'], lpts_dict['lpts_normal'], lpts_dict['lpts_intensity']):
                     o_ = lpts_dict['lpts']
-                    d_ = lpts_dict['lpts_normal'] / np.linalg.norm(lpts_dict['lpts_normal'], axis=-1, keepdims=True)
+                    d_ = lpts_dict['lpts_normal'] / (np.linalg.norm(lpts_dict['lpts_normal'], axis=-1, keepdims=True)+1e-5)
                     lpts_end = o_ + d_ * np.linalg.norm(lpts_dict['lpts_intensity'], axis=-1) * radiance_scale
-                    print('GT intensity', lpts_dict['lpts_intensity'], np.linalg.norm(lpts_dict['lpts_intensity'], axis=-1))
+                    print(white_red('GT intensity'), lpts_dict['lpts_intensity'], np.linalg.norm(lpts_dict['lpts_intensity'], axis=-1))
                     emitter_rays = o3d.geometry.LineSet()
                     emitter_rays.points = o3d.utility.Vector3dVector(np.vstack((lpts_dict['lpts'], lpts_end)))
                     emitter_rays.colors = o3d.utility.Vector3dVector([[1., 0., 0.]]*lpts_dict['lpts'].shape[0]) # RED for GT

@@ -3,8 +3,9 @@ work with Mitsuba/Blender scenes
 '''
 import sys
 
-host = 'mm1'
-# host = 'apple'
+# host = 'mm1'
+host = 'apple'
+
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
     'mm1': '', 
@@ -50,8 +51,8 @@ parser.add_argument('--renderer', type=str, default='blender', help='mi, blender
 
 # evaluator for rad-MLP
 parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
-parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=False, help='if add rays from evaluating MLPs (e.g. emitter radiance rays')
-parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=False, help='if add estimations from evaluating MLPs (e.g. en=nvmaps')
+parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs (e.g. emitter radiance rays')
+parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs (e.g. en=nvmaps')
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -68,9 +69,9 @@ scene_name = 'kitchen'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 189, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
-# split = 'train'; frame_ids = [0]
+split = 'train'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(0, 189, 1))
-split = 'val'; frame_ids = list(range(10))
+# split = 'val'; frame_ids = list(range(10))
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -104,9 +105,9 @@ mitsuba_scene = mitsubaScene3D(
         'im_hdr', 
         'im_sdr', 
         # 'lighting_envmap', 
-        'albedo', 'roughness', 
-        'emission', 
-        'depth', 'normal', 
+        # 'albedo', 'roughness', 
+        # 'emission', 
+        # 'depth', 'normal', 
         # 'lighting_SG', 
         # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
@@ -212,7 +213,7 @@ if opt.eval_rad:
         host=host, 
         scene_object=mitsuba_scene, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='kitchen/last.ckpt', # 110
+        ckpt_path='20230110-132112-rad_kitchen_190-10_specT/last.ckpt', # 110
         dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
         split=split, 
         rad_scale=1., 

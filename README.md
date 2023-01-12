@@ -340,12 +340,21 @@ Re-render the image from rad-MLP (via querying camera rays)
 public_re_3_v5pose_2048:
 ![](images/demo_eval_radMLP_render_110.png)
 
-Evaluate **emission**: emitter surface radiance (GT (red) and est. (blue) from querying emitter surface rays)
+Evaluate emitter **emission**: emitter surface radiance (GT (red) and est. (blue) from querying emitter surface rays)
+
+- enable `evaluator_rad.sample_emitter` (est in blue)
+- 'emitters' in visualizer_scene_3D_o3d -> modality_list_vis (GT in red)
+
 ![](images/demo_emitter_o3d_sampling_emission.png)
+![](images/demo_emitter_o3d_sampling_emission_kitchen1.png)
+![](images/demo_emitter_o3d_sampling_emission_kitchen2.png)
 
 Evaluate **incident radiance** (same idea as generating envmap in OptixRenderer):
+
+- enable `evaluator_rad.sample_lighting(opt.rad_lighting_sample_type='emission')`
+
 ``` bash
-python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_rad True --vis_2d_plt True --if_add_rays_from_eval True --if_add_est_from_eval True
+python test_class_openroomsScene3D.py --vis_2d_plt True --eval_rad True --vis_2d_plt True --if_add_rays_from_eval True --if_add_est_from_eval True
 ```
 ![](images/demo_eval_radMLP_incident_openrooms_0.png)
 
@@ -360,7 +369,7 @@ Indoor-kitchen scene:
 - [x] vis envmap
 - [ ] change dump_OR_xml_for_mi() to be FULLY compatible with Mitsuba 3'
 - [ ] renderer_blender_mitsubaScene_3D: render with multiple cameras at once
-- [ ] mitsubaScene3D: inhereit openroomsScene2D
+- [x] mitsubaScene3D: inhereit openroomsScene2D
 - [ ] how to get **mi_rays_ret_expanded**?
 - [ ] Check OptixRendererLight rays (images/demo_eval_radMLP_rample_lighting_openrooms_1.png)
 - [ ] room coverage count

@@ -46,7 +46,7 @@ class evaluator_scene_rad():
 
         ckpt_path = self.INV_NERF_ROOT / 'checkpoints' / ckpt_path
 
-        from train_rad_rui import ModelTrainer, add_model_specific_args
+        from train_rad_rui import ModelTrainerRad, add_model_specific_args
         from argparse import ArgumentParser
         from configs.scene_options import scene_options
 
@@ -61,13 +61,14 @@ class evaluator_scene_rad():
             'qc': '', 
         }[self.host]
 
-        self.model = ModelTrainer(
+        self.model = ModelTrainerRad(
             hparams, 
             host=self.host, 
             dataset_key=dataset_key, 
             if_overfit_train=False, 
             if_seg_obj=False, 
             mitsuba_variant=mi_variant_dict[self.host], 
+            if_load_baked=False, 
             scene_object=scene_object, 
             spec=spec, 
         ).to(self.device)
@@ -80,7 +81,7 @@ class evaluator_scene_rad():
         self.model.eval()
 
         self.rad_scale = rad_scale
-        self.os = self.model.scene_object
+        self.os = self.model.scene_object[split]
 
         mi.set_variant(mi_variant_dict[self.host])
 
@@ -146,6 +147,10 @@ class evaluator_scene_rad():
     def sample_emitter(self, emitter_params={}):
         '''
         sample emitter surface radiance from rad-MLP: images/demo_emitter_o3d_sampling.png
+
+        args:
+        - emitter_params
+            - radiance_scale: rescale radiance magnitude (because radiance can be large, e.g. 500, 3000)
         '''
         max_plate = emitter_params.get('max_plate', 64)
         radiance_scale = emitter_params.get('radiance_scale', 1.)
@@ -159,14 +164,15 @@ class evaluator_scene_rad():
                 lpts_dict = sample_mesh_emitter(emitter_type, emitter_index=emitter_index, emitter_dict=emitter_dict, max_plate=max_plate, if_dense_sample=True)
                 rays_o_nerf = self.or2nerf_th(torch.from_numpy(lpts_dict['lpts']).to(self.device)) # convert to NeRF coordinates
                 rays_d_nerf = self.or2nerf_th(torch.from_numpy(-lpts_dict['lpts_normal']).to(self.device)) # convert to NeRF coordinates
-                if self.dataset_type == 'Indoor':
-                    rays_o_nerf = self.process_for_Indoor(rays_o_nerf)
+                # if self.dataset_type == 'Indoor':
+                #     rays_o_nerf = self.process_for_Indoor(rays_o_nerf)
                 rgbs = self.model.nerf(rays_o_nerf, rays_d_nerf)['rgb'] # queried d is incoming directions!
                 intensity = rgbs.detach().cpu().numpy() / self.rad_scale # get back to original scale, without hdr scaling
+                # intensity = intensity * 0. + 5.
                 o_ = lpts_dict['lpts']
-                d_ = lpts_dict['lpts_normal'] / np.linalg.norm(lpts_dict['lpts_normal'], axis=-1, keepdims=True)
+                d_ = lpts_dict['lpts_normal'] / (np.linalg.norm(lpts_dict['lpts_normal'], axis=-1, keepdims=True)+1e-5)
                 lpts_end = o_ + d_ * np.linalg.norm(intensity, axis=-1, keepdims=True) * radiance_scale
-                print('EST intensity', intensity, np.linalg.norm(intensity, axis=-1))
+                print(white_blue('EST intensity'), np.linalg.norm(intensity, axis=-1))
                 emitter_rays_list.append((lpts_dict['lpts'], lpts_end))
                 # emitter_rays = o3d.geometry.LineSet()
                 # emitter_rays.points = o3d.utility.Vector3dVector(np.vstack((lpts_dict['lpts'], lpts_end)))
@@ -334,8 +340,8 @@ class evaluator_scene_rad():
                 rays_o_select = rays_o[b0:b1]
                 rays_o_nerf = self.or2nerf_th(torch.from_numpy(rays_o_select).to(self.device))
                 rays_d_nerf = self.or2nerf_th(torch.from_numpy(-rays_d_select).to(self.device)) # nagate to comply with rad-inv coordinates
-                if self.dataset_type == 'Indoor':
-                    rays_o_nerf = self.process_for_Indoor(rays_o_nerf)
+                # if self.dataset_type == 'Indoor':
+                #     rays_o_nerf = self.process_for_Indoor(rays_o_nerf)
                 rgbs = self.model.nerf(rays_o_nerf, rays_d_nerf)['rgb']
                 rad = rgbs.detach().cpu().numpy() / self.rad_scale # get back to original scale, without hdr scaling
                 # rad = rad * 0. + 10.
@@ -374,10 +380,10 @@ class evaluator_scene_rad():
             'lighting_envmap': lighting_envmap_list, 
             }
 
-    def process_for_Indoor(self, position):
-        assert isinstance(position, torch.Tensor)
-        # Liwen's model was trained using scene.obj (smaller) instead of scene_v3.xml (bigger), between which there is scaling and translation. self.os.cam_rays_list are acquired from the scene of scene_v3.xml
-        scale_m2b = torch.from_numpy(np.array([0.206,0.206,0.206], dtype=np.float32).reshape((1, 3))).to(position.device)
-        trans_m2b = torch.from_numpy(np.array([-0.074684,0.23965,-0.30727], dtype=np.float32).reshape((1, 3))).to(position.device)
-        position = scale_m2b * position + trans_m2b
-        return position
+    # def process_for_Indoor(self, position):
+    #     assert isinstance(position, torch.Tensor)
+    #     # Liwen's model was trained using scene.obj (smaller) instead of scene_v3.xml (bigger), between which there is scaling and translation. self.os.cam_rays_list are acquired from the scene of scene_v3.xml
+    #     scale_m2b = torch.from_numpy(np.array([0.206,0.206,0.206], dtype=np.float32).reshape((1, 3))).to(position.device)
+    #     trans_m2b = torch.from_numpy(np.array([-0.074684,0.23965,-0.30727], dtype=np.float32).reshape((1, 3))).to(position.device)
+    #     position = scale_m2b * position + trans_m2b
+    #     return position

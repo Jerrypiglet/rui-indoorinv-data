@@ -135,12 +135,14 @@ class mitsubaBase():
             mi_seg_area_file_folder = self.scene_rendering_path / 'mi_seg_emitter'
             mi_seg_area_file_folder.mkdir(parents=True, exist_ok=True)
             mi_seg_area_file_path = mi_seg_area_file_folder / ('mi_seg_emitter_%d.png'%(self.frame_id_list[frame_idx]))
-            if_get_from_scratch = False
+            if_get_from_scratch = True
             if mi_seg_area_file_path.exists():
-                mi_seg_area = load_img(mi_seg_area_file_path, (self.im_H_load, self.im_W_load), ext='png', target_HW=self.im_target_HW, if_attempt_load=True)/255.
+                mi_seg_area = load_img(mi_seg_area_file_path, (self.im_H_load, self.im_W_load), ext='png', target_HW=self.im_target_HW, if_attempt_load=True)
                 if mi_seg_area is None:
-                    if_get_from_scratch = True
                     mi_seg_area_file_path.unlink()
+                else:
+                    if_get_from_scratch = False
+                    mi_seg_area = mi_seg_area / 255.
 
             if if_get_from_scratch:
                 mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self.H, self.W)

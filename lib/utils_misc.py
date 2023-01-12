@@ -57,6 +57,10 @@ def basic_logger(name='basic_logger'):
 def red(text):
     return colored(text, 'yellow', 'on_red')
 
+def white_red(text):
+    coloredd = colored(text, 'white', 'on_red')
+    return coloredd
+
 def print_red(text):
     print(red(text))
 

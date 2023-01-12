@@ -1,7 +1,8 @@
 import sys
 
-host = 'mm1'
-# host = 'apple'
+# host = 'mm1'
+host = 'apple'
+
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
     'mm1': '/home/ruizhu/Documents/Projects/OpenRooms_RAW_loader', 
@@ -46,6 +47,7 @@ parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default
 parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
 # evaluator for rad-MLP
 parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
+parser.add_argument('--rad_lighting_sample_type', default='emission', const='all', nargs='?', choices=['emission', 'incident'], help='from supported sample types (default: %(default)s)')
 parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs')
 parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs')
 # debug
@@ -103,8 +105,8 @@ frame_ids = list(range(3, 102, 10))
 '''
 - more & better cameras
 '''
-# dataset_version = 'public_re_3_v3pose_2048'
-dataset_version = 'public_re_3_v5pose_2048'
+dataset_version = 'public_re_3_v3pose_2048'
+# dataset_version = 'public_re_3_v5pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
 emitter_type_index_list = [('lamp', 0)]
@@ -112,6 +114,7 @@ emitter_type_index_list = [('lamp', 0)]
 # frame_ids = [36, 41]
 # frame_ids =[0]
 frame_ids = [0, 3]
+radiance_scale = 0.001
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
 xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
@@ -127,10 +130,10 @@ openrooms_scene = openroomsScene3D(
         'im_sdr', 
         'poses', 
         'seg', 'im_hdr', 
-        'albedo', 'roughness', 
-        'depth', 'normal', 
+        # 'albedo', 'roughness', 
+        # 'depth', 'normal', 
         # 'lighting_SG', 
-        'lighting_envmap', 
+        # 'lighting_envmap', 
         # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
@@ -196,10 +199,11 @@ if opt.eval_rad:
         host=host, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
         # ckpt_path='rad_3_v3pose_2048_main_xml_scene0008_00_more/last.ckpt', # 166, 208
-        ckpt_path='rad_3_v5pose_2048_main_xml_scene0008_00_more/last-v1.ckpt', # 110
+        # ckpt_path='rad_3_v5pose_2048_main_xml_scene0008_00_more/last-v1.ckpt', # 110
+        ckpt_path='20230104-162138-rad_v3pose_2048_main_xml_scene0008_00_more_specT/last.ckpt', 
         dataset_key='-'.join(['OR', dataset_version]), 
         rad_scale=1./5., 
-        spec=False, 
+        spec=True, 
     )
 
     '''
@@ -208,28 +212,27 @@ if opt.eval_rad:
     # evaluator_rad.render_im(0, if_plt=True) 
 
     '''
-    sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
+    sample and visualize **radiance** on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
     '''
-    # eval_return_dict.update(
-    #     evaluator_rad.sample_emitter(
-    #         emitter_params={
-    #             'max_plate': 64, 
-    #             'radiance_scale': 0.1, 
-    #             'emitter_type_index_list': emitter_type_index_list, 
-    #             }))
+    eval_return_dict.update(
+        evaluator_rad.sample_emitter(
+            emitter_params={
+                'max_plate': 64, 
+                'radiance_scale': radiance_scale, 
+                'emitter_type_index_list': emitter_type_index_list, 
+                }))
     
     '''
     sample non-emitter locations along envmap (hemisphere) directions radiance from rad-MLP: images/demo_envmap_o3d_sampling.png
     '''
-    eval_return_dict.update(
-        evaluator_rad.sample_lighting(
-            # sample_type='emission', # 'emission', 'incident'
-            sample_type='incident', # 'emission', 'incident'
-            subsample_rate_pts=1, 
-            lighting_scale=0.1, # rescaling the brightness of the envmap
-            if_vis_envmap_2d_plt=False, 
-        )
-    )
+    # eval_return_dict.update(
+    #     evaluator_rad.sample_lighting(
+    #         sample_type=opt.rad_lighting_sample_type, # 'emission', 'incident'
+    #         subsample_rate_pts=1, 
+    #         lighting_scale=0.1, # rescaling the brightness of the envmap
+    #         if_vis_envmap_2d_plt=False, 
+    #     )
+    # )
 
 
 '''
@@ -324,11 +327,11 @@ if opt.vis_3d_o3d:
             # 'dense_geo', 
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
-            'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
+            # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
-            # 'emitters', # emitter properties (e.g. SGs, half envmaps)
-            # 'mi', # mitsuba sampled rays, pts
+            'emitters', # emitter properties (e.g. SGs, half envmaps)
+            'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -384,7 +387,9 @@ if opt.vis_3d_o3d:
                     ('rays', {
                         'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 0., 1.]]*lpts.shape[0]), # BLUE for EST
                     }),
-                ]) 
+                ])
+                print('---', lpts.shape, np.amax(lpts), np.amin(lpts),np.amax(lpts_end), np.amin(lpts_end))
+                
         if 'lighting_fused_list' in eval_return_dict:
             assert opt.eval_rad
             for lighting_fused_dict in eval_return_dict['lighting_fused_list']:
@@ -425,7 +430,7 @@ if opt.vis_3d_o3d:
             'scale_SG_length': 2., 
             'if_sampling_emitter': True, # if sample and visualize points on emitter surface; show intensity as vectors along normals (RED for GT): images/demo_emitter_o3d_sampling.png
             'max_plate': 64, 
-            'radiance_scale': 0.1, 
+            'radiance_scale': radiance_scale, 
         },
         mi_params={
             'if_pts': True, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
