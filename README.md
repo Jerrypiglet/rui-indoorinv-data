@@ -352,6 +352,7 @@ Evaluate emitter **emission**: emitter surface radiance (GT (red) and est. (blue
 Evaluate shape per-vertex **radiance** (emission), and colorize mesh faces:
 
 - enable `evaluator_rad.sample_shapes`
+- evaluator_rad.sample_shapes(sample_type='rad', ...
 
 Indoor-kitchen scene:
 ![](images/demo_eval_radMLP_shapes_rad_kitchen_0.png)
@@ -370,10 +371,24 @@ Indoor-kitchen scene:
 ![](images/demo_eval_radMLP_incident_kitchen_0.png)
 [Google Drive](https://drive.google.com/open?id=1NEBVcbFIPkra0GOWxIlOxPYXet9q38g8)
 
-
-
-
 ### inv-MLP
+Tested with repo **inv-nerf** (branch rui_emission). ```opt.eval_inv``` for evaluating inv-MLP loaded from ckpt.
+
+[mm1 3c87ce2] added sampling rad-MLP for est emitter radiance: public_re_3_v3pose_2048 and public_re_3_v5pose_2048
+
+``` bash
+python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_inv True 
+```
+
+Evaluate shape per-vertex **emission mask**, and colorize mesh faces (emitter (red) and non-emitter (blue)):
+
+- enable `evaluator_inv.sample_shapes`
+- evaluator_inv.sample_shapes(sample_type='emission_mask', ...
+
+Openrooms-3lamps scene: ([2D vis](https://i.imgur.com/E8z7lN6.jpg))
+![](images/demo_eval_invMLP_shapes_emission_mask_0.png)
+Indoor-kitchen scene: ([2D vis](https://i.imgur.com/VYF2iGU.jpg))
+![](images/demo_eval_invMLP_shapes_emission_mask_kitchen_0.png)
 
 # Todolist
 - [x] vis envmap in 2D plt

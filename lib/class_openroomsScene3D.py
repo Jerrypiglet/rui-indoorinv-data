@@ -23,7 +23,7 @@ from lib.utils_mitsuba import dump_OR_xml_for_mi
 from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
 
-from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, mesh_to_skeleton, transform_v
+from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, mesh_to_skeleton, transform_v, sample_mesh, simplify_mesh
 from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
@@ -65,6 +65,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         )
 
         self.if_loaded_colors = False
+        self.if_loaded_shapes = False
 
         self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
@@ -231,9 +232,21 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         images/demo_emitters_3D.png # the classroom scene
 
         '''
+        if self.if_loaded_shapes: return
+
         if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', False)
         if_load_emitter_mesh = shape_params_dict.get('if_load_emitter_mesh', False)
         print(white_blue('[openroomsScene3D] load_shapes for scene...'))
+
+        if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
+        sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
+        sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
+        sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
+
+        if_simplify_mesh = shape_params_dict.get('if_simplify_mesh', False)
+        simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
+        simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
+        simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
 
         # load emitter properties from light*.dat files of **a specific N_ambient_representation**
         self.emitter_dict_of_lists_world = load_emitter_dat_world(light_dir=self.scene_rendering_path, N_ambient_rep=self.emitter_params_dict['N_ambient_rep'], if_save_storage=self.if_save_storage)
@@ -262,6 +275,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         self.ids_list = []
         self.bverts_list = []
         
+        if if_sample_mesh:
+            self.sample_pts_list = []
+
         light_axis_list = []
         # self.num_vertices = 0
         obj_path_list = []
@@ -278,6 +294,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         for shape_idx, shape_dict in tqdm(enumerate(self.shape_list_ori + self.emitter_list[1:])): # self.emitter_list[0] is the envmap
             if 'container' in shape_dict['filename']:
                 continue
+            
+            _id = shape_dict['id'] + '_' + shape_dict['random_id']
             
         #     if_emitter = shape_dict['if_emitter'] and 'combined_filename' in shape_dict['emitter_prop'] and shape_idx >= len(shape_list)
             if_emitter = shape_dict['if_in_emitter_dict']
@@ -305,6 +323,18 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                     Path(bbox_file_path).parent.mkdir(parents=True, exist_ok=True)
                     with open(bbox_file_path, "wb") as f:
                         pickle.dump(dict(bverts=bverts, bfaces=bfaces), f)
+
+                # --sample mesh--
+                if if_sample_mesh:
+                    sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
+                    self.sample_pts_list.append(sample_pts)
+                    # print(sample_pts.shape[0])
+
+                # --simplify mesh--
+                if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
+                    vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max)
+                    if N_triangles != target_number_of_triangles:
+                        print('[%s] Mesh simplified to %d->%d triangles.'%(_id, N_triangles, target_number_of_triangles))
             else:
                 with open(bbox_file_path, "rb") as f:
                     bbox_dict = pickle.load(f)
@@ -335,7 +365,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 self.vertices_list.append(None)
                 self.faces_list.append(None)
             self.bverts_list.append(bverts_transformed)
-            self.ids_list.append(shape_dict['id'])
+            self.ids_list.append(_id)
             
             self.shape_list_valid.append(shape_dict)
 
@@ -344,6 +374,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                     self.window_list.append((shape_dict, vertices_transformed, faces))
                 elif shape_dict['emitter_prop']['obj_type'] == 'obj':
                     self.lamp_list.append((shape_dict, vertices_transformed, faces))
+
+        self.if_loaded_shapes = True
 
         print(blue_text('[openroomsScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
             len(self.shape_list_valid), 

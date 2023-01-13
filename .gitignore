@@ -18,6 +18,7 @@ tmp_mesh*
 test_files/
 test_scripts/*.hdr
 test_scripts/*.obj
+checkpoints
 
 tmp*
 README.md.orig*

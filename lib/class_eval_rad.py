@@ -67,7 +67,7 @@ class evaluator_scene_rad():
             host=self.host, 
             dataset_key=dataset_key, 
             if_overfit_train=False, 
-            if_seg_obj=False, 
+            if_seg_obj_loss=False, 
             mitsuba_variant=mi_variant_dict[self.host], 
             if_load_baked=False, 
             scene_object=scene_object, 
@@ -192,7 +192,7 @@ class evaluator_scene_rad():
         ):
         '''
         sample shape surface for sample_type:
-            - 'rad': radiance (at vectices along vertice normals) from rad-MLP: 
+            - 'rad': radiance (at vectices along vertice normals) from rad-MLP
 
         args:
         - shape_params
@@ -200,7 +200,7 @@ class evaluator_scene_rad():
         '''
         radiance_scale = shape_params.get('radiance_scale', 1.)
         assert self.os.if_loaded_shapes
-        # , 'incident-rad']
+        assert sample_type in ['rad'] #, 'incident-rad']
 
         return_dict = {}
         samples_v_dict = {}

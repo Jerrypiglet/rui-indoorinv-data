@@ -25,11 +25,12 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_eval_rad import evaluator_scene_rad
+from lib.class_eval_inv import evaluator_scene_inv
 from lib.class_renderer_mi_mitsubaScene_3D import renderer_mi_mitsubaScene_3D
 from lib.class_renderer_blender_mitsubaScene_3D import renderer_blender_mitsubaScene_3D
-
 from lib.utils_misc import str2bool
 import argparse
+
 parser = argparse.ArgumentParser()
 # visualizers
 # parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
@@ -54,6 +55,9 @@ parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=
 parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs (e.g. emitter radiance rays')
 parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs (e.g. ennvmaps)')
 parser.add_argument('--if_add_color_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if colorize mesh vertices with values from evaluator')
+# evaluator for inv-MLP
+parser.add_argument('--eval_inv', type=str2bool, nargs='?', const=True, default=False, help='eval trained inv-MLP')
+
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -215,10 +219,10 @@ if opt.render_2d:
     renderer.render()
 
 
-'''
-Evaluator for rad-MLP and inv-MLP
-'''
 eval_return_dict = {}
+'''
+Evaluator for rad-MLP
+'''
 if opt.eval_rad:
     evaluator_rad = evaluator_scene_rad(
         host=host, 
@@ -271,6 +275,34 @@ if opt.eval_rad:
     )
 
 '''
+Evaluator for inv-MLP
+'''
+if opt.eval_inv:
+    evaluator_inv = evaluator_scene_inv(
+        host=host, 
+        scene_object=mitsuba_scene, 
+        INV_NERF_ROOT = INV_NERF_ROOT, 
+        ckpt_path='20230111-191305-inv_kitchen_190-10_specT/last.ckpt', # 110
+        dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
+        split=split, 
+        spec=True, 
+    )
+
+    '''
+    sample emission mask on shape vertices
+    '''
+    _ = evaluator_inv.sample_shapes(
+        sample_type='emission_mask', # ['']
+        shape_params={
+        }
+    )
+    for k, v in _.items():
+        if k in eval_return_dict:
+            eval_return_dict[k].update(_[k])
+        else:
+            eval_return_dict[k] = _[k]
+
+'''
 Matploblib 2D viewer
 '''
 if opt.vis_2d_plt:
@@ -305,7 +337,6 @@ if opt.vis_2d_plt:
             'lighting_scale': 1., # rescaling the brightness of the envmap
             }, 
             )
-
 
 '''
 Open3D 3D viewer
@@ -369,7 +400,7 @@ if opt.vis_3d_o3d:
         
     if opt.if_add_color_from_eval:
         if 'samples_v_dict' in eval_return_dict:
-            assert opt.eval_rad
+            assert opt.eval_rad or opt.eval_inv
             visualizer_3D_o3d.extra_input_dict['samples_v_dict'] = eval_return_dict['samples_v_dict']
         
         # vertex normals

@@ -29,6 +29,7 @@ from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
 from lib.class_diff_renderer_openroomsScene_3D import diff_renderer_openroomsScene_3D
 from lib.class_eval_rad import evaluator_scene_rad
+from lib.class_eval_inv import evaluator_scene_inv
 
 from lib.utils_misc import str2bool
 import argparse
@@ -38,18 +39,25 @@ parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, defaul
 parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize in open3D')
 parser.add_argument('--vis_2d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to show (1) pixel-space modalities (2) projection onto one image (e.g. layout, object bboxes), with plt')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
+
 # options for visualizers
 parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help='colormap for all points in fused geo')
 parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=True, default=False, help='if create color map for all points of Mitsuba; required: input_colors_tuple')
 parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
+
 # differential renderer
 parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
 parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
+
 # evaluator for rad-MLP
 parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
 parser.add_argument('--rad_lighting_sample_type', default='emission', const='all', nargs='?', choices=['emission', 'incident'], help='from supported sample types (default: %(default)s)')
 parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs')
 parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs')
+parser.add_argument('--if_add_color_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if colorize mesh vertices with values from evaluator')
+# evaluator for inv-MLP
+parser.add_argument('--eval_inv', type=str2bool, nargs='?', const=True, default=False, help='eval trained inv-MLP')
+
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -176,6 +184,16 @@ openrooms_scene = openroomsScene3D(
     shape_params_dict={
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
+
+        'if_sample_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
+        'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
+        'sample_mesh_min': 10, 
+        'sample_mesh_max': 100, 
+
+        'if_simplify_mesh': True,  # default True: simply triangles
+        'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
+        'simplify_mesh_min': 100, 
+        'simplify_mesh_max': 1000, 
         },
     emitter_params_dict={
         'N_ambient_rep': '3SG-SkyGrd', 
@@ -189,10 +207,10 @@ openrooms_scene = openroomsScene3D(
         },
 )
 
-'''
-Evaluator for rad-MLP and inv-MLP
-'''
 eval_return_dict = {}
+'''
+Evaluator for rad-MLP
+'''
 if opt.eval_rad:
     evaluator_rad = evaluator_scene_rad(
         scene_object=openrooms_scene, 
@@ -201,7 +219,8 @@ if opt.eval_rad:
         # ckpt_path='rad_3_v3pose_2048_main_xml_scene0008_00_more/last.ckpt', # 166, 208
         # ckpt_path='rad_3_v5pose_2048_main_xml_scene0008_00_more/last-v1.ckpt', # 110
         ckpt_path='20230104-162138-rad_v3pose_2048_main_xml_scene0008_00_more_specT/last.ckpt', 
-        dataset_key='-'.join(['OR', dataset_version]), 
+        # dataset_key='-'.join(['OR', dataset_version]), 
+        dataset_key='OR-public_re_3_v3pose_2048', # has to be one of the keys from inv-nerf/configs/scene_options.py
         rad_scale=1./5., 
         spec=True, 
     )
@@ -234,6 +253,33 @@ if opt.eval_rad:
     #     )
     # )
 
+'''
+Evaluator for inv-MLP
+'''
+if opt.eval_inv:
+    evaluator_inv = evaluator_scene_inv(
+        host=host, 
+        scene_object=openrooms_scene, 
+        INV_NERF_ROOT = INV_NERF_ROOT, 
+        ckpt_path='20230109-014709-inv_v3pose_2048_main_xml_scene0008_00_more_specT_re/last.ckpt', # 110
+        # dataset_key='-'.join(['OR', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
+        dataset_key='OR-public_re_3_v3pose_2048', # has to be one of the keys from inv-nerf/configs/scene_options.py
+        spec=True, 
+    )
+
+    '''
+    sample emission mask on shape vertices
+    '''
+    _ = evaluator_inv.sample_shapes(
+        sample_type='emission_mask', # ['']
+        shape_params={
+        }
+    )
+    for k, v in _.items():
+        if k in eval_return_dict:
+            eval_return_dict[k].update(_[k])
+        else:
+            eval_return_dict[k] = _[k]
 
 '''
 Differential renderers
@@ -331,7 +377,7 @@ if opt.vis_3d_o3d:
             # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             'emitters', # emitter properties (e.g. SGs, half envmaps)
-            'mi', # mitsuba sampled rays, pts
+            # 'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -403,6 +449,11 @@ if opt.vis_3d_o3d:
                     if_use_pts_end=False,
                     )
                 visualizer_3D_o3d.add_extra_geometry(geometry_list, if_processed_geometry_list=True)
+
+    if opt.if_add_color_from_eval:
+        if 'samples_v_dict' in eval_return_dict:
+            assert opt.eval_rad or opt.eval_inv
+            visualizer_3D_o3d.extra_input_dict['samples_v_dict'] = eval_return_dict['samples_v_dict']
 
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 

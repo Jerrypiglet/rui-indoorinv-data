@@ -717,7 +717,7 @@ class visualizer_scene_3D_o3d(object):
                     '''
             else:
                 # obj_color = [0.7, 0.7, 0.7]
-                obj_color = [0.7, 0.7, 0.] # yellow-ish for non-emitter objects
+                obj_color = [0.7, 0.7, 0.] # yellow-ish as default color, for non-emitter objects
                 if if_emitter:
                     obj_color = [1., np.random.random()*0.5, np.random.random()*0.5] # red-ish for emitters
                     # print(yellow(str(obj_color)), shape_dict['random_id'])
@@ -744,9 +744,16 @@ class visualizer_scene_3D_o3d(object):
 
                 if 'samples_v_dict' in self.extra_input_dict and _id in self.extra_input_dict['samples_v_dict']:
                     (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
+                    # print(_id, samples_v.shape[0], vertices.shape[0])
                     assert samples_v.shape[0] == vertices.shape[0]
                     if samples_type == 'rad':
+                        # vertices colored with: radiance in SDR space
                         samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
+                        shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+                    elif samples_type == 'emission_mask':
+                        # vertices colored with: emission prob (non-emitter: blue; emitter: red)
+                        samples_v_ = np.clip(samples_v, 0., 1.)
+                        samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
                         shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
                     else:
                         raise RuntimeError('Unsupported samples_type: %s!'%samples_type)
