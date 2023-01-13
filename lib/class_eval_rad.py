@@ -6,6 +6,7 @@ import numpy as np
 from tqdm import tqdm
 import math
 import mitsuba as mi
+import trimesh
 
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_mitsubaScene3D import mitsubaScene3D
@@ -169,11 +170,13 @@ class evaluator_scene_rad():
                 rgbs = self.model.nerf(rays_o_nerf, rays_d_nerf)['rgb'] # queried d is incoming directions!
                 intensity = rgbs.detach().cpu().numpy() / self.rad_scale # get back to original scale, without hdr scaling
                 # intensity = intensity * 0. + 5.
-                o_ = lpts_dict['lpts']
-                d_ = lpts_dict['lpts_normal'] / (np.linalg.norm(lpts_dict['lpts_normal'], axis=-1, keepdims=True)+1e-5)
-                lpts_end = o_ + d_ * np.linalg.norm(intensity, axis=-1, keepdims=True) * radiance_scale
                 print(white_blue('EST intensity'), np.linalg.norm(intensity, axis=-1))
-                emitter_rays_list.append((lpts_dict['lpts'], lpts_end))
+                emitter_rays_list.append({
+                    'v': lpts_dict['lpts'], 
+                    'd': lpts_dict['lpts_normal'] / (np.linalg.norm(lpts_dict['lpts_normal'], axis=-1, keepdims=True)+1e-5), 
+                    'l': np.linalg.norm(intensity, axis=-1, keepdims=True) * radiance_scale
+                    })
+
                 # emitter_rays = o3d.geometry.LineSet()
                 # emitter_rays.points = o3d.utility.Vector3dVector(np.vstack((lpts_dict['lpts'], lpts_end)))
                 # emitter_rays.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*lpts_dict['lpts'].shape[0])
@@ -182,9 +185,56 @@ class evaluator_scene_rad():
 
         return {'emitter_rays_list': emitter_rays_list}
 
+    def sample_shapes(
+        self, 
+        sample_type: str='rad', 
+        shape_params={}, 
+        ):
+        '''
+        sample shape surface for sample_type:
+            - 'rad': radiance (at vectices along vertice normals) from rad-MLP: 
+
+        args:
+        - shape_params
+            - radiance_scale: rescale radiance magnitude (because radiance can be large, e.g. 500, 3000)
+        '''
+        radiance_scale = shape_params.get('radiance_scale', 1.)
+        assert self.os.if_loaded_shapes
+        # , 'incident-rad']
+
+        return_dict = {}
+        samples_v_dict = {}
+        if sample_type == 'rad':
+            shape_rays_dict = {}
+
+        print('Evlauating NeRF: sample_shapes...')
+
+        for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
+            assert np.amin(faces) == 1
+            shape_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
+
+            if sample_type == 'rad':
+                vertex_normals = shape_tri_mesh.vertex_normals # already normalized
+
+                if vertex_normals.shape[0] != vertices.shape[0]: # [TODO] why?
+                    # print(vertex_normals.shape[0], vertices.shape[0], faces.shape)
+                    continue
+                
+                shape_rays_dict[_id] = {'v': vertices, 'd': vertex_normals}
+                rays_o_nerf = self.or2nerf_th(torch.from_numpy(vertices).float().to(self.device)) # convert to NeRF coordinates
+                rays_d_nerf = self.or2nerf_th(torch.from_numpy(-vertex_normals).float().to(self.device)) # convert to NeRF coordinates
+                rgbs = self.model.nerf(rays_o_nerf, rays_d_nerf)['rgb'] # queried d is incoming directions!
+                rads = rgbs.detach().cpu().numpy() / self.rad_scale * radiance_scale # get back to original scale, without hdr scaling
+                samples_v_dict[_id] = ('rad', rads)
+
+        return_dict.update({'samples_v_dict': samples_v_dict})
+        if sample_type == 'rad':
+            return_dict.update({'shape_rays_dict': shape_rays_dict})
+        return return_dict
+
     def sample_lighting(
         self, 
-        sample_type: str='emission', 
+        sample_type: str='rad', 
         subsample_rate_pts: int=1, 
         if_use_mi_geometry: bool=True, 
         if_use_loaded_envmap_position: bool=False, 
@@ -196,12 +246,12 @@ class evaluator_scene_rad():
         '''
         sample non-emitter locations along hemisphere directions for incident radiance, from rad-MLP: images/demo_envmap_o3d_sampling.png
         Args:
-            sample_type: 'emission' for querying radiance emitted FROM all points; 'incident' for incident radiance TOWARDS all points
+            sample_type: 'rad' for querying radiance emitted FROM all points; 'incident-rad' for incident radiance TOWARDS all points
         Results:
             images/demo_eval_radMLP_rample_lighting_openrooms_1.png
         '''
         
-        assert sample_type in ['emission', 'incident']
+        assert sample_type in ['rad', 'incident-rad']
         if if_use_mi_geometry:
             assert self.os.if_has_mitsuba_all; normal_list = self.os.mi_normal_list
         else:
@@ -241,10 +291,10 @@ class evaluator_scene_rad():
             # samples_o = np.broadcast_to(samples_o, (samples_o.shape[0], wi_num, 3))
             # samples_o = samples_o.view(-1, 3)
             samples_o = np.repeat(samples_o, wi_num, axis=1).reshape(-1, 3) # (HW*wi_num, 3)
-            if sample_type == 'emission':
+            if sample_type == 'rad':
                 rays_d = samples_d
                 rays_o = samples_o
-            elif sample_type == 'incident':
+            elif sample_type == 'incident-rad':
                 rays_d = -samples_d # from destination point, towards opposite direction
                 # [mitsuba.Interaction3f] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html#mitsuba.Interaction3f
                 # [mitsuba.SurfaceInteraction3f] https://mitsuba.readthedocs.io/en/latest/src/api_reference.html#mitsuba.SurfaceInteraction3f

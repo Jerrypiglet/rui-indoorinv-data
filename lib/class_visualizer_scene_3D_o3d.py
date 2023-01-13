@@ -61,6 +61,7 @@ class visualizer_scene_3D_o3d(object):
         if 'mi' in self.modality_list_vis:
             self.mi_pcd_color_list = None
         self.extra_geometry_list = []
+        self.extra_input_dict = {}
 
     def run_demo(self, extra_geometry_list=[]):
 
@@ -674,11 +675,12 @@ class visualizer_scene_3D_o3d(object):
 
         # emitters_obj_random_id_list = [shape['random_id'] for shape in self.os.shape_list_valid if shape['if_in_emitter_dict']]
 
-        for shape_idx, (shape_dict, vertices, faces, bverts) in tqdm(enumerate(zip(
+        for shape_idx, (shape_dict, vertices, faces, bverts, _id) in tqdm(enumerate(zip(
             self.os.shape_list_valid, 
             self.os.vertices_list, 
             self.os.faces_list, 
             self.os.bverts_list, 
+            self.os.ids_list, 
         ))):
 
             if_emitter = shape_dict['if_in_emitter_dict']
@@ -714,7 +716,8 @@ class visualizer_scene_3D_o3d(object):
                     images/OR42_color_mapping_light.png
                     '''
             else:
-                obj_color = [0.7, 0.7, 0.7]
+                # obj_color = [0.7, 0.7, 0.7]
+                obj_color = [0.7, 0.7, 0.] # yellow-ish for non-emitter objects
                 if if_emitter:
                     obj_color = [1., np.random.random()*0.5, np.random.random()*0.5] # red-ish for emitters
                     # print(yellow(str(obj_color)), shape_dict['random_id'])
@@ -731,7 +734,7 @@ class visualizer_scene_3D_o3d(object):
             geometry_list.append(shape_bbox)
 
             '''
-            [optional] load mashes & labels
+            [optional] load mashes & text labels
             '''
             if_mesh = if_obj_meshes if not if_emitter else if_emitter_meshes
             if if_mesh:
@@ -739,7 +742,17 @@ class visualizer_scene_3D_o3d(object):
                 shape_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
                 shape_mesh = shape_mesh.as_open3d
 
-                shape_mesh.paint_uniform_color(obj_color)
+                if 'samples_v_dict' in self.extra_input_dict and _id in self.extra_input_dict['samples_v_dict']:
+                    (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
+                    assert samples_v.shape[0] == vertices.shape[0]
+                    if samples_type == 'rad':
+                        samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
+                        shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+                    else:
+                        raise RuntimeError('Unsupported samples_type: %s!'%samples_type)
+                else:
+                    shape_mesh.paint_uniform_color(obj_color)
+
                 shape_mesh.compute_vertex_normals()
                 shape_mesh.compute_triangle_normals()
                 geometry_list.append([shape_mesh, 'shape_emitter_'+shape_dict['random_id'] if if_emitter else 'shape_obj_'+shape_dict['random_id']])
@@ -839,7 +852,7 @@ class visualizer_scene_3D_o3d(object):
                     a_light = get_arrow_o3d(light_center, light_axis_end, scale=scale, color=color)
                     geometry_list.append(a_light)
 
-                if if_half_envmap:
+                if if_half_envmap: # images/demo_envmap_o3d.png # added envmap hemisphere
                     env_map_path = shape_dict['emitter_prop']['envMapPath']
                     im_envmap_ori = load_HDR(Path(env_map_path))
                     im_envmap_ori_SDR, im_envmap_ori_scale = to_nonHDR(im_envmap_ori)

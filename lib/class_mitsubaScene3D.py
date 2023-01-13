@@ -13,7 +13,7 @@ from lib.utils_io import read_cam_params, normalize_v
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
 # from collections import defaultdict
-import trimesh
+# import trimesh
 
 import string
 # Import the library using the alias "mi"
@@ -599,7 +599,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     emitter_prop = {'intensity': radiance, 'obj_type': 'obj', 'if_lit_up': np.amax(radiance) > 1e-3}
             else:
                 if not len(shape.findall('string')) > 0: continue
-                _id = shape.findall('ref')[0].get('id')
+                _id = shape.findall('ref')[0].get('id')+'_'+random_id
                 # if 'walls' in _id.lower() or 'ceiling' in _id.lower():
                 #     continue
                 filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
@@ -617,7 +617,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
                     vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max)
                     if N_triangles != target_number_of_triangles:
-                        print('[%s-%s] Mesh simplified to %d->%d triangles.'%(_id, random_id, N_triangles, target_number_of_triangles))
+                        print('[%s] Mesh simplified to %d->%d triangles.'%(_id, N_triangles, target_number_of_triangles))
 
                 assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
 
@@ -649,6 +649,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
 
         self.if_loaded_shapes = True
+        
         print(blue_text('[mitsubaScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
             len(self.shape_list_valid), 
             len([_ for _ in self.window_list if _[0]['emitter_prop']['if_lit_up']]), len(self.window_list), 

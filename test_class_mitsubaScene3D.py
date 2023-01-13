@@ -52,7 +52,8 @@ parser.add_argument('--renderer', type=str, default='blender', help='mi, blender
 # evaluator for rad-MLP
 parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
 parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs (e.g. emitter radiance rays')
-parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs (e.g. en=nvmaps')
+parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs (e.g. ennvmaps)')
+parser.add_argument('--if_add_color_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if colorize mesh vertices with values from evaluator')
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
@@ -250,12 +251,24 @@ if opt.eval_rad:
     '''
     # eval_return_dict.update(
     #     evaluator_rad.sample_lighting(
-    #         # sample_type='emission', # 'emission', 'incident'
-    #         sample_type='incident', # 'emission', 'incident'
+    #         # sample_type='rad', # 'rad', 'incident-rad'
+    #         sample_type='incident', # 'rad', 'incident-rad'
     #         subsample_rate_pts=1, 
     #         if_use_loaded_envmap_position=True, # assuming lighting envmap endpoint position dumped by Blender renderer
     #     )
     # )
+
+    '''
+    sample radiance field on shape vertices
+    '''
+    eval_return_dict.update(
+        evaluator_rad.sample_shapes(
+            sample_type='rad', # ['rad']
+            shape_params={
+                'radiance_scale': 1., 
+            }
+        )
+    )
 
 '''
 Matploblib 2D viewer
@@ -334,7 +347,8 @@ if opt.vis_3d_o3d:
     if opt.if_add_rays_from_eval:
         if 'emitter_rays_list' in eval_return_dict:
             assert opt.eval_rad
-            for (lpts, lpts_end) in eval_return_dict['emitter_rays_list']:
+            for _ in eval_return_dict['emitter_rays_list']:
+                lpts, lpts_end = _['v'], _['v']+_['d']*_['l']
                 visualizer_3D_o3d.add_extra_geometry([
                     ('rays', {
                         'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 0., 1.]]*lpts.shape[0]), # BLUE for EST
@@ -352,6 +366,24 @@ if opt.vis_3d_o3d:
                     if_use_pts_end=True,
                     )
                 visualizer_3D_o3d.add_extra_geometry(geometry_list, if_processed_geometry_list=True)
+        
+    if opt.if_add_color_from_eval:
+        if 'samples_v_dict' in eval_return_dict:
+            assert opt.eval_rad
+            visualizer_3D_o3d.extra_input_dict['samples_v_dict'] = eval_return_dict['samples_v_dict']
+        
+        # vertex normals
+
+        # if 'samples_v_dict' in eval_return_dict:
+        #     assert opt.eval_rad
+        #     for _id in eval_return_dict['samples_v_dict']:
+        #         lpts, lpts_d = eval_return_dict['samples_v_dict'][_id]['v'], eval_return_dict['samples_v_dict'][_id]['d']
+        #         lpts_end = lpts + 0.1 * lpts_d
+        #         visualizer_3D_o3d.add_extra_geometry([
+        #             ('rays', {
+        #                 'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 1., 0.]]*lpts.shape[0]), # green
+        #             }),
+        #         ]) 
 
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 

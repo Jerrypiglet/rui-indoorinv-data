@@ -349,7 +349,14 @@ Evaluate emitter **emission**: emitter surface radiance (GT (red) and est. (blue
 ![](images/demo_emitter_o3d_sampling_emission_kitchen1.png)
 ![](images/demo_emitter_o3d_sampling_emission_kitchen2.png)
 
-Evaluate **incident radiance** (same idea as generating envmap in OptixRenderer):
+Evaluate shape per-vertex **radiance** (emission), and colorize mesh faces:
+
+- enable `evaluator_rad.sample_shapes`
+
+Indoor-kitchen scene:
+![](images/demo_eval_radMLP_shapes_rad_kitchen_0.png)
+
+Evaluate per-pixel **incident radiance** (same idea as generating envmap in OptixRenderer):
 
 - enable `evaluator_rad.sample_lighting(opt.rad_lighting_sample_type='emission')`
 
@@ -363,10 +370,15 @@ Indoor-kitchen scene:
 ![](images/demo_eval_radMLP_incident_kitchen_0.png)
 [Google Drive](https://drive.google.com/open?id=1NEBVcbFIPkra0GOWxIlOxPYXet9q38g8)
 
+
+
+
 ### inv-MLP
 
 # Todolist
-- [x] vis envmap
+- [x] vis envmap in 2D plt
+- [ ] compute visibility
+- [ ] make faces always 0-based acorss utils_mesh and trimesh
 - [ ] change dump_OR_xml_for_mi() to be FULLY compatible with Mitsuba 3'
 - [ ] renderer_blender_mitsubaScene_3D: render with multiple cameras at once
 - [x] mitsubaScene3D: inhereit openroomsScene2D
