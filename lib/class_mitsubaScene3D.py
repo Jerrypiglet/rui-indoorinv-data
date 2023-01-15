@@ -552,6 +552,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
         simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
         simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
+        if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
+        remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
 
         print(white_blue('[mitsubaScene3D] load_shapes for scene...'))
         root = get_XML_root(self.xml_file)
@@ -607,19 +609,20 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 # if if_load_obj_mesh:
                 vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py; faces is 1-based!
 
-                # --sample mesh--
-                if if_sample_mesh:
-                    sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
-                    self.sample_pts_list.append(sample_pts)
-                    # print(sample_pts.shape[0])
-
-                # --simplify mesh--
-                if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
-                    vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max)
-                    if N_triangles != target_number_of_triangles:
-                        print('[%s] Mesh simplified to %d->%d triangles.'%(_id, N_triangles, target_number_of_triangles))
-
                 assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
+
+                
+            # --sample mesh--
+            if if_sample_mesh:
+                sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
+                self.sample_pts_list.append(sample_pts)
+                # print(sample_pts.shape[0])
+
+            # --simplify mesh--
+            if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
+                vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh=if_remesh, remesh_max_edge=remesh_max_edge, _id=_id)
+                if N_triangles != faces.shape[0]:
+                    print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
 
             bverts, bfaces = computeBox(vertices)
             self.vertices_list.append(vertices)

@@ -193,7 +193,9 @@ openrooms_scene = openroomsScene3D(
         'if_simplify_mesh': True,  # default True: simply triangles
         'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
         'simplify_mesh_min': 100, 
-        'simplify_mesh_max': 1000, 
+        'simplify_mesh_max': 1000,
+        'if_remesh': True, # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
+        'remesh_max_edge': 0.15,  
         },
     emitter_params_dict={
         'N_ambient_rep': '3SG-SkyGrd', 
@@ -464,7 +466,7 @@ if opt.vis_3d_o3d:
         dense_geo_params={
             'subsample_pcd_rate': 100, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
             'if_ceiling': False, # remove ceiling points to better see the furniture 
-            'if_walls': False, # remove wall points to better see the furniture 
+            'if_walls': True, # remove wall points to better see the furniture 
             'if_normal': False, # turn off normals to avoid clusters
             'subsample_normal_rate_x': 2, 
             'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
@@ -475,6 +477,10 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
+            'if_ceiling': False, 
+            'if_walls': True, 
+            # 'mesh_color_type': 'obj_color', 
+            'mesh_color_type': 'face_normal', #'obj_color', 
         },
         emitter_params={
             'if_half_envmap': False, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)

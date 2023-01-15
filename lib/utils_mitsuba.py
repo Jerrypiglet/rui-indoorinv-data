@@ -117,7 +117,7 @@ def dump_OR_xml_for_mi(
                     transforms_list.append(transform_dict)
             vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
             if '/uv_mapped.obj' in obj_path:
-                    faces = flip_ceiling_normal(faces, vertices)
+                faces = flip_ceiling_normal(faces, vertices)
             vertices_transformed, _ = transform_with_transforms_xml_list(transforms_list, vertices)
             vertices_list.append(vertices_transformed)
             faces_list.append(faces)

@@ -27,7 +27,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.utils_misc import get_list_of_keys, gen_random_str, yellow, white_red
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
 from lib.utils_io import load_HDR, to_nonHDR
-from lib.utils_OR.utils_OR_mesh import writeMesh
+from lib.utils_OR.utils_OR_mesh import writeMesh, colorize_o3d_mesh_faces
 from lib.utils_vis import color_map_color
 
 aabb_01 = np.array([[0, 0, 0],
@@ -669,6 +669,9 @@ class visualizer_scene_3D_o3d(object):
         if_ceiling = shapes_params.get('if_ceiling', False)
         if_walls = shapes_params.get('if_walls', False)
 
+        mesh_color_type = shapes_params.get('mesh_color_type', 'obj_color')
+        assert mesh_color_type in ['obj_color', 'face_normal', 'eval-rad', 'eval-emissio_mask']
+
         self.os.load_colors()
 
         geometry_list = []
@@ -700,22 +703,27 @@ class visualizer_scene_3D_o3d(object):
             if not if_walls and shape_dict.get('is_wall', False): continue
             if not if_ceiling and shape_dict.get('is_ceiling', False): continue
 
+            if_default_color = True
             if self.os.if_loaded_colors:
                 cat_id_str = str(obj_path).split('/')[-3]
-                assert cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
-                cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
-                obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
-                obj_color = [float(x)/255. for x in obj_color]
-                linestyle = '-'
-                linewidth = 1
-                if if_emitter:
-                    linewidth = 3
-                    linestyle = '--'
-                    obj_color = [1., np.random.random()*0.5, np.random.random()*0.5] # red-ish for emitters
-                    '''
-                    images/OR42_color_mapping_light.png
-                    '''
-            else:
+                if cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict:
+                    cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
+                    obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
+                    obj_color = [float(x)/255. for x in obj_color]
+                    if_default_color = False
+                    linestyle = '-'
+                    linewidth = 1
+                    if if_emitter:
+                        linewidth = 3
+                        linestyle = '--'
+                        obj_color = [1., np.random.random()*0.5, np.random.random()*0.5] # red-ish for emitters
+                        '''
+                        images/OR42_color_mapping_light.png
+                        '''
+                else:
+                    print(yellow('Default color for invalid cat_id_str: [%s]; %s'%(cat_id_str, obj_path)))
+
+            if if_default_color:
                 # obj_color = [0.7, 0.7, 0.7]
                 obj_color = [0.7, 0.7, 0.] # yellow-ish as default color, for non-emitter objects
                 if if_emitter:
@@ -738,30 +746,44 @@ class visualizer_scene_3D_o3d(object):
             '''
             if_mesh = if_obj_meshes if not if_emitter else if_emitter_meshes
             if if_mesh:
+                if np.amax(faces) > vertices.shape[0]:
+                    import ipdb; ipdb.set_trace()
                 assert np.amax(faces-1) < vertices.shape[0]
                 shape_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
                 shape_mesh = shape_mesh.as_open3d
-
-                if 'samples_v_dict' in self.extra_input_dict and _id in self.extra_input_dict['samples_v_dict']:
-                    (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
-                    # print(_id, samples_v.shape[0], vertices.shape[0])
-                    assert samples_v.shape[0] == vertices.shape[0]
-                    if samples_type == 'rad':
-                        # vertices colored with: radiance in SDR space
-                        samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
-                        shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                    elif samples_type == 'emission_mask':
-                        # vertices colored with: emission prob (non-emitter: blue; emitter: red)
-                        samples_v_ = np.clip(samples_v, 0., 1.)
-                        samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
-                        shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                    else:
-                        raise RuntimeError('Unsupported samples_type: %s!'%samples_type)
-                else:
-                    shape_mesh.paint_uniform_color(obj_color)
-
                 shape_mesh.compute_vertex_normals()
                 shape_mesh.compute_triangle_normals()
+
+                if mesh_color_type.startswith('eval_'):
+                    if 'samples_v_dict' in self.extra_input_dict and _id in self.extra_input_dict['samples_v_dict']:
+                        (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
+                        # print(_id, samples_v.shape[0], vertices.shape[0])
+                        assert samples_v.shape[0] == vertices.shape[0]
+                        if samples_type == 'rad':
+                            # vertices colored with: radiance in SDR space
+                            samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
+                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+                        elif samples_type == 'emission_mask':
+                            # vertices colored with: emission prob (non-emitter: blue; emitter: red)
+                            samples_v_ = np.clip(samples_v, 0., 1.)
+                            samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
+                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+                        else:
+                            raise RuntimeError('Unsupported samples_type: %s!'%samples_type)
+                elif mesh_color_type == 'face_normal':
+                    '''
+                    global normals: images/demo_shapes_o3d_face_normal.png
+                    otherwise press ctrl+9 for camera-space normals: images/demo_shapes_o3d_face_normal_local.png
+                    '''
+                    triangle_normals = (np.array(shape_mesh.triangle_normals) + 1.)/2.
+                    shape_mesh = colorize_o3d_mesh_faces(shape_mesh, faces, face_colors=triangle_normals)
+                else:
+                    # if mesh_color_type == 'obj_color':
+                    '''
+                    images/demo_shapes_o3d_obj_color.png
+                    '''
+                    shape_mesh.paint_uniform_color(obj_color)
+
                 geometry_list.append([shape_mesh, 'shape_emitter_'+shape_dict['random_id'] if if_emitter else 'shape_obj_'+shape_dict['random_id']])
 
             # print('[collect_shapes] --', if_emitter, shape_idx, obj_path, cat_name, cat_id, shape_dict['random_id'])

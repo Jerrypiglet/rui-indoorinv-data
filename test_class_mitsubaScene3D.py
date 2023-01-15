@@ -177,6 +177,8 @@ mitsuba_scene = mitsubaScene3D(
         'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
         'simplify_mesh_min': 100, 
         'simplify_mesh_max': 1000, 
+        'if_remesh': True, # False: images/demo_shapes_3D_kitchen_NO_remesh.png; True: images/demo_shapes_3D_kitchen_YES_remesh.png
+        'remesh_max_edge': 0.15,  
         },
     emitter_params_dict={
         },
@@ -438,6 +440,8 @@ if opt.vis_3d_o3d:
             'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from mitsuba_scene.sample_pts_list if available
+            # 'mesh_color_type': 'obj_color', 
+            'mesh_color_type': 'face_normal', #'obj_color', 
         },
         emitter_params={
             # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)

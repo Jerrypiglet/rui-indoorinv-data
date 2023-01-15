@@ -247,6 +247,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
         simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
         simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
+        if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
+        remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
 
         # load emitter properties from light*.dat files of **a specific N_ambient_representation**
         self.emitter_dict_of_lists_world = load_emitter_dat_world(light_dir=self.scene_rendering_path, N_ambient_rep=self.emitter_params_dict['N_ambient_rep'], if_save_storage=self.if_save_storage)
@@ -308,7 +310,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             bbox_file_path = obj_path.replace('.obj', '.pickle')
             if 'layoutMesh' in bbox_file_path:
                 bbox_file_path = Path('layoutMesh') / Path(bbox_file_path).relative_to(self.root_path_dict['layout_root'])
-            elif 'uv_mapped' in bbox_file_path:
+            elif 'uv_mapped' in bbox_file_path: # box mesh for the enclosure of the room (walls, ceiling and floor)
                 bbox_file_path = Path('uv_mapped') / Path(bbox_file_path).relative_to(self.root_path_dict['shapes_root'])
             bbox_file_path = self.root_path_dict['shape_pickles_root'] / bbox_file_path
 
@@ -316,13 +318,23 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             
             if_load_mesh = if_load_obj_mesh if not if_emitter else if_load_emitter_mesh
 
-            if if_load_mesh or (not Path(bbox_file_path).exists()):
-                vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
+            if if_load_mesh: # or (not Path(bbox_file_path).exists()):
+                if_convert_to_double_sided = 'uv_mapped.obj' in str(obj_path) # convert uv_mapped.obj to double sides mesh (OpenRooms only)
+                # if_convert_to_double_sided = False
+                vertices, faces = loadMesh(obj_path, if_convert_to_double_sided=if_convert_to_double_sided) # based on L430 of adjustObjectPoseCorrectChairs.py
                 bverts, bfaces = computeBox(vertices)
                 if not Path(bbox_file_path).exists():
                     Path(bbox_file_path).parent.mkdir(parents=True, exist_ok=True)
                     with open(bbox_file_path, "wb") as f:
                         pickle.dump(dict(bverts=bverts, bfaces=bfaces), f)
+                
+                # --a bunch of fixes if broken meshes; SLOW--
+                # _ = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
+                # # trimesh.repair.fix_inversion(_)
+                # trimesh.repair.fix_normals(_)
+                # # trimesh.repair.fill_holes(_)
+                # # trimesh.repair.fix_winding(_)
+                # vertices, faces = _.vertices, _.faces+1
 
                 # --sample mesh--
                 if if_sample_mesh:
@@ -332,9 +344,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
                 # --simplify mesh--
                 if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
-                    vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max)
-                    if N_triangles != target_number_of_triangles:
-                        print('[%s] Mesh simplified to %d->%d triangles.'%(_id, N_triangles, target_number_of_triangles))
+                    vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh=if_remesh, remesh_max_edge=remesh_max_edge)
+                    if N_triangles != faces.shape[0]:
+                        print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
             else:
                 with open(bbox_file_path, "rb") as f:
                     bbox_dict = pickle.load(f)
@@ -357,8 +369,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             if if_load_mesh:
                 self.vertices_list.append(vertices_transformed)
                 # self.faces_list.append(faces+self.num_vertices)
-                if '/uv_mapped.obj' in shape_dict['filename']:
-                    faces = flip_ceiling_normal(faces, vertices)
+                # if '/uv_mapped.obj' in shape_dict['filename']:
+                #     faces = flip_ceiling_normal(faces, vertices)
                 self.faces_list.append(faces)
                 # self.num_vertices += vertices_transformed.shape[0]
             else:

@@ -374,7 +374,7 @@ Indoor-kitchen scene:
 ### inv-MLP
 Tested with repo **inv-nerf** (branch rui_emission). ```opt.eval_inv``` for evaluating inv-MLP loaded from ckpt.
 
-[mm1 3c87ce2] added sampling rad-MLP for est emitter radiance: public_re_3_v3pose_2048 and public_re_3_v5pose_2048
+[mm1 8ed6d14] tested inv-mlp for emission mask on both scenes
 
 ``` bash
 python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_inv True 
@@ -389,10 +389,12 @@ Openrooms-3lamps scene: ([2D vis](https://i.imgur.com/E8z7lN6.jpg))
 ![](images/demo_eval_invMLP_shapes_emission_mask_0.png)
 Indoor-kitchen scene: ([2D vis](https://i.imgur.com/VYF2iGU.jpg))
 ![](images/demo_eval_invMLP_shapes_emission_mask_kitchen_0.png)
+![](images/demo_eval_invMLP_shapes_emission_mask_kitchen_1.png)
 
 # Todolist
 - [x] vis envmap in 2D plt
-- [ ] compute visibility
+- [ ] compute visibility and vis
+- [ ] densely sample pts on shape surface
 - [ ] make faces always 0-based acorss utils_mesh and trimesh
 - [ ] change dump_OR_xml_for_mi() to be FULLY compatible with Mitsuba 3'
 - [ ] renderer_blender_mitsubaScene_3D: render with multiple cameras at once
