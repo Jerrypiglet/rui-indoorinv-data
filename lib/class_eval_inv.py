@@ -114,7 +114,7 @@ class evaluator_scene_inv():
         return_dict = {}
         samples_v_dict = {}
 
-        print('Evlauating NeRF: sample_shapes...')
+        print(white_blue('Evlauating NeRF'), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
 
         for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
             assert np.amin(faces) == 1
@@ -125,9 +125,9 @@ class evaluator_scene_inv():
                 alpha_np = (1 - torch.exp(-emission_mask.relu())).detach().cpu().numpy()
                 # print(torch.amax(emission_mask), torch.amin(emission_mask), torch.amax(alpha_np), torch.amin(alpha_np))
                 # rads = rgbs.detach().cpu().numpy() / self.rad_scale * radiance_scale # get back to original scale, without hdr scaling
-                samples_v_dict[_id] = ('emission_mask', emission_mask_np)
+                samples_v_dict[_id] = ('emission_mask', emission_mask_np * 2.)
                 # samples_v_dict[_id] = ('emission_mask', alpha_np)
-                print('>', _id, np.amax(emission_mask_np), np.amin(emission_mask_np), np.amax(alpha_np), np.amin(alpha_np), )
+                # print('>', _id, np.amax(emission_mask_np), np.amin(emission_mask_np), np.amax(alpha_np), np.amin(alpha_np), )
 
         return_dict.update({'samples_v_dict': samples_v_dict})
         return return_dict

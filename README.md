@@ -252,6 +252,10 @@ Examples:
 (Indoor-kitchen scene: one window and 3 oven-top lamps as area lights)
 ![](images/demo_shapes_o3d_kitchen_emitters.png)
 
+`mesh_color_type` is supported to colorize shape meshes with different sources. E.g., set `shapes_params['mesh_color_type'] = 'face_normal'`:
+
+![](images/demo_shapes_o3d_kitchen-mesh_color_type-face_normal.png)
+
 **mi**:
 ![](images/demo_mitsuba_ret_pts_1.png)
 ![](images/demo_mitsuba_ret_normals.png)
@@ -383,7 +387,8 @@ python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_inv True
 Evaluate shape per-vertex **emission mask**, and colorize mesh faces (emitter (red) and non-emitter (blue)):
 
 - enable `evaluator_inv.sample_shapes`
-- evaluator_inv.sample_shapes(sample_type='emission_mask', ...
+  - evaluator_inv.sample_shapes(sample_type='emission_mask', ...
+- 'mesh_color_type': 'eval-emission_mask', 
 
 Openrooms-3lamps scene: ([2D vis](https://i.imgur.com/E8z7lN6.jpg))
 ![](images/demo_eval_invMLP_shapes_emission_mask_0.png)

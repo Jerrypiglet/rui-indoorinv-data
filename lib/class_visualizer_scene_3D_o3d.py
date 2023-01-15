@@ -670,7 +670,7 @@ class visualizer_scene_3D_o3d(object):
         if_walls = shapes_params.get('if_walls', False)
 
         mesh_color_type = shapes_params.get('mesh_color_type', 'obj_color')
-        assert mesh_color_type in ['obj_color', 'face_normal', 'eval-rad', 'eval-emissio_mask']
+        assert mesh_color_type in ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
 
         self.os.load_colors()
 
@@ -749,16 +749,20 @@ class visualizer_scene_3D_o3d(object):
                 if np.amax(faces) > vertices.shape[0]:
                     import ipdb; ipdb.set_trace()
                 assert np.amax(faces-1) < vertices.shape[0]
-                shape_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
-                shape_mesh = shape_mesh.as_open3d
+
+                # shape_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based # Trimesh does not support non-mesh (e.g. triangle soup) well
+                # shape_mesh = shape_mesh.as_open3d
+                shape_mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(vertices), o3d.utility.Vector3iVector(faces-1))
                 shape_mesh.compute_vertex_normals()
                 shape_mesh.compute_triangle_normals()
+                assert np.array(shape_mesh.vertices).shape[0] == vertices.shape[0]
 
-                if mesh_color_type.startswith('eval_'):
+                if mesh_color_type.startswith('eval-'):
                     if 'samples_v_dict' in self.extra_input_dict and _id in self.extra_input_dict['samples_v_dict']:
                         (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
                         # print(_id, samples_v.shape[0], vertices.shape[0])
                         assert samples_v.shape[0] == vertices.shape[0]
+                        assert mesh_color_type.split('-')[1] == samples_type
                         if samples_type == 'rad':
                             # vertices colored with: radiance in SDR space
                             samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)

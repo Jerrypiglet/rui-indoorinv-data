@@ -106,7 +106,6 @@ def simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simpl
     else:
         vertices, faces = shape_tri_mesh.vertices, shape_tri_mesh.faces
 
-
     return vertices, faces+1, (N_triangles, target_number_of_triangles)
 
 def colorize_o3d_mesh_faces(shape_mesh, faces, face_colors):

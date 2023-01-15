@@ -477,10 +477,9 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
-            'if_ceiling': False, 
+            'if_ceiling': True, 
             'if_walls': True, 
-            # 'mesh_color_type': 'obj_color', 
-            'mesh_color_type': 'face_normal', #'obj_color', 
+            'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
         },
         emitter_params={
             'if_half_envmap': False, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)

@@ -437,11 +437,10 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
-            'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from mitsuba_scene.sample_pts_list if available
-            # 'mesh_color_type': 'obj_color', 
-            'mesh_color_type': 'face_normal', #'obj_color', 
+            'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
         },
         emitter_params={
             # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
