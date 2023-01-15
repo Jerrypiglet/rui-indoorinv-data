@@ -4,27 +4,29 @@
 <!--See https://github.com/ekalinin/github-markdown-toc#readme-->
 
 <!--ts-->
-- [Description](#description)
-- [Dependencies](#dependencies)
-  - [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
-- [Dataset structure](#dataset-structure)
-- [Notes on coordinate systems](#notes-on-coordinate-systems)
-- [Usage](#usage)
-  - [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
-  - [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
-    - [Matplotlib viewer](#matplotlib-viewer)
-    - [Open3D viewer](#open3d-viewer)
-  - [3D differentiable renderer](#3d-differentiable-renderer)
-    - [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
-    - [Direct-lighting-only renderer](#direct-lighting-only-renderer)
-  - [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
-  - [Evaluator for rad-MLP and inv-MLP](#evaluator-for-rad-mlp-and-inv-mlp)
-    - [rad-MLP](#rad-mlp)
-    - [inv-MLP](#inv-mlp)
-- [Todolist](#todolist)
+* [Description](#description)
+* [Dependencies](#dependencies)
+   * [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
+* [Dataset structure](#dataset-structure)
+* [Notes on coordinate systems](#notes-on-coordinate-systems)
+* [Usage](#usage)
+   * [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
+   * [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
+      * [Matplotlib viewer](#matplotlib-viewer)
+      * [Open3D viewer](#open3d-viewer)
+   * [3D differentiable renderer](#3d-differentiable-renderer)
+      * [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
+      * [Direct-lighting-only renderer](#direct-lighting-only-renderer)
+   * [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
+   * [Evaluator for rad-MLP and inv-MLP](#evaluator-for-rad-mlp-and-inv-mlp)
+      * [rad-MLP](#rad-mlp)
+      * [inv-MLP](#inv-mlp)
+   * [Evaluator for scene/shape properties](#evaluator-for-sceneshape-properties)
+      * [view coverage](#view-coverage)
+* [Todolist](#todolist)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
-<!-- Added by: ruizhu, at: Tue Jan 10 16:11:23 PST 2023 -->
+<!-- Added by: jerrypiglet, at: Sun Jan 15 02:02:01 PST 2023 -->
 
 <!--te-->
 
@@ -378,7 +380,7 @@ Indoor-kitchen scene:
 ### inv-MLP
 Tested with repo **inv-nerf** (branch rui_emission). ```opt.eval_inv``` for evaluating inv-MLP loaded from ckpt.
 
-[mm1 8ed6d14] tested inv-mlp for emission mask on both scenes
+[mm1 579b41f] tested inv-mlp for emission mask on both scenes; fixed mesh issues + remesh
 
 ``` bash
 python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_inv True 
@@ -396,22 +398,36 @@ Indoor-kitchen scene: ([2D vis](https://i.imgur.com/VYF2iGU.jpg))
 ![](images/demo_eval_invMLP_shapes_emission_mask_kitchen_0.png)
 ![](images/demo_eval_invMLP_shapes_emission_mask_kitchen_1.png)
 
+## Evaluator for scene/shape properties
+### view coverage
+
+Evaluator for view coverage:
+``` bash
+python test_class_mitsubaScene3D.py --vis_3d_o3d True --eval_scene True
+```
+
+- enable `evaluator_scene.sample_shapes`
+  - evaluator_scene.sample_shapes(sample_type='vis_count', ...
+- 'mesh_color_type': 'eval-vis_count', 
+
+![](images/demo_eval_scene_shapes-vis_count-kitchen_0.png)
+![](images/demo_eval_scene_shapes-vis_count-kitchen_1.png)
+
 # Todolist
 - [x] vis envmap in 2D plt
-- [ ] compute visibility and vis
-- [ ] densely sample pts on shape surface
+- [ ] compute visibility and vis for room coverage count
+- [x] densely sample pts on shape surface
 - [ ] make faces always 0-based acorss utils_mesh and trimesh
 - [ ] change dump_OR_xml_for_mi() to be FULLY compatible with Mitsuba 3'
 - [ ] renderer_blender_mitsubaScene_3D: render with multiple cameras at once
 - [x] mitsubaScene3D: inhereit openroomsScene2D
 - [ ] how to get **mi_rays_ret_expanded**?
 - [ ] Check OptixRendererLight rays (images/demo_eval_radMLP_rample_lighting_openrooms_1.png)
-- [ ] room coverage count
 - [ ] o3d: show layout bbox without meshes
 - [ ] unit test scrpt without X
 - [ ] batch mi ray intersection when too many frames
 - [ ] multi-gpu support
-- [ ] vis 3D grid of unit length in o3d visualizer
+- [x] vis 3D grid of unit length in o3d visualizer
 - [ ] vis projection of layout+objects in visualizer_scene_2D()
 - [x] vis 3D layout+objects+**camera poses** in visualizer_openroomsScene_3D_plt()
 - [ ] **Interactive mode**: map keys to load/offload modalities on-the-go without having to change the flags and restart the viewer

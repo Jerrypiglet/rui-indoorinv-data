@@ -47,7 +47,7 @@ class evaluator_scene_rad():
 
         ckpt_path = self.INV_NERF_ROOT / 'checkpoints' / ckpt_path
 
-        from train_rad_rui import ModelTrainerRad, add_model_specific_args
+        from train_rad_rui import add_model_specific_args
         from argparse import ArgumentParser
         from configs.scene_options import scene_options
 
@@ -61,7 +61,9 @@ class evaluator_scene_rad():
             'mm1': 'cuda', 
             'qc': '', 
         }[self.host]
+        mi.set_variant(mi_variant_dict[self.host])
 
+        from train_rad_rui import ModelTrainerRad
         self.model = ModelTrainerRad(
             hparams, 
             host=self.host, 
@@ -84,7 +86,6 @@ class evaluator_scene_rad():
         self.rad_scale = rad_scale
         self.os = self.model.scene_object[split]
 
-        mi.set_variant(mi_variant_dict[self.host])
 
     def or2nerf_th(self, x):
         """x:Bxe"""
@@ -207,7 +208,7 @@ class evaluator_scene_rad():
         if sample_type == 'rad':
             shape_rays_dict = {}
 
-        print('Evlauating NeRF: sample_shapes...')
+        print(white_blue('Evlauating rad-MLP for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
 
         for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
             assert np.amin(faces) == 1

@@ -26,6 +26,7 @@ from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_eval_rad import evaluator_scene_rad
 from lib.class_eval_inv import evaluator_scene_inv
+from lib.class_eval_scene import evaluator_scene_scene
 from lib.class_renderer_mi_mitsubaScene_3D import renderer_mi_mitsubaScene_3D
 from lib.class_renderer_blender_mitsubaScene_3D import renderer_blender_mitsubaScene_3D
 from lib.utils_misc import str2bool
@@ -57,6 +58,8 @@ parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=Tr
 parser.add_argument('--if_add_color_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if colorize mesh vertices with values from evaluator')
 # evaluator for inv-MLP
 parser.add_argument('--eval_inv', type=str2bool, nargs='?', const=True, default=False, help='eval trained inv-MLP')
+# evaluator over scene shapes
+parser.add_argument('--eval_scene', type=str2bool, nargs='?', const=True, default=False, help='eval over scene (e.g. shapes for coverage)')
 
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
@@ -74,9 +77,9 @@ scene_name = 'kitchen'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 189, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
-split = 'train'; frame_ids = [0]
-# split = 'train'; frame_ids = list(range(0, 189, 1))
-# split = 'val'; frame_ids = list(range(10))
+# split = 'train'; frame_ids = [0]
+# split = 'train'; frame_ids = list(range(189))
+split = 'val'; frame_ids = list(range(1))
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -305,6 +308,30 @@ if opt.eval_inv:
             eval_return_dict[k] = _[k]
 
 '''
+Evaluator for scene
+'''
+if opt.eval_scene:
+    evaluator_scene = evaluator_scene_scene(
+        host=host, 
+        scene_object=mitsuba_scene, 
+    )
+
+    '''
+    sample visivility to camera centers on vertices
+    '''
+    _ = evaluator_scene.sample_shapes(
+        sample_type='vis_count', # ['']
+        # sample_type='t', # ['']
+        shape_params={
+        }
+    )
+    for k, v in _.items():
+        if k in eval_return_dict:
+            eval_return_dict[k].update(_[k])
+        else:
+            eval_return_dict[k] = _[k]
+
+'''
 Matploblib 2D viewer
 '''
 if opt.vis_2d_plt:
@@ -402,7 +429,7 @@ if opt.vis_3d_o3d:
         
     if opt.if_add_color_from_eval:
         if 'samples_v_dict' in eval_return_dict:
-            assert opt.eval_rad or opt.eval_inv
+            assert opt.eval_rad or opt.eval_inv or opt.eval_scene
             visualizer_3D_o3d.extra_input_dict['samples_v_dict'] = eval_return_dict['samples_v_dict']
         
         # vertex normals
@@ -417,6 +444,29 @@ if opt.vis_3d_o3d:
         #                 'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 1., 0.]]*lpts.shape[0]), # green
         #             }),
         #         ]) 
+
+    # for frame_idx, (rays_o, rays_d, _) in enumerate(mitsuba_scene.cam_rays_list):
+    #     normal_up = np.cross(rays_d[0][0], rays_d[0][-1])
+    #     normal_down = np.cross(rays_d[-1][-1], rays_d[-1][0])
+    #     normal_left = np.cross(rays_d[-1][0], rays_d[0][0])
+    #     normal_right = np.cross(rays_d[0][-1], rays_d[-1][-1])
+    #     normals = np.stack((normal_up, normal_down, normal_left, normal_right), axis=0)
+    #     cam_o = rays_o[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
+    #     visualizer_3D_o3d.add_extra_geometry([
+    #         ('rays', {
+    #             'ray_o': cam_o[0:1], 'ray_e': cam_o[0:1] + normals[0:1], 'ray_c': np.array([[0., 0., 0.]]*1), # black
+    #         }),
+    #         ('rays', {
+    #             'ray_o': cam_o[1:2], 'ray_e': cam_o[1:2] + normals[1:2], 'ray_c': np.array([[1., 0., 0.]]*1), # r
+    #         }),
+    #         ('rays', {
+    #             'ray_o': cam_o[2:3], 'ray_e': cam_o[2:3] + normals[2:3], 'ray_c': np.array([[0., 1., 0.]]*1), # g
+    #         }),
+    #         ('rays', {
+    #             'ray_o': cam_o[3:4], 'ray_e': cam_o[3:4] + normals[3:4], 'ray_c': np.array([[0., 0., 1.]]*1), # b
+    #         }),
+    #     ]) 
+
 
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
@@ -437,10 +487,11 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
-            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
+            # 'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            # 'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from mitsuba_scene.sample_pts_list if available
-            'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
+            'mesh_color_type': 'eval-vis_count', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count', 'eval-t']
+            # 'mesh_color_type': 'eval-t', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count]
         },
         emitter_params={
             # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
