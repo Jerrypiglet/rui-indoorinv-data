@@ -4,29 +4,29 @@
 <!--See https://github.com/ekalinin/github-markdown-toc#readme-->
 
 <!--ts-->
-* [Description](#description)
-* [Dependencies](#dependencies)
-   * [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
-* [Dataset structure](#dataset-structure)
-* [Notes on coordinate systems](#notes-on-coordinate-systems)
-* [Usage](#usage)
-   * [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
-   * [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
-      * [Matplotlib viewer](#matplotlib-viewer)
-      * [Open3D viewer](#open3d-viewer)
-   * [3D differentiable renderer](#3d-differentiable-renderer)
-      * [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
-      * [Direct-lighting-only renderer](#direct-lighting-only-renderer)
-   * [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
-   * [Evaluator for rad-MLP and inv-MLP](#evaluator-for-rad-mlp-and-inv-mlp)
-      * [rad-MLP](#rad-mlp)
-      * [inv-MLP](#inv-mlp)
-   * [Evaluator for scene/shape properties](#evaluator-for-sceneshape-properties)
-      * [view coverage](#view-coverage)
-* [Todolist](#todolist)
+- [Description](#description)
+- [Dependencies](#dependencies)
+  - [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
+- [Dataset structure](#dataset-structure)
+- [Notes on coordinate systems](#notes-on-coordinate-systems)
+- [Usage](#usage)
+  - [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
+  - [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
+    - [Matplotlib viewer](#matplotlib-viewer)
+    - [Open3D viewer](#open3d-viewer)
+  - [3D differentiable renderer](#3d-differentiable-renderer)
+    - [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
+    - [Direct-lighting-only renderer](#direct-lighting-only-renderer)
+  - [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
+  - [Evaluator for rad-MLP and inv-MLP](#evaluator-for-rad-mlp-and-inv-mlp)
+    - [rad-MLP](#rad-mlp)
+    - [inv-MLP](#inv-mlp)
+  - [Evaluator for scene/shape properties](#evaluator-for-sceneshape-properties)
+    - [view coverage](#view-coverage)
+- [Todolist](#todolist)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
-<!-- Added by: jerrypiglet, at: Sun Jan 15 02:02:01 PST 2023 -->
+<!-- Added by: jerrypiglet, at: Sun Jan 15 16:31:48 PST 2023 -->
 
 <!--te-->
 
@@ -380,11 +380,11 @@ Indoor-kitchen scene:
 ### inv-MLP
 Tested with repo **inv-nerf** (branch rui_emission). ```opt.eval_inv``` for evaluating inv-MLP loaded from ckpt.
 
-[mm1 579b41f] tested inv-mlp for emission mask on both scenes; fixed mesh issues + remesh
-
 ``` bash
 python test_class_openroomsScene3D.py --vis_3d_o3d True --eval_inv True 
 ```
+
+[mm1 579b41f] tested inv-mlp for emission mask on both scenes; fixed mesh issues + remesh
 
 Evaluate shape per-vertex **emission mask**, and colorize mesh faces (emitter (red) and non-emitter (blue)):
 
@@ -406,16 +406,22 @@ Evaluator for view coverage:
 python test_class_mitsubaScene3D.py --vis_3d_o3d True --eval_scene True
 ```
 
+[mm1 9588506] added view count: --eval_scene True
+
 - enable `evaluator_scene.sample_shapes`
   - evaluator_scene.sample_shapes(sample_type='vis_count', ...
 - 'mesh_color_type': 'eval-vis_count', 
 
-![](images/demo_eval_scene_shapes-vis_count-kitchen_0.png)
-![](images/demo_eval_scene_shapes-vis_count-kitchen_1.png)
+Train:
+![](images/demo_eval_scene_shapes-vis_count-train-kitchen_0.png)
+![](images/demo_eval_scene_shapes-vis_count-train-kitchen_1.png)
+Val:
+
+![](images/demo_eval_scene_shapes-vis_count-val-kitchen_0.png)
 
 # Todolist
 - [x] vis envmap in 2D plt
-- [ ] compute visibility and vis for room coverage count
+- [x] compute visibility and vis for room coverage count
 - [x] densely sample pts on shape surface
 - [ ] make faces always 0-based acorss utils_mesh and trimesh
 - [ ] change dump_OR_xml_for_mi() to be FULLY compatible with Mitsuba 3'

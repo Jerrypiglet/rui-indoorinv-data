@@ -779,6 +779,7 @@ class visualizer_scene_3D_o3d(object):
                             assert np.all(samples_v_vis_count <= max_vis_count)
                             samples_v_ = (samples_v_vis_count / float(max_vis_count)).reshape(-1, 1)
                             samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
+                            samples_v_[samples_v_vis_count==0] = np.array([[1., 1., 1.]]) # set not onserved area to white
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
                         elif samples_type == 't':
                             (samples_v_t, max_t) = samples_v
