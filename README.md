@@ -182,6 +182,12 @@ python test_class_mitsubaScene3D.py --vis_2d_plt True --vis_3d_o3d False
 ```
 ![](images/demo_all_2D_mitsuba.png)
 
+MonoSDF scenes (e.g. scannet):
+``` bash
+python test_class_scannetScene3D.py --vis_2d_plt True --vis_3d_o3d False
+```
+![](images/demo_all_2D_scannet.png)
+
 ## 3D dataloader and visualizer
 
 Note that there are two visualizer implemented: based on Matplotlib and Open3D respectively.

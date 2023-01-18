@@ -15,7 +15,7 @@ import mitsuba as mi
 
 from lib.utils_io import load_img
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import green, green_text, blue_text, get_list_of_keys, white_blue, yellow
+from lib.utils_misc import green, white_red, green_text, yellow
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 
 class mitsubaBase():
@@ -35,10 +35,11 @@ class mitsubaBase():
             return x
         return torch.from_numpy(x).to(self.device)
 
-    def get_cam_rays_list(self, H, W, K, pose_list):
+    def get_cam_rays_list(self, H: int, W: int, K_list: list, pose_list: list, convention: str='opencv'):
+        assert convention in ['opengl', 'opencv']
         cam_rays_list = []
-        for _, pose in enumerate(pose_list):
-            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=True)
+        for _, (pose, K) in enumerate(zip(pose_list, K_list)):
+            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=(convention=='opencv'))
             cam_rays_list.append((rays_o, rays_d, ray_d_center))
         return cam_rays_list
 
@@ -102,8 +103,9 @@ class mitsubaBase():
 
             mi_pts = ret.p.numpy()
             # mi_pts = ret.t.numpy()[:, np.newaxis] * rays_d_flatten + rays_o_flatten # should be the same as above
-            assert sum(ret.t.numpy()!=np.inf) > 1, 'no rays hit any surface!'
-            assert np.amax(np.abs((mi_pts - ret.p.numpy())[ret.t.numpy()!=np.inf, :])) < 1e-3 # except in window areas
+            if np.all(ret.t.numpy()==np.inf):
+                print(white_red('no rays hit any surface!'))
+            # assert np.amax(np.abs((mi_pts - ret.p.numpy())[ret.t.numpy()!=np.inf, :])) < 1e-3 # except in window areas
             mi_pts = mi_pts.reshape(self.H, self.W, 3)
             mi_pts[invalid_depth_mask, :] = np.inf
 
@@ -137,12 +139,13 @@ class mitsubaBase():
             mi_seg_area_file_path = mi_seg_area_file_folder / ('mi_seg_emitter_%d.png'%(self.frame_id_list[frame_idx]))
             if_get_from_scratch = True
             if mi_seg_area_file_path.exists():
-                mi_seg_area = load_img(mi_seg_area_file_path, (self.im_H_load, self.im_W_load), ext='png', target_HW=self.im_target_HW, if_attempt_load=True)
+                mi_seg_area = load_img(mi_seg_area_file_path, (self.H, self.W), ext='png', target_HW=self.im_target_HW, if_attempt_load=True)
                 if mi_seg_area is None:
                     mi_seg_area_file_path.unlink()
                 else:
+                    print(yellow('loading mi_seg_emitter from %s'%str(mi_seg_area_file_folder)))
                     if_get_from_scratch = False
-                    mi_seg_area = mi_seg_area / 255.
+                    mi_seg_area = (mi_seg_area / 255.).astype(np.bool)
 
             if if_get_from_scratch:
                 mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self.H, self.W)

@@ -84,6 +84,15 @@ class scene2DBase():
     def num_frames(self):
         ...
 
+    @property
+    def _K(self, frame_idx: int):
+        if hasattr(self, 'K'):
+            return self.K
+        elif hasattr(self, 'K_list'):
+            return self.K_list[frame_idx]
+        else:
+            raise ValueError('No intrinsics found for %s'%self.parent_class_name)
+
     def check_and_sort_modalities(self, modalitiy_list):
         modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
         for _ in modalitiy_list_new:

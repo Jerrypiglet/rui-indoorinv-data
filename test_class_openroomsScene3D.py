@@ -113,7 +113,7 @@ frame_ids = list(range(3, 102, 10))
 '''
 - more & better cameras
 '''
-dataset_version = 'public_re_3_v3pose_2048'
+dataset_version = 'public_re_3_v5pose_2048'
 # dataset_version = 'public_re_3_v5pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
@@ -139,7 +139,8 @@ openrooms_scene = openroomsScene3D(
         'poses', 
         'seg', 'im_hdr', 
         # 'albedo', 'roughness', 
-        # 'depth', 'normal', 
+        'depth', 
+        'normal', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
         # 'layout', 
@@ -322,14 +323,14 @@ if opt.vis_2d_plt:
             'im', 
             # 'layout', 
             # 'shapes', 
-            'albedo', 
-            'roughness', 
+            # 'albedo', 
+            # 'roughness', 
             'depth', 
             'normal', 
-            # 'mi_depth', 
-            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            'mi_depth', 
+            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
-            'lighting_envmap', 
+            # 'lighting_envmap', 
             # 'seg_area', 'seg_env', 'seg_obj', 
             # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
@@ -346,7 +347,11 @@ if opt.vis_2d_plt:
         lighting_params={
             'lighting_scale': 0.1, # rescaling the brightness of the envmap
             }, 
-            )
+        other_params={
+            'mi_normal_vis_coords': 'opengl', 
+            'mi_depth_if_sync_scale': True, 
+            }, 
+    )
 
 '''
 Matploblib 3D viewer

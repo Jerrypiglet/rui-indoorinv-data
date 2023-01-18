@@ -222,7 +222,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
     def load_cam_rays(self, cam_params_dict={}):
         self.near = cam_params_dict.get('near', 0.1)
         self.far = cam_params_dict.get('far', 7.)
-        self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, self.K, self.pose_list)
+        self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
 
     def load_shapes(self, shape_params_dict={}):
         '''

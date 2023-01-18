@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_mitsubaScene3D import mitsubaScene3D
+from lib.class_scannetScene3D import scannetScene3D
 
 from lib.utils_vis import vis_index_map, colorize
 from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
@@ -23,7 +24,7 @@ class visualizer_scene_2D(object):
         frame_idx_list, # 0-based indexing, [0, ..., os.frame_num-1]
     ):
 
-        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D or mitsubaScene3D!'
+        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D, scannetScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D or mitsubaScene3D!'
 
         self.os = openrooms_scene
 
@@ -140,6 +141,9 @@ class visualizer_scene_2D(object):
                         modality_title_appendix = '(red for invalid areas (e.g. emitters)'
                     if modality in ['mi_depth', 'mi_normal', 'mi_seg']:
                         modality_title_appendix = '(from Mitsuba)'
+                        if modality == 'mi_normal':
+                            mi_normal_vis_coords = kwargs['other_params'].get('mi_normal_vis_coords', 'opengl')
+                            modality_title_appendix += '(%s)'%mi_normal_vis_coords
 
             subfig.suptitle(source+'-'+modality+' '+modality_title_appendix)
 
@@ -153,6 +157,9 @@ class visualizer_scene_2D(object):
         source: str='GT', 
         lighting_params={
             'lighting_scale': 0.1, 
+            }, 
+        other_params={
+            'mi_normal_vis_coords': 'opencv', # visualize mi normal in which coords (global->opengl (e.g. OpenRooms) or global->opencv (e.g. ScanNet, Mitsuba))
             }, 
         ):
         '''
@@ -170,14 +177,32 @@ class visualizer_scene_2D(object):
             _im = _list[frame_idx]
 
             if modality == 'normal':
-               _im = (_im + 1.) / 2. 
+                _im = (_im + 1.) / 2. 
             if modality == 'mi_normal':
                 assert self.os.pts_from['mi']
                 R = self.os.pose_list[frame_idx][:3, :3]
                 mi_normal_global = _im
-                mi_normal_cam = (R.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.H, self.os.W, 3)
-                # transform mi_normal from OpenCV (right-down-forward) to OpenGL convention (right-up-backward)
-                mi_normal_cam = np.stack([mi_normal_cam[:, :, 0], -mi_normal_cam[:, :, 1], -mi_normal_cam[:, :, 2]], axis=-1)
+                mi_normal_vis_coords = other_params.get('mi_normal_vis_coords', 'opengl')
+
+                assert mi_normal_vis_coords in ['opengl', 'opencv', 'mitsuba-json', 'world', 'world-blender'] # 'mitsuba-json': consistent with json pose files in MitsubaScene
+
+                if mi_normal_vis_coords in ['opengl', 'opencv']:
+                    mi_normal_cam = (R.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.H, self.os.W, 3) # images/demo_normal_gt_scannetScene_opencv.png
+                    # transform mi_normal from OpenCV (right-down-forward) to OpenGL convention (right-up-backward)
+                    if mi_normal_vis_coords == 'opengl': # images/demo_normal_gt_openroomsScene_opengl.png
+                        mi_normal_cam = np.stack([mi_normal_cam[:, :, 0], -mi_normal_cam[:, :, 1], -mi_normal_cam[:, :, 2]], axis=-1)
+
+                elif mi_normal_vis_coords in ['mitsuba-json']:
+                    R_mitsuba = (self.os.T_w_b2m.T) @ R @ (self.os.T_c_b2m.T)
+                    assert abs(np.linalg.det(R_mitsuba) - 1) < 1e-4
+                    mi_normal_cam = (R_mitsuba.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.H, self.os.W, 3)
+
+                elif mi_normal_vis_coords in ['world']: # opencv
+                    mi_normal_cam = mi_normal_global
+
+                elif mi_normal_vis_coords in ['world-blender']: # images/demo_normal_gt_mitsubaScene_world-blender.png
+                    mi_normal_cam = (self.os.T_w_b2m.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.H, self.os.W, 3)
+
                 _im = np.clip((mi_normal_cam+1.)/2., 0., 1.)
                 _im[mi_normal_global==np.inf] = 0.
 
@@ -187,12 +212,17 @@ class visualizer_scene_2D(object):
                 continue
             if modality == 'mi_depth':
                 assert self.os.pts_from['mi']
-                if self.os.if_has_depth_normal:
+                if self.os.if_has_depth_normal and other_params.get('mi_depth_if_sync_scale', True):
                     vmin, vmax = np.amin(self.os.depth_list[frame_idx]), np.amax(self.os.depth_list[frame_idx])
                 else:
                     vmin, vmax = np.amin(self.os.mi_depth_list[frame_idx]), np.amax(self.os.mi_depth_list[frame_idx])
                 _im[_im==np.inf] = 0.
                 plot = ax.imshow(_im, vmin=0., vmax=vmax, cmap='jet')
+                plt.colorbar(plot, ax=ax)
+                continue
+                
+            if modality.startswith('mi_seg_'):
+                plot = ax.imshow(_im, vmin=0., vmax=1., cmap='jet')
                 plt.colorbar(plot, ax=ax)
                 continue
 

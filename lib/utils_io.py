@@ -32,7 +32,7 @@ def load_matrix(path: Path, if_inverse_y: bool=False) -> np.ndarray:
             assert False, 'wrong input matrix dimension when if_inverse_y=True!'
     return m
 
-def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tuple[int, int]=(), resize_method: str='area', if_attempt_load: bool=False) -> np.ndarray:
+def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tuple[int, int]=(), resize_method: str='area', npy_if_channel_first: bool=False, if_attempt_load: bool=False) -> np.ndarray:
     '''
     Load an image from a file, trying to maintain its datatype (gray, 16bit, rgb)
     set target_HW to some shape to resize after loading
@@ -50,6 +50,8 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         im = cv2.imread(str(path), -1)
     elif ext in ['npy']:
         im = np.load(str(path))
+        if npy_if_channel_first:
+            im = im.transpose(1, 2, 0)
 
     # cv2.imread returns None when it cannot read the file
     if im is None:

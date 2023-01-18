@@ -108,7 +108,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         self.near = cam_params_dict.get('near', 0.1)
         self.far = cam_params_dict.get('far', 10.)
-        self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
 
         self.host = host
         self.device = get_device(self.host)
@@ -387,11 +386,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 for idx in self.frame_id_list:
                     pose = np.array(self.meta['frames'][idx]['transform_matrix'])[:3, :4].astype(np.float32)
                     R_, t_ = np.split(pose, (3,), axis=1)
-                    R_ = R_ / np.linalg.norm(R_, axis=1, keepdims=True)
+                    R_ = R_ / np.linalg.norm(R_, axis=1, keepdims=True) # somehow R_ was mistakenly scaled by self.scale_m2b; need to recover to det(R)=1
                     self.R_c2w_b_list.append(R_)
                     self.t_c2w_b_list.append(t_)
 
+            self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
             self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
+
             for R_c2w_b, t_c2w_b in zip(self.R_c2w_b_list, self.t_c2w_b_list):
                 assert abs(1.-np.linalg.det(R_c2w_b))<1e-6
                 t_c2w_b = (t_c2w_b - self.trans_m2b) / self.scale_m2b
@@ -414,7 +415,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         print(blue_text('[mistubaScene] DONE. load_poses'))
 
     def get_cam_rays(self, cam_params_dict={}):
-        self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, self.K, self.pose_list)
+        self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
 
     def get_room_center_pose(self):
         '''
