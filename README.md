@@ -285,6 +285,15 @@ Or with visibility to emitter_0 (`--pcd_color_mode mi_visibility_emitter0 --if_s
 
 ![](images/demo_pcd_color_mi_visibility_emitter0.png)
 
+**ScanNet scenes from MonoSDF data:** (GT mesh & EST mesh)
+
+``` bash
+python test_class_scannetScene3D.py --vis_2d_plt False --vis_3d_o3d True
+```
+
+![](images/demo_scannetScene-GTMesh_o3d.png)
+![](images/demo_scannetScene-ESTMesh_o3d.png)
+
 ## 3D differentiable renderer
 
 Supported 3D differentiable renderers (using GT labels):

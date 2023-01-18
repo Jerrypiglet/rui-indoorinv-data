@@ -332,7 +332,10 @@ class scannetScene3D(mitsubaBase, scene2DBase):
             self.origin_lookatvector_up_list = []
 
             for scale_mat, world_mat in zip(scale_mats, world_mats):
-                P = world_mat @ scale_mat
+                if self._shapeshape_if_normalized:
+                    P = world_mat @ scale_mat
+                else:
+                    P = world_mat
                 P = P[:3, :4]
                 intrinsics, pose = rend_util.load_K_Rt_from_P(None, P)
                 assert pose.shape in ((4, 4), (3, 4))
