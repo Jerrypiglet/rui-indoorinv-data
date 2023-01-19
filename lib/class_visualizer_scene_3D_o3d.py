@@ -23,7 +23,7 @@ import mitsuba as mi
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_mitsubaScene3D import mitsubaScene3D
-from lib.class_scannetScene3D import scannetScene3D
+from lib.class_monosdfScene3D import monosdfScene3D
 
 from lib.utils_misc import get_list_of_keys, gen_random_str, yellow, white_red
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
@@ -51,7 +51,7 @@ class visualizer_scene_3D_o3d(object):
         if_debug_info: bool=False, 
     ):
 
-        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D, scannetScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D, mitsubaScene3D!'
+        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D, mitsubaScene3D!'
 
         self.os = openrooms_scene
         self.if_debug_info = if_debug_info

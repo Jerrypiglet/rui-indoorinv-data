@@ -184,7 +184,7 @@ python test_class_mitsubaScene3D.py --vis_2d_plt True --vis_3d_o3d False
 
 MonoSDF scenes (e.g. scannet):
 ``` bash
-python test_class_scannetScene3D.py --vis_2d_plt True --vis_3d_o3d False
+python test_class_monosdfScene3D.py --vis_2d_plt True --vis_3d_o3d False
 ```
 ![](images/demo_all_2D_scannet.png)
 
@@ -288,7 +288,7 @@ Or with visibility to emitter_0 (`--pcd_color_mode mi_visibility_emitter0 --if_s
 **ScanNet scenes from MonoSDF data:** (GT mesh & EST mesh)
 
 ``` bash
-python test_class_scannetScene3D.py --vis_2d_plt False --vis_3d_o3d True
+python test_class_monosdfScene3D.py --vis_2d_plt False --vis_3d_o3d True
 ```
 
 ![](images/demo_scannetScene-GTMesh_o3d.png)

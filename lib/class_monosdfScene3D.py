@@ -38,7 +38,7 @@ from .class_scene2DBase import scene2DBase
 
 from lib.utils_MonoSDF import rend_util
 
-class scannetScene3D(mitsubaBase, scene2DBase):
+class monosdfScene3D(mitsubaBase, scene2DBase):
     '''
     A class used to visualize/render scenes from MonoSDF preprocessed dataset format (e.g. scannet)
     '''
@@ -332,6 +332,19 @@ class scannetScene3D(mitsubaBase, scene2DBase):
             self.origin_lookatvector_up_list = []
 
             for scale_mat, world_mat in zip(scale_mats, world_mats):
+                '''
+                ipdb> scale_mat
+                array([[3.0752, 0.    , 0.    , 4.2513],
+                    [0.    , 3.0752, 0.    , 2.3006],
+                    [0.    , 0.    , 3.0752, 1.1594],
+                    [0.    , 0.    , 0.    , 1.    ]], dtype=float32)
+                    
+                ipdb> world_mat
+                array([[-370.474 , -480.1891, -106.3876, 3152.1213],
+                    [ -62.6545,  105.3606, -603.4276,  888.8303],
+                    [   0.5237,   -0.6943,   -0.4936,   -0.127 ],
+                    [   0.    ,    0.    ,    0.    ,    1.    ]], dtype=float32)
+                '''
                 if self._shapeshape_if_normalized:
                     P = world_mat @ scale_mat
                 else:
@@ -340,6 +353,7 @@ class scannetScene3D(mitsubaBase, scene2DBase):
                 intrinsics, pose = rend_util.load_K_Rt_from_P(None, P)
                 assert pose.shape in ((4, 4), (3, 4))
                 assert intrinsics.shape in ((4, 4), (3, 4), (3, 3))
+                import ipdb; ipdb.set_trace()
 
                 # because we do resize and center crop 384x384 when using omnidata model, we need to adjust the camera intrinsic accordingly
                 if center_crop_type == 'center_crop_for_replica':

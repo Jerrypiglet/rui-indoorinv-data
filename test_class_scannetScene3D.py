@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
 
-from lib.class_scannetScene3D import scannetScene3D
+from lib.class_monosdfScene3D import monosdfScene3D
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_eval_rad import evaluator_scene_rad
@@ -80,7 +80,7 @@ frame_ids = list(range(0, 465, 40))
 # shape_file = ('not-normalized', 'GTmesh/scene0050_00_vh_clean_2.ply')
 shape_file = ('normalized', 'ESTmesh/scan1.ply')
 
-mitsuba_scene = scannetScene3D(
+mitsuba_scene = monosdfScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root}, 

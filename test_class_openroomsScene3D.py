@@ -113,7 +113,7 @@ frame_ids = list(range(3, 102, 10))
 '''
 - more & better cameras
 '''
-dataset_version = 'public_re_3_v5pose_2048'
+dataset_version = 'public_re_3_v3pose_2048'
 # dataset_version = 'public_re_3_v5pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'

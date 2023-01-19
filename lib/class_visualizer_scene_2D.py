@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_mitsubaScene3D import mitsubaScene3D
-from lib.class_scannetScene3D import scannetScene3D
+from lib.class_monosdfScene3D import monosdfScene3D
 
 from lib.utils_vis import vis_index_map, colorize
 from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
@@ -24,7 +24,7 @@ class visualizer_scene_2D(object):
         frame_idx_list, # 0-based indexing, [0, ..., os.frame_num-1]
     ):
 
-        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D, scannetScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D or mitsubaScene3D!'
+        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D or mitsubaScene3D!'
 
         self.os = openrooms_scene
 

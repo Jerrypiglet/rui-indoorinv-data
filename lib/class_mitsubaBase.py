@@ -60,7 +60,7 @@ class mitsubaBase():
 
         self.mi_depth_list = []
         self.mi_invalid_depth_mask_list = []
-        self.mi_normal_list = [] # in local OpenGL coords
+        self.mi_normal_opengl_list = [] # in local OpenGL coords
         self.mi_normal_global_list = []
         self.mi_pts_list = []
 
@@ -99,7 +99,7 @@ class mitsubaBase():
             mi_normal_cam_opencv = mi_normal_global @ self.pose_list[frame_idx][:3, :3]
             mi_normal_cam_opengl = np.stack([mi_normal_cam_opencv[:, :, 0], -mi_normal_cam_opencv[:, :, 1], -mi_normal_cam_opencv[:, :, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
             mi_normal_cam_opengl[invalid_depth_mask, :] = np.inf
-            self.mi_normal_list.append(mi_normal_cam_opengl)
+            self.mi_normal_opengl_list.append(mi_normal_cam_opengl)
 
             mi_pts = ret.p.numpy()
             # mi_pts = ret.t.numpy()[:, np.newaxis] * rays_d_flatten + rays_o_flatten # should be the same as above
@@ -238,7 +238,7 @@ class mitsubaBase():
             rgb_global_list.append(rgb_global)
             
             if if_use_mi_geometry:
-                normal = self.mi_normal_list[frame_idx]
+                normal = self.mi_normal_opengl_list[frame_idx]
             else:
                 normal = self.normal_list[frame_idx]
             if subsample_HW_rates != ():
@@ -275,7 +275,7 @@ class mitsubaBase():
 
         if if_use_mi_geometry:
             assert self.if_has_mitsuba_all
-            normal_list = self.mi_normal_list
+            normal_list = self.mi_normal_opengl_list
         else:
             assert self.if_has_depth_normal
             normal_list = self.normal_list
