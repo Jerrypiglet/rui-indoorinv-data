@@ -26,16 +26,13 @@ from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
 from lib.utils_io import load_matrix, resize_intrinsics
 
 # from .class_openroomsScene2D import openroomsScene2D
-from .class_mitsubaBase import mitsubaBase
-from .class_scene2DBase import scene2DBase
+from lib.class_mitsubaBase import mitsubaBase
+from lib.class_scene2DBase import scene2DBase
 
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, sample_mesh, simplify_mesh
 from lib.utils_OR.utils_OR_xml import get_XML_root
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, get_rectangle_mesh
 from lib.utils_misc import get_device
-
-from .class_scene2DBase import scene2DBase
-
 from lib.utils_MonoSDF import rend_util
 
 class monosdfScene3D(mitsubaBase, scene2DBase):
@@ -88,9 +85,9 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         self.pose_file = self.scene_path / pose_file
         
         self.shape_file = self.rendering_root / shape_file
-        assert self.shape_file.exists()
-        assert _shape_normalized in ['normalized', 'not-normalized']
-        self._shapeshape_if_normalized = _shape_normalized=='normalized'
+        assert self.shape_file.exists(), 'Shape file not exist: %s'%str(self.shape_file)
+        assert _shape_normalized in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%_shape_normalized
+        self.shape_if_normalized = _shape_normalized=='normalized'
 
         # self.im_params_dict = im_params_dict
         # self.lighting_params_dict = lighting_params_dict
@@ -345,7 +342,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
                     [   0.5237,   -0.6943,   -0.4936,   -0.127 ],
                     [   0.    ,    0.    ,    0.    ,    1.    ]], dtype=float32)
                 '''
-                if self._shapeshape_if_normalized:
+                if self.shape_if_normalized:
                     P = world_mat @ scale_mat
                 else:
                     P = world_mat
@@ -353,7 +350,6 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
                 intrinsics, pose = rend_util.load_K_Rt_from_P(None, P)
                 assert pose.shape in ((4, 4), (3, 4))
                 assert intrinsics.shape in ((4, 4), (3, 4), (3, 3))
-                import ipdb; ipdb.set_trace()
 
                 # because we do resize and center crop 384x384 when using omnidata model, we need to adjust the camera intrinsic accordingly
                 if center_crop_type == 'center_crop_for_replica':
@@ -453,18 +449,6 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         '''
         if self.if_loaded_shapes: return
         
-        if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
-        sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
-        sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
-        sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
-
-        if_simplify_mesh = shape_params_dict.get('if_simplify_mesh', False)
-        simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
-        simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
-        simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
-        if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
-        remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
-
         print(white_blue('[%s] load_shapes for scene...')%self.parent_class_name)
         
         self.shape_list_valid = []
@@ -474,49 +458,21 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         self.bverts_list = []
         self.bfaces_list = []
 
-        if if_sample_mesh:
-            self.sample_pts_list = []
-
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
-
-        shape_tri_mesh = trimesh.load_mesh(str(self.shape_file))
-        vertices, faces = shape_tri_mesh.vertices, shape_tri_mesh.faces+1 # faces is 1-based; [TODO] change to 0-based in all methods
-        _id = 'scene_obj'
-
-        # --sample mesh--
-        if if_sample_mesh:
-            sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
-            self.sample_pts_list.append(sample_pts)
-            # print(sample_pts.shape[0])
-
-        # --simplify mesh--
-        if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
-            vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh=if_remesh, remesh_max_edge=remesh_max_edge, _id=_id)
-            if N_triangles != faces.shape[0]:
-                print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
-
-        bverts, bfaces = computeBox(vertices)
-        self.vertices_list.append(vertices)
-        self.faces_list.append(faces)
-        self.bverts_list.append(bverts)
-        self.bfaces_list.append(bfaces)
-        self.ids_list.append(_id)
         
-        shape_dict = {
-            'filename': str(self.shape_file), 
-            'id': _id, 
-            'random_id': 'XXXXXX', 
-            'if_in_emitter_dict': False, 
-            # [IMPORTANT] currently relying on definition of walls and ceiling in XML file to identify those, becuase sometimes they can be complex meshes instead of thin rectangles
-            'is_wall': False, 
-            'is_ceiling': False, 
-            'is_layout': False, 
-        }
-        self.shape_list_valid.append(shape_dict)
+        monosdf_shape_dict = load_monosdf_shape(self.shape_file, shape_params_dict)
 
-        self.xyz_max = np.maximum(np.amax(vertices, axis=0), self.xyz_max)
-        self.xyz_min = np.minimum(np.amin(vertices, axis=0), self.xyz_min)
+        self.vertices_list.append(monosdf_shape_dict['vertices'])
+        self.faces_list.append(monosdf_shape_dict['faces'])
+        self.bverts_list.append(monosdf_shape_dict['bverts'])
+        self.bfaces_list.append(monosdf_shape_dict['bfaces'])
+        self.ids_list.append(monosdf_shape_dict['_id'])
+        
+        self.shape_list_valid.append(monosdf_shape_dict['shape_dict'])
+
+        self.xyz_max = np.maximum(np.amax(monosdf_shape_dict['vertices'], axis=0), self.xyz_max)
+        self.xyz_min = np.minimum(np.amin(monosdf_shape_dict['vertices'], axis=0), self.xyz_min)
 
         self.if_loaded_shapes = True
         
@@ -532,3 +488,72 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         self.if_loaded_colors = False
         return
 
+def load_monosdf_shape(shape_file: Path, shape_params_dict={}, scale_offset: tuple=()):
+    if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
+    sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
+    sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
+    sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
+
+    if_simplify_mesh = shape_params_dict.get('if_simplify_mesh', False)
+    simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
+    simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
+    simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
+    if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
+    remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
+
+    if if_sample_mesh:
+        sample_pts_list = []
+
+    shape_tri_mesh = trimesh.load_mesh(str(shape_file))
+    vertices, faces = shape_tri_mesh.vertices, shape_tri_mesh.faces+1 # faces is 1-based; [TODO] change to 0-based in all methods
+    if scale_offset != ():
+        (scale, offset) = scale_offset
+        vertices = vertices / scale
+        vertices = vertices - offset
+
+    _id = Path(shape_file).stem
+
+    # --sample mesh--
+    if if_sample_mesh:
+        sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
+        sample_pts_list.append(sample_pts)
+        # print(sample_pts.shape[0])
+
+    # --simplify mesh--
+    if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
+        vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh=if_remesh, remesh_max_edge=remesh_max_edge, _id=_id)
+        if N_triangles != faces.shape[0]:
+            print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
+
+    bverts, bfaces = computeBox(vertices)
+    shape_dict = {
+        'filename': str(shape_file), 
+        'id': _id, 
+        'random_id': 'XXXXXX', 
+        'if_in_emitter_dict': False, 
+        # [IMPORTANT] currently relying on definition of walls and ceiling in XML file to identify those, becuase sometimes they can be complex meshes instead of thin rectangles
+        'is_wall': False, 
+        'is_ceiling': False, 
+        'is_layout': False, 
+    }
+
+    return {
+        'vertices': vertices, 
+        'faces': faces, 
+        'bverts': bverts, 
+        'bfaces': bfaces, 
+        'shape_dict': shape_dict, 
+        '_id': _id, 
+    }
+
+def load_monosdf_scale_offset(monosdf_pose_file: Path):
+    '''
+    v_normalized = scale * (v_ori + offset)
+    '''
+    camera_dict = np.load(str(monosdf_pose_file))
+    scale_mat = camera_dict['scale_mat_%d' % 0].astype(np.float32)
+    scale_mat = np.linalg.inv(scale_mat)
+    scale = scale_mat[0][0]
+    scale_mat[:3] = scale_mat[:3] / scale
+    offset = scale_mat[:3, 3:4].reshape(1, 3) # (1, 3)
+    return (scale, offset)

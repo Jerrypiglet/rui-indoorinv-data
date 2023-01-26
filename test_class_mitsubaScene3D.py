@@ -80,6 +80,14 @@ emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1;
 # split = 'train'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(202))
 split = 'val'; frame_ids = list(range(10))
+# split = 'val'; frame_ids = [0]
+
+monosdf_shape_dict = {
+    '_shape_normalized': 'normalized', 
+    'shape_file': 'ESTmesh/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply', 
+    'camera_file': 'monosdf/kitchen/trainval/cameras.npz', 
+    }, # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
+# monosdf_shape_dict = {}
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -96,6 +104,7 @@ mitsuba_scene = mitsubaScene3D(
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
         'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+        'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
         'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
@@ -118,7 +127,7 @@ mitsuba_scene = mitsubaScene3D(
         'depth', 'normal', 
         # 'lighting_SG', 
         # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
     modality_filename_dict = {
         # 'poses', 
@@ -222,7 +231,6 @@ if opt.render_2d:
         )
     host=host, 
     renderer.render()
-
 
 eval_return_dict = {}
 '''

@@ -207,17 +207,17 @@ class visualizer_scene_2D(object):
                 _im[mi_normal_global==np.inf] = 0.
 
             if modality == 'depth':
-                plot = ax.imshow(_im, vmin=0., cmap='jet')
+                plot = ax.imshow(_im, cmap='jet')
                 plt.colorbar(plot, ax=ax)
                 continue
             if modality == 'mi_depth':
                 assert self.os.pts_from['mi']
+                _im[_im==np.inf] = np.mean(_im[_im!=np.inf])
                 if self.os.if_has_depth_normal and other_params.get('mi_depth_if_sync_scale', True):
                     vmin, vmax = np.amin(self.os.depth_list[frame_idx]), np.amax(self.os.depth_list[frame_idx])
                 else:
-                    vmin, vmax = np.amin(self.os.mi_depth_list[frame_idx]), np.amax(self.os.mi_depth_list[frame_idx])
-                _im[_im==np.inf] = 0.
-                plot = ax.imshow(_im, vmin=0., vmax=vmax, cmap='jet')
+                    vmin, vmax = np.amin(_im), np.amax(_im)
+                plot = ax.imshow(_im, vmin=vmin, vmax=vmax, cmap='jet')
                 plt.colorbar(plot, ax=ax)
                 continue
                 

@@ -28,6 +28,7 @@ from lib.utils_io import load_matrix, resize_intrinsics
 # from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
 from .class_scene2DBase import scene2DBase
+from .class_monosdfScene3D import load_monosdf_scale_offset, load_monosdf_shape
 
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, sample_mesh, simplify_mesh
 from lib.utils_OR.utils_OR_xml import get_XML_root
@@ -86,7 +87,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.scene_path = self.rendering_root / self.scene_name
         self.scene_rendering_path = self.rendering_root / self.scene_name / self.split
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
+
         self.xml_file = self.xml_scene_root / self.scene_name / self.xml_filename
+        self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})[0]
 
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['OpenRooms', 'Blender', 'json'], 'Unsupported pose file: '+pose_file
@@ -136,7 +139,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.load_poses(self.cam_params_dict)
 
         self.load_modalities()
-        # self.est = {}
 
         self.get_cam_rays(self.cam_params_dict)
         self.process_mi_scene(self.mi_params_dict)
@@ -246,13 +248,26 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         else:
             mi.set_variant(mi_variant_dict[self.host])
 
-        self.mi_scene = mi.load_file(str(self.xml_file))
-        if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
-        if if_also_dump_xml_with_lit_area_lights_only:
-            from lib.utils_mitsuba import dump_Indoor_area_lights_only_xml_for_mi
-            xml_file_lit_up_area_lights_only = dump_Indoor_area_lights_only_xml_for_mi(str(self.xml_file))
-            print(blue_text('XML (lit_up_area_lights_only) for Mitsuba dumped to: %s')%str(xml_file_lit_up_area_lights_only))
-            self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
+        if self.monosdf_shape_dict == {}:
+            self.mi_scene = mi.load_file(str(self.xml_file))
+            if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
+            if if_also_dump_xml_with_lit_area_lights_only:
+                from lib.utils_mitsuba import dump_Indoor_area_lights_only_xml_for_mi
+                xml_file_lit_up_area_lights_only = dump_Indoor_area_lights_only_xml_for_mi(str(self.xml_file))
+                print(blue_text('XML (lit_up_area_lights_only) for Mitsuba dumped to: %s')%str(xml_file_lit_up_area_lights_only))
+                self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
+        else:
+            shape_file = self.scene_path / Path(self.monosdf_shape_dict['shape_file'])
+            (scale, offset) = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
+            self.mi_scene = mi.load_dict({
+                'type': 'scene',
+                'shape_id':{
+                    'type': shape_file.suffix[1:],
+                    'filename': str(shape_file), 
+                    # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
+                    'to_world': mi.ScalarTransform4f.translate((-offset).flatten().tolist()).scale([1./scale]*3), 
+                }
+            })
 
     def process_mi_scene(self, mi_params_dict={}):
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
@@ -412,7 +427,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.pose_list = pose_list
         self.origin_lookatvector_up_list = origin_lookatvector_up_list
 
-        print(blue_text('[mistubaScene] DONE. load_poses'))
+        print(blue_text('[mistubaScene] DONE. load_poses (%d poses)'%len(self.pose_list)))
 
     def get_cam_rays(self, cam_params_dict={}):
         self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
@@ -544,22 +559,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if self.if_loaded_shapes: return
         
-        if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
-        sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
-        sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
-        sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
-
-        if_simplify_mesh = shape_params_dict.get('if_simplify_mesh', False)
-        simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
-        simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
-        simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
-        if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
-        remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
-
-        print(white_blue('[mitsubaScene3D] load_shapes for scene...'))
-        root = get_XML_root(self.xml_file)
-        shapes = root.findall('shape')
-        
         self.shape_list_valid = []
         self.vertices_list = []
         self.faces_list = []
@@ -567,89 +566,123 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.bverts_list = []
         self.bfaces_list = []
 
-        if if_sample_mesh:
-            self.sample_pts_list = []
-
         self.window_list = []
         self.lamp_list = []
 
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
-
-        for shape in tqdm(shapes):
-            random_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-            if_emitter = False; if_window = False; if_area_light = False
-            if shape.get('type') != 'obj':
-                assert shape.get('type') == 'rectangle'
-                '''
-                window as rectangle meshes: 
-                    images/demo_mitsubaScene_rectangle_windows_1.png
-                    images/demo_mitsubaScene_rectangle_windows_2.png
-                '''
-                transform_m = np.array(shape.findall('transform')[0].findall('matrix')[0].get('value').split(' ')).reshape(4, 4).astype(np.float32) # [[R,t], [0,0,0,1]]
-                (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4])
-                _id = 'rectangle_'+random_id
-                emitters = shape.findall('emitter')
-                if len(emitters) > 0:
-                    assert len(emitters) == 1
-                    emitter = emitters[0]
-                    assert emitter.get('type') == 'area'
-                    rgb = emitter.findall('rgb')[0]
-                    assert rgb.get('name') == 'radiance'
-                    radiance = np.array(rgb.get('value').split(', ')).astype(np.float32).reshape(3,)
-                    if_emitter = True; if_area_light = True
-                    _id = 'emitter-' + _id
-                    emitter_prop = {'intensity': radiance, 'obj_type': 'obj', 'if_lit_up': np.amax(radiance) > 1e-3}
-            else:
-                if not len(shape.findall('string')) > 0: continue
-                _id = shape.findall('ref')[0].get('id')+'_'+random_id
-                # if 'walls' in _id.lower() or 'ceiling' in _id.lower():
-                #     continue
-                filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
-                obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
-                # if if_load_obj_mesh:
-                vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py; faces is 1-based!
-
-                assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
-
-                
-            # --sample mesh--
-            if if_sample_mesh:
-                sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
-                self.sample_pts_list.append(sample_pts)
-                # print(sample_pts.shape[0])
-
-            # --simplify mesh--
-            if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
-                vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh=if_remesh, remesh_max_edge=remesh_max_edge, _id=_id)
-                if N_triangles != faces.shape[0]:
-                    print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
-
-            bverts, bfaces = computeBox(vertices)
-            self.vertices_list.append(vertices)
-            self.faces_list.append(faces)
-            self.bverts_list.append(bverts)
-            self.bfaces_list.append(bfaces)
-            self.ids_list.append(_id)
+        
+        if self.monosdf_shape_dict != {}:
+            '''
+            load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
+            '''
+            (scale, offset) = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
+            monosdf_shape_dict = load_monosdf_shape(self.scene_path / Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, (scale, offset))
+            self.vertices_list.append(monosdf_shape_dict['vertices'])
+            self.faces_list.append(monosdf_shape_dict['faces'])
+            self.bverts_list.append(monosdf_shape_dict['bverts'])
+            self.bfaces_list.append(monosdf_shape_dict['bfaces'])
+            self.ids_list.append(monosdf_shape_dict['_id'])
             
-            shape_dict = {
-                'filename': filename.get('value'), 
-                'if_in_emitter_dict': if_emitter, 
-                'id': _id, 
-                'random_id': random_id, 
-                # [IMPORTANT] currently relying on definition of walls and ceiling in XML file to identify those, becuase sometimes they can be complex meshes instead of thin rectangles
-                'is_wall': 'walls' in _id.lower(), 
-                'is_ceiling': 'ceiling' in _id.lower(), 
-                'is_layout': 'walls' in _id.lower() or 'ceiling' in _id.lower(), 
-            }
-            if if_emitter:
-                shape_dict.update({'emitter_prop': emitter_prop})
-            if if_area_light:
-                self.lamp_list.append((shape_dict, vertices, faces))
-            self.shape_list_valid.append(shape_dict)
+            self.shape_list_valid.append(monosdf_shape_dict['shape_dict'])
 
-            self.xyz_max = np.maximum(np.amax(vertices, axis=0), self.xyz_max)
-            self.xyz_min = np.minimum(np.amin(vertices, axis=0), self.xyz_min)
+            self.xyz_max = np.maximum(np.amax(monosdf_shape_dict['vertices'], axis=0), self.xyz_max)
+            self.xyz_min = np.minimum(np.amin(monosdf_shape_dict['vertices'], axis=0), self.xyz_min)
+        else:
+            if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
+            sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
+            sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
+            sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
+
+            if_simplify_mesh = shape_params_dict.get('if_simplify_mesh', False)
+            simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
+            simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
+            simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
+            if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
+            remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
+
+            if if_sample_mesh:
+                self.sample_pts_list = []
+
+            print(white_blue('[mitsubaScene3D] load_shapes for scene...'))
+
+            root = get_XML_root(self.xml_file)
+            shapes = root.findall('shape')
+            
+            for shape in tqdm(shapes):
+                random_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+                if_emitter = False; if_window = False; if_area_light = False
+                if shape.get('type') != 'obj':
+                    assert shape.get('type') == 'rectangle'
+                    '''
+                    window as rectangle meshes: 
+                        images/demo_mitsubaScene_rectangle_windows_1.png
+                        images/demo_mitsubaScene_rectangle_windows_2.png
+                    '''
+                    transform_m = np.array(shape.findall('transform')[0].findall('matrix')[0].get('value').split(' ')).reshape(4, 4).astype(np.float32) # [[R,t], [0,0,0,1]]
+                    (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4])
+                    _id = 'rectangle_'+random_id
+                    emitters = shape.findall('emitter')
+                    if len(emitters) > 0:
+                        assert len(emitters) == 1
+                        emitter = emitters[0]
+                        assert emitter.get('type') == 'area'
+                        rgb = emitter.findall('rgb')[0]
+                        assert rgb.get('name') == 'radiance'
+                        radiance = np.array(rgb.get('value').split(', ')).astype(np.float32).reshape(3,)
+                        if_emitter = True; if_area_light = True
+                        _id = 'emitter-' + _id
+                        emitter_prop = {'intensity': radiance, 'obj_type': 'obj', 'if_lit_up': np.amax(radiance) > 1e-3}
+                else:
+                    if not len(shape.findall('string')) > 0: continue
+                    _id = shape.findall('ref')[0].get('id')+'_'+random_id
+                    # if 'walls' in _id.lower() or 'ceiling' in _id.lower():
+                    #     continue
+                    filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
+                    obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
+                    # if if_load_obj_mesh:
+                    vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py; faces is 1-based!
+
+                    assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
+
+                    
+                # --sample mesh--
+                if if_sample_mesh:
+                    sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
+                    self.sample_pts_list.append(sample_pts)
+                    # print(sample_pts.shape[0])
+
+                # --simplify mesh--
+                if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
+                    vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh=if_remesh, remesh_max_edge=remesh_max_edge, _id=_id)
+                    if N_triangles != faces.shape[0]:
+                        print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
+
+                bverts, bfaces = computeBox(vertices)
+                self.vertices_list.append(vertices)
+                self.faces_list.append(faces)
+                self.bverts_list.append(bverts)
+                self.bfaces_list.append(bfaces)
+                self.ids_list.append(_id)
+                
+                shape_dict = {
+                    'filename': filename.get('value'), 
+                    'if_in_emitter_dict': if_emitter, 
+                    'id': _id, 
+                    'random_id': random_id, 
+                    # [IMPORTANT] currently relying on definition of walls and ceiling in XML file to identify those, becuase sometimes they can be complex meshes instead of thin rectangles
+                    'is_wall': 'walls' in _id.lower(), 
+                    'is_ceiling': 'ceiling' in _id.lower(), 
+                    'is_layout': 'walls' in _id.lower() or 'ceiling' in _id.lower(), 
+                }
+                if if_emitter:
+                    shape_dict.update({'emitter_prop': emitter_prop})
+                if if_area_light:
+                    self.lamp_list.append((shape_dict, vertices, faces))
+                self.shape_list_valid.append(shape_dict)
+
+                self.xyz_max = np.maximum(np.amax(vertices, axis=0), self.xyz_max)
+                self.xyz_min = np.minimum(np.amin(vertices, axis=0), self.xyz_min)
 
 
         self.if_loaded_shapes = True

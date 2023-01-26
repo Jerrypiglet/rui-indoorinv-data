@@ -15,7 +15,7 @@ import mitsuba as mi
 
 from lib.utils_io import load_img
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import green, white_red, green_text, yellow
+from lib.utils_misc import green, white_red, green_text, yellow, white_blue
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 
 class mitsubaBase():
