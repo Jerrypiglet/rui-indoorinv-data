@@ -61,6 +61,7 @@ class mitsubaBase():
         self.mi_depth_list = []
         self.mi_invalid_depth_mask_list = []
         self.mi_normal_opengl_list = [] # in local OpenGL coords
+        self.mi_normal_opencv_list = []
         self.mi_normal_global_list = []
         self.mi_pts_list = []
 
@@ -97,6 +98,7 @@ class mitsubaBase():
             self.mi_normal_global_list.append(mi_normal_global)
 
             mi_normal_cam_opencv = mi_normal_global @ self.pose_list[frame_idx][:3, :3]
+            self.mi_normal_opencv_list.append(mi_normal_cam_opencv)
             mi_normal_cam_opengl = np.stack([mi_normal_cam_opencv[:, :, 0], -mi_normal_cam_opencv[:, :, 1], -mi_normal_cam_opencv[:, :, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
             mi_normal_cam_opengl[invalid_depth_mask, :] = np.inf
             self.mi_normal_opengl_list.append(mi_normal_cam_opengl)

@@ -258,7 +258,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
         else:
             shape_file = self.scene_path / Path(self.monosdf_shape_dict['shape_file'])
-            (scale, offset) = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
+            (scale, offset), self.monosdf_scale_mat = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
             self.mi_scene = mi.load_dict({
                 'type': 'scene',
                 'shape_id':{
@@ -576,7 +576,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             '''
             load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
             '''
-            (scale, offset) = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
+            (scale, offset), _ = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
             monosdf_shape_dict = load_monosdf_shape(self.scene_path / Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, (scale, offset))
             self.vertices_list.append(monosdf_shape_dict['vertices'])
             self.faces_list.append(monosdf_shape_dict['faces'])

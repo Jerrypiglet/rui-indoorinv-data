@@ -559,4 +559,10 @@ def load_monosdf_scale_offset(monosdf_pose_file: Path):
     # offset = scale_mat[:3, 3:4].reshape(1, 3) # (1, 3)
     scale = camera_dict['scale'].item()
     offset = -camera_dict['center'].reshape(1, 3) # (1, 3)
-    return (scale, offset)
+
+    scale_mat = np.eye(4).astype(np.float32)
+    scale_mat[:3, 3] = -camera_dict['center']
+    scale_mat[:3 ] *= scale 
+    scale_mat = np.linalg.inv(scale_mat)
+
+    return (scale, offset), scale_mat

@@ -3,8 +3,8 @@ work with Mitsuba/Blender scenes
 '''
 import sys
 
-# host = 'mm1'
-host = 'apple'
+host = 'mm1'
+# host = 'apple'
 
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
@@ -88,13 +88,13 @@ emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1;
 # split = 'train'; frame_ids = list(range(0, 4, 1))
 # split = 'train'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(202))
-split = 'val'; frame_ids = list(range(10))
-# split = 'val'; frame_ids = [0]
+# split = 'val'; frame_ids = list(range(10))
+split = 'val'; frame_ids = [0]
 
 monosdf_shape_dict = {
     '_shape_normalized': 'normalized', 
-    'shape_file': 'ESTmesh/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply', 
-    'camera_file': 'monosdf/kitchen/trainval/cameras.npz', 
+    'shape_file': str(Path(MONOSDF_ROOT) / 'exps/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/plots/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply'), 
+    'camera_file': str(Path(MONOSDF_ROOT) / 'data/kitchen/trainval/cameras.npz'), 
     } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
 # monosdf_shape_dict = {}
 
@@ -155,7 +155,8 @@ mitsuba_scene = mitsubaScene3D(
     im_params_dict={
         # 'im_H_resize': 480, 'im_W_resize': 640, 
         'im_H_load': 320, 'im_W_load': 640, 
-        'im_H_resize': 160, 'im_W_resize': 320, 
+        # 'im_H_resize': 160, 'im_W_resize': 320, 
+        'im_H_resize': 320, 'im_W_resize': 640, 
         # 'im_H_resize': 1, 'im_W_resize': 2, 
         # 'im_H_resize': 32, 'im_W_resize': 64, 
         # 'spp': 2048, 
@@ -329,22 +330,23 @@ if opt.eval_monosdf:
         host=host, 
         scene_object=mitsuba_scene, 
         MONOSDF_ROOT = MONOSDF_ROOT, 
-        conf_path='20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/runconf.conf', 
-        ckpt_path='20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest.pth', 
+        conf_path='20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/runconf.conf', 
+        ckpt_path='kitchen_HDR_EST_grids_gamma2_randomPixel_fixedDepthHDR_trainval/2023_01_23_21_23_38/checkpoints/ModelParameters/latest.pth', 
         rad_scale=1., 
     )
 
-    '''
-    sample radiance field on shape vertices
-    '''
-    eval_return_dict.update(
-        evaluator_monosdf.sample_shapes(
-            sample_type='rad', # ['rad']
-            shape_params={
-                'radiance_scale': 1., 
-            }
-        )
-    )
+    # evaluator_monosdf.export_mesh()
+
+    evaluator_monosdf.render_im(frame_id=0, offset_in_scan=202, if_plt=False)
+
+    # eval_return_dict.update(
+    #     evaluator_monosdf.sample_shapes(
+    #         sample_type='rad', # ['rad']
+    #         shape_params={
+    #             'radiance_scale': 1., 
+    #         }
+    #     )
+    # )
 '''
 Evaluator for scene
 '''

@@ -1,7 +1,7 @@
 import sys
 
-# host = 'mm1'
-host = 'apple'
+host = 'mm1'
+# host = 'apple'
 
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 

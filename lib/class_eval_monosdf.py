@@ -35,75 +35,160 @@ class evaluator_scene_monosdf():
         sys.path.insert(0, str(Path(MONOSDF_ROOT) / 'code'))
         self.MONOSDF_ROOT = Path(MONOSDF_ROOT)
 
+        from pyhocon import ConfigFactory
+        import utils.general as utils_monosdf
+
         assert rad_scale == 1.
         ckpt_path = self.MONOSDF_ROOT / 'exps' / ckpt_path
         conf_path = self.MONOSDF_ROOT / 'exps' / conf_path
 
-        from pyhocon import ConfigFactory
-        conf = ConfigFactory.parse_file(str(conf_path))
-        dataset_conf = conf.get_config('dataset')
-        assert dataset_conf['if_hdr']
-        dataset_conf['num_views'] = -1
+        self.conf = ConfigFactory.parse_file(str(conf_path))
+        self.dataset_conf = self.conf.get_config('dataset')
+        assert self.dataset_conf['if_hdr']
+        self.dataset_conf['num_views'] = -1
+        self.plot_conf = self.conf.get_config('plot')
 
-        import utils.general as utils_monosdf
-        # eval_dataset = utils_monosdf.get_class(conf.get_string('train.dataset_class'))(**dataset_conf)
-        conf_model = conf.get_config('model')
-        model = utils_monosdf.get_class(conf.get_string('train.model_class'))(conf=conf_model)
+        # eval_dataset = utils_monosdf.get_class(conf.get_string('train.dataset_class'))(**self.dataset_conf)
+        if_pixel_train = self.conf.get_config('dataset').get('if_pixel', False)
+        if_hdr = self.conf.get_config('dataset').get('if_hdr', False)
+
+        conf_model = self.conf.get_config('model')
+        self.model = utils_monosdf.get_class(self.conf.get_string('train.model_class'))(conf=conf_model, if_hdr=if_hdr)
         self.host = host
         self.device = {
             'apple': 'mps', 
             'mm1': 'cuda', 
             'qc': '', 
         }[self.host]
-        model.to(self.device)
+        self.model.to(self.device)
 
         saved_model_state = torch.load(ckpt_path)
         # deal with multi-gpu training model
         if list(saved_model_state["model_state_dict"].keys())[0].startswith("module."):
             saved_model_state["model_state_dict"] = {k[7:]: v for k, v in saved_model_state["model_state_dict"].items()}
+        self.model.load_state_dict(saved_model_state["model_state_dict"], strict=True)
 
-        import ipdb; ipdb.set_trace()
-
-
-        from train_rad_rui import add_model_specific_args
-        from argparse import ArgumentParser
-        from configs.scene_options import scene_options
-
-        default_options['dataset'] = scene_options[dataset_key]
-        parser = ArgumentParser()
-        parser = add_model_specific_args(parser, default_options)
-        hparams, _ = parser.parse_known_args()
-        self.host = host
-        self.device = {
-            'apple': 'mps', 
-            'mm1': 'cuda', 
-            'qc': '', 
-        }[self.host]
-        mi.set_variant(mi_variant_dict[self.host])
-
-        from train_rad_rui import ModelTrainerRad
-        self.model = ModelTrainerRad(
-            hparams, 
-            host=self.host, 
-            dataset_key=dataset_key, 
-            if_overfit_train=False, 
-            if_seg_obj_loss=False, 
-            mitsuba_variant=mi_variant_dict[self.host], 
-            if_load_baked=False, 
-            scene_object=scene_object, 
-            spec=spec, 
-        ).to(self.device)
-
-        checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
-        self.model.load_state_dict({k: v for k, v in checkpoint['state_dict'].items() if 'nerf.' in k})
-        # print(checkpoint['state_dict'].keys())
-        # print(checkpoint['state_dict']['nerf.linears.0.bias'][:2])
-        # print(self.model.nerf.linears[0].bias[:2])
         self.model.eval()
 
         self.rad_scale = rad_scale
-        self.os = self.model.scene_object[split]
+        self.os = scene_object
+        assert self.os.H==320 and self.os.W==640, 'MonoSDF was trained with image res of 320x640!'
 
+    def export_mesh(self, mesh_path: str='test_files/monosdf_mesh.ply', resolution: int=1024):
+        from utils.plots import get_surface_sliding
+        # exporting mesh from SDF
+        print(white_blue('-> Exporting MonoSDF mesh to %s...'%mesh_path))
+        with torch.no_grad():
+            mesh = get_surface_sliding(
+                path='', 
+                epoch='', 
+                sdf=lambda x: self.model.implicit_network(x)[:, 0], 
+                resolution=resolution, 
+                grid_boundary=self.conf.get_list('plot.grid_boundary'), 
+                level=0,  
+                return_mesh=True,  
+                )
+        mesh.export(mesh_path, 'ply')
+        print(blue_text('-> Exported.'))
+
+    def render_im(self, frame_id: int, offset_in_scan: int=0, split_n_pixels: int=1024, if_plt: bool=False):
+        import utils.general as utils_monosdf
+        from utils import rend_util
+        import utils.plots as plots
+
+        frame_id_monosdf = frame_id + offset_in_scan # `indice` in MonoSDF (which is conditioning on per-image features; so that you would want to input the real image id in monosdf dataset)
+
+        # Load cameras following convert_mitsubaScene3D_to_monosdf.py and {monosdf}/code/datasets/scene_dataset.py
+        K = self.os.K # (3, 3)
+        K = np.hstack((K, np.array([0., 0., 0.], dtype=np.float32).reshape((3, 1))))
+        K = np.vstack((K, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
+
+        pose = self.os.pose_list[frame_id] # (3, 4)
+        pose = np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
+
+        world_mat = K @ np.linalg.inv(pose)
+        scale_mat = self.os.monosdf_scale_mat
+
+        P = world_mat @ scale_mat
+        P = P[:3, :4]
+        intrinsics, pose = rend_util.load_K_Rt_from_P(None, P) # (4, 4), (4, 4)
+        intrinsics = torch.from_numpy(intrinsics).float().to(self.device).unsqueeze(0) # (1, 4, 4)
+        pose = torch.from_numpy(pose).float().to(self.device).unsqueeze(0) # (1, 4, 4)
+
+        # gather input dict
+        uv = np.mgrid[0:self.os.H, 0:self.os.W].astype(np.int32)
+        uv = torch.from_numpy(np.flip(uv, axis=0).copy()).float().to(self.device)
+        uv = uv.reshape(2, -1).transpose(1, 0).unsqueeze(0) # (1, HW, 2)
+
+        model_input = dict(intrinsics=intrinsics, pose=pose, uv=uv)
+        indices = torch.tensor(frame_id_monosdf, dtype=torch.int64).reshape(1,)
+
+        # Forward network
+        total_pixels_im = self.os.H * self.os.W
+        split = utils_monosdf.split_input(model_input, total_pixels_im, n_pixels=split_n_pixels)
+        res = []
+        for s in tqdm(split):
+            out = self.model(s, indices)
+            d = {'rgb_values': out['rgb_values'].detach(),
+                'normal_map': out['normal_map'].detach(),
+                'depth_values': out['depth_values'].detach()}
+            if 'rgb_un_values' in out:
+                d['rgb_un_values'] = out['rgb_un_values'].detach()
+            res.append(d)
+
+        model_outputs = utils_monosdf.merge_output(res, total_pixels_im, 1)
+        ground_truth = {
+            'rgb': torch.from_numpy(self.os.im_hdr_list[frame_id].reshape(1, -1, 3)).float(), 
+            'normal': torch.from_numpy(self.os.mi_normal_opencv_list[frame_id].reshape(1, -1, 3)).float(), 
+            'depth': torch.from_numpy(self.os.mi_depth_list[frame_id].reshape(1, -1, 1)).float(), 
+        }
+        plot_data = self.get_plot_data(model_input, model_outputs, model_input['pose'], ground_truth['rgb'], ground_truth['normal'], ground_truth['depth'])
+
+        merge_path = plots.plot(self.model.implicit_network,
+                indices,
+                plot_data,
+                'test_files',
+                0,
+                [self.os.H, self.os.W],
+                if_hdr=True, 
+                if_tensorboard=False, 
+                **self.plot_conf
+                )
+
+        print(white_blue('-> Exported rendering result to %s...'%merge_path))
+
+    def get_plot_data(self, model_input, model_outputs, pose, rgb_gt, normal_gt, depth_gt):
+        from model.loss import compute_scale_and_shift
+        batch_size, num_samples, _ = rgb_gt.shape
+
+        rgb_eval = model_outputs['rgb_values'].reshape(batch_size, num_samples, 3)
+        normal_map = model_outputs['normal_map'].reshape(batch_size, num_samples, 3)
+        normal_map = (normal_map + 1.) / 2.
+      
+        depth_map = model_outputs['depth_values'].reshape(batch_size, num_samples)
+        depth_gt = depth_gt.to(depth_map.device)
+        scale, shift = compute_scale_and_shift(depth_map[..., None], depth_gt, depth_gt > 0.)
+        depth_map = depth_map * scale + shift
+        
+        # save point cloud
+        # depth = depth_map.reshape(1, 1, self.img_res[0], self.img_res[1])
+        # pred_points = self.get_point_cloud(depth, model_input, model_outputs)
+        # gt_depth = depth_gt.reshape(1, 1, self.img_res[0], self.img_res[1])
+        # gt_points = self.get_point_cloud(gt_depth, model_input, model_outputs)
+        
+        plot_data = {
+            'rgb_gt': rgb_gt,
+            'normal_gt': (normal_gt + 1.)/ 2.,
+            'depth_gt': depth_gt,
+            'pose': pose,
+            'rgb_eval': rgb_eval,
+            'normal_map': normal_map,
+            'depth_map': depth_map,
+            # "pred_points": pred_points,
+            # "gt_points": gt_points,
+        }
+
+        return plot_data
 
     def or2nerf_th(self, x):
         """x:Bxe"""
@@ -121,7 +206,7 @@ class evaluator_scene_monosdf():
             return x
         return torch.from_numpy(x).to(self.device)
 
-    def render_im(self, frame_id: int, if_plt: bool=False):
+    def render_im_(self, frame_id: int, if_plt: bool=False):
         '''
         render one image by querying rad-MLP: 
         public_re_3_v3pose_2048:

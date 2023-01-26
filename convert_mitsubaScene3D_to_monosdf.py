@@ -199,7 +199,7 @@ for scene, out_name in zip(scenes, out_names):
     # intrinsic_path = os.path.join(data_root, scene, 'frames', 'intrinsic', 'intrinsic_color.txt')
     # camera_intrinsic = np.loadtxt(intrinsic_path)
     # print(camera_intrinsic)
-    camera_intrinsic = mitsuba_scene_dict['train'].K # (3, 4)
+    camera_intrinsic = mitsuba_scene_dict['train'].K # (3, 3)
     camera_intrinsic = np.hstack((camera_intrinsic, np.array([0., 0., 0.], dtype=np.float32).reshape((3, 1))))
     camera_intrinsic = np.vstack((camera_intrinsic, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
     '''
