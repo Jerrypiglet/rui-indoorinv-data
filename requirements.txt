@@ -30,3 +30,8 @@ jupyterlab
 mitsuba
 pytorch_lightning
 bpy
+pyhocon
+cachetools
+
+# === Also:
+# conda install -c conda-forge ninja

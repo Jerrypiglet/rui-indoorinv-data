@@ -352,5 +352,7 @@ for scene, out_name in zip(scenes, out_names):
         '''
         idx += 1
 
+    cameras['center'] = center
+    cameras['scale'] = scale
     #np.savez(os.path.join(out_path, "cameras_sphere.npz"), **cameras)
     np.savez(os.path.join(out_path, "cameras.npz"), **cameras)

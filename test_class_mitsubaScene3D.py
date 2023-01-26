@@ -17,6 +17,11 @@ INV_NERF_ROOT = {
     'mm1': '/home/ruizhu/Documents/Projects/inv-nerf', 
     'qc': '', 
 }[host]
+MONOSDF_ROOT = {
+    'apple': '/Users/jerrypiglet/Documents/Projects/monosdf', 
+    'mm1': '/home/ruizhu/Documents/Projects/monosdf', 
+    'qc': '', 
+}[host]
 from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
@@ -25,6 +30,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_eval_rad import evaluator_scene_rad
+from lib.class_eval_monosdf import evaluator_scene_monosdf
 from lib.class_eval_inv import evaluator_scene_inv
 from lib.class_eval_scene import evaluator_scene_scene
 from lib.class_renderer_mi_mitsubaScene_3D import renderer_mi_mitsubaScene_3D
@@ -51,15 +57,18 @@ parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=Tru
 parser.add_argument('--render_2d', type=str2bool, nargs='?', const=True, default=False, help='render 2D modalities')
 parser.add_argument('--renderer', type=str, default='blender', help='mi, blender')
 
-# evaluator for rad-MLP
-parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
+# ==== Evaluators
 parser.add_argument('--if_add_rays_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add rays from evaluating MLPs (e.g. emitter radiance rays')
 parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if add estimations from evaluating MLPs (e.g. ennvmaps)')
 parser.add_argument('--if_add_color_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if colorize mesh vertices with values from evaluator')
+# evaluator for rad-MLP
+parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=False, help='eval trained rad-MLP')
 # evaluator for inv-MLP
 parser.add_argument('--eval_inv', type=str2bool, nargs='?', const=True, default=False, help='eval trained inv-MLP')
 # evaluator over scene shapes
 parser.add_argument('--eval_scene', type=str2bool, nargs='?', const=True, default=False, help='eval over scene (e.g. shapes for coverage)')
+# evaluator for MonoSDF
+parser.add_argument('--eval_monosdf', type=str2bool, nargs='?', const=True, default=False, help='eval trained MonoSDF')
 
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
@@ -86,7 +95,7 @@ monosdf_shape_dict = {
     '_shape_normalized': 'normalized', 
     'shape_file': 'ESTmesh/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply', 
     'camera_file': 'monosdf/kitchen/trainval/cameras.npz', 
-    }, # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
+    } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
 # monosdf_shape_dict = {}
 
 mitsuba_scene = mitsubaScene3D(
@@ -111,7 +120,7 @@ mitsuba_scene = mitsubaScene3D(
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
-        'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
+        'if_get_segs': False, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
         # sample poses and render images 
         # 'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
         'poses_sample_num': 200, # Number of poses to sample; set to -1 if not sampling
@@ -119,12 +128,12 @@ mitsuba_scene = mitsubaScene3D(
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'poses', 
-        # 'im_hdr', 
+        'im_hdr', 
         'im_sdr', 
         # 'lighting_envmap', 
         # 'albedo', 'roughness', 
         # 'emission', 
-        'depth', 'normal', 
+        # 'depth', 'normal', 
         # 'lighting_SG', 
         # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
@@ -315,6 +324,27 @@ if opt.eval_inv:
         else:
             eval_return_dict[k] = _[k]
 
+if opt.eval_monosdf:
+    evaluator_monosdf = evaluator_scene_monosdf(
+        host=host, 
+        scene_object=mitsuba_scene, 
+        MONOSDF_ROOT = MONOSDF_ROOT, 
+        conf_path='20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/runconf.conf', 
+        ckpt_path='20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest.pth', 
+        rad_scale=1., 
+    )
+
+    '''
+    sample radiance field on shape vertices
+    '''
+    eval_return_dict.update(
+        evaluator_monosdf.sample_shapes(
+            sample_type='rad', # ['rad']
+            shape_params={
+                'radiance_scale': 1., 
+            }
+        )
+    )
 '''
 Evaluator for scene
 '''
@@ -442,7 +472,7 @@ if opt.vis_3d_o3d:
         
     if opt.if_add_color_from_eval:
         if 'samples_v_dict' in eval_return_dict:
-            assert opt.eval_rad or opt.eval_inv or opt.eval_scene
+            assert opt.eval_rad or opt.eval_inv or opt.eval_scene or opt.eval_monosdf
             visualizer_3D_o3d.extra_input_dict['samples_v_dict'] = eval_return_dict['samples_v_dict']
         
         # vertex normals

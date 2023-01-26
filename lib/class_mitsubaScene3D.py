@@ -89,7 +89,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
 
         self.xml_file = self.xml_scene_root / self.scene_name / self.xml_filename
-        self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})[0]
+        self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})
 
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['OpenRooms', 'Blender', 'json'], 'Unsupported pose file: '+pose_file

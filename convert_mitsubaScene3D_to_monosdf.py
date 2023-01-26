@@ -173,6 +173,7 @@ for scene, out_name in zip(scenes, out_names):
     out_path = os.path.join(out_path_prefix, out_name)
     os.makedirs(out_path, exist_ok=True)
     print(out_path)
+    import ipdb; ipdb.set_trace()
 
     folders = ["image", "mask", "depth", "normal"]
     for folder in folders:
@@ -309,10 +310,8 @@ for scene, out_name in zip(scenes, out_names):
         cameras["scale_mat_%d"%(idx)] = scale_mat
         cameras["world_mat_%d"%(idx)] = pose
         
-        cameras['center'] = center
-        cameras['scale'] = scale
-        cameras['split'] = 'train' if idx < len(mitsuba_scene_dict['train'].pose_list) else 'val'
-        cameras['frame_id'] = idx if idx < len(mitsuba_scene_dict['train'].pose_list) else idx-len(mitsuba_scene_dict['train'].pose_list)
+        cameras['split_%d'%idx] = 'train' if idx < len(mitsuba_scene_dict['train'].pose_list) else 'val'
+        cameras['frame_id_%d'%idx] = idx if idx < len(mitsuba_scene_dict['train'].pose_list) else idx-len(mitsuba_scene_dict['train'].pose_list)
 
         '''
         ipdb> scale_mat
@@ -329,5 +328,7 @@ for scene, out_name in zip(scenes, out_names):
         '''
         idx += 1
 
+    cameras['center'] = center
+    cameras['scale'] = scale
     #np.savez(os.path.join(out_path, "cameras_sphere.npz"), **cameras)
     np.savez(os.path.join(out_path, "cameras.npz"), **cameras)
