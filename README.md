@@ -19,9 +19,10 @@
     - [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
     - [Direct-lighting-only renderer](#direct-lighting-only-renderer)
   - [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
-  - [Evaluator for rad-MLP and inv-MLP](#evaluator-for-rad-mlp-and-inv-mlp)
+  - [Evaluator](#evaluator)
     - [rad-MLP](#rad-mlp)
     - [inv-MLP](#inv-mlp)
+    - [MonoSDF](#monosdf)
   - [Evaluator for scene/shape properties](#evaluator-for-sceneshape-properties)
     - [view coverage](#view-coverage)
 - [Todolist](#todolist)
@@ -362,7 +363,7 @@ python test_class_mitsubaScene3D.py --render_2d --renderer mi
 python test_class_mitsubaScene3D.py --render_2d --renderer blender
 ```
 
-## Evaluator for rad-MLP and inv-MLP
+## Evaluator
 ### rad-MLP
 Tested with repo **inv-nerf** (branch rui_emission). ```opt.eval_rad``` for evaluating rad-MLP loaded from ckpt.
 
@@ -429,6 +430,19 @@ Openrooms-3lamps scene: ([2D vis](https://i.imgur.com/E8z7lN6.jpg))
 Indoor-kitchen scene: ([2D vis](https://i.imgur.com/VYF2iGU.jpg))
 ![](images/demo_eval_invMLP_shapes_emission_mask_kitchen_0.png)
 ![](images/demo_eval_invMLP_shapes_emission_mask_kitchen_1.png)
+
+### MonoSDF
+(need to run `--eval_monosdf` on a CUDA machine, then you can load the .npy file on another machine to visualize in Open3D)
+
+``` bash
+python test_class_mitsubaScene3D.py --vis_2d_plt False --vis_3d_o3d True --eval_monosdf True
+```
+
+Indoor-kitchen scene:
+![](images/demo_eval_monosdf_render_kitchen_0.png)
+![](images/demo_eval_monosdf_rad_kitchen_0.png)
+![](images/demo_eval_monosdf_rad_kitchen_1.png)
+
 
 ## Evaluator for scene/shape properties
 ### view coverage
