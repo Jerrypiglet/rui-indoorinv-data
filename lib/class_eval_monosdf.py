@@ -60,6 +60,7 @@ class evaluator_scene_monosdf():
             'mm1': 'cuda', 
             'qc': '', 
         }[self.host]
+        assert self.device == 'cuda', 'MonoSDF has ops built with customized cuda kernels'
         self.model.to(self.device)
 
         saved_model_state = torch.load(ckpt_path)
@@ -91,12 +92,8 @@ class evaluator_scene_monosdf():
         mesh.export(mesh_path, 'ply')
         print(blue_text('-> Exported.'))
 
-    def render_im(self, frame_id: int, offset_in_scan: int=0, split_n_pixels: int=1024, if_plt: bool=False):
-        import utils.general as utils_monosdf
+    def load_K_pose(self, frame_id: int):
         from utils import rend_util
-        import utils.plots as plots
-
-        frame_id_monosdf = frame_id + offset_in_scan # `indice` in MonoSDF (which is conditioning on per-image features; so that you would want to input the real image id in monosdf dataset)
 
         # Load cameras following convert_mitsubaScene3D_to_monosdf.py and {monosdf}/code/datasets/scene_dataset.py
         K = self.os.K # (3, 3)
@@ -112,8 +109,24 @@ class evaluator_scene_monosdf():
         P = world_mat @ scale_mat
         P = P[:3, :4]
         intrinsics, pose = rend_util.load_K_Rt_from_P(None, P) # (4, 4), (4, 4)
+        '''
+        ↑ R in pose is the same as R in self.os.pose_list[frame_id]
+        ↑ t in pose is t in self.os.pose_list[frame_id], after transformation via normalize_x: ![](https://i.imgur.com/HObmuVc.png)
+        ↑ intrinsics is the same as self.os.K
+        '''
+
         intrinsics = torch.from_numpy(intrinsics).float().to(self.device).unsqueeze(0) # (1, 4, 4)
         pose = torch.from_numpy(pose).float().to(self.device).unsqueeze(0) # (1, 4, 4)
+
+        return intrinsics, pose
+
+    def render_im(self, frame_id: int, offset_in_scan: int=0, split_n_pixels: int=1024, if_plt: bool=False):
+        import utils.general as utils_monosdf
+        import utils.plots as plots
+
+        frame_id_monosdf = frame_id + offset_in_scan # `indice` in MonoSDF (which is conditioning on per-image features; so that you would want to input the real image id in monosdf dataset)
+
+        intrinsics, pose = self.load_K_pose(frame_id)
 
         # gather input dict
         uv = np.mgrid[0:self.os.H, 0:self.os.W].astype(np.int32)
@@ -190,68 +203,34 @@ class evaluator_scene_monosdf():
 
         return plot_data
 
-    def or2nerf_th(self, x):
-        """x:Bxe"""
-        ret = torch.tensor([[1,1,-1]], device=x.device)*x
-        return ret[:,[0,2,1]]
-
-    # def or2nerf_np(self, x):
+    # def or2nerf_th(self, x):
     #     """x:Bxe"""
-    #     # ret = np.array([[1,1,-1]], dtype=x.dtype) * x
-    #     # return ret[:,[0,2,1]]
-    #     return x @ np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]], dtype=x.dtype)
+    #     ret = torch.tensor([[1,1,-1]], device=x.device)*x
+    #     return ret[:,[0,2,1]]
+
+    def normalize_x(self, x: torch.tensor, if_offset: bool=True):
+        '''
+        x: (N, 3)
+        '''
+        scale, offset = self.os.monosdf_scale, self.os.monosdf_offset
+        if if_offset:
+            return scale * (x + offset)
+        else:
+            return scale * x
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
             return x
+        # if type(x) in [np.ndarray, trimesh.caching.TrackedArray]:
         return torch.from_numpy(x).to(self.device)
-
-    def render_im_(self, frame_id: int, if_plt: bool=False):
-        '''
-        render one image by querying rad-MLP: 
-        public_re_3_v3pose_2048:
-            images/demo_eval_radMLP_render.png
-            images/demo_eval_radMLP_render_166.png
-            images/demo_eval_radMLP_render_208.png
-        public_re_3_v5pose_2048:
-            images/demo_eval_radMLP_render_110.png
-
-        '''
-        assert self.os.if_has_mitsuba_rays_pts
-        (rays_o, rays_d, ray_d_center) = self.os.cam_rays_list[frame_id]
-        rays_o_np = rays_o.reshape(-1, 3)
-        rays_d_np = rays_d.reshape(-1, 3)
-
-        # rays_o_nerf = mi.Point3f(self.or2nerf_np(rays_o_th)) # concert to NeRF coordinates
-        # rays_d_nerf = mi.Vector3f(self.or2nerf_np(rays_d_th))
-        rays_d_nerf = self.or2nerf_th(torch.from_numpy(rays_d_np).to(self.device)) # convert to NeRF coordinates
-
-        # rays_o_th = torch.from_numpy(rays_o).to(self.device)[::2, ::2].flatten(0, 1)
-        # rays_d_th = torch.from_numpy(rays_d).to(self.device)[::2, ::2].flatten(0, 1)
-        # rays_o_nerf = self.or2nerf_th(rays_o_th)
-        # rays_d_nerf = self.or2nerf_th(rays_d_th)
-
-        position, _, t_, valid = self.model.ray_intersect(rays_o_np, rays_d_np, if_mi_np=True)
-        if self.dataset_type == 'Indoor':
-            position = self.process_for_Indoor(position)
-        rgbs = self.model.nerf(position.to(self.device), rays_d_nerf)['rgb'] # queried d is incoming directions!
-
-        if if_plt:
-            plt.figure()
-            ax = plt.subplot(121)
-            plt.imshow(np.clip(self.model.gamma_func(rgbs).detach().cpu().reshape((self.os.H, self.os.W, 3)), 0., 1.))
-            ax.set_title('[%d] rendered image from rad-MLP'%frame_id)
-            ax = plt.subplot(122)
-            plt.imshow(np.clip(self.model.gamma_func(self.os.im_hdr_list[frame_id]/self.os.hdr_scale_list[frame_id]*self.rad_scale), 0., 1.))
-
-            # a = rgbs.detach().cpu().numpy().reshape((self.os.H, self.os.W, 3))[0:100, 50:250].reshape((-1, 3))
-            # b = self.os.im_hdr_list[frame_id].reshape((self.os.H, self.os.W, 3))[0:100, 50:250].reshape((-1, 3))
-            ax.set_title('[%d] GT image; set to same scale as image loaded in rad-MLP'%frame_id)
-            plt.show()
+        # elif type(x) == torch.tensor:
+        #     return x.to(self.device)
+        # else:
+        #     raise RuntimeError
 
     def sample_emitter(self, emitter_params={}):
         '''
-        sample emitter surface radiance from rad-MLP: images/demo_emitter_o3d_sampling.png
+        sample emitter surface radiance from MonoSDF: images/demo_emitter_o3d_sampling.png
 
         args:
         - emitter_params
@@ -296,12 +275,14 @@ class evaluator_scene_monosdf():
         ):
         '''
         sample shape surface for sample_type:
-            - 'rad': radiance (at vectices along vertice normals) from rad-MLP
+            - 'rad': radiance (at vectices along vertice normals) from MonoSDF
 
         args:
         - shape_params
             - radiance_scale: rescale radiance magnitude (because radiance can be large, e.g. 500, 3000)
         '''
+        import utils.general as utils_monosdf
+
         radiance_scale = shape_params.get('radiance_scale', 1.)
         assert self.os.if_loaded_shapes
         assert sample_type in ['rad'] #, 'incident-rad']
@@ -311,7 +292,7 @@ class evaluator_scene_monosdf():
         if sample_type == 'rad':
             shape_rays_dict = {}
 
-        print(white_blue('Evlauating rad-MLP for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
+        print(white_blue('Evaluating MonoSDF for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
 
         for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
             assert np.amin(faces) == 1
@@ -325,10 +306,23 @@ class evaluator_scene_monosdf():
                     continue
                 
                 shape_rays_dict[_id] = {'v': vertices, 'd': vertex_normals}
-                rays_o_nerf = self.or2nerf_th(torch.from_numpy(vertices).float().to(self.device)) # convert to NeRF coordinates
-                rays_d_nerf = self.or2nerf_th(torch.from_numpy(-vertex_normals).float().to(self.device)) # convert to NeRF coordinates
-                rgbs = self.model.nerf(rays_o_nerf, rays_d_nerf)['rgb'] # queried d is incoming directions!
-                rads = rgbs.detach().cpu().numpy() / self.rad_scale * radiance_scale # get back to original scale, without hdr scaling
+                vertices_mono, vertex_normals_mono = self.to_d(self.normalize_x(vertices, True)).float(), self.to_d(self.normalize_x(vertex_normals)).float()
+                indices = self.to_d(np.zeros((vertices_mono.shape[0]))).long()
+
+                # One sample per-ray; instead of N samples like in MonoSDF
+                per_split_size = 4096*4
+                rgbs_all = []
+                for (x, d, i) in tqdm(zip(torch.split(vertices_mono, per_split_size), torch.split(-vertex_normals_mono, per_split_size), torch.split(indices, per_split_size))):
+                    sdf, feature_vectors, gradients = self.model.implicit_network.get_outputs(x)
+                    rgb_flat = self.model.rendering_network(x, gradients, d, feature_vectors, i, if_pixel_input=True)
+                    rgbs_all.append(rgb_flat.detach().cpu())
+                rgbs = torch.cat(rgbs_all)
+                rads = rgbs.numpy() / self.rad_scale * radiance_scale # get back to original scale, without hdr scaling
+
+                # sdf, feature_vectors, gradients = self.model.implicit_network.get_outputs(vertices_mono)
+                # rgb_flat = self.model.rendering_network(vertices_mono, gradients, -vertex_normals_mono, feature_vectors, indices, if_pixel_input=True)
+                # rads = rgb_flat.detach().cpu().numpy() / self.rad_scale * radiance_scale # get back to original scale, without hdr scaling
+
                 samples_v_dict[_id] = ('rad', rads)
 
         return_dict.update({'samples_v_dict': samples_v_dict})
@@ -348,7 +342,7 @@ class evaluator_scene_monosdf():
         ):
 
         '''
-        sample non-emitter locations along hemisphere directions for incident radiance, from rad-MLP: images/demo_envmap_o3d_sampling.png
+        sample non-emitter locations along hemisphere directions for incident radiance, from MonoSDF: images/demo_envmap_o3d_sampling.png
         Args:
             sample_type: 'rad' for querying radiance emitted FROM all points; 'incident-rad' for incident radiance TOWARDS all points
         Results:
@@ -359,7 +353,7 @@ class evaluator_scene_monosdf():
         if if_use_mi_geometry:
             assert self.os.if_has_mitsuba_all; normal_list = self.os.mi_normal_list
         else:
-            assert False, 'use mi for GT geometry which was used to train rad-MLP!'
+            assert False, 'use mi for GT geometry which was used to train MonoSDF!'
             # assert self.os.if_has_depth_normal; normal_list = self.os.normal_list
         batch_size = self.model.hparams.batch_size * 10
         lighting_fused_list = []
@@ -478,14 +472,14 @@ class evaluator_scene_monosdf():
                 # plt.show()
                 # <<<< debug
 
-            assert rays_d.shape == rays_o.shape # ray d and o to query rad-MLP
+            assert rays_d.shape == rays_o.shape # ray d and o to query MonoSDF
             if subsample_rate_pts != 1:
                 rays_d = rays_d[::subsample_rate_pts]
                 rays_o = rays_o[::subsample_rate_pts]
 
             # batching to prevent memory overflow
             batch_num = math.ceil(rays_d.shape[0]*1.0/batch_size)
-            print(blue_text('Querying rad-MLP for %d batches of rays...')%batch_num)
+            print(blue_text('Querying MonoSDF for %d batches of rays...')%batch_num)
             rad_list = []
             for b_id in tqdm(range(batch_num)):
                 b0 = b_id*batch_size

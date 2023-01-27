@@ -114,7 +114,7 @@ class evaluator_scene_inv():
         return_dict = {}
         samples_v_dict = {}
 
-        print(white_blue('Evlauating inv-MLP for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
+        print(white_blue('Evaluating inv-MLP for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
 
         for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
             assert np.amin(faces) == 1

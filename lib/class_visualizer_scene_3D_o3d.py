@@ -762,6 +762,7 @@ class visualizer_scene_3D_o3d(object):
                     if 'samples_v_dict' in self.extra_input_dict and _id in self.extra_input_dict['samples_v_dict']:
                         (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
                         # print(_id, samples_v.shape[0], vertices.shape[0])
+                        print(mesh_color_type.split('-')[1], samples_type)
                         assert mesh_color_type.split('-')[1] == samples_type
                         if samples_type == 'rad':
                             # vertices colored with: radiance in SDR space

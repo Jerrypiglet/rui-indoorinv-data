@@ -56,7 +56,7 @@ class evaluator_scene_scene():
         return_dict = {}
         samples_v_dict = {}
 
-        print(white_blue('Evlauating scene for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
+        print(white_blue('Evaluating scene for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
         if sample_type == 'vis_count':
             max_vis_count = 0
             vis_frustum_normals_list = []

@@ -258,14 +258,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
         else:
             shape_file = self.scene_path / Path(self.monosdf_shape_dict['shape_file'])
-            (scale, offset), self.monosdf_scale_mat = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
+            (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
             self.mi_scene = mi.load_dict({
                 'type': 'scene',
                 'shape_id':{
                     'type': shape_file.suffix[1:],
                     'filename': str(shape_file), 
                     # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
-                    'to_world': mi.ScalarTransform4f.translate((-offset).flatten().tolist()).scale([1./scale]*3), 
+                    'to_world': mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3), 
                 }
             })
 

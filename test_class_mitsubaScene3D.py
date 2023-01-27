@@ -337,16 +337,19 @@ if opt.eval_monosdf:
 
     # evaluator_monosdf.export_mesh()
 
-    evaluator_monosdf.render_im(frame_id=0, offset_in_scan=202, if_plt=False)
+    # evaluator_monosdf.render_im(frame_id=0, offset_in_scan=202, if_plt=False)
 
-    # eval_return_dict.update(
-    #     evaluator_monosdf.sample_shapes(
-    #         sample_type='rad', # ['rad']
-    #         shape_params={
-    #             'radiance_scale': 1., 
-    #         }
-    #     )
-    # )
+    # [!!!] set 'mesh_color_type': 'eval-rad'
+    eval_return_dict.update(
+        evaluator_monosdf.sample_shapes(
+            sample_type='rad', # ['rad']
+            shape_params={
+                'radiance_scale': 1., 
+            }
+        )
+    )
+    # np.save('test_files/eval_return_dict.npy', eval_return_dict)
+
 '''
 Evaluator for scene
 '''
@@ -358,6 +361,7 @@ if opt.eval_scene:
 
     '''
     sample visivility to camera centers on vertices
+    [!!!] set 'mesh_color_type': 'eval-vis_count'
     '''
     _ = evaluator_scene.sample_shapes(
         sample_type='vis_count', # ['']
@@ -535,7 +539,7 @@ if opt.vis_3d_o3d:
             'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from mitsuba_scene.sample_pts_list if available
-            'mesh_color_type': 'eval-vis_count', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count', 'eval-t']
+            'mesh_color_type': 'eval-rad', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count', 'eval-t']
             # 'mesh_color_type': 'eval-t', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count]
         },
         emitter_params={
