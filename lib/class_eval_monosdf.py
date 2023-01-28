@@ -212,7 +212,7 @@ class evaluator_scene_monosdf():
         '''
         x: (N, 3)
         '''
-        scale, offset = self.os.monosdf_scale, self.os.monosdf_offset
+        scale, offset = self.os.monosdf_scale, torch.from_numpy(self.os.monosdf_offset).to(x.device)
         if if_offset:
             return scale * (x + offset)
         else:

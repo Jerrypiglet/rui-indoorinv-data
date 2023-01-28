@@ -259,6 +259,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         else:
             shape_file = self.scene_path / Path(self.monosdf_shape_dict['shape_file'])
             (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
+            # self.mi_scene = mi.load_file(str(self.xml_file))
+            '''
+            [!!!] transform to XML scene coords (scale & location) so that ray intersection for GT geometry does not have to adapt to ESTIMATED geometry
+            '''
             self.mi_scene = mi.load_dict({
                 'type': 'scene',
                 'shape_id':{
