@@ -3,8 +3,8 @@ work with Mitsuba/Blender scenes
 '''
 import sys
 
-# host = 'mm1'
-host = 'apple'
+host = 'mm1'
+# host = 'apple'
 
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
@@ -337,7 +337,16 @@ if opt.eval_monosdf:
 
     # evaluator_monosdf.export_mesh()
 
-    evaluator_monosdf.render_im(frame_id=0, offset_in_scan=202, if_plt=False)
+    evaluator_monosdf.render_im_scratch(
+        frame_id=0, offset_in_scan=202, 
+        if_integrate=False, 
+        if_plt=True, 
+        )
+
+    # evaluator_monosdf.render_im(
+    #     frame_id=0, offset_in_scan=202, 
+    #     if_plt=False
+    #     )
 
     # [!!!] set 'mesh_color_type': 'eval-rad'
     # eval_return_dict.update(

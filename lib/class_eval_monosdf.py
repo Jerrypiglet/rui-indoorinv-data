@@ -52,8 +52,8 @@ class evaluator_scene_monosdf():
         if_pixel_train = self.conf.get_config('dataset').get('if_pixel', False)
         if_hdr = self.conf.get_config('dataset').get('if_hdr', False)
 
-        conf_model = self.conf.get_config('model')
-        self.model = utils_monosdf.get_class(self.conf.get_string('train.model_class'))(conf=conf_model, if_hdr=if_hdr)
+        self.conf_model = self.conf.get_config('model')
+        self.model = utils_monosdf.get_class(self.conf.get_string('train.model_class'))(conf=self.conf_model, if_hdr=if_hdr)
         self.host = host
         self.device = {
             'apple': 'mps', 
@@ -64,7 +64,6 @@ class evaluator_scene_monosdf():
         self.model.to(self.device)
 
         saved_model_state = torch.load(ckpt_path)
-        # deal with multi-gpu training model
         if list(saved_model_state["model_state_dict"].keys())[0].startswith("module."):
             saved_model_state["model_state_dict"] = {k[7:]: v for k, v in saved_model_state["model_state_dict"].items()}
         self.model.load_state_dict(saved_model_state["model_state_dict"], strict=True)
@@ -75,10 +74,19 @@ class evaluator_scene_monosdf():
         self.os = scene_object
         assert self.os.H==320 and self.os.W==640, 'MonoSDF was trained with image res of 320x640!'
 
+        uv = np.mgrid[0:self.os.H, 0:self.os.W].astype(np.int32)
+        uv = torch.from_numpy(np.flip(uv, axis=0).copy()).float().to(self.device)
+        self.uv = uv.reshape(2, -1).transpose(1, 0).unsqueeze(0) # (1, HW, 2)
+
+        from utils import rend_util
+        intrinsics, _ = self.load_K_pose(0)
+        ray_dirs_tmp, _ = rend_util.get_camera_params(self.uv, torch.eye(4)[None].to(self.device), intrinsics)
+        self.depth_scale = ray_dirs_tmp[0, :, 2:] # (N, 1)
+
     def export_mesh(self, mesh_path: str='test_files/monosdf_mesh.ply', resolution: int=1024):
         from utils.plots import get_surface_sliding
         # exporting mesh from SDF
-        print(white_blue('-> Exporting MonoSDF mesh to %s...'%mesh_path))
+        print(white_blue('-> Exporting MonoSDF mesh to %s ...'%mesh_path))
         with torch.no_grad():
             mesh = get_surface_sliding(
                 path='', 
@@ -120,7 +128,73 @@ class evaluator_scene_monosdf():
 
         return intrinsics, pose
 
-    def render_im(self, frame_id: int, offset_in_scan: int=0, split_n_pixels: int=1024, if_plt: bool=False):
+    def render_im_scratch(
+        self, 
+        frame_id: int, 
+        offset_in_scan: int=0, 
+        if_integrate: bool=False, # Truel to integrate over camera rays; False to only query single surface point per ray
+        if_plt: bool=False
+        ):
+        '''
+        rendering image using 
+        [1] if_integrate=True: 
+            ![](images/demo_evaluator_monosdf_render_im_scratch_integrate.png)
+            integration over samples per-ray; 
+        [2] if_integrate=False: 
+            ![](images/demo_evaluator_monosdf_render_im_scratch_surface.png)
+            sample surface points along -cam_d dirs. 
+        '''
+
+        rays_o, rays_d, _ = self.os.cam_rays_list[frame_id]
+        rays_o_, rays_d_ = self.to_d(rays_o.reshape(-1, 3)).float(), self.to_d(rays_d.reshape(-1, 3)).float()
+
+        if not if_integrate:
+            mi_pts = self.os.mi_pts_list[frame_id]
+            mi_pts_ = self.to_d(mi_pts.reshape(-1, 3)).float()
+            x_mono, rays_d_mono = self.normalize_x(mi_pts_, True), rays_d_
+            indices = self.to_d(np.zeros((x_mono.shape[0]))).long()
+
+            # One sample per-ray; instead of N samples like in MonoSDF
+            rgbs_N = self.query_rad_scene_pts(
+                x_mono, 
+                -rays_d_mono, 
+                indices, 
+                per_split_size = 4096*4, 
+                )
+            rgbs = np.clip(rgbs_N.reshape(self.os.H, self.os.W, 3).detach().cpu().numpy() ** (1./2.2), 0., 1.)
+            depths = np.zeros((self.os.H, self.os.W))
+        else:
+            rays_o_mono, rays_d_mono = self.normalize_x(rays_o_, True), rays_d_
+            rays_return_dict = self.query_rays(
+                rays_o_mono, 
+                rays_d_mono, 
+                # indices, 
+                per_split_size = 1024*2, 
+            )
+            rgbs = np.clip(rays_return_dict['rgb_values'].reshape(self.os.H, self.os.W, 3).detach().cpu().numpy() ** (1./2.2), 0., 1.)
+            depths = rays_return_dict['depth_values'].reshape(self.os.H, self.os.W).detach().cpu().numpy()
+
+        if if_plt:
+            plt.figure()
+            plt.subplot(121)
+            plt.imshow(rgbs)
+            plt.subplot(122)
+            plt.imshow(depths); plt.colorbar()
+            plt.show()
+        else:
+            plt.imsave('test_files/mono_render_im_scratch_im_%d.png'%frame_id, rgbs)
+
+    def render_im(
+        self, 
+        frame_id: int, 
+        offset_in_scan: int=0, 
+        split_n_pixels: int=1024, 
+        if_plt: bool=False
+        ):
+        '''
+        rendering image using MonoSDF's eval code
+        '''
+
         import utils.general as utils_monosdf
         import utils.plots as plots
 
@@ -129,10 +203,6 @@ class evaluator_scene_monosdf():
         intrinsics, pose = self.load_K_pose(frame_id)
 
         # gather input dict
-        uv = np.mgrid[0:self.os.H, 0:self.os.W].astype(np.int32)
-        uv = torch.from_numpy(np.flip(uv, axis=0).copy()).float().to(self.device)
-        uv = uv.reshape(2, -1).transpose(1, 0).unsqueeze(0) # (1, HW, 2)
-
         model_input = dict(intrinsics=intrinsics, pose=pose, uv=uv)
         indices = torch.tensor(frame_id_monosdf, dtype=torch.int64).reshape(1,)
 
@@ -168,7 +238,7 @@ class evaluator_scene_monosdf():
                 **self.plot_conf
                 )
 
-        print(white_blue('-> Exported rendering result to %s...'%merge_path))
+        print(white_blue('-> Exported rendering result to %s ...'%merge_path))
 
     def get_plot_data(self, model_input, model_outputs, pose, rgb_gt, normal_gt, depth_gt):
         from model.loss import compute_scale_and_shift
@@ -208,6 +278,82 @@ class evaluator_scene_monosdf():
     #     ret = torch.tensor([[1,1,-1]], device=x.device)*x
     #     return ret[:,[0,2,1]]
 
+    def query_rad_scene_pts(
+        self, 
+        x_mono: torch.Tensor, # (N, 3), float32
+        d_mono: torch.Tensor, # (N, 3), float32
+        indices: torch.Tensor, # (N,), long
+        per_split_size = 4096*4*4*2
+    ):
+        assert len(x_mono.shape)==2, 'x_mono has to be 2D: (N, 3)'
+        assert len(d_mono.shape)==2, 'd_mono has to be 2D: (N, 3)'
+        assert len(indices.shape)==1, 'indices has to be 1D: (N,)'
+        assert indices.shape[0]==x_mono.shape[0], 'indices size mismatch with x_mono!'
+
+        rgbs_all = []
+
+        for (x, d, i) in tqdm(zip(torch.split(x_mono, per_split_size), torch.split(d_mono, per_split_size), torch.split(indices, per_split_size))):
+            sdf, feature_vectors, gradients = self.model.implicit_network.get_outputs(x)
+            rgb_flat = self.model.rendering_network(x, gradients, d, feature_vectors, i, if_pixel_input=True)['rgb']
+            rgbs_all.append(rgb_flat.detach().cpu())
+
+        return torch.cat(rgbs_all) # (N, 3)
+
+    def query_rays(
+        self, 
+        rays_o_mono: torch.Tensor, # (N, 3), float32
+        rays_d_mono: torch.Tensor, # (N, 3), float32
+        # indices: torch.Tensor, # (N,), long
+        per_split_size = 1024, 
+    ):
+        assert len(rays_o_mono.shape)==2, 'rays_o_mono has to be 2D: (N, 3)'
+        assert len(rays_d_mono.shape)==2, 'rays_d_mono has to be 2D: (N, 3)'
+
+        import utils.general as utils_monosdf
+
+        res = []
+
+        print('-- query_rays in %d batches...'%(self.depth_scale.shape[0]//per_split_size))
+        for (o_, d_, depth_scale_) in tqdm(zip(torch.split(rays_o_mono, per_split_size), torch.split(rays_d_mono, per_split_size), torch.split(self.depth_scale, per_split_size))):
+            z_vals, z_samples_eik = self.model.ray_sampler.get_z_vals(d_, o_, self.model)
+            N_samples = z_vals.shape[1]
+
+            points = o_.unsqueeze(1) + z_vals.unsqueeze(2) * d_.unsqueeze(1) # (1024, 1, 3) + (1024, 98, 1) * (1024, 1, 3)
+            points_flat = points.reshape(-1, 3) # (1024, N_samples, 3) -> (1024*N_samples, 3)
+
+            dirs = d_.unsqueeze(1).repeat(1,N_samples,1)
+            dirs_flat = dirs.reshape(-1, 3)
+
+            sdf, feature_vectors, gradients_sdf = self.model.implicit_network.get_outputs(points_flat)
+            
+            # points_flat: (N_pixels*N_samples, 3)
+            i_ = self.to_d(np.zeros(points_flat.shape[0])).long()
+            rendering_output_dict = self.model.rendering_network(points_flat, gradients_sdf, dirs_flat, feature_vectors, i_, if_pixel_input=True)
+            rgb_flat = rendering_output_dict['rgb']
+            rgb = rgb_flat.reshape(-1, N_samples, 3)
+
+            weights = self.model.volume_rendering(z_vals, sdf)
+
+            rgb_values = torch.sum(weights.unsqueeze(-1) * rgb, 1)
+            
+            depth_values = torch.sum(weights * z_vals, 1, keepdims=True) / (weights.sum(dim=1, keepdims=True) +1e-8)
+            # we should scale rendered distance to depth along z direction
+            depth_values = depth_scale_ * depth_values
+
+
+            res.append({
+                'rgb': rgb.detach().cpu(), # (N, 98, 3)
+                'rgb_values': rgb_values.detach().cpu(), # (N, 3)
+                'depth_values': depth_values.detach().cpu(), # (N, 1)
+                'z_vals': z_vals.detach().cpu(), # (N, 98)
+                'depth_vals': z_vals.detach().cpu() * depth_scale_.detach().cpu(), # (N, 98)
+                'sdf': sdf.reshape(z_vals.shape).detach().cpu(), # (N, 98)
+                'weights': weights.detach().cpu(), # (N, 98)
+            })
+
+        model_outputs = utils_monosdf.merge_output(res, self.os.H * self.os.W, 1)
+        return model_outputs
+
     def normalize_x(self, x: torch.tensor, if_offset: bool=True):
         '''
         x: (N, 3)
@@ -216,17 +362,14 @@ class evaluator_scene_monosdf():
         if if_offset:
             return scale * (x + offset)
         else:
-            return scale * x
+            x = scale * x
+            x = x / (torch.linalg.norm(x, axis=1, keepdim=True)+1e-12)
+            return x
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
             return x
-        # if type(x) in [np.ndarray, trimesh.caching.TrackedArray]:
         return torch.from_numpy(x).to(self.device)
-        # elif type(x) == torch.tensor:
-        #     return x.to(self.device)
-        # else:
-        #     raise RuntimeError
 
     def sample_emitter(self, emitter_params={}):
         '''
@@ -281,8 +424,6 @@ class evaluator_scene_monosdf():
         - shape_params
             - radiance_scale: rescale radiance magnitude (because radiance can be large, e.g. 500, 3000)
         '''
-        import utils.general as utils_monosdf
-
         radiance_scale = shape_params.get('radiance_scale', 1.)
         assert self.os.if_loaded_shapes
         assert sample_type in ['rad'] #, 'incident-rad']
@@ -306,17 +447,17 @@ class evaluator_scene_monosdf():
                     continue
                 
                 shape_rays_dict[_id] = {'v': vertices, 'd': vertex_normals}
-                vertices_mono, vertex_normals_mono = self.to_d(self.normalize_x(vertices, True)).float(), self.to_d(self.normalize_x(vertex_normals)).float()
+                vertices_mono, vertex_normals_mono = self.normalize_x(self.to_d(vertices).float(), True), self.to_d(vertex_normals).float()
                 indices = self.to_d(np.zeros((vertices_mono.shape[0]))).long()
 
                 # One sample per-ray; instead of N samples like in MonoSDF
-                per_split_size = 4096*4
-                rgbs_all = []
-                for (x, d, i) in tqdm(zip(torch.split(vertices_mono, per_split_size), torch.split(-vertex_normals_mono, per_split_size), torch.split(indices, per_split_size))):
-                    sdf, feature_vectors, gradients = self.model.implicit_network.get_outputs(x)
-                    rgb_flat = self.model.rendering_network(x, gradients, d, feature_vectors, i, if_pixel_input=True)
-                    rgbs_all.append(rgb_flat.detach().cpu())
-                rgbs = torch.cat(rgbs_all)
+                rgbs = self.query_rad_scene_pts(
+                    vertices_mono, 
+                    -vertex_normals_mono, 
+                    indices, 
+                    per_split_size = 4096*4, 
+                    )
+
                 rads = rgbs.numpy() / self.rad_scale * radiance_scale # get back to original scale, without hdr scaling
 
                 # sdf, feature_vectors, gradients = self.model.implicit_network.get_outputs(vertices_mono)
