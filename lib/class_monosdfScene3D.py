@@ -29,7 +29,7 @@ from lib.class_mitsubaBase import mitsubaBase
 from lib.class_scene2DBase import scene2DBase
 
 from lib.utils_misc import get_device
-from lib.utils_monosdf import rend_util
+from lib.utils_from_monosdf import rend_util
 from lib.utils_monosdf_scene import load_monosdf_shape, load_monosdf_scale_offset
 class monosdfScene3D(mitsubaBase, scene2DBase):
     '''

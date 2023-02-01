@@ -15,6 +15,7 @@ from lib.global_vars import mi_variant_dict
 from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
 from lib.utils_misc import get_list_of_keys, white_blue, blue_text
 from lib.utils_OR.utils_OR_lighting import get_lighting_envmap_dirs_global
+from lib.utils_from_monosdf import rend_util
 
 class evaluator_scene_monosdf():
     '''
@@ -80,7 +81,6 @@ class evaluator_scene_monosdf():
         uv = torch.from_numpy(np.flip(uv, axis=0).copy()).float().to(self.device)
         self.uv = uv.reshape(2, -1).transpose(1, 0).unsqueeze(0) # (1, HW, 2)
 
-        from utils import rend_util
         intrinsics, _ = self.load_K_pose(0)
         ray_dirs_tmp, _ = rend_util.get_camera_params(self.uv, torch.eye(4)[None].to(self.device), intrinsics)
         self.depth_scale = ray_dirs_tmp[0, :, 2:] # (N, 1)
@@ -103,7 +103,6 @@ class evaluator_scene_monosdf():
         print(blue_text('-> Exported.'))
 
     def load_K_pose(self, frame_id: int):
-        from utils import rend_util
 
         # Load cameras following convert_mitsubaScene3D_to_monosdf.py and {monosdf}/code/datasets/scene_dataset.py
         K = self.os.K # (3, 3)

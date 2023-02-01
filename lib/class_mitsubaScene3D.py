@@ -557,6 +557,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.bverts_list = []
         self.bfaces_list = []
         
+        self.window_list = []
+        self.lamp_list = []
+        self.xyz_max = np.zeros(3,)-np.inf
+        self.xyz_min = np.zeros(3,)+np.inf
+        
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_shape(shape_params_dict=shape_params_dict)
         else:
@@ -572,11 +577,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
             remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
 
-            self.window_list = []
-            self.lamp_list = []
 
-            self.xyz_max = np.zeros(3,)-np.inf
-            self.xyz_min = np.zeros(3,)+np.inf
             if if_sample_mesh:
                 self.sample_pts_list = []
 
