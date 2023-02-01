@@ -10,11 +10,12 @@ from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
 from lib.utils_io import read_cam_params, normalize_v
+from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
 # from collections import defaultdict
 # import trimesh
-
+import imageio
 import string
 # Import the library using the alias "mi"
 import mitsuba as mi
@@ -53,7 +54,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         cam_params_dict: dict={'near': 0.1, 'far': 10.}, 
         shape_params_dict: dict={'if_load_mesh': True}, 
         emitter_params_dict: dict={'N_ambient_rep': '3SG-SkyGrd'},
-        mi_params_dict: dict={'if_sample_rays_pts': True, 'if_sample_poses': False}, 
+        mi_params_dict: dict={'if_sample_rays_pts': True}, 
         if_debug_info: bool=False, 
         host: str='', 
         device_id: int=-1, 
@@ -322,21 +323,22 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
-        if self.mi_params_dict.get('if_sample_poses', False):
-            assert False, 'disabled; use '
+        if cam_params_dict.get('if_sample_poses', False):
+            # assert False, 'disabled; use '
             if_resample = 'n'
-            if hasattr(self, 'pose_list'):
-                if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
-            if self.pose_file.exists():
-                if_resample = input(red("pose file exists: %s. Resample pose? [y/n]"%str(self.pose_file)))
-            if if_resample in ['Y', 'y']:
-                self.sample_poses(self.mi_params_dict.get('pose_sample_num'), cam_params_dict)
-            else:
-                print(yellow('ABORTED resample pose.'))
-        else:
-            if not self.pose_file.exists():
-            # if not hasattr(self, 'pose_list'):
-                self.get_room_center_pose()
+            # if hasattr(self, 'pose_list'):
+            #     if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
+            # if self.pose_file.exists():
+            #     if_resample = input(red("pose file exists: %s. Resample pose? [y/n]"%str(self.pose_file)))
+            # if if_resample in ['Y', 'y']:
+            self.sample_poses(cam_params_dict.get('sample_pose_num'))
+            return
+            # else:
+            #     print(yellow('ABORTED resample pose.'))
+        # else:
+        #     if not self.pose_file.exists():
+        #     # if not hasattr(self, 'pose_list'):
+        #         self.get_room_center_pose()
 
         print(white_blue('[mitsubaScene] load_poses from %s'%str(self.pose_file)))
          
@@ -556,7 +558,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.ids_list = []
         self.bverts_list = []
         self.bfaces_list = []
-        
+
         self.window_list = []
         self.lamp_list = []
         self.xyz_max = np.zeros(3,)-np.inf
@@ -576,7 +578,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
             if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
             remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
-
 
             if if_sample_mesh:
                 self.sample_pts_list = []
@@ -619,9 +620,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
                     # if if_load_obj_mesh:
                     vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py; faces is 1-based!
-
                     assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
-
                     
                 # --sample mesh--
                 if if_sample_mesh:
@@ -732,11 +731,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             lighting_global_pts_list.append(lighting_global_pts)
         return lighting_global_xyz_list, lighting_global_pts_list
 
-    def sample_poses(self, pose_sample_num: int):
+    def sample_poses(self, sample_pose_num: int):
         '''
         sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)
         '''
-        assert False, 'not tested'
         from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
         assert self.up_axis == 'y+', 'not supporting other axes for now'
         if not self.if_loaded_layout: self.load_layout()
@@ -745,8 +743,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         boxes = [[bverts, bfaces] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) if not shape['is_layout']]
         cads = [[vertices, faces] for vertices, faces, shape in zip(self.vertices_list, self.faces_list, self.shape_list_valid) if not shape['is_layout']]
 
-        self.cam_params_dict['samplePoint'] = pose_sample_num
+        assert sample_pose_num is not None
+        assert sample_pose_num > 0
+        self.cam_params_dict['samplePoint'] = sample_pose_num
+
         origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
+            mitsubaScene=self, 
             scene_dict={
                 'lverts': lverts, 
                 'boxes': boxes, 
@@ -761,23 +763,17 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         origin_lookatvector_up_list = []
         for cam_param in origin_lookat_up_list:
             origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-            origin = origin.flatten()
-            lookat = lookat.flatten()
-            up = up.flatten()
-            at_vector = normalize_v(lookat - origin)
-            assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
-            t = origin.reshape((3, 1)).astype(np.float32)
-            R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
+            (R, t), at_vector = origin_lookat_up_to_R_t(origin, lookat, up)
             pose_list.append(np.hstack((R, t)))
             origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
 
-        # self.pose_list = pose_list[:pose_sample_num]
+        # self.pose_list = pose_list[:sample_pose_num]
         # return
 
         H, W = self.im_H_load//4, self.im_W_load//4
         scale_factor = [t / s for t, s in zip((H, W), (self.im_H_load, self.im_W_load))]
         K = resize_intrinsics(self.K, scale_factor)
-        tmp_cam_rays_list = self.get_cam_rays_list(H, W, K, pose_list)
+        tmp_cam_rays_list = self.get_cam_rays_list(H, W, [K]*len(pose_list), pose_list)
         normal_costs = []
         depth_costs = []
         normal_list = []
@@ -825,28 +821,24 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path))
         tmp_rendering_path.mkdir(parents=True, exist_ok=True)
         print(blue_text('Dumping tmp normal and depth by Mitsuba: %s')%str(tmp_rendering_path))
-        for i in tqdm(camIndex):
+        for i in tqdm(camIndex[:sample_pose_num]):
             imageio.imwrite(str(tmp_rendering_path / ('normal_%04d.png'%i)), (np.clip((normal_list[camIndex[i]] + 1.)/2., 0., 1.)*255.).astype(np.uint8))
             imageio.imwrite(str(tmp_rendering_path / ('depth_%04d.png'%i)), (np.clip(depth_list[camIndex[i]] / np.amax(depth_list[camIndex[i]]+1e-6), 0., 1.)*255.).astype(np.uint8))
         print(blue_text('DONE.'))
         # print(normal_costs[camIndex])
 
-        self.pose_list = [pose_list[_] for _ in camIndex[:pose_sample_num]]
-        self.origin_lookatvector_up_list = [origin_lookatvector_up_list[_] for _ in camIndex[:pose_sample_num]]
-
-        # if self.pose_file.exists():
-        #     txt = input(red("pose_list loaded. Overrite cam.txt? [y/n]"))
-        #     if txt in ['N', 'n']:
-        #         return
+        self.pose_list = [pose_list[_] for _ in camIndex[:sample_pose_num]]
+        self.origin_lookatvector_up_list = [origin_lookatvector_up_list[_] for _ in camIndex[:sample_pose_num]]
+        print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
     
-        with open(str(self.pose_file), 'w') as camOut:
-            cam_poses_write = [origin_lookat_up_list[_] for _ in camIndex[:pose_sample_num]]
-            camOut.write('%d\n'%len(cam_poses_write))
-            print('Final sampled camera poses: %d'%len(cam_poses_write))
-            for camPose in cam_poses_write:
-                for n in range(0, 3):
-                    camOut.write('%.3f %.3f %.3f\n'%\
-                        (camPose[n, 0], camPose[n, 1], camPose[n, 2]))
-        print(blue_text('cam.txt written to %s.'%str(self.pose_file)))
+        # with open(str(self.pose_file), 'w') as camOut:
+        #     cam_poses_write = [origin_lookat_up_list[_] for _ in camIndex[:sample_pose_num]]
+        #     camOut.write('%d\n'%len(cam_poses_write))
+        #     print('Final sampled camera poses: %d'%len(cam_poses_write))
+        #     for camPose in cam_poses_write:
+        #         for n in range(0, 3):
+        #             camOut.write('%.3f %.3f %.3f\n'%\
+        #                 (camPose[n, 0], camPose[n, 1], camPose[n, 2]))
+        # print(blue_text('cam.txt written to %s.'%str(self.pose_file)))
 
 

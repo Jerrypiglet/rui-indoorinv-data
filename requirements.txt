@@ -32,6 +32,7 @@ pytorch_lightning
 bpy
 pyhocon
 cachetools
+imageio
 
 # === Also:
 # conda install -c conda-forge ninja

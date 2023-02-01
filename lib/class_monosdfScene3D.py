@@ -301,7 +301,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
             if self.pose_file.exists():
                 if_resample = input(red("pose file exists: %s. Resample pose? [y/n]"%str(self.pose_file)))
             if if_resample in ['Y', 'y']:
-                self.sample_poses(self.mi_params_dict.get('pose_sample_num'), cam_params_dict)
+                self.sample_poses(self.mi_params_dict.get('sample_pose_num'), cam_params_dict)
             else:
                 print(yellow('ABORTED resample pose.'))
         else:

@@ -8,6 +8,7 @@ def get_rays_np(H, W, K, c2w, inverse_y: bool=True, if_normalize_d: bool=True, i
     '''
     inverse_y: camera axis (z) pointing forward
     '''
+    assert K.shape in [(3, 3), (3, 4), (4, 4)]
     if if_center_offset:
         O = 0.5
         i, j = np.meshgrid(np.linspace(O, W - 1 + O, W, dtype=np.float32), np.linspace(O, H - 1 + O, H, dtype=np.float32), indexing='xy')

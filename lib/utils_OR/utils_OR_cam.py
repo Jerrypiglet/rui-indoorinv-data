@@ -6,6 +6,7 @@ parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir) 
 # print(sys.path)
 from utils_OR.utils_OR_geo import isect_line_plane_v3
+from lib.utils_io import normalize_v
 
 def read_cam_params(camFile):
     assert osp.isfile(str(camFile))
@@ -93,6 +94,17 @@ def get_T_local_to_camopengl_np(normal):
     T_local_to_camopengl =  np.stack((cam_x, cam_y, normal), axis=-1)# concat as cols: local2cam; (H, W, 3, 3)
 
     return T_local_to_camopengl
+
+def origin_lookat_up_to_R_t(origin, lookat, up):
+    origin = origin.flatten()
+    lookat = lookat.flatten()
+    up = up.flatten()
+    at_vector = normalize_v(lookat - origin)
+    assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
+    t = origin.reshape((3, 1)).astype(np.float32)
+    R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
+
+    return (R, t), at_vector
     
 # def project_v_homo(v, cam_transformation4x4, cam_K):
 #     # https://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/img30.gif

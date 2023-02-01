@@ -40,6 +40,7 @@ class mitsubaBase():
     def get_cam_rays_list(self, H: int, W: int, K_list: list, pose_list: list, convention: str='opencv'):
         assert convention in ['opengl', 'opencv']
         cam_rays_list = []
+        if not isinstance(K_list, list): K_list = [K_list] * len(pose_list)
         for _, (pose, K) in enumerate(zip(pose_list, K_list)):
             rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=(convention=='opencv'))
             cam_rays_list.append((rays_o, rays_d, ray_d_center))

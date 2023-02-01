@@ -155,7 +155,7 @@ mitsuba_scene = monosdfScene3D(
         # 'thetaMax' : 40, # theta: pitch angle; up+
         # 'phiMin': -60, # yaw angle
         # 'phiMax': 60, 
-        'if_vis_plt': False, # images/demo_sample_pose.png
+        'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png
     }, 
     # lighting_params_dict={
     #     'SG_num': 12, 

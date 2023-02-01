@@ -4,31 +4,34 @@
 <!--See https://github.com/ekalinin/github-markdown-toc#readme-->
 
 <!--ts-->
-- [Description](#description)
-- [Dependencies](#dependencies)
-  - [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
-- [Dataset structure](#dataset-structure)
-- [Notes on coordinate systems](#notes-on-coordinate-systems)
-- [Usage](#usage)
-  - [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
-  - [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
-    - [Matplotlib viewer](#matplotlib-viewer)
-    - [Open3D viewer](#open3d-viewer)
-    - [MonoSDF results loader](#monosdf-results-loader)
-  - [3D differentiable renderer](#3d-differentiable-renderer)
-    - [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
-    - [Direct-lighting-only renderer](#direct-lighting-only-renderer)
-  - [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
-  - [Evaluator](#evaluator)
-    - [rad-MLP](#rad-mlp)
-    - [inv-MLP](#inv-mlp)
-    - [MonoSDF](#monosdf)
-  - [Evaluator for scene/shape properties](#evaluator-for-sceneshape-properties)
-    - [view coverage](#view-coverage)
-- [Todolist](#todolist)
+* [Description](#description)
+* [Dependencies](#dependencies)
+   * [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
+* [Dataset structure](#dataset-structure)
+* [Notes on coordinate systems](#notes-on-coordinate-systems)
+* [Usage](#usage)
+   * [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
+   * [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
+      * [Matplotlib viewer](#matplotlib-viewer)
+      * [Open3D viewer](#open3d-viewer)
+      * [MonoSDF results loader](#monosdf-results-loader)
+   * [3D differentiable renderer](#3d-differentiable-renderer)
+      * [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
+      * [Direct-lighting-only renderer](#direct-lighting-only-renderer)
+   * [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
+   * [Evaluator](#evaluator)
+      * [rad-MLP](#rad-mlp)
+      * [inv-MLP](#inv-mlp)
+      * [MonoSDF](#monosdf)
+   * [Evaluator for scene/shape properties](#evaluator-for-sceneshape-properties)
+      * [view coverage](#view-coverage)
+   * [Other utilities](#other-utilities)
+      * [Sample camera poses for new Mitsuba scene](#sample-camera-poses-for-new-mitsuba-scene)
+* [Checklist for getting started](#checklist-for-getting-started)
+* [Todolist](#todolist)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
-<!-- Added by: jerrypiglet, at: Wed Jan 25 18:01:31 PST 2023 -->
+<!-- Added by: jerrypiglet, at: Wed Feb  1 02:05:26 PST 2023 -->
 
 <!--te-->
 
@@ -130,9 +133,26 @@ For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-
   - EnvDataset # outdoor envmaps
 
 - data
-  - intrinsic.txt
+  <!-- - intrinsic.txt
   - colors
-  - semanticLabelName_OR42.txt
+  - semanticLabelName_OR42.txt -->
+  - indoor_synthetic
+    - kitchen
+      - train
+        - Image
+          - %03d_0001.exr
+        - Roughness
+        - Normal
+        - IndexOB
+        - GlossCol
+        - Emit
+        - DiffCol
+        - Depth
+        - Alpha
+        - transforms.json
+      - val
+        - ...
+      - scene_v3.xml
   - OpenRooms_public_scene_dataset_2
     - scenes
       - xml1
@@ -464,6 +484,21 @@ Train:
 Val:
 
 ![](images/demo_eval_scene_shapes-vis_count-val-kitchen_0.png)
+
+## Other utilities
+### Sample camera poses for new Mitsuba scene
+Set `--if_sample_poses True`. Change parameters in `mitsuba_scene->cam_params_dict{}` to adjust parameters in sampling camera poses (e.g. range of random yaw/pitch angles, number of samples, min distance to the wall, min/median distances of all camera rays to the scene).
+
+**Optionally**, set `--eval_scene True` to show view [coverage visualization](images/demo_eval_scene_shapes-vis_count-train-kitchen_0.png) under current poses.
+
+``` bash
+python utils_class_mitsubaScene3D_sample_pose.py --if_sample_poses True --vis_2d_plt False --vis_3d_o3d True
+```
+
+# Checklist for getting started
+- Install all dependencies (especially Mitsuba, Open3D (opengl-supported display required))
+- Change `host` and `PATH_HOME` in the beginning of a script before running it.
+- Check you have the data 
 
 # Todolist
 - [x] vis envmap in 2D plt
