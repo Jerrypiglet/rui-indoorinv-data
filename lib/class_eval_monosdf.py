@@ -38,7 +38,7 @@ class evaluator_scene_monosdf():
         from pyhocon import ConfigFactory
         import utils.general as utils_monosdf
 
-        assert rad_scale == 1.
+        # assert rad_scale == 1.
         ckpt_path = self.MONOSDF_ROOT / 'exps' / ckpt_path
         conf_path = self.MONOSDF_ROOT / 'exps' / conf_path
 
@@ -72,7 +72,9 @@ class evaluator_scene_monosdf():
 
         self.rad_scale = rad_scale
         self.os = scene_object
-        assert self.os.H==320 and self.os.W==640, 'MonoSDF was trained with image res of 320x640!'
+
+        assert [self.os.H, self.os.W]==self.dataset_conf['img_res'], \
+                'MonoSDF was trained with image res of %s; scene_object uses %s!'%(str(self.dataset_conf['img_res']), str([self.os.H, self.os.W]))
 
         uv = np.mgrid[0:self.os.H, 0:self.os.W].astype(np.int32)
         uv = torch.from_numpy(np.flip(uv, axis=0).copy()).float().to(self.device)
@@ -139,9 +141,11 @@ class evaluator_scene_monosdf():
         rendering image using 
         [1] if_integrate=True: 
             ![](images/demo_evaluator_monosdf_render_im_scratch_integrate.png)
+            ![](images/demo_evaluator_monosdf_render_im_scratch_integrate_OR.png)
             integration over samples per-ray; 
         [2] if_integrate=False: 
             ![](images/demo_evaluator_monosdf_render_im_scratch_surface.png)
+            ![](images/demo_evaluator_monosdf_render_im_scratch_surface_OR.png)
             sample surface points along -cam_d dirs. 
         '''
 
@@ -161,7 +165,8 @@ class evaluator_scene_monosdf():
                 indices, 
                 per_split_size = 4096*4, 
                 )
-            rgbs = np.clip(rgbs_N.reshape(self.os.H, self.os.W, 3).detach().cpu().numpy() ** (1./2.2), 0., 1.)
+            rgbs_hdr_scaled = rgbs_N.reshape(self.os.H, self.os.W, 3).detach().cpu().numpy() / self.rad_scale
+            rgbs_sdr = np.clip(rgbs_hdr_scaled ** (1./2.2), 0., 1.)
             depths = np.zeros((self.os.H, self.os.W))
         else:
             rays_o_mono, rays_d_mono = self.normalize_x(rays_o_, True), rays_d_
@@ -169,17 +174,27 @@ class evaluator_scene_monosdf():
                 rays_o_mono, 
                 rays_d_mono, 
                 # indices, 
-                per_split_size = 1024*2, 
+                per_split_size = 1024, 
             )
-            rgbs = np.clip(rays_return_dict['rgb_values'].reshape(self.os.H, self.os.W, 3).detach().cpu().numpy() ** (1./2.2), 0., 1.)
+            rgbs_hdr_scaled = rays_return_dict['rgb_values'].reshape(self.os.H, self.os.W, 3).detach().cpu().numpy() / self.rad_scale
+            rgbs_sdr = np.clip(rgbs_hdr_scaled ** (1./2.2), 0., 1.)
             depths = rays_return_dict['depth_values'].reshape(self.os.H, self.os.W).detach().cpu().numpy()
 
         if if_plt:
             plt.figure()
-            plt.subplot(121)
-            plt.imshow(rgbs)
-            plt.subplot(122)
+            plt.title('render_im_scratch (frame %d)'%frame_id)
+            ax = plt.subplot(221)
+            plt.imshow(rgbs_sdr)
+            ax.set_title('monosdf rgb (SDR; scaled to GT)')
+            ax = plt.subplot(222)
             plt.imshow(depths); plt.colorbar()
+            ax.set_title('monosdf depth')
+            ax = plt.subplot(223)
+            plt.imshow(np.clip(self.os.im_hdr_list[frame_id]**(1./2.2), 0., 1.))
+            ax.set_title('GT rgb (SDR)')
+            ax = plt.subplot(224)
+            plt.imshow(self.os.mi_depth_list[frame_id]); plt.colorbar()
+            ax.set_title('GT depth')
             plt.show()
         else:
             plt.imsave('test_files/mono_render_im_scratch_im_%d.png'%frame_id, rgbs)
@@ -273,11 +288,6 @@ class evaluator_scene_monosdf():
 
         return plot_data
 
-    # def or2nerf_th(self, x):
-    #     """x:Bxe"""
-    #     ret = torch.tensor([[1,1,-1]], device=x.device)*x
-    #     return ret[:,[0,2,1]]
-
     def query_rad_scene_pts(
         self, 
         x_mono: torch.Tensor, # (N, 3), float32
@@ -305,6 +315,7 @@ class evaluator_scene_monosdf():
         rays_d_mono: torch.Tensor, # (N, 3), float32
         # indices: torch.Tensor, # (N,), long
         per_split_size = 1024, 
+        if_from_one_frame=True, # True: all rays from one frame
     ):
         assert len(rays_o_mono.shape)==2, 'rays_o_mono has to be 2D: (N, 3)'
         assert len(rays_d_mono.shape)==2, 'rays_d_mono has to be 2D: (N, 3)'
@@ -314,7 +325,10 @@ class evaluator_scene_monosdf():
         res = []
 
         print('-- query_rays in %d batches...'%(self.depth_scale.shape[0]//per_split_size))
-        for (o_, d_, depth_scale_) in tqdm(zip(torch.split(rays_o_mono, per_split_size), torch.split(rays_d_mono, per_split_size), torch.split(self.depth_scale, per_split_size))):
+        if if_from_one_frame:
+            depth_scale_list = torch.split(self.depth_scale, per_split_size)
+
+        for _, (o_, d_) in enumerate(tqdm(zip(torch.split(rays_o_mono, per_split_size), torch.split(rays_d_mono, per_split_size)))):
             z_vals, z_samples_eik = self.model.ray_sampler.get_z_vals(d_, o_, self.model)
             N_samples = z_vals.shape[1]
 
@@ -335,23 +349,28 @@ class evaluator_scene_monosdf():
             weights = self.model.volume_rendering(z_vals, sdf)
 
             rgb_values = torch.sum(weights.unsqueeze(-1) * rgb, 1)
-            
-            depth_values = torch.sum(weights * z_vals, 1, keepdims=True) / (weights.sum(dim=1, keepdims=True) +1e-8)
-            # we should scale rendered distance to depth along z direction
-            depth_values = depth_scale_ * depth_values
 
-
-            res.append({
+            result_dict = {
                 'rgb': rgb.detach().cpu(), # (N, 98, 3)
                 'rgb_values': rgb_values.detach().cpu(), # (N, 3)
-                'depth_values': depth_values.detach().cpu(), # (N, 1)
-                'z_vals': z_vals.detach().cpu(), # (N, 98)
-                'depth_vals': z_vals.detach().cpu() * depth_scale_.detach().cpu(), # (N, 98)
                 'sdf': sdf.reshape(z_vals.shape).detach().cpu(), # (N, 98)
                 'weights': weights.detach().cpu(), # (N, 98)
-            })
+            }
+            if if_from_one_frame:
+                depth_scale_ =depth_scale_list[_]
+                depth_values = torch.sum(weights * z_vals, 1, keepdims=True) / (weights.sum(dim=1, keepdims=True) +1e-8)
+                # we should scale rendered distance to depth along z direction
+                depth_values = depth_scale_ * depth_values
+                result_dict.update({
+                    'depth_values': depth_values.detach().cpu(), # (N, 1)
+                    'z_vals': z_vals.detach().cpu(), # (N, 98)
+                    'depth_vals': z_vals.detach().cpu() * depth_scale_.detach().cpu(), # (N, 98)
+                })
 
-        model_outputs = utils_monosdf.merge_output(res, self.os.H * self.os.W, 1)
+            res.append(result_dict)
+
+        assert sum([_['rgb'].shape[0] for _ in res]) == rays_o_mono.shape[0]
+        model_outputs = utils_monosdf.merge_output(res, rays_o_mono.shape[0], 1)
         return model_outputs
 
     def normalize_x(self, x: torch.tensor, if_offset: bool=True):
@@ -370,46 +389,6 @@ class evaluator_scene_monosdf():
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
             return x
         return torch.from_numpy(x).to(self.device)
-
-    def sample_emitter(self, emitter_params={}):
-        '''
-        sample emitter surface radiance from MonoSDF: images/demo_emitter_o3d_sampling.png
-
-        args:
-        - emitter_params
-            - radiance_scale: rescale radiance magnitude (because radiance can be large, e.g. 500, 3000)
-        '''
-        max_plate = emitter_params.get('max_plate', 64)
-        radiance_scale = emitter_params.get('radiance_scale', 1.)
-        emitter_type_index_list = emitter_params.get('emitter_type_index_list', 1.)
-        emitter_dict = {'lamp': self.os.lamp_list, 'window': self.os.window_list}
-        emitter_rays_list = []
-
-        for emitter_type_index in emitter_type_index_list:
-            (emitter_type, _) = emitter_type_index
-            for emitter_index in range(len(emitter_dict[emitter_type])):
-                lpts_dict = sample_mesh_emitter(emitter_type, emitter_index=emitter_index, emitter_dict=emitter_dict, max_plate=max_plate, if_dense_sample=True)
-                rays_o_nerf = self.or2nerf_th(torch.from_numpy(lpts_dict['lpts']).to(self.device)) # convert to NeRF coordinates
-                rays_d_nerf = self.or2nerf_th(torch.from_numpy(-lpts_dict['lpts_normal']).to(self.device)) # convert to NeRF coordinates
-                # if self.dataset_type == 'Indoor':
-                #     rays_o_nerf = self.process_for_Indoor(rays_o_nerf)
-                rgbs = self.model.nerf(rays_o_nerf, rays_d_nerf)['rgb'] # queried d is incoming directions!
-                intensity = rgbs.detach().cpu().numpy() / self.rad_scale # get back to original scale, without hdr scaling
-                # intensity = intensity * 0. + 5.
-                print(white_blue('EST intensity'), np.linalg.norm(intensity, axis=-1))
-                emitter_rays_list.append({
-                    'v': lpts_dict['lpts'], 
-                    'd': lpts_dict['lpts_normal'] / (np.linalg.norm(lpts_dict['lpts_normal'], axis=-1, keepdims=True)+1e-5), 
-                    'l': np.linalg.norm(intensity, axis=-1, keepdims=True) * radiance_scale
-                    })
-
-                # emitter_rays = o3d.geometry.LineSet()
-                # emitter_rays.points = o3d.utility.Vector3dVector(np.vstack((lpts_dict['lpts'], lpts_end)))
-                # emitter_rays.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*lpts_dict['lpts'].shape[0])
-                # emitter_rays.lines = o3d.utility.Vector2iVector([[_, _+lpts_dict['lpts'].shape[0]] for _ in range(lpts_dict['lpts'].shape[0])])
-                # geometry_list.append([emitter_rays, 'emitter_rays'])
-
-        return {'emitter_rays_list': emitter_rays_list}
 
     def sample_shapes(
         self, 
@@ -470,209 +449,3 @@ class evaluator_scene_monosdf():
         if sample_type == 'rad':
             return_dict.update({'shape_rays_dict': shape_rays_dict})
         return return_dict
-
-    def sample_lighting(
-        self, 
-        sample_type: str='rad', 
-        subsample_rate_pts: int=1, 
-        if_use_mi_geometry: bool=True, 
-        if_use_loaded_envmap_position: bool=False, 
-        if_mask_off_emitters: bool=False, 
-        if_vis_envmap_2d_plt: bool=False, 
-        lighting_scale: float=1., 
-        ):
-
-        '''
-        sample non-emitter locations along hemisphere directions for incident radiance, from MonoSDF: images/demo_envmap_o3d_sampling.png
-        Args:
-            sample_type: 'rad' for querying radiance emitted FROM all points; 'incident-rad' for incident radiance TOWARDS all points
-        Results:
-            images/demo_eval_radMLP_rample_lighting_openrooms_1.png
-        '''
-        
-        assert sample_type in ['rad', 'incident-rad']
-        if if_use_mi_geometry:
-            assert self.os.if_has_mitsuba_all; normal_list = self.os.mi_normal_list
-        else:
-            assert False, 'use mi for GT geometry which was used to train MonoSDF!'
-            # assert self.os.if_has_depth_normal; normal_list = self.os.normal_list
-        batch_size = self.model.hparams.batch_size * 10
-        lighting_fused_list = []
-        lighting_envmap_list = []
-
-        print(white_blue('[evaluator_scene_rad] sampling %s for %d frames... subsample_rate_pts: %d'%('lighting_envmap', len(self.os.frame_id_list), subsample_rate_pts)))
-
-        for frame_idx in tqdm(range(len(self.os.frame_id_list))):
-            seg_obj = self.os.mi_seg_dict_of_lists['obj'][frame_idx] # (H, W), bool, [IMPORTANT] mask off emitter area!!
-            if not if_mask_off_emitters:
-                seg_obj = np.ones_like(seg_obj).astype(np.bool)
-
-            env_height, env_width, env_row, env_col = get_list_of_keys(self.os.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
-            downsize_ratio = self.os.lighting_params_dict.get('env_downsample_rate', 1) # over loaded envmap rows/cols
-            wi_num = env_height * env_width
-
-            '''
-            [emission] directions from a surface point to hemisphere directions
-            '''
-            if if_use_loaded_envmap_position:
-                assert if_use_mi_geometry
-                samples_d = self.os.process_loaded_envmap_axis_2d_for_frame(frame_idx).reshape(env_row, env_col, env_height*env_width, 3)[::downsize_ratio, ::downsize_ratio] # (env_row//downsize_ratio, env_col//downsize_ratio, wi_num, 3)
-            else:
-                samples_d = get_lighting_envmap_dirs_global(self.os.pose_list[frame_idx], normal_list[frame_idx], env_height, env_width) # (HW, wi_num, 3)
-                samples_d = samples_d.reshape(env_row, env_col, env_height*env_width, 3)[::downsize_ratio, ::downsize_ratio] # (env_row//downsize_ratio, env_col//downsize_ratio, wi_num, 3)
-            
-            seg_obj = seg_obj[::self.os.im_lighting_HW_ratios[0], ::self.os.im_lighting_HW_ratios[1]][::downsize_ratio, ::downsize_ratio]
-            assert seg_obj.shape[:2] == samples_d.shape[:2]
-
-            samples_d = samples_d[seg_obj].reshape(-1, 3) # (HW*wi_num, 3)
-            samples_o = self.os.mi_pts_list[frame_idx][::self.os.im_lighting_HW_ratios[0], ::self.os.im_lighting_HW_ratios[1]][::downsize_ratio, ::downsize_ratio] # (H, W, 3)
-            samples_o = np.expand_dims(samples_o[seg_obj].reshape(-1, 3), axis=1)
-            # samples_o = np.broadcast_to(samples_o, (samples_o.shape[0], wi_num, 3))
-            # samples_o = samples_o.view(-1, 3)
-            samples_o = np.repeat(samples_o, wi_num, axis=1).reshape(-1, 3) # (HW*wi_num, 3)
-            if sample_type == 'rad':
-                rays_d = samples_d
-                rays_o = samples_o
-            elif sample_type == 'incident-rad':
-                rays_d = -samples_d # from destination point, towards opposite direction
-                # [mitsuba.Interaction3f] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html#mitsuba.Interaction3f
-                # [mitsuba.SurfaceInteraction3f] https://mitsuba.readthedocs.io/en/latest/src/api_reference.html#mitsuba.SurfaceInteraction3f
-
-                ds_mi = mi.Vector3f(samples_d) # (HW*wi_num, 3)
-                # --- [V1] hack by adding a small offset to samples_o to reduce self-intersection: images/demo_incident_rays_V1.png
-                xs_mi = mi.Point3f(samples_o + samples_d * 1e-4) # (HW*wi_num, 3) [TODO] how to better handle self-intersection?
-                incident_rays_mi = mi.Ray3f(xs_mi, ds_mi)
-
-                # batch_sensor_dict = {
-                #     'type': 'batch', 
-                #     'film': {
-                #         'type': 'hdrfilm',
-                #         'width': 10,
-                #         'height': 1,
-                #         'pixel_format': 'rgb',
-                #     },
-                #     }
-                # mi_rad_list = []
-                # print(samples_d.shape[0])
-                # for _, (d, x) in tqdm(enumerate(zip(samples_d, samples_o))):
-                #     sensor = get_rad_meter_sensor(x, d, spp=32)
-                #     # print(x.shape, d.shape, sensor)
-                #     # batch_sensor_dict[str(_)] = sensor
-                #     image = mi.render(self.os.mi_scene, sensor=sensor)
-                #     mi_rad_list.append(image.numpy().flatten())
-
-                # # batch_sensor = mi.load_dict(batch_sensor_dict)
-                # mi_lighting_envmap = np.stack(mi_rad_list).reshape((self.os.H, self.os.W, env_height//downsize_ratio, env_width//downsize_ratio, 3))
-                # mi_lighting_envmap = mi_lighting_envmap.transpose((0, 1, 4, 2, 3))
-                # from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
-                # lighting_envmap_vis = np.clip(downsample_lighting_envmap(mi_lighting_envmap, lighting_scale=lighting_scale, downsize_ratio=1)**(1./2.2), 0., 1.)
-                # plt.figure()
-                # plt.imshow(lighting_envmap_vis)
-                # plt.show()
-
-
-                # scene = mi.load_file('/Users/jerrypiglet/Documents/Projects/dvgomm1/data/indoor_synthetic/kitchen/scene_v3.xml')
-                # sensor = get_rad_meter_sensor(samples_o, samples_d, spp=1)
-                # image = mi.render(self.os.mi_scene, sensor=sensor)
-                # image = mi.render(self.os.mi_scene, sensor=sensor)
-                # image = mi.render(self.os.mi_scene, sensor=batch_sensor)
-                # mi.util.write_bitmap("tmp.exr", image)
-                # import ipdb; ipdb.set_trace()
-
-
-                # --- [V2] try to expand mi_rays_ret to wi_num rays per-point; HOW TO?
-                # mi_rays_ret = self.os.mi_rays_ret_list[frame_idx] # (HW,) # [TODO how to get mi_rays_ret_expanded?
-                # mi_rays_ret_expanded = mi.SurfaceInteraction3f(
-                #     # t=mi.Float(mi_rays_ret.t.numpy()[..., np.newaxis].repeat(wi_num, 1).flatten()), 
-                #     # time=mi_rays_ret.time, 
-                #     wavelengths=mi_rays_ret.wavelengths, 
-                #     ps=mi.Point3f(mi_rays_ret.p.numpy()[:, np.newaxis, :].repeat(wi_num, 1).reshape(-1, 3)), 
-                #     # n=mi.Normal3f(mi_rays_ret.n.numpy()[:, np.newaxis, :].repeat(wi_num, 1).reshape(-1, 3)), 
-                # )
-                # --- [V3] expansive: re-generating camera rays where each pixel has wi_num rays: images/demo_incident_rays_V3.png
-                # (cam_rays_o, cam_rays_d, _) = self.os.cam_rays_list[frame_idx]
-                # cam_rays_o_flatten_expanded = cam_rays_o[:, :, np.newaxis, :].repeat(wi_num, 2).reshape(-1, 3)
-                # cam_rays_d_flatten_expanded = cam_rays_d[:, :, np.newaxis, :].repeat(wi_num, 2).reshape(-1, 3)
-                # cam_rays_xs_mi = mi.Point3f(cam_rays_o_flatten_expanded)
-                # cam_rays_ds_mi = mi.Vector3f(cam_rays_d_flatten_expanded)
-                # cam_rays_mi = mi.Ray3f(cam_rays_xs_mi, cam_rays_ds_mi)
-                # mi_rays_ret_expanded = self.os.mi_scene.ray_intersect(cam_rays_mi) # [mitsuba.Scene.ray_intersect] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
-                # incident_rays_mi = mi_rays_ret_expanded.spawn_ray(ds_mi)
-
-
-                ret = self.os.mi_scene.ray_intersect(incident_rays_mi) # [mitsuba.Scene.ray_intersect] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
-                rays_o = ret.p.numpy() # destination point
-                # >>>> debug to look for self-intersections (e.g. images/demo_self_intersection.png); use spawn rays instead to avoid self-intersection: https://mitsuba.readthedocs.io/en/stable/src/rendering/scripting_renderer.html#Spawning-rays
-                # plt.figure()
-                # plt.subplot(121)
-                # plt.imshow(self.os.im_sdr_list[frame_idx])
-                # plt.subplot(122)
-                # plt.imshow(np.amin(ret.t.numpy().reshape((self.os.H, self.os.W, wi_num)), axis=-1), cmap='jet')
-                # plt.colorbar()
-                # plt.title('[demo of self-intersection] distance to destination point (min among all rays')
-                # plt.show()
-                # <<<< debug
-
-            assert rays_d.shape == rays_o.shape # ray d and o to query MonoSDF
-            if subsample_rate_pts != 1:
-                rays_d = rays_d[::subsample_rate_pts]
-                rays_o = rays_o[::subsample_rate_pts]
-
-            # batching to prevent memory overflow
-            batch_num = math.ceil(rays_d.shape[0]*1.0/batch_size)
-            print(blue_text('Querying MonoSDF for %d batches of rays...')%batch_num)
-            rad_list = []
-            for b_id in tqdm(range(batch_num)):
-                b0 = b_id*batch_size
-                b1 = min((b_id+1)*batch_size, rays_d.shape[0])
-                rays_d_select = rays_d[b0:b1]
-                rays_o_select = rays_o[b0:b1]
-                rays_o_nerf = self.or2nerf_th(torch.from_numpy(rays_o_select).to(self.device))
-                rays_d_nerf = self.or2nerf_th(torch.from_numpy(-rays_d_select).to(self.device)) # nagate to comply with rad-inv coordinates
-                # if self.dataset_type == 'Indoor':
-                #     rays_o_nerf = self.process_for_Indoor(rays_o_nerf)
-                rgbs = self.model.nerf(rays_o_nerf, rays_d_nerf)['rgb']
-                rad = rgbs.detach().cpu().numpy() / self.rad_scale # get back to original scale, without hdr scaling
-                # rad = rad * 0. + 10.
-                rad_list.append(rad)
-            rad_all = np.concatenate(rad_list)
-            assert rad_all.shape[0] == rays_o.shape[0]
-
-            lighting_envmap = rad_all.reshape((env_row//downsize_ratio, env_col//downsize_ratio, env_height, env_width, 3))
-            lighting_envmap = lighting_envmap.transpose((0, 1, 4, 2, 3))
-            lighting_envmap_list.append(lighting_envmap)
-
-            if if_vis_envmap_2d_plt:
-                assert subsample_rate_pts == 1
-                assert not if_mask_off_emitters
-                plt.figure(figsize=(15, 15))
-                plt.subplot(311)
-                plt.imshow(self.os.im_sdr_list[frame_idx])
-                plt.subplot(312)
-                rad_im = lighting_envmap[self.os.H//4, self.os.W//4*3].transpose(1, 2, 0)
-                plt.imshow(np.clip((rad_im*lighting_scale)**(1./2.2), 0., 1.))
-                plt.subplot(313)
-                from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
-                lighting_envmap_vis = np.clip(downsample_lighting_envmap(lighting_envmap, lighting_scale=lighting_scale)**(1./2.2), 0., 1.)
-                plt.imshow(lighting_envmap_vis)
-                plt.show()
-
-            if subsample_rate_pts != 1:
-                samples_o = samples_o[::subsample_rate_pts]
-                samples_d = samples_d[::subsample_rate_pts]
-
-            lighting_fused_dict = {'pts_global_lighting': samples_o, 'axis': samples_d, 'weight': rad_all, 'pts_end': rays_o}
-            lighting_fused_list.append(lighting_fused_dict)
-
-        return {
-            'lighting_fused_list': lighting_fused_list, 
-            'lighting_envmap': lighting_envmap_list, 
-            }
-
-    # def process_for_Indoor(self, position):
-    #     assert isinstance(position, torch.Tensor)
-    #     # Liwen's model was trained using scene.obj (smaller) instead of scene_v3.xml (bigger), between which there is scaling and translation. self.os.cam_rays_list are acquired from the scene of scene_v3.xml
-    #     scale_m2b = torch.from_numpy(np.array([0.206,0.206,0.206], dtype=np.float32).reshape((1, 3))).to(position.device)
-    #     trans_m2b = torch.from_numpy(np.array([-0.074684,0.23965,-0.30727], dtype=np.float32).reshape((1, 3))).to(position.device)
-    #     position = scale_m2b * position + trans_m2b
-    #     return position

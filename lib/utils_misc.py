@@ -96,6 +96,10 @@ def yellow(text):
     coloredd = colored(text, 'blue', 'on_yellow')
     return coloredd
 
+def yellow_text(text):
+    coloredd = colored(text, 'yellow')
+    return coloredd
+
 # Model
 def magenta(text):
     coloredd = colored(text, 'white', 'on_magenta')
@@ -149,7 +153,7 @@ def colorize(gray, palette):
     color.putpalette(palette)
     return color
 
-def get_device(host: str):
+def get_device(host: str, device_id: int=-1):
     assert host in ['apple', 'mm1', 'qc'], 'Unsupported host: %s!'%host
     device = 'cpu'
     if host == 'apple':
@@ -157,8 +161,11 @@ def get_device(host: str):
             device = 'mps'
     else:
         if torch.cuda.is_available():
-            device = 'cuda'
-    # device = 'cpu'
+            if device_id == -1:
+                device = 'cuda'
+            else:
+                device = 'cuda:%d'%device_id
+
     if device == 'cpu':
         print(yellow('[WARNING] rendering could be slow because device is cpu at %s'%host))
     return device

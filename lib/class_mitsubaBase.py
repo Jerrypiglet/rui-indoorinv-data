@@ -15,8 +15,10 @@ import mitsuba as mi
 
 from lib.utils_io import load_img
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import green, white_red, green_text, yellow, white_blue
+from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
+
+from lib.utils_monosdf_scene import load_monosdf_shape, load_monosdf_scale_offset
 
 class mitsubaBase():
     '''
@@ -115,6 +117,40 @@ class mitsubaBase():
 
         print(green_text('DONE. [mi_sample_rays_pts] for %d frames...'%len(cam_rays_list)))
 
+    def load_monosdf_scene(self):
+        shape_file = Path(self.monosdf_shape_dict['shape_file'])
+        (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
+        # self.mi_scene = mi.load_file(str(self.xml_file))
+        '''
+        [!!!] transform to XML scene coords (scale & location) so that ray intersection for GT geometry does not have to adapt to ESTIMATED geometry
+        '''
+        self.mi_scene = mi.load_dict({
+            'type': 'scene',
+            'shape_id':{
+                'type': shape_file.suffix[1:],
+                'filename': str(shape_file), 
+                # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
+                'to_world': mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3), 
+            }
+        })
+
+    def load_monosdf_shape(self, shape_params_dict: dict):
+        '''
+        load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
+        '''
+        (scale, offset), _ = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
+        monosdf_shape_dict = load_monosdf_shape(Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, (scale, offset))
+        self.vertices_list.append(monosdf_shape_dict['vertices'])
+        self.faces_list.append(monosdf_shape_dict['faces'])
+        self.bverts_list.append(monosdf_shape_dict['bverts'])
+        self.bfaces_list.append(monosdf_shape_dict['bfaces'])
+        self.ids_list.append(monosdf_shape_dict['_id'])
+        
+        self.shape_list_valid.append(monosdf_shape_dict['shape_dict'])
+
+        self.xyz_max = np.maximum(np.amax(monosdf_shape_dict['vertices'], axis=0), self.xyz_max)
+        self.xyz_min = np.minimum(np.amin(monosdf_shape_dict['vertices'], axis=0), self.xyz_min)
+
     def mi_get_segs(self, if_also_dump_xml_with_lit_area_lights_only=True, if_dump=True):
         '''
         images/demo_mitsuba_ret_seg_2D.png; 
@@ -145,7 +181,7 @@ class mitsubaBase():
                 if mi_seg_area is None:
                     mi_seg_area_file_path.unlink()
                 else:
-                    print(yellow('loading mi_seg_emitter from %s'%str(mi_seg_area_file_folder)))
+                    print(yellow_text('loading mi_seg_emitter from'), '%s'%str(mi_seg_area_file_folder))
                     if_get_from_scratch = False
                     mi_seg_area = (mi_seg_area / 255.).astype(np.bool)
 

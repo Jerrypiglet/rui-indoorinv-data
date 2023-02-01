@@ -232,19 +232,19 @@ class openroomsScene2D(scene2DBase):
 
             self.hdr_scale_list = []
             if self.if_scale_hdr_per_frame:
+                hdr_scale_global = None
+            else:
                 hdr_scale_list_ = []
                 for im_hdr, seg_ori in zip(self.im_hdr_list, self.seg_dict_of_lists['ori']):
                     hdr_scale_ = scale_HDR(im_hdr, seg_ori[..., np.newaxis], fixed_scale=True, if_return_scale_only=True)
                     hdr_scale_list_.append(hdr_scale_)
                 hdr_scale_global = np.median(hdr_scale_list_)
-            else:
-                hdr_scale_global = None
 
             for _, (im_hdr, seg_ori) in enumerate(zip(self.im_hdr_list, self.seg_dict_of_lists['ori'])):
                 im_hdr_scaled, hdr_scale = scale_HDR(im_hdr, seg_ori[..., np.newaxis], scale_input=hdr_scale_global, if_clip_to_01=self.if_clip_HDR_to_01)
                 self.im_hdr_list[_] = im_hdr_scaled
                 self.hdr_scale_list.append(hdr_scale)
-              
+
         print(blue_text('[openroomsScene] DONE. load_im_hdr'))
 
 

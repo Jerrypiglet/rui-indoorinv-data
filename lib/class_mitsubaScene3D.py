@@ -56,6 +56,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         mi_params_dict: dict={'if_sample_rays_pts': True, 'if_sample_poses': False}, 
         if_debug_info: bool=False, 
         host: str='', 
+        device_id: int=-1, 
     ):
         scene2DBase.__init__(
             self, 
@@ -113,7 +114,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.far = cam_params_dict.get('far', 10.)
 
         self.host = host
-        self.device = get_device(self.host)
+        self.device = get_device(self.host, device_id)
 
         # self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
         self.pcd_color = None
@@ -248,7 +249,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         else:
             mi.set_variant(mi_variant_dict[self.host])
 
-        if self.monosdf_shape_dict == {}:
+        if self.monosdf_shape_dict != {}:
+            self.load_monosdf_scene()
+        else:
             self.mi_scene = mi.load_file(str(self.xml_file))
             if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
             if if_also_dump_xml_with_lit_area_lights_only:
@@ -256,22 +259,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 xml_file_lit_up_area_lights_only = dump_Indoor_area_lights_only_xml_for_mi(str(self.xml_file))
                 print(blue_text('XML (lit_up_area_lights_only) for Mitsuba dumped to: %s')%str(xml_file_lit_up_area_lights_only))
                 self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
-        else:
-            shape_file = self.scene_path / Path(self.monosdf_shape_dict['shape_file'])
-            (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
-            # self.mi_scene = mi.load_file(str(self.xml_file))
-            '''
-            [!!!] transform to XML scene coords (scale & location) so that ray intersection for GT geometry does not have to adapt to ESTIMATED geometry
-            '''
-            self.mi_scene = mi.load_dict({
-                'type': 'scene',
-                'shape_id':{
-                    'type': shape_file.suffix[1:],
-                    'filename': str(shape_file), 
-                    # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
-                    'to_world': mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3), 
-                }
-            })
 
     def process_mi_scene(self, mi_params_dict={}):
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
@@ -569,29 +556,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.ids_list = []
         self.bverts_list = []
         self.bfaces_list = []
-
-        self.window_list = []
-        self.lamp_list = []
-
-        self.xyz_max = np.zeros(3,)-np.inf
-        self.xyz_min = np.zeros(3,)+np.inf
         
         if self.monosdf_shape_dict != {}:
-            '''
-            load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
-            '''
-            (scale, offset), _ = load_monosdf_scale_offset(self.scene_path / Path(self.monosdf_shape_dict['camera_file']))
-            monosdf_shape_dict = load_monosdf_shape(self.scene_path / Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, (scale, offset))
-            self.vertices_list.append(monosdf_shape_dict['vertices'])
-            self.faces_list.append(monosdf_shape_dict['faces'])
-            self.bverts_list.append(monosdf_shape_dict['bverts'])
-            self.bfaces_list.append(monosdf_shape_dict['bfaces'])
-            self.ids_list.append(monosdf_shape_dict['_id'])
-            
-            self.shape_list_valid.append(monosdf_shape_dict['shape_dict'])
-
-            self.xyz_max = np.maximum(np.amax(monosdf_shape_dict['vertices'], axis=0), self.xyz_max)
-            self.xyz_min = np.minimum(np.amin(monosdf_shape_dict['vertices'], axis=0), self.xyz_min)
+            self.load_monosdf_shape(shape_params_dict=shape_params_dict)
         else:
             if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
             sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
@@ -605,6 +572,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
             remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
 
+            self.window_list = []
+            self.lamp_list = []
+
+            self.xyz_max = np.zeros(3,)-np.inf
+            self.xyz_min = np.zeros(3,)+np.inf
             if if_sample_mesh:
                 self.sample_pts_list = []
 

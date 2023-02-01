@@ -28,8 +28,8 @@ import matplotlib.pyplot as plt
 work with Mitsuba/Blender scenes
 '''
 import sys
-# host = 'mm1'
-host = 'apple'
+host = 'mm1'
+# host = 'apple'
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
     'mm1': '', 
@@ -71,7 +71,6 @@ scan_id = 'scan1'
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
 xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
-
 
 openrooms_scene = openroomsScene3D(
     if_debug_info=False, 
@@ -170,7 +169,7 @@ out_names = [scan_id]
 for scene, out_name in zip(scenes, out_names):
     out_path = os.path.join(out_path_prefix, out_name)
     os.makedirs(out_path, exist_ok=True)
-    print(out_path)
+    print('====>', out_path)
 
     folders = ["image", "mask", "depth", "normal"]
     for folder in folders:
@@ -257,12 +256,12 @@ for scene, out_name in zip(scenes, out_names):
     import mitsuba as mi
     mi.set_variant('llvm_ad_rgb')
 
+    assert openrooms_scene.hdr_scale_list.count(openrooms_scene.hdr_scale_list[0]) == len(openrooms_scene.hdr_scale_list)
+
     for idx, pose in tqdm(enumerate(poses)):
         # print(idx, valid)
         # if idx % 10 != 0: continue
         # if not valid : continue
-
-
         # ==== HDR
         target_image_hdr = os.path.join(out_path, "image/%06d.exr"%(idx))
         # shutil.copy(openrooms_scene.im_hdr_file_list[idx], target_image_hdr)

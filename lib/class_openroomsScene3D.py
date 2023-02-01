@@ -78,8 +78,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         self.modality_list = self.check_and_sort_modalities(list(set(self.modality_list)))
         self.shapes_root, self.layout_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'layout_root', 'envmaps_root'], [PosixPath, PosixPath, PosixPath])
         self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
+        self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})
         self.pcd_color = None
-
 
         '''
         load everything
@@ -176,37 +176,40 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             )
         print(blue_text('XML for Mitsuba dumped to: %s')%str(self.mi_xml_dump_path))
 
-        self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
-        if if_also_dump_xml_with_lit_area_lights_only:
-            self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'))
-
-        debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
-        if debug_dump_mesh:
-            '''
-            images/demo_mitsuba_dump_meshes.png
-            '''
-            mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
-            if mesh_dump_root.exists():
-                shutil.rmtree(str(mesh_dump_root))
-            mesh_dump_root.mkdir()
-
-            for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
-                shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
-
-        debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
-        if debug_render_test_image:
-            '''
-            images/demo_mitsuba_render.png
-            '''
-            print(blue_text('Rendering... test frame by Mitsuba: %s')%str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'))
-            image = mi.render(self.mi_scene, spp=64)
-            mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'), image)
-            mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
+        if self.monosdf_shape_dict != {}:
+            self.load_monosdf_scene()
+        else:
+            self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
             if if_also_dump_xml_with_lit_area_lights_only:
-                image = mi.render(self.mi_scene_lit_up_area_lights_only, spp=64)
-                mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render_lit_up_area_lights_only.exr'), image)
+                self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'))
 
-            print(blue_text('DONE.'))
+            debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
+            if debug_dump_mesh:
+                '''
+                images/demo_mitsuba_dump_meshes.png
+                '''
+                mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
+                if mesh_dump_root.exists():
+                    shutil.rmtree(str(mesh_dump_root))
+                mesh_dump_root.mkdir()
+
+                for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
+                    shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
+
+            debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
+            if debug_render_test_image:
+                '''
+                images/demo_mitsuba_render.png
+                '''
+                print(blue_text('Rendering... test frame by Mitsuba: %s')%str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'))
+                image = mi.render(self.mi_scene, spp=64)
+                mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'), image)
+                mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
+                if if_also_dump_xml_with_lit_area_lights_only:
+                    image = mi.render(self.mi_scene_lit_up_area_lights_only, spp=64)
+                    mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render_lit_up_area_lights_only.exr'), image)
+
+                print(blue_text('DONE.'))
 
         if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
         if if_sample_rays_pts:
@@ -234,158 +237,161 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         if self.if_loaded_shapes: return
 
-        if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', False)
-        if_load_emitter_mesh = shape_params_dict.get('if_load_emitter_mesh', False)
-        print(white_blue('[openroomsScene3D] load_shapes for scene...'))
+        if self.monosdf_shape_dict != {}:
+            self.load_monosdf_shape(shape_params_dict=shape_params_dict)
+        else:
+            if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', False)
+            if_load_emitter_mesh = shape_params_dict.get('if_load_emitter_mesh', False)
+            print(white_blue('[openroomsScene3D] load_shapes for scene...'))
 
-        if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
-        sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
-        sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
-        sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
+            if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
+            sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
+            sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
+            sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
 
-        if_simplify_mesh = shape_params_dict.get('if_simplify_mesh', False)
-        simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
-        simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
-        simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
-        if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
-        remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
+            if_simplify_mesh = shape_params_dict.get('if_simplify_mesh', False)
+            simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
+            simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
+            simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
+            if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
+            remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
 
-        # load emitter properties from light*.dat files of **a specific N_ambient_representation**
-        self.emitter_dict_of_lists_world = load_emitter_dat_world(light_dir=self.scene_rendering_path, N_ambient_rep=self.emitter_params_dict['N_ambient_rep'], if_save_storage=self.if_save_storage)
+            # load emitter properties from light*.dat files of **a specific N_ambient_representation**
+            self.emitter_dict_of_lists_world = load_emitter_dat_world(light_dir=self.scene_rendering_path, N_ambient_rep=self.emitter_params_dict['N_ambient_rep'], if_save_storage=self.if_save_storage)
 
-        # load general shapes and emitters, and fuse with previous emitter properties
-        # print(main_xml_file)
-        root = get_XML_root(self.xml_file)
+            # load general shapes and emitters, and fuse with previous emitter properties
+            # print(main_xml_file)
+            root = get_XML_root(self.xml_file)
 
-        self.shape_list_ori, self.emitter_list = parse_XML_for_shapes_global(
-            root=root, 
-            scene_xml_path=self.scene_xml_path, 
-            root_uv_mapped=self.shapes_root, 
-            root_layoutMesh=self.layout_root, 
-            root_EnvDataset=self.envmaps_root, 
-            if_return_emitters=True, 
-            light_dat_lists=self.emitter_dict_of_lists_world)
+            self.shape_list_ori, self.emitter_list = parse_XML_for_shapes_global(
+                root=root, 
+                scene_xml_path=self.scene_xml_path, 
+                root_uv_mapped=self.shapes_root, 
+                root_layoutMesh=self.layout_root, 
+                root_EnvDataset=self.envmaps_root, 
+                if_return_emitters=True, 
+                light_dat_lists=self.emitter_dict_of_lists_world)
 
-        assert self.shape_list_ori[0]['filename'].endswith('uv_mapped.obj')
-        assert self.shape_list_ori[1]['filename'].endswith('container.obj')
-        assert self.emitter_list[0]['emitter_prop']['if_env'] == True # first of emitter_list is the env
+            assert self.shape_list_ori[0]['filename'].endswith('uv_mapped.obj')
+            assert self.shape_list_ori[1]['filename'].endswith('container.obj')
+            assert self.emitter_list[0]['emitter_prop']['if_env'] == True # first of emitter_list is the env
 
-        # start to load objects
+            # start to load objects
 
-        self.vertices_list = []
-        self.faces_list = []
-        self.ids_list = []
-        self.bverts_list = []
-        
-        if if_sample_mesh:
-            self.sample_pts_list = []
-
-        light_axis_list = []
-        # self.num_vertices = 0
-        obj_path_list = []
-        self.shape_list_valid = []
-        self.window_list = []
-        self.lamp_list = []
-        
-        print(blue_text('[openroomsScene3D] loading %d shapes and %d emitters...'%(len(self.shape_list_ori), len(self.emitter_list[1:]))))
-
-        self.emitter_env = self.emitter_list[0] # e.g. {'if_emitter': True, 'emitter_prop': {'emitter_type': 'envmap', 'if_env': True, 'emitter_filename': '.../EnvDataset/1611L.hdr', 'emitter_scale': 164.1757}}
-        assert self.emitter_env['if_emitter']
-        assert self.emitter_env['emitter_prop']['emitter_type'] == 'envmap'
-
-        for shape_idx, shape_dict in tqdm(enumerate(self.shape_list_ori + self.emitter_list[1:])): # self.emitter_list[0] is the envmap
-            if 'container' in shape_dict['filename']:
-                continue
+            self.vertices_list = []
+            self.faces_list = []
+            self.ids_list = []
+            self.bverts_list = []
             
-            _id = shape_dict['id'] + '_' + shape_dict['random_id']
+            if if_sample_mesh:
+                self.sample_pts_list = []
+
+            light_axis_list = []
+            # self.num_vertices = 0
+            obj_path_list = []
+            self.shape_list_valid = []
+            self.window_list = []
+            self.lamp_list = []
             
-        #     if_emitter = shape_dict['if_emitter'] and 'combined_filename' in shape_dict['emitter_prop'] and shape_idx >= len(shape_list)
-            if_emitter = shape_dict['if_in_emitter_dict']
-            if if_emitter:
-                obj_path = shape_dict['emitter_prop']['emitter_filename']
-        #         obj_path = shape_dict['filename']
-            else:
-                obj_path = shape_dict['filename']
+            print(blue_text('[openroomsScene3D] loading %d shapes and %d emitters...'%(len(self.shape_list_ori), len(self.emitter_list[1:]))))
 
-            bbox_file_path = obj_path.replace('.obj', '.pickle')
-            if 'layoutMesh' in bbox_file_path:
-                bbox_file_path = Path('layoutMesh') / Path(bbox_file_path).relative_to(self.root_path_dict['layout_root'])
-            elif 'uv_mapped' in bbox_file_path: # box mesh for the enclosure of the room (walls, ceiling and floor)
-                bbox_file_path = Path('uv_mapped') / Path(bbox_file_path).relative_to(self.root_path_dict['shapes_root'])
-            bbox_file_path = self.root_path_dict['shape_pickles_root'] / bbox_file_path
+            self.emitter_env = self.emitter_list[0] # e.g. {'if_emitter': True, 'emitter_prop': {'emitter_type': 'envmap', 'if_env': True, 'emitter_filename': '.../EnvDataset/1611L.hdr', 'emitter_scale': 164.1757}}
+            assert self.emitter_env['if_emitter']
+            assert self.emitter_env['emitter_prop']['emitter_type'] == 'envmap'
 
-            #  Path(bbox_file_path).exists(), 'Rerun once first with if_load_mesh=True, to dump pickle files for shapes to %s'%bbox_file_path
-            
-            if_load_mesh = if_load_obj_mesh if not if_emitter else if_load_emitter_mesh
-
-            if if_load_mesh: # or (not Path(bbox_file_path).exists()):
-                if_convert_to_double_sided = 'uv_mapped.obj' in str(obj_path) # convert uv_mapped.obj to double sides mesh (OpenRooms only)
-                # if_convert_to_double_sided = False
-                vertices, faces = loadMesh(obj_path, if_convert_to_double_sided=if_convert_to_double_sided) # based on L430 of adjustObjectPoseCorrectChairs.py
-                bverts, bfaces = computeBox(vertices)
-                if not Path(bbox_file_path).exists():
-                    Path(bbox_file_path).parent.mkdir(parents=True, exist_ok=True)
-                    with open(bbox_file_path, "wb") as f:
-                        pickle.dump(dict(bverts=bverts, bfaces=bfaces), f)
+            for shape_idx, shape_dict in tqdm(enumerate(self.shape_list_ori + self.emitter_list[1:])): # self.emitter_list[0] is the envmap
+                if 'container' in shape_dict['filename']:
+                    continue
                 
-                # --a bunch of fixes if broken meshes; SLOW--
-                # _ = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
-                # # trimesh.repair.fix_inversion(_)
-                # trimesh.repair.fix_normals(_)
-                # # trimesh.repair.fill_holes(_)
-                # # trimesh.repair.fix_winding(_)
-                # vertices, faces = _.vertices, _.faces+1
+                _id = shape_dict['id'] + '_' + shape_dict['random_id']
+                
+            #     if_emitter = shape_dict['if_emitter'] and 'combined_filename' in shape_dict['emitter_prop'] and shape_idx >= len(shape_list)
+                if_emitter = shape_dict['if_in_emitter_dict']
+                if if_emitter:
+                    obj_path = shape_dict['emitter_prop']['emitter_filename']
+            #         obj_path = shape_dict['filename']
+                else:
+                    obj_path = shape_dict['filename']
 
-                # --sample mesh--
-                if if_sample_mesh:
-                    sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
-                    self.sample_pts_list.append(sample_pts)
-                    # print(sample_pts.shape[0])
+                bbox_file_path = obj_path.replace('.obj', '.pickle')
+                if 'layoutMesh' in bbox_file_path:
+                    bbox_file_path = Path('layoutMesh') / Path(bbox_file_path).relative_to(self.root_path_dict['layout_root'])
+                elif 'uv_mapped' in bbox_file_path: # box mesh for the enclosure of the room (walls, ceiling and floor)
+                    bbox_file_path = Path('uv_mapped') / Path(bbox_file_path).relative_to(self.root_path_dict['shapes_root'])
+                bbox_file_path = self.root_path_dict['shape_pickles_root'] / bbox_file_path
 
-                # --simplify mesh--
-                if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
-                    vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh=if_remesh, remesh_max_edge=remesh_max_edge)
-                    if N_triangles != faces.shape[0]:
-                        print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
-            else:
-                with open(bbox_file_path, "rb") as f:
-                    bbox_dict = pickle.load(f)
-                bverts, bfaces = bbox_dict['bverts'], bbox_dict['bfaces']
+                #  Path(bbox_file_path).exists(), 'Rerun once first with if_load_mesh=True, to dump pickle files for shapes to %s'%bbox_file_path
+                
+                if_load_mesh = if_load_obj_mesh if not if_emitter else if_load_emitter_mesh
 
-            if if_load_mesh:
-                vertices_transformed, _ = transform_with_transforms_xml_list(shape_dict['transforms_list'], vertices)
-            bverts_transformed, transforms_converted_list = transform_with_transforms_xml_list(shape_dict['transforms_list'], bverts)
+                if if_load_mesh: # or (not Path(bbox_file_path).exists()):
+                    if_convert_to_double_sided = 'uv_mapped.obj' in str(obj_path) # convert uv_mapped.obj to double sides mesh (OpenRooms only)
+                    # if_convert_to_double_sided = False
+                    vertices, faces = loadMesh(obj_path, if_convert_to_double_sided=if_convert_to_double_sided) # based on L430 of adjustObjectPoseCorrectChairs.py
+                    bverts, bfaces = computeBox(vertices)
+                    if not Path(bbox_file_path).exists():
+                        Path(bbox_file_path).parent.mkdir(parents=True, exist_ok=True)
+                        with open(bbox_file_path, "wb") as f:
+                            pickle.dump(dict(bverts=bverts, bfaces=bfaces), f)
+                    
+                    # --a bunch of fixes if broken meshes; SLOW--
+                    # _ = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
+                    # # trimesh.repair.fix_inversion(_)
+                    # trimesh.repair.fix_normals(_)
+                    # # trimesh.repair.fill_holes(_)
+                    # # trimesh.repair.fix_winding(_)
+                    # vertices, faces = _.vertices, _.faces+1
 
-            y_max = bverts_transformed[:, 1].max()
-            points_2d = bverts_transformed[abs(bverts_transformed[:, 1] - y_max) < 1e-5, :]
-            if points_2d.shape[0] != 4:
-                assert if_load_mesh
-                bverts_transformed, bfaces = computeBox(vertices_transformed) # dealing with cases like pillow, where its y axis after transformation does not align with world's (because pillows do not have to stand straight)
+                    # --sample mesh--
+                    if if_sample_mesh:
+                        sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
+                        self.sample_pts_list.append(sample_pts)
+                        # print(sample_pts.shape[0])
+
+                    # --simplify mesh--
+                    if if_simplify_mesh and simplify_mesh_ratio != 1.: # not simplying for mesh with very few faces
+                        vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh=if_remesh, remesh_max_edge=remesh_max_edge)
+                        if N_triangles != faces.shape[0]:
+                            print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
+                else:
+                    with open(bbox_file_path, "rb") as f:
+                        bbox_dict = pickle.load(f)
+                    bverts, bfaces = bbox_dict['bverts'], bbox_dict['bfaces']
+
+                if if_load_mesh:
+                    vertices_transformed, _ = transform_with_transforms_xml_list(shape_dict['transforms_list'], vertices)
+                bverts_transformed, transforms_converted_list = transform_with_transforms_xml_list(shape_dict['transforms_list'], bverts)
+
+                y_max = bverts_transformed[:, 1].max()
+                points_2d = bverts_transformed[abs(bverts_transformed[:, 1] - y_max) < 1e-5, :]
+                if points_2d.shape[0] != 4:
+                    assert if_load_mesh
+                    bverts_transformed, bfaces = computeBox(vertices_transformed) # dealing with cases like pillow, where its y axis after transformation does not align with world's (because pillows do not have to stand straight)
+                
+                # if not(any(ext in shape_dict['filename'] for ext in ['window', 'door', 'lamp'])):
             
-            # if not(any(ext in shape_dict['filename'] for ext in ['window', 'door', 'lamp'])):
+                obj_path_list.append(obj_path)
         
-            obj_path_list.append(obj_path)
-    
-            if if_load_mesh:
-                self.vertices_list.append(vertices_transformed)
-                # self.faces_list.append(faces+self.num_vertices)
-                # if '/uv_mapped.obj' in shape_dict['filename']:
-                #     faces = flip_ceiling_normal(faces, vertices)
-                self.faces_list.append(faces)
-                # self.num_vertices += vertices_transformed.shape[0]
-            else:
-                self.vertices_list.append(None)
-                self.faces_list.append(None)
-            self.bverts_list.append(bverts_transformed)
-            self.ids_list.append(_id)
-            
-            self.shape_list_valid.append(shape_dict)
+                if if_load_mesh:
+                    self.vertices_list.append(vertices_transformed)
+                    # self.faces_list.append(faces+self.num_vertices)
+                    # if '/uv_mapped.obj' in shape_dict['filename']:
+                    #     faces = flip_ceiling_normal(faces, vertices)
+                    self.faces_list.append(faces)
+                    # self.num_vertices += vertices_transformed.shape[0]
+                else:
+                    self.vertices_list.append(None)
+                    self.faces_list.append(None)
+                self.bverts_list.append(bverts_transformed)
+                self.ids_list.append(_id)
+                
+                self.shape_list_valid.append(shape_dict)
 
-            if if_emitter:
-                if shape_dict['emitter_prop']['obj_type'] == 'window':
-                    self.window_list.append((shape_dict, vertices_transformed, faces))
-                elif shape_dict['emitter_prop']['obj_type'] == 'obj':
-                    self.lamp_list.append((shape_dict, vertices_transformed, faces))
+                if if_emitter:
+                    if shape_dict['emitter_prop']['obj_type'] == 'window':
+                        self.window_list.append((shape_dict, vertices_transformed, faces))
+                    elif shape_dict['emitter_prop']['obj_type'] == 'obj':
+                        self.lamp_list.append((shape_dict, vertices_transformed, faces))
 
         self.if_loaded_shapes = True
 

@@ -19,19 +19,29 @@ INV_NERF_ROOT = {
     'qc': '', 
 }[host]
 sys.path.insert(0, PATH_HOME)
+MONOSDF_ROOT = {
+    'apple': '/Users/jerrypiglet/Documents/Projects/monosdf', 
+    'mm1': '/home/ruizhu/Documents/Projects/monosdf', 
+    'qc': '', 
+}[host]
+
 from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
+from lib.utils_misc import str2bool
 
 from lib.class_openroomsScene3D import openroomsScene3D
+
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
+
 from lib.class_diff_renderer_openroomsScene_3D import diff_renderer_openroomsScene_3D
+
 from lib.class_eval_rad import evaluator_scene_rad
 from lib.class_eval_inv import evaluator_scene_inv
+from lib.class_eval_monosdf import evaluator_scene_monosdf
 
-from lib.utils_misc import str2bool
 import argparse
 parser = argparse.ArgumentParser()
 # visualizers
@@ -57,6 +67,8 @@ parser.add_argument('--if_add_est_from_eval', type=str2bool, nargs='?', const=Tr
 parser.add_argument('--if_add_color_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if colorize mesh vertices with values from evaluator')
 # evaluator for inv-MLP
 parser.add_argument('--eval_inv', type=str2bool, nargs='?', const=True, default=False, help='eval trained inv-MLP')
+# evaluator for MonoSDF
+parser.add_argument('--eval_monosdf', type=str2bool, nargs='?', const=True, default=False, help='eval trained MonoSDF')
 
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
@@ -127,12 +139,24 @@ radiance_scale = 0.001
 base_root = Path(PATH_HOME) / 'data' / dataset_version
 xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
 
+monosdf_shape_dict = {
+    '_shape_normalized': 'normalized', 
+    'shape_file': str(Path(MONOSDF_ROOT) / 'exps/public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1/2023_01_20_13_38_20/plots/public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1_epoch380.ply'), 
+    'camera_file': str(Path(MONOSDF_ROOT) / 'data/public_re_3_v3pose_2048-main_xml-scene0008_00_morerescaledSDR/scan1/cameras.npz'), 
+    } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
+# monosdf_shape_dict = {}
+
 openrooms_scene = openroomsScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
         'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root}, 
-    scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
+    scene_params_dict={
+        'meta_split': meta_split, 
+        'scene_name': scene_name, 
+        'frame_id_list': frame_ids, 
+        'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
+        }, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'im_sdr', 
@@ -144,7 +168,7 @@ openrooms_scene = openroomsScene3D(
         # 'lighting_SG', 
         # 'lighting_envmap', 
         # 'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
     modality_filename_dict = {
@@ -163,7 +187,8 @@ openrooms_scene = openroomsScene3D(
     im_params_dict={
         'im_H_load': 480, 'im_W_load': 640, 
         # 'im_H_resize': 240, 'im_W_resize': 320, 
-        'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
+        # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
+        'im_H_resize': 480, 'im_W_resize': 640, # to use for rendering so that im dimensions == lighting dimensions
         # 'im_H_resize': 6, 'im_W_resize': 8, # to use for rendering so that im dimensions == lighting dimensions
         'if_direct_lighting': False, # if load direct lighting envmaps and SGs inetad of total lighting
         # 'im_hdr_ext': 'hdr', 
@@ -283,6 +308,45 @@ if opt.eval_inv:
             eval_return_dict[k].update(_[k])
         else:
             eval_return_dict[k] = _[k]
+
+if opt.eval_monosdf:
+    assert openrooms_scene.hdr_scale_list.count(openrooms_scene.hdr_scale_list[0]) == len(openrooms_scene.hdr_scale_list)
+
+    evaluator_monosdf = evaluator_scene_monosdf(
+        host=host, 
+        scene_object=openrooms_scene, 
+        MONOSDF_ROOT = MONOSDF_ROOT, 
+        conf_path='public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1/2023_01_20_13_38_20/runconf.conf', 
+        ckpt_path='public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1/2023_01_20_13_38_20/checkpoints/ModelParameters/latest.pth', 
+        rad_scale= 1. / openrooms_scene.hdr_scale_list[0] * (1./5.), 
+    )
+
+    # evaluator_monosdf.export_mesh()
+
+    evaluator_monosdf.render_im_scratch(
+        frame_id=0, offset_in_scan=202, 
+        # if_integrate=False, 
+        if_integrate=True, 
+        if_plt=True, 
+        )
+
+    # evaluator_monosdf.render_im(
+    #     frame_id=0, offset_in_scan=202, 
+    #     if_plt=False
+    #     )
+
+    # [!!!] set 'mesh_color_type': 'eval-rad'
+    # eval_return_dict.update(
+    #     evaluator_monosdf.sample_shapes(
+    #         sample_type='rad', # ['rad']
+    #         shape_params={
+    #             'radiance_scale': 1., 
+    #         }
+    #     )
+    # )
+    # np.save('test_files/eval_return_dict.npy', eval_return_dict)
+
+# eval_return_dict = np.load('test_files/eval_return_dict.npy', allow_pickle=True).item(); opt.eval_monosdf = True
 
 '''
 Differential renderers
