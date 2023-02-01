@@ -33,6 +33,8 @@ class evaluator_scene_inv():
         split: str='val', 
         # rad_scale: float=1., 
         spec: bool=True, 
+        if_monosdf: bool=False, 
+        monosdf_shape_dict: dict={}, 
     ):
         sys.path.insert(0, str(INV_NERF_ROOT))
         self.INV_NERF_ROOT = Path(INV_NERF_ROOT)
@@ -75,6 +77,8 @@ class evaluator_scene_inv():
             if_load_baked=True, 
             scene_object=scene_object, 
             spec=spec, 
+            if_monosdf=if_monosdf, 
+            monosdf_shape_dict=monosdf_shape_dict, 
         ).to(self.device)
 
         checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
@@ -109,7 +113,7 @@ class evaluator_scene_inv():
             - radiance_scale: rescale radiance magnitude (because radiance can be large, e.g. 500, 3000)
         '''
         assert self.os.if_loaded_shapes
-        assert sample_type in ['emission_mask'] #, 'albedo', 'roughness', 'metallic']
+        assert sample_type in ['emission_mask', 'albedo', 'roughness', 'metallic']
 
         return_dict = {}
         samples_v_dict = {}
@@ -118,16 +122,17 @@ class evaluator_scene_inv():
 
         for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
             assert np.amin(faces) == 1
+            positions_nerf = self.or2nerf_th(torch.from_numpy(vertices).float().to(self.device)) # convert to NeRF coordinates
             if sample_type == 'emission_mask':
-                positions_nerf = self.or2nerf_th(torch.from_numpy(vertices).float().to(self.device)) # convert to NeRF coordinates
                 emission_mask = self.model.emission_mask(positions_nerf)
                 emission_mask_np = emission_mask.detach().cpu().numpy()
                 alpha_np = (1 - torch.exp(-emission_mask.relu())).detach().cpu().numpy()
-                # print(torch.amax(emission_mask), torch.amin(emission_mask), torch.amax(alpha_np), torch.amin(alpha_np))
-                # rads = rgbs.detach().cpu().numpy() / self.rad_scale * radiance_scale # get back to original scale, without hdr scaling
                 samples_v_dict[_id] = ('emission_mask', emission_mask_np)
                 # samples_v_dict[_id] = ('emission_mask', alpha_np)
-                # print('>', _id, np.amax(emission_mask_np), np.amin(emission_mask_np), np.amax(alpha_np), np.amin(alpha_np), )
+            elif sample_type in ['albedo', 'metallic', 'roughness']:
+                mat = self.model.material(positions_nerf).sigmoid()
+                albedo_np, metallic_np, roughness_np = mat[...,:3].detach().cpu().numpy(), mat[...,3:4].detach().cpu().numpy(), mat[...,4:5].detach().cpu().numpy()
+                samples_v_dict[_id] = {'albedo': ('albedo', albedo_np), 'metallic': ('metallic', metallic_np), 'roughness': ('roughness', roughness_np)}[sample_type]
 
         return_dict.update({'samples_v_dict': samples_v_dict})
         return return_dict

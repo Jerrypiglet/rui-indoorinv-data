@@ -99,12 +99,12 @@ emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1;
 # split = 'val'; frame_ids = list(range(10))
 split = 'val'; frame_ids = [0]
 
-# monosdf_shape_dict = {
-#     '_shape_normalized': 'normalized', 
-#     'shape_file': str(Path(MONOSDF_ROOT) / 'exps/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/plots/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply'), 
-#     'camera_file': str(Path(MONOSDF_ROOT) / 'data/kitchen/trainval/cameras.npz'), 
-#     } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
-monosdf_shape_dict = {}
+monosdf_shape_dict = {
+    '_shape_normalized': 'normalized', 
+    'shape_file': str(Path(MONOSDF_ROOT) / 'exps/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/plots/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply'), 
+    'camera_file': str(Path(MONOSDF_ROOT) / 'data/kitchen/trainval/cameras.npz'), 
+    } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
+# monosdf_shape_dict = {}
 
 mitsuba_scene = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -317,17 +317,19 @@ if opt.eval_inv:
         host=host, 
         scene_object=mitsuba_scene, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='20230111-191305-inv_kitchen_190-10_specT/last.ckpt', # 110
+        ckpt_path='20230127-001044-tmp/last.ckpt', # 110
         dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
         split=split, 
         spec=True, 
+        if_monosdf=monosdf_shape_dict=={}, 
+        monosdf_shape_dict=monosdf_shape_dict, 
     )
 
     '''
     sample emission mask on shape vertices
     '''
     _ = evaluator_inv.sample_shapes(
-        sample_type='emission_mask', # ['']
+        sample_type='emission_mask', # ['emission_mask', 'albedo', 'metallic', 'roughness']
         shape_params={
         }
     )
@@ -562,8 +564,7 @@ if opt.vis_3d_o3d:
             'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from mitsuba_scene.sample_pts_list if available
-            'mesh_color_type': 'eval-vis_count', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count', 'eval-t']
-            # 'mesh_color_type': 'eval-t', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count]
+            'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
         },
         emitter_params={
             # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)

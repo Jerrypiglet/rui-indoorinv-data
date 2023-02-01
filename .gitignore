@@ -19,7 +19,7 @@ test_files/
 test_scripts/*.hdr
 test_scripts/*.obj
 checkpoints
-
+ScreenCapture*
 tmp*
 README.md.orig*
 README.md.toc*

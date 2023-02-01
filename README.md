@@ -4,31 +4,31 @@
 <!--See https://github.com/ekalinin/github-markdown-toc#readme-->
 
 <!--ts-->
-* [Description](#description)
-* [Dependencies](#dependencies)
-   * [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
-* [Dataset structure](#dataset-structure)
-* [Notes on coordinate systems](#notes-on-coordinate-systems)
-* [Usage](#usage)
-   * [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
-   * [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
-      * [Matplotlib viewer](#matplotlib-viewer)
-      * [Open3D viewer](#open3d-viewer)
-      * [MonoSDF results loader](#monosdf-results-loader)
-   * [3D differentiable renderer](#3d-differentiable-renderer)
-      * [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
-      * [Direct-lighting-only renderer](#direct-lighting-only-renderer)
-   * [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
-   * [Evaluator](#evaluator)
-      * [rad-MLP](#rad-mlp)
-      * [inv-MLP](#inv-mlp)
-      * [MonoSDF](#monosdf)
-   * [Evaluator for scene/shape properties](#evaluator-for-sceneshape-properties)
-      * [view coverage](#view-coverage)
-   * [Other utilities](#other-utilities)
-      * [Sample camera poses for new Mitsuba scene](#sample-camera-poses-for-new-mitsuba-scene)
-* [Checklist for getting started](#checklist-for-getting-started)
-* [Todolist](#todolist)
+- [Description](#description)
+- [Dependencies](#dependencies)
+  - [Mitsuba 3 based inference, and notes on installation on ARM64 Mac](#mitsuba-3-based-inference-and-notes-on-installation-on-arm64-mac)
+- [Dataset structure](#dataset-structure)
+- [Notes on coordinate systems](#notes-on-coordinate-systems)
+- [Usage](#usage)
+  - [2D dataloader and visualizer](#2d-dataloader-and-visualizer)
+  - [3D dataloader and visualizer](#3d-dataloader-and-visualizer)
+    - [Matplotlib viewer](#matplotlib-viewer)
+    - [Open3D viewer](#open3d-viewer)
+    - [MonoSDF results loader](#monosdf-results-loader)
+  - [3D differentiable renderer](#3d-differentiable-renderer)
+    - [Full lighting renderers from ground truth lighting](#full-lighting-renderers-from-ground-truth-lighting)
+    - [Direct-lighting-only renderer](#direct-lighting-only-renderer)
+  - [Renderer via Mitsuba or Blender](#renderer-via-mitsuba-or-blender)
+  - [Evaluator](#evaluator)
+    - [rad-MLP](#rad-mlp)
+    - [inv-MLP](#inv-mlp)
+    - [MonoSDF](#monosdf)
+  - [Evaluator for scene/shape properties](#evaluator-for-sceneshape-properties)
+    - [view coverage](#view-coverage)
+  - [Other utilities](#other-utilities)
+    - [Sample camera poses for new Mitsuba scene](#sample-camera-poses-for-new-mitsuba-scene)
+- [Checklist for getting started](#checklist-for-getting-started)
+- [Todolist](#todolist)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 <!-- Added by: jerrypiglet, at: Wed Feb  1 02:05:26 PST 2023 -->
@@ -501,6 +501,8 @@ python utils_class_mitsubaScene3D_sample_pose.py --if_sample_poses True --vis_2d
 - Check you have the data 
 
 # Todolist
+- [] eval-inv:
+  - [] GT emission, albedo, roughness, metallic
 - [x] vis envmap in 2D plt
 - [x] compute visibility and vis for room coverage count
 - [x] densely sample pts on shape surface

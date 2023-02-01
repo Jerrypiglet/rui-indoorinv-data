@@ -671,7 +671,7 @@ class visualizer_scene_3D_o3d(object):
         if_walls = shapes_params.get('if_walls', False)
 
         mesh_color_type = shapes_params.get('mesh_color_type', 'obj_color')
-        assert mesh_color_type in ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count', 'eval-t']
+        assert mesh_color_type in ['obj_color', 'face_normal'] or mesh_color_type.startswith('eval-')
 
         self.os.load_colors()
 
@@ -762,17 +762,22 @@ class visualizer_scene_3D_o3d(object):
                     if 'samples_v_dict' in self.extra_input_dict and _id in self.extra_input_dict['samples_v_dict']:
                         (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
                         # print(_id, samples_v.shape[0], vertices.shape[0])
-                        assert mesh_color_type.split('-')[1] == samples_type, 'Make sure this two match (got %s VS %s): your_evalautor->sample_type, visualizer_3D_o3d->shapes_params->mesh_color_type'%(mesh_color_type.split('-')[1], samples_type)
+                        # assert mesh_color_type.split('-')[1] == samples_type, 'Make sure this two match (got [%s] VS [%s]): your_evalautor->sample_type, visualizer_3D_o3d->shapes_params->mesh_color_type'%(mesh_color_type.split('-')[1], samples_type)
                         if samples_type == 'rad':
                             # vertices colored with: radiance in SDR space
                             assert samples_v.shape[0] == vertices.shape[0]
                             samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                        elif samples_type == 'emission_mask':
+                        elif samples_type in ['emission_mask', 'roughness', 'metallic']:
                             # vertices colored with: emission prob (non-emitter: blue; emitter: red)
                             assert samples_v.shape[0] == vertices.shape[0]
-                            samples_v_ = np.clip(samples_v, 0., 1.)
+                            samples_v_ = np.clip(samples_v, 0., 1.).reshape(samples_v.shape[0], 1)
                             samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
+                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+                        elif samples_type == 'albedo':
+                            # vertices colored with albedo (SDR)
+                            assert samples_v.shape[0] == vertices.shape[0]
+                            samples_v_ = np.clip(samples_v, 0., 1.)
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
                         elif samples_type == 'vis_count':
                             (samples_v_vis_count, max_vis_count) = samples_v
