@@ -92,6 +92,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         self.xml_file = self.xml_scene_root / self.scene_name / self.xml_filename
         self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})
+        if '_shape_normalized' in self.monosdf_shape_dict:
+            assert self.monosdf_shape_dict['_shape_normalized'] in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%_shape_normalized
 
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['OpenRooms', 'Blender', 'json'], 'Unsupported pose file: '+pose_file

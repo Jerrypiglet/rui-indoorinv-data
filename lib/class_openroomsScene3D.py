@@ -79,6 +79,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         self.shapes_root, self.layout_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'layout_root', 'envmaps_root'], [PosixPath, PosixPath, PosixPath])
         self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
         self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})
+        if '_shape_normalized' in self.monosdf_shape_dict:
+            assert self.monosdf_shape_dict['_shape_normalized'] in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%_shape_normalized
+
         self.pcd_color = None
 
         '''

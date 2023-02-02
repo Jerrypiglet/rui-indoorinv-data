@@ -120,27 +120,36 @@ class mitsubaBase():
 
     def load_monosdf_scene(self):
         shape_file = Path(self.monosdf_shape_dict['shape_file'])
+        if_shape_normalized = Path(self.monosdf_shape_dict['_shape_normalized']) == 'normalized'
         (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
         # self.mi_scene = mi.load_file(str(self.xml_file))
         '''
         [!!!] transform to XML scene coords (scale & location) so that ray intersection for GT geometry does not have to adapt to ESTIMATED geometry
         '''
+        shape_id_dict = {
+            'type': shape_file.suffix[1:],
+            'filename': str(shape_file), 
+            # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
+            }
+        if if_shape_normalized:
+            # un-normalize to regular Mitsuba scene space
+            shape_id_dict['to_world'] = mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3)
+            
         self.mi_scene = mi.load_dict({
             'type': 'scene',
-            'shape_id':{
-                'type': shape_file.suffix[1:],
-                'filename': str(shape_file), 
-                # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
-                'to_world': mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3), 
-            }
+            'shape_id': shape_id_dict, 
         })
 
     def load_monosdf_shape(self, shape_params_dict: dict):
         '''
         load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
         '''
-        (scale, offset), _ = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
-        monosdf_shape_dict = load_monosdf_shape(Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, (scale, offset))
+        if_shape_normalized = Path(self.monosdf_shape_dict['_shape_normalized']) == 'normalized'
+        if if_shape_normalized:
+            scale_offset_tuple, _ = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
+        else:
+            scale_offset_tuple = ()
+        monosdf_shape_dict = load_monosdf_shape(Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, scale_offset_tuple)
         self.vertices_list.append(monosdf_shape_dict['vertices'])
         self.faces_list.append(monosdf_shape_dict['faces'])
         self.bverts_list.append(monosdf_shape_dict['bverts'])
