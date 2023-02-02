@@ -99,11 +99,26 @@ emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1;
 # split = 'val'; frame_ids = list(range(10))
 split = 'val'; frame_ids = [0]
 
-monosdf_shape_dict = {
-    '_shape_normalized': 'normalized', 
-    'shape_file': str(Path(MONOSDF_ROOT) / 'exps/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/plots/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply'), 
-    'camera_file': str(Path(MONOSDF_ROOT) / 'data/kitchen/trainval/cameras.npz'), 
-    } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
+'''
+default
+'''
+eval_models_dict = {
+    'inv-MLP_ckpt_path': '20230111-191305-inv_kitchen_190-10_specT/last.ckpt', 
+    'rad-MLP_ckpt_path': '20230110-132112-rad_kitchen_190-10_specT/last.ckpt', 
+    }
+monosdf_shape_dict = {}
+
+'''
+umcomment👇 to use estimated geometry and radiance from monosdf
+'''
+# monosdf_shape_dict = {
+#     '_shape_normalized': 'normalized', 
+#     'shape_file': str(Path(MONOSDF_ROOT) / 'exps/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/plots/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply'), 
+#     'camera_file': str(Path(MONOSDF_ROOT) / 'data/kitchen/trainval/cameras.npz'), 
+#     'monosdf_conf_path': '20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/runconf.conf', 
+#     'monosdf_ckpt_path': 'kitchen_HDR_EST_grids_gamma2_randomPixel_fixedDepthHDR_trainval/2023_01_23_21_23_38/checkpoints/ModelParameters/latest.pth', 
+#     'inv-MLP_ckpt_path': '20230127-001044-inv-kitchen/last.ckpt' # OVERRIDING eval_models_dict
+#     } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
 # monosdf_shape_dict = {}
 
 mitsuba_scene = mitsubaScene3D(
@@ -263,7 +278,7 @@ if opt.eval_rad:
         host=host, 
         scene_object=mitsuba_scene, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='20230110-132112-rad_kitchen_190-10_specT/last.ckpt', # 110
+        ckpt_path=monosdf_shape_dict.get('rad-MLP_ckpt_path', eval_models_dict['rad-MLP_ckpt_path']), 
         dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
         split=split, 
         rad_scale=1., 
@@ -317,7 +332,7 @@ if opt.eval_inv:
         host=host, 
         scene_object=mitsuba_scene, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='20230127-001044-tmp/last.ckpt', # 110
+        ckpt_path=monosdf_shape_dict.get('inv-MLP_ckpt_path', eval_models_dict['inv-MLP_ckpt_path']), 
         dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
         split=split, 
         spec=True, 
@@ -344,8 +359,8 @@ if opt.eval_monosdf:
         host=host, 
         scene_object=mitsuba_scene, 
         MONOSDF_ROOT = MONOSDF_ROOT, 
-        conf_path='20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/runconf.conf', 
-        ckpt_path='kitchen_HDR_EST_grids_gamma2_randomPixel_fixedDepthHDR_trainval/2023_01_23_21_23_38/checkpoints/ModelParameters/latest.pth', 
+        conf_path=monosdf_shape_dict['monosdf_conf_path'], 
+        ckpt_path=monosdf_shape_dict['monosdf_ckpt_path'], 
         rad_scale=1., 
     )
 

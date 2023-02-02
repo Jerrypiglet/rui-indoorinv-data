@@ -103,6 +103,7 @@ class evaluator_scene_inv():
         self, 
         sample_type: str='emission_mask', 
         shape_params={}, 
+        if_dump_emitter_mesh: bool=False, # dump emitter mesh and the rest of scene mesh
         ):
         '''
         sample shape surface for sample_type:
@@ -133,12 +134,18 @@ class evaluator_scene_inv():
                     emission_mask_bin = alpha_np > 0.45
                     samples_v_dict[_id] = ('emission_mask_bin', (emission_mask_bin).astype(np.float32))
                     
-                    face_mask = np.all(emission_mask_bin.reshape(-1)[faces-1], axis=1)
-                    faces_valid = faces[face_mask]
-                    emitters_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces_valid-1)
-                    emitters_tri_mesh_path = 'test_files/tmp_emitters.obj'
-                    emitters_tri_mesh.export(emitters_tri_mesh_path)
-                    print(blue_text('Exported emitter mesh to %s (%d v, %d f)'%(emitters_tri_mesh_path, vertices.shape[0], faces_valid.shape[0])))
+                    if if_dump_emitter_mesh:
+                        face_mask = np.all(emission_mask_bin.reshape(-1)[faces-1], axis=1)
+                        faces_valid = faces[face_mask]
+                        emitters_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces_valid-1)
+                        emitters_tri_mesh_path = 'test_files/tmp_emitters.obj'
+                        emitters_tri_mesh.export(emitters_tri_mesh_path)
+                        print(blue_text('Exported emitter mesh to %s (%d v, %d f)'%(emitters_tri_mesh_path, vertices.shape[0], faces_valid.shape[0])))
+                        faces_valid = faces[~face_mask]
+                        emitters_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces_valid-1)
+                        emitters_tri_mesh_path = 'test_files/tmp_non_emitters.obj'
+                        emitters_tri_mesh.export(emitters_tri_mesh_path)
+                        print(blue_text('Exported non-emitter mesh to %s (%d v, %d f)'%(emitters_tri_mesh_path, vertices.shape[0], faces_valid.shape[0])))
 
             elif sample_type in ['albedo', 'metallic', 'roughness']:
                 mat = self.model.material(positions_nerf).sigmoid()

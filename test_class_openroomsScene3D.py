@@ -139,12 +139,26 @@ radiance_scale = 0.001
 base_root = Path(PATH_HOME) / 'data' / dataset_version
 xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
 
-monosdf_shape_dict = {
-    '_shape_normalized': 'normalized', 
-    'shape_file': str(Path(MONOSDF_ROOT) / 'exps/public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1/2023_01_20_13_38_20/plots/public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1_epoch380.ply'), 
-    'camera_file': str(Path(MONOSDF_ROOT) / 'data/public_re_3_v3pose_2048-main_xml-scene0008_00_morerescaledSDR/scan1/cameras.npz'), 
-    } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
-# monosdf_shape_dict = {}
+'''
+default
+'''
+eval_models_dict = {
+    'inv-MLP_ckpt_path': '20230109-014709-inv_v3pose_2048_main_xml_scene0008_00_more_specT_re/last.ckpt', 
+    'rad-MLP_ckpt_path': '20230104-162138-rad_v3pose_2048_main_xml_scene0008_00_more_specT/last.ckpt', 
+    }
+monosdf_shape_dict = {}
+
+'''
+umcomment to use estimated geometry and radiance from monosdf
+'''
+# monosdf_shape_dict = {
+#     '_shape_normalized': 'normalized', 
+#     'shape_file': str(Path(MONOSDF_ROOT) / 'exps/public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1/2023_01_20_13_38_20/plots/public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1_epoch380.ply'), 
+#     'camera_file': str(Path(MONOSDF_ROOT) / 'data/public_re_3_v3pose_2048-main_xml-scene0008_00_morerescaledSDR/scan1/cameras.npz'), 
+#     'monosdf_conf_path': 'public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1/2023_01_20_13_38_20/runconf.conf', 
+#     'monosdf_ckpt_path': 'public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1/2023_01_20_13_38_20/checkpoints/ModelParameters/latest.pth', 
+#     'inv-MLP_ckpt_path': '20230201-185742-inv-OR/last.ckpt' # OVERRIDING eval_models_dict
+#     } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
 
 openrooms_scene = openroomsScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -246,7 +260,7 @@ if opt.eval_rad:
         INV_NERF_ROOT = INV_NERF_ROOT, 
         # ckpt_path='rad_3_v3pose_2048_main_xml_scene0008_00_more/last.ckpt', # 166, 208
         # ckpt_path='rad_3_v5pose_2048_main_xml_scene0008_00_more/last-v1.ckpt', # 110
-        ckpt_path='20230104-162138-rad_v3pose_2048_main_xml_scene0008_00_more_specT/last.ckpt', 
+        ckpt_path=monosdf_shape_dict.get('rad-MLP_ckpt_path', eval_models_dict['rad-MLP_ckpt_path']), 
         # dataset_key='-'.join(['OR', dataset_version]), 
         dataset_key='OR-public_re_3_v3pose_2048', # has to be one of the keys from inv-nerf/configs/scene_options.py
         rad_scale=1./5., 
@@ -289,7 +303,7 @@ if opt.eval_inv:
         host=host, 
         scene_object=openrooms_scene, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='20230201-185742-inv-OR/last.ckpt', 
+        ckpt_path=monosdf_shape_dict.get('inv-MLP_ckpt_path', eval_models_dict['inv-MLP_ckpt_path']), 
         # ckpt_path='20230109-014709-inv_v3pose_2048_main_xml_scene0008_00_more_specT_re/last.ckpt', # 110
         # dataset_key='-'.join(['OR', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
         dataset_key='OR-public_re_3_v3pose_2048', # has to be one of the keys from inv-nerf/configs/scene_options.py
@@ -304,7 +318,8 @@ if opt.eval_inv:
     _ = evaluator_inv.sample_shapes(
         sample_type='emission_mask_bin', # ['']
         shape_params={
-        }
+        }, 
+        if_dump_emitter_mesh=True, 
     )
     for k, v in _.items():
         if k in eval_return_dict:
@@ -319,8 +334,8 @@ if opt.eval_monosdf:
         host=host, 
         scene_object=openrooms_scene, 
         MONOSDF_ROOT = MONOSDF_ROOT, 
-        conf_path='public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1/2023_01_20_13_38_20/runconf.conf', 
-        ckpt_path='public_re_3_v3pose_2048-main_xml-scene0008_00_more_HDR_EST_mlp_gamma2_L2loss_4xreg_lr1e-4_decay25_scan1/2023_01_20_13_38_20/checkpoints/ModelParameters/latest.pth', 
+        conf_path=monosdf_shape_dict['monosdf_conf_path'], 
+        ckpt_path=monosdf_shape_dict['monosdf_ckpt_path'], 
         rad_scale= 1. / openrooms_scene.hdr_scale_list[0] * (1./5.), 
     )
 
