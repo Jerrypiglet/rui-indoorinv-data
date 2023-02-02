@@ -1,7 +1,7 @@
 import sys
 
-host = 'mm1'
-# host = 'apple'
+# host = 'mm1'
+host = 'apple'
 
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
@@ -132,8 +132,8 @@ scene_name = 'scene0008_00_more'
 emitter_type_index_list = [('lamp', 0)]
 # frame_ids = list(range(0, 345, 10))
 # frame_ids = [36, 41]
-# frame_ids =[0]
-frame_ids = [0, 3]
+frame_ids =[0]
+# frame_ids = [0, 3]
 radiance_scale = 0.001
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
@@ -159,16 +159,16 @@ openrooms_scene = openroomsScene3D(
         }, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'im_sdr', 
+        # 'im_sdr', 
         'poses', 
-        'seg', 'im_hdr', 
+        # 'seg', 'im_hdr', 
         # 'albedo', 'roughness', 
-        'depth', 
-        'normal', 
+        # 'depth', 
+        # 'normal', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
         # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        'shapes', # objs + emitters, geometry shapes + emitter properties
         'mi', # mitsuba scene, loading from scene xml file
         ], 
     modality_filename_dict = {
@@ -216,7 +216,7 @@ openrooms_scene = openroomsScene3D(
         'sample_mesh_min': 10, 
         'sample_mesh_max': 100, 
 
-        'if_simplify_mesh': True,  # default True: simply triangles
+        'if_simplify_mesh': False,  # default True: simply triangles
         'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
         'simplify_mesh_min': 100, 
         'simplify_mesh_max': 1000,
@@ -289,17 +289,20 @@ if opt.eval_inv:
         host=host, 
         scene_object=openrooms_scene, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='20230109-014709-inv_v3pose_2048_main_xml_scene0008_00_more_specT_re/last.ckpt', # 110
+        ckpt_path='20230201-185742-inv-OR/last.ckpt', 
+        # ckpt_path='20230109-014709-inv_v3pose_2048_main_xml_scene0008_00_more_specT_re/last.ckpt', # 110
         # dataset_key='-'.join(['OR', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
         dataset_key='OR-public_re_3_v3pose_2048', # has to be one of the keys from inv-nerf/configs/scene_options.py
         spec=True, 
+        if_monosdf=monosdf_shape_dict=={}, 
+        monosdf_shape_dict=monosdf_shape_dict, 
     )
 
     '''
     sample emission mask on shape vertices
     '''
     _ = evaluator_inv.sample_shapes(
-        sample_type='emission_mask', # ['']
+        sample_type='emission_mask_bin', # ['']
         shape_params={
         }
     )

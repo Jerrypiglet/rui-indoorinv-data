@@ -768,7 +768,7 @@ class visualizer_scene_3D_o3d(object):
                             assert samples_v.shape[0] == vertices.shape[0]
                             samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                        elif samples_type in ['emission_mask', 'roughness', 'metallic']:
+                        elif samples_type in ['emission_mask', 'emission_mask_bin', 'roughness', 'metallic']:
                             # vertices colored with: emission prob (non-emitter: blue; emitter: red)
                             assert samples_v.shape[0] == vertices.shape[0]
                             samples_v_ = np.clip(samples_v, 0., 1.).reshape(samples_v.shape[0], 1)

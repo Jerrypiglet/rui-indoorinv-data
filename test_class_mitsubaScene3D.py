@@ -329,7 +329,7 @@ if opt.eval_inv:
     sample emission mask on shape vertices
     '''
     _ = evaluator_inv.sample_shapes(
-        sample_type='emission_mask', # ['emission_mask', 'albedo', 'metallic', 'roughness']
+        sample_type='emission_mask_bin', # ['emission_mask', 'emission_mask_bin', 'albedo', 'metallic', 'roughness']
         shape_params={
         }
     )

@@ -125,6 +125,7 @@ class openroomsScene2D(scene2DBase):
         '''
         load everything
         '''
+        self.load_intrinsics()
         self.load_modalities()
         # self.est = {}
 
@@ -292,8 +293,6 @@ class openroomsScene2D(scene2DBase):
         '''
         pose_list: list of pose matrices (**camera-to-world** transformation), each (3, 4): [R|t] (OpenCV convention: right-down-forward)
         '''
-
-        self.load_intrinsics()
 
         if hasattr(self, 'pose_list'): return
 

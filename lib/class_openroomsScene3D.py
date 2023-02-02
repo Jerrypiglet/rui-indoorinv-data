@@ -84,7 +84,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         load everything
         '''
-        self.load_cam_rays(self.cam_params_dict)
+        if hasattr(self, 'pose_list'): 
+            self.load_cam_rays(self.cam_params_dict)
         if 'mi' in self.modality_list:
             mitsubaBase.__init__(
                 self, 
@@ -157,28 +158,29 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         xml_dump_dir = self.PATH_HOME / 'mitsuba'
 
-        if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
         variant = mi_params_dict.get('variant', '')
         if variant != '':
             mi.set_variant(variant)
         else:
             mi.set_variant(mi_variant_dict[self.host])
 
-        self.mi_xml_dump_path = dump_OR_xml_for_mi(
-            str(self.xml_file), 
-            shapes_root=self.shapes_root, 
-            layout_root=self.layout_root, 
-            envmaps_root=self.envmaps_root, 
-            xml_dump_dir=xml_dump_dir, 
-            origin_lookatvector_up_tuple=self.origin_lookatvector_up_list[0], # [debug] set to any frame_idx
-            if_no_emitter_shape=False, 
-            if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only, 
-            )
-        print(blue_text('XML for Mitsuba dumped to: %s')%str(self.mi_xml_dump_path))
+        if_also_dump_xml_with_lit_area_lights_only = False
 
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_scene()
         else:
+            if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
+            self.mi_xml_dump_path = dump_OR_xml_for_mi(
+                str(self.xml_file), 
+                shapes_root=self.shapes_root, 
+                layout_root=self.layout_root, 
+                envmaps_root=self.envmaps_root, 
+                xml_dump_dir=xml_dump_dir, 
+                origin_lookatvector_up_tuple=self.origin_lookatvector_up_list[0], # [debug] set to any frame_idx
+                if_no_emitter_shape=False, 
+                if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only, 
+                )
+            print(blue_text('XML for Mitsuba dumped to: %s')%str(self.mi_xml_dump_path))
             self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
             if if_also_dump_xml_with_lit_area_lights_only:
                 self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'))
@@ -237,6 +239,19 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         if self.if_loaded_shapes: return
 
+        self.vertices_list = []
+        self.faces_list = []
+        self.ids_list = []
+        self.bverts_list = []
+        self.bfaces_list = []
+
+        self.shape_list_valid = []
+
+        self.window_list = []
+        self.lamp_list = []
+        self.xyz_max = np.zeros(3,)-np.inf
+        self.xyz_min = np.zeros(3,)+np.inf
+
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_shape(shape_params_dict=shape_params_dict)
         else:
@@ -278,10 +293,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
             # start to load objects
 
-            self.vertices_list = []
-            self.faces_list = []
-            self.ids_list = []
-            self.bverts_list = []
             
             if if_sample_mesh:
                 self.sample_pts_list = []
@@ -289,9 +300,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             light_axis_list = []
             # self.num_vertices = 0
             obj_path_list = []
-            self.shape_list_valid = []
-            self.window_list = []
-            self.lamp_list = []
             
             print(blue_text('[openroomsScene3D] loading %d shapes and %d emitters...'%(len(self.shape_list_ori), len(self.emitter_list[1:]))))
 

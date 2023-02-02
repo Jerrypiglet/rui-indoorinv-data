@@ -113,22 +113,33 @@ class evaluator_scene_inv():
             - radiance_scale: rescale radiance magnitude (because radiance can be large, e.g. 500, 3000)
         '''
         assert self.os.if_loaded_shapes
-        assert sample_type in ['emission_mask', 'albedo', 'roughness', 'metallic']
+        assert sample_type in ['emission_mask', 'emission_mask_bin', 'albedo', 'roughness', 'metallic']
 
         return_dict = {}
         samples_v_dict = {}
 
-        print(white_blue('Evaluating inv-MLP for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
 
         for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
-            assert np.amin(faces) == 1
+            print(white_blue('Evaluating inv-MLP for [%s]'%sample_type), 'sample_shapes for %d/%d shapes (%d v, %d f) ...'%(shape_index, len(self.os.ids_list), vertices.shape[0], faces.shape[0]))
+            assert np.amin(faces) == 1 # [!!!] faces is 1-based!
             positions_nerf = self.or2nerf_th(torch.from_numpy(vertices).float().to(self.device)) # convert to NeRF coordinates
-            if sample_type == 'emission_mask':
+            if sample_type in ['emission_mask', 'emission_mask_bin']:
                 emission_mask = self.model.emission_mask(positions_nerf)
                 emission_mask_np = emission_mask.detach().cpu().numpy()
-                alpha_np = (1 - torch.exp(-emission_mask.relu())).detach().cpu().numpy()
-                samples_v_dict[_id] = ('emission_mask', emission_mask_np)
-                # samples_v_dict[_id] = ('emission_mask', alpha_np)
+                if sample_type == 'emission_mask':
+                    samples_v_dict[_id] = ('emission_mask', emission_mask_np)
+                elif sample_type == 'emission_mask_bin':
+                    alpha_np = (1 - torch.exp(-emission_mask.relu())).detach().cpu().numpy()
+                    emission_mask_bin = alpha_np > 0.45
+                    samples_v_dict[_id] = ('emission_mask_bin', (emission_mask_bin).astype(np.float32))
+                    
+                    face_mask = np.all(emission_mask_bin.reshape(-1)[faces-1], axis=1)
+                    faces_valid = faces[face_mask]
+                    emitters_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces_valid-1)
+                    emitters_tri_mesh_path = 'test_files/tmp_emitters.obj'
+                    emitters_tri_mesh.export(emitters_tri_mesh_path)
+                    print(blue_text('Exported emitter mesh to %s (%d v, %d f)'%(emitters_tri_mesh_path, vertices.shape[0], faces_valid.shape[0])))
+
             elif sample_type in ['albedo', 'metallic', 'roughness']:
                 mat = self.model.material(positions_nerf).sigmoid()
                 albedo_np, metallic_np, roughness_np = mat[...,:3].detach().cpu().numpy(), mat[...,3:4].detach().cpu().numpy(), mat[...,4:5].detach().cpu().numpy()
