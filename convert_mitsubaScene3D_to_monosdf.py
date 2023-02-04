@@ -55,7 +55,7 @@ intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScen
 The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
-scene_name = 'kitchen'
+scene_name = 'kitchen_re'
 # split = 'train'; scan_id = 'scan1'; frame_ids = list(range(202))
 # split = 'val'; scan_id = 'scan2'; frame_ids = list(range(10))
 
@@ -76,7 +76,7 @@ for split, frame_ids in zip(['train', 'val'], [list(range(202)), list(range(10))
             'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
             }, 
         mi_params_dict={
-            'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
+            # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
             'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
             'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
             'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
@@ -144,7 +144,7 @@ for split, frame_ids in zip(['train', 'val'], [list(range(202)), list(range(10))
             'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
             'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
 
-            'if_sample_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
+            'if_sample_pts_on_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
             'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
             'sample_mesh_min': 10, 
             'sample_mesh_max': 100, 
@@ -173,7 +173,6 @@ for scene, out_name in zip(scenes, out_names):
     out_path = os.path.join(out_path_prefix, out_name)
     os.makedirs(out_path, exist_ok=True)
     print(out_path)
-    import ipdb; ipdb.set_trace()
 
     folders = ["image", "mask", "depth", "normal"]
     for folder in folders:

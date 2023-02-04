@@ -46,6 +46,10 @@ class scene2DBase():
         self.if_debug_info = if_debug_info
         self.parent_class_name = parent_class_name
 
+        self.if_loaded_colors = False
+        self.if_loaded_shapes = False
+        self.if_loaded_layout = False
+
         self.root_path_dict = root_path_dict
         self.PATH_HOME, self.rendering_root, self.xml_scene_root = get_list_of_keys(
             self.root_path_dict, 
@@ -125,7 +129,7 @@ class scene2DBase():
 
         if modality == 'im_sdr': self.load_im_sdr(); return True
         if modality == 'im_hdr': self.load_im_hdr(); return True
-        if modality == 'poses': self.load_poses(); return True
+        # if modality == 'poses': self.load_poses(); return True
         if modality == 'albedo': self.load_albedo(); return True
         if modality == 'roughness': self.load_roughness(); return True
         if modality == 'depth': self.load_depth(); return True

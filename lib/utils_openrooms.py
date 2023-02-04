@@ -41,7 +41,7 @@ from pathlib import Path
 import pickle
 from lib.utils_io import read_cam_params, normalize_v
 
-def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, frame_id_list: list, if_inverse_y: bool=False, if_1_based: bool=True):
+def load_OR_public_poses_to_Rt(cam_file: Path, frame_id_list: list, if_inverse_y: bool=False, if_1_based: bool=True):
     '''
     load OpenRooms public pose files (cam.txt and transform.dat[NOT DOING THIS]) and convert to list of per-frame R, t
 
@@ -59,8 +59,7 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
     # rotMat_inv_scene = np.linalg.inv(rotMat_scene)
     # trans_scene = transforms[0][2][1].reshape((3, 1)) # (3,1)
 
-    cam_file = scene_xml_dir / 'cam.txt'
-    cam_params = read_cam_params(cam_file)
+    cam_params = read_cam_params(str(cam_file))
 
     pose_list = []
     origin_lookatvector_up_list = []

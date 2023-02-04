@@ -90,7 +90,8 @@ intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScen
 The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
-scene_name = 'kitchen'
+# scene_name = 'kitchen_re'
+scene_name = 'bathroom'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
@@ -121,7 +122,7 @@ umcomment👇 to use estimated geometry and radiance from monosdf
 #     } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
 # monosdf_shape_dict = {}
 
-mitsuba_scene = mitsubaScene3D(
+scene_obj = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root}, 
@@ -139,7 +140,7 @@ mitsuba_scene = mitsubaScene3D(
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
-        'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
+        # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
@@ -147,7 +148,7 @@ mitsuba_scene = mitsubaScene3D(
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'poses', 
+        # 'poses', 
         # 'im_hdr', 
         # 'im_sdr', 
         # 'lighting_envmap', 
@@ -217,7 +218,7 @@ mitsuba_scene = mitsubaScene3D(
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
 
-        'if_sample_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
+        'if_sample_pts_on_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
         'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
         'sample_mesh_min': 10, 
         'sample_mesh_max': 100, 
@@ -249,7 +250,7 @@ if opt.render_2d:
         ]
     if opt.renderer == 'mi':
         renderer = renderer_mi_mitsubaScene_3D(
-            mitsuba_scene, 
+            scene_obj, 
             modality_list=modality_list, 
             im_params_dict={}, 
             cam_params_dict={}, 
@@ -257,7 +258,7 @@ if opt.render_2d:
         )
     if opt.renderer == 'blender':
         renderer = renderer_blender_mitsubaScene_3D(
-            mitsuba_scene, 
+            scene_obj, 
             modality_list=modality_list, 
             host=host, 
             FORMAT='OPEN_EXR', 
@@ -276,7 +277,7 @@ Evaluator for rad-MLP
 if opt.eval_rad:
     evaluator_rad = evaluator_scene_rad(
         host=host, 
-        scene_object=mitsuba_scene, 
+        scene_object=scene_obj, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
         ckpt_path=monosdf_shape_dict.get('rad-MLP_ckpt_path', eval_models_dict['rad-MLP_ckpt_path']), 
         dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
@@ -330,7 +331,7 @@ Evaluator for inv-MLP
 if opt.eval_inv:
     evaluator_inv = evaluator_scene_inv(
         host=host, 
-        scene_object=mitsuba_scene, 
+        scene_object=scene_obj, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
         ckpt_path=monosdf_shape_dict.get('inv-MLP_ckpt_path', eval_models_dict['inv-MLP_ckpt_path']), 
         dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
@@ -357,7 +358,7 @@ if opt.eval_inv:
 if opt.eval_monosdf:
     evaluator_monosdf = evaluator_scene_monosdf(
         host=host, 
-        scene_object=mitsuba_scene, 
+        scene_object=scene_obj, 
         MONOSDF_ROOT = MONOSDF_ROOT, 
         conf_path=monosdf_shape_dict['monosdf_conf_path'], 
         ckpt_path=monosdf_shape_dict['monosdf_ckpt_path'], 
@@ -396,7 +397,7 @@ Evaluator for scene
 if opt.eval_scene:
     evaluator_scene = evaluator_scene_scene(
         host=host, 
-        scene_object=mitsuba_scene, 
+        scene_object=scene_obj, 
     )
 
     '''
@@ -420,7 +421,7 @@ Matploblib 2D viewer
 '''
 if opt.vis_2d_plt:
     visualizer_2D = visualizer_scene_2D(
-        mitsuba_scene, 
+        scene_obj, 
         modality_list_vis=[
             'im', 
             # 'layout', 
@@ -443,7 +444,7 @@ if opt.vis_2d_plt:
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:
             if modality in eval_return_dict:
-                mitsuba_scene.add_modality(eval_return_dict[modality], modality, 'EST')
+                scene_obj.add_modality(eval_return_dict[modality], modality, 'EST')
 
     visualizer_2D.vis_2d_with_plt(
         lighting_params={
@@ -461,7 +462,7 @@ Open3D 3D viewer
 '''
 if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
-        mitsuba_scene, 
+        scene_obj, 
         modality_list_vis=[
             # 'dense_geo', # fused from 2D
             'cameras', 
@@ -534,7 +535,7 @@ if opt.vis_3d_o3d:
         #             }),
         #         ]) 
 
-    # for frame_idx, (rays_o, rays_d, _) in enumerate(mitsuba_scene.cam_rays_list):
+    # for frame_idx, (rays_o, rays_d, _) in enumerate(scene_obj.cam_rays_list):
     #     normal_up = np.cross(rays_d[0][0], rays_d[0][-1])
     #     normal_down = np.cross(rays_d[-1][-1], rays_d[-1][0])
     #     normal_left = np.cross(rays_d[-1][0], rays_d[0][0])
@@ -578,7 +579,7 @@ if opt.vis_3d_o3d:
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
             'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            'if_sampled_pts': False, # [OPTIONAL] is show samples pts from mitsuba_scene.sample_pts_list if available
+            'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
         },
         emitter_params={

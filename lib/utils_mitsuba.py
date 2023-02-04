@@ -179,14 +179,14 @@ def dump_OR_xml_for_mi(
     with open(str(xml_dump_path), 'w') as xmlOut:
         xmlOut.write(xmlString )
 
-    if if_also_dump_xml_with_lit_area_lights_only:
-        for shape in root.findall('shape'):
-            root.remove(shape)
-        for lamp in lit_up_lamp_list:
-            root.append(lamp)
-        xmlString = transformToXml(root)
-        with open(str(xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'), 'w') as xmlOut:
-            xmlOut.write(xmlString )
+    # if if_also_dump_xml_with_lit_area_lights_only:
+    #     for shape in root.findall('shape'):
+    #         root.remove(shape)
+    #     for lamp in lit_up_lamp_list:
+    #         root.append(lamp)
+    #     xmlString = transformToXml(root)
+    #     with open(str(xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'), 'w') as xmlOut:
+    #         xmlOut.write(xmlString )
 
     return xml_dump_path
 

@@ -28,8 +28,8 @@ import matplotlib.pyplot as plt
 work with Mitsuba/Blender scenes
 '''
 import sys
-host = 'mm1'
-# host = 'apple'
+# host = 'mm1'
+host = 'apple'
 PATH_HOME = {
     'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
     'mm1': '', 
@@ -64,8 +64,8 @@ dataset_version = 'public_re_3_v3pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
 emitter_type_index_list = [('lamp', 0)]
-frame_ids = list(range(0, 345, 1))
-# frame_ids = [0]
+# frame_ids = list(range(0, 345, 1))
+frame_ids = [0]
 # radiance_scale = 0.001
 scan_id = 'scan1'
 
@@ -133,7 +133,7 @@ openrooms_scene = openroomsScene3D(
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
 
-        'if_sample_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
+        'if_sample_pts_on_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
         'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
         'sample_mesh_min': 10, 
         'sample_mesh_max': 100, 
@@ -149,7 +149,7 @@ openrooms_scene = openroomsScene3D(
         'N_ambient_rep': '3SG-SkyGrd', 
         },
     mi_params_dict={
-        'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
+        # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
@@ -265,7 +265,7 @@ for scene, out_name in zip(scenes, out_names):
         # ==== HDR
         target_image_hdr = os.path.join(out_path, "image/%06d.exr"%(idx))
         # shutil.copy(openrooms_scene.im_hdr_file_list[idx], target_image_hdr)
-        im_hdr_liwenScale = openrooms_scene.im_hdr_list[idx] / openrooms_scene.hdr_scale_list[idx] * (1./5.)
+        im_hdr_liwenScale = openrooms_scene.im_hdr_list[idx] / openrooms_scene.hdr_scale_list[idx] * (1./5.) # original max (300.) / 5. -> max ~= 60
         mi.util.write_bitmap(str(target_image_hdr), im_hdr_liwenScale)
 
         # ==== SDR

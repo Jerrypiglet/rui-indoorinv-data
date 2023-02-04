@@ -26,7 +26,8 @@
   - [Evaluator for scene/shape properties](#evaluator-for-sceneshape-properties)
     - [view coverage](#view-coverage)
   - [Other utilities](#other-utilities)
-    - [Sample camera poses for new Mitsuba scene](#sample-camera-poses-for-new-mitsuba-scene)
+    - [Sample camera poses for new \[Mitsuba\] scene](#sample-camera-poses-for-new-mitsuba-scene)
+    - [Sample camera poses for new \[Openrooms\] scene](#sample-camera-poses-for-new-openrooms-scene)
 - [Checklist for getting started](#checklist-for-getting-started)
 - [Todolist](#todolist)
 
@@ -486,7 +487,7 @@ Val:
 ![](images/demo_eval_scene_shapes-vis_count-val-kitchen_0.png)
 
 ## Other utilities
-### Sample camera poses for new Mitsuba scene
+### Sample camera poses for new [Mitsuba] scene
 Set `--if_sample_poses True`. Change parameters in `mitsuba_scene->cam_params_dict{}` to adjust parameters in sampling camera poses (e.g. range of random yaw/pitch angles, number of samples, min distance to the wall, min/median distances of all camera rays to the scene).
 
 **Optionally**, set `--eval_scene True` to show view [coverage visualization](images/demo_eval_scene_shapes-vis_count-train-kitchen_0.png) under current poses.
@@ -494,6 +495,27 @@ Set `--if_sample_poses True`. Change parameters in `mitsuba_scene->cam_params_di
 ``` bash
 python utils_class_mitsubaScene3D_sample_pose.py --if_sample_poses True --vis_2d_plt False --vis_3d_o3d True
 ```
+
+### Sample camera poses for new [Openrooms] scene
+
+`[mm1 a823cc5] added sample poses for NEW OR scene`
+
+Put basic scene files from original OR dataset to:
+- data/public_re_3_v3pose_2048/
+  - main_xml1/scene0552_00/
+    - intrinsic.txt
+  - scenes
+    - xml1/scene0552_00
+      - XML file (e.g. main.xml), transform.dat
+
+Tested on Mac:
+``` bash
+python test_class_openroomsScene3D.py --vis_2d_plt False --vis_3d_o3d True --if_sample_poses True --eval_scene
+```
+
+Small normal/depth maps of sampled poses will be dumped to `data/public_re_3_v3pose_2048/main_xml1/scene0552_00/tmp_sample_poses_rendering/`
+
+![](images/demo_sample_poses_OR_main_xml1_scene0552_00.png)
 
 # Checklist for getting started
 - Install all dependencies (especially Mitsuba, Open3D (opengl-supported display required))
@@ -504,6 +526,7 @@ python utils_class_mitsubaScene3D_sample_pose.py --if_sample_poses True --vis_2d
 - [] eval-inv:
   - [] GT emission, albedo, roughness, metallic
 - [x] vis envmap in 2D plt
+- [ ] 1./rad* -> * rad_mul
 - [x] compute visibility and vis for room coverage count
 - [x] densely sample pts on shape surface
 - [ ] make faces always 0-based acorss utils_mesh and trimesh

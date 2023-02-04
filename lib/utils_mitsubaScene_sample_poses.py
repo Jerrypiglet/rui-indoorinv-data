@@ -21,12 +21,6 @@ from utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 def func_mitsubaScene_sample_poses(
         mitsubaScene, 
         lverts, boxes,
-        # samplePoint, sampleNum,
-        # heightMin, heightMax,
-        # distMin, distMax,
-        # thetaMin, thetaMax,
-        # phiMin, phiMax,
-        # distRaysMin=-1, 
         sample_params_dict, 
         sample_pose_if_vis_plt: bool=False):
 
@@ -264,6 +258,7 @@ def func_mitsubaScene_sample_poses(
                         
 
                     camPoses.append(camPose)
+                    print('Appended valid pose; min_depth: %.2f'%min_depth)
 
                     # if (camPose[1, :] - camPose[0, :])[1] > np.sin(20/180*np.pi):
                     #     import ipdb; ipdb.set_trace()
@@ -296,16 +291,6 @@ def mitsubaScene_sample_poses_one_scene(mitsubaScene, scene_dict: dict, program_
 
     threshold = param_dict.get('threshold', 0.3) # 'the threshold to decide low quality mesh.'
     samplePoint = param_dict.get('samplePoint', 100)
-    # sampleNum = param_dict.get('sampleNum', 3)
-    # heightMin = param_dict.get('heightMin', 1.4)
-    # heightMax = param_dict.get('heightMax', 1.8)
-    # distMin = param_dict.get('distMin', 0.3)
-    # distMax = param_dict.get('distMax', 1.5)
-    # thetaMin = param_dict.get('thetaMin', -60)
-    # thetaMax = param_dict.get('thetaMax', 20)
-    # phiMin = param_dict.get('phiMin', -45)
-    # phiMax = param_dict.get('phiMax', 45)
-    # distRaysMin = param_dict.get('distRaysMin', 0.3)
 
     sample_pose_if_vis_plt = param_dict.get('sample_pose_if_vis_plt', False)
     print(yellow('Num of sample points %d'%(samplePoint)))
@@ -352,149 +337,9 @@ def mitsubaScene_sample_poses_one_scene(mitsubaScene, scene_dict: dict, program_
             mitsubaScene=mitsubaScene, 
             lverts=lverts, boxes=boxes, \
             sample_params_dict=param_dict, 
-            # samplePoint, sampleNum,
-            # heightMin, heightMax, \
-            # distMin, distMax, \
-            # thetaMin, thetaMax, \
-            # phiMin, phiMax, 
-            # distRaysMin=distRaysMin, 
             sample_pose_if_vis_plt=sample_pose_if_vis_plt)
     
     camNum = len(camPoses)
     assert camNum != 0
 
     return camPoses
-
-    with open(str(dest_scene_path / 'camInitial.txt'), 'w') as camOut:
-        camOut.write('%d\n'%camNum)
-        print('Final sampled camera poses: %d'%len(camPoses))
-        for camPose in camPoses:
-            for n in range(0, 3):
-                camOut.write('%.3f %.3f %.3f\n'%\
-                        (camPose[n, 0], camPose[n, 1], camPose[n, 2]))
-
-    # Downsize the size of the image
-    oldXML = dest_scene_path / 'main.xml'
-    newXML = dest_scene_path / 'mainTemp.xml'
-    camFile = dest_scene_path / 'camInitial.txt'
-    if not oldXML.exists() or not camFile.exists():
-        assert False
-
-    tree = et.parse(oldXML)
-    root  = tree.getroot()
-
-    sensors = root.findall('sensor')
-    for sensor in sensors:
-        film = sensor.findall('film')[0]
-        integers = film.findall('integer')
-        for integer in integers:
-            if integer.get('name') == 'width':
-                integer.set('value', '160')
-            if integer.get('name') == 'height':
-                integer.set('value', '120')
-
-    for elem in root.iter():
-        if elem is not None and elem.get('value') is not None:
-            if '../../../../../' in elem.get('value'):
-                # print('=====', elem.get('value'))
-                for tag in ['layoutMesh', 'BRDFOriginDataset', 'uv_mapped', 'EnvDataset']:
-                    elem.set('value', elem.get('value').replace('../../../../../%s'%tag, str(Path(path_dict['OR_RAW'])/tag)))
-
-    xmlString = transformToXml(root)
-    with open(str(newXML), 'w') as xmlOut:
-        xmlOut.write(xmlString)
-
-    # Render depth and normal
-    cmd = '%s -f %s -c %s -o %s -m %d'%(program_dict['program'], str(newXML), 'camInitial.txt', 'im.rgbe', 2)
-    cmd += ' --forceOutput'
-    os.system(cmd)
-
-    cmd = '%s -f %s -c %s -o %s -m %d'%(program_dict['program'], str(newXML), 'camInitial.txt', 'im.rgbe', 4)
-    cmd += ' --forceOutput'
-    os.system(cmd)
-
-    cmd = '%s -f %s -c %s -o %s -m %d'%(program_dict['program'], str(newXML), 'camInitial.txt', 'im.rgbe', 5)
-    cmd += ' --forceOutput'
-    os.system(cmd)
-
-    # Load the normal and depth
-    normalCosts = []
-    depthCosts = []
-    for n in range(0, camNum):
-        # Load the depth and normal
-        normalName = dest_scene_path / ('imnormal_%d.png'%n)
-        maskName = dest_scene_path / ('immask_%d.png'%n)
-        depthName = dest_scene_path / ('imdepth_%d.dat'%n)
-
-        normal = cv2.imread(str(normalName))
-        mask = cv2.imread(str(maskName))
-        with open(str(depthName), 'rb') as fIn:
-            hBuffer = fIn.read(4)
-            height = struct.unpack('i', hBuffer)[0]
-            wBuffer = fIn.read(4)
-            width = struct.unpack('i', wBuffer)[0]
-            dBuffer = fIn.read(4 * width * height)
-            depth = np.asarray(struct.unpack('f' * height * width, dBuffer), dtype=np.float32)
-            depth = depth.reshape([height, width])
-
-        # Compute the ranking
-        mask = mask[:, :, 0] > 0.4
-        mask = ndimage.binary_erosion(mask, border_value=1, structure=np.ones((3, 3)))
-        mask = mask.astype(np.float32)
-        pixelNum = np.sum(mask)
-
-        if pixelNum == 0:
-            normalCosts.append(0)
-            depthCosts.append(0)
-            continue
-
-        normal = normal.astype(np.float32)
-        normal_gradx = np.abs(normal[:, 1:] - normal[:, 0:-1])
-        normal_grady = np.abs(normal[1:, :] - normal[0:-1, :])
-        ncost = (np.sum(normal_gradx) + np.sum(normal_grady)) / pixelNum
-
-        dcost = np.sum(np.log(depth + 1)) / pixelNum
-
-        normalCosts.append(ncost)
-        depthCosts.append(dcost)
-
-    normalCosts = np.array(normalCosts, dtype=np.float32)
-    depthCosts = np.array(depthCosts, dtype=np.float32)
-
-    normalCosts = (normalCosts - normalCosts.min()) \
-            / (normalCosts.max() - normalCosts.min())
-    depthCosts = (depthCosts - depthCosts.min()) \
-            / (depthCosts.max() - depthCosts.min())
-
-    totalCosts = normalCosts + 0.3 * depthCosts
-
-    camIndex = np.argsort(totalCosts)
-    camIndex = camIndex[::-1]
-
-    camPoses_s = []
-    selectedDir = dest_scene_path / 'selected'
-    if selectedDir.exists():
-        # os.system('rm -r %s'%selectedDir)
-        shutil.rmtree(selectedDir)
-    # os.system('mkdir %s'%selectedDir)
-    selectedDir.mkdir(parents=False, exist_ok=False)
-
-    for n in range(0, min(samplePoint, camNum)):
-        camPoses_s.append(camPoses[camIndex[n]])
-
-        normalName = dest_scene_path / ('imnormal_%d.png'%(camIndex[n]))
-        os.system('cp %s %s'%(str(normalName), str(selectedDir)))
-
-    with open(str(dest_scene_path / 'cam.txt'), 'w') as camOut:
-        camOut.write('%d\n'%len(camPoses_s))
-        print('Final sampled camera poses: %d'%len(camPoses_s))
-        for camPose in camPoses_s:
-            # assert (camPose[1, :] - camPose[0, :]) <= np.sin(-20/180*np.pi)
-            for n in range(0, 3):
-                camOut.write('%.3f %.3f %.3f\n'%\
-                        (camPose[n, 0], camPose[n, 1], camPose[n, 2]))
-
-    os.system('rm %s'%str(dest_scene_path / 'mainTemp.xml'))
-    os.system('rm %s'%str(dest_scene_path / 'immask_*.png'))
-    os.system('rm %s'%str(dest_scene_path / 'imdepth_*.dat'))
-    os.system('rm %s'%str(dest_scene_path / 'imnormal_*.png'))

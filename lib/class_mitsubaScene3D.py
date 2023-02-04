@@ -10,7 +10,6 @@ from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
 from lib.utils_io import read_cam_params, normalize_v
-from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
 # from collections import defaultdict
@@ -19,9 +18,6 @@ import imageio
 import string
 # Import the library using the alias "mi"
 import mitsuba as mi
-# Set the variant of the renderer
-# from lib.global_vars import mi_variant
-# mi.set_variant(mi_variant)
 
 from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
 from lib.utils_io import load_matrix, resize_intrinsics
@@ -49,9 +45,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         modality_list: list, 
         modality_filename_dict: dict, 
         im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640, 'spp': 1024}, 
+        cam_params_dict: dict={'near': 0.1, 'far': 10.}, 
         BRDF_params_dict: dict={}, 
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
-        cam_params_dict: dict={'near': 0.1, 'far': 10.}, 
         shape_params_dict: dict={'if_load_mesh': True}, 
         emitter_params_dict: dict={'N_ambient_rep': '3SG-SkyGrd'},
         mi_params_dict: dict={'if_sample_rays_pts': True}, 
@@ -89,6 +85,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.scene_path = self.rendering_root / self.scene_name
         self.scene_rendering_path = self.rendering_root / self.scene_name / self.split
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
+        self.scene_name_full = self.scene_name # e.g. 'main_xml_scene0008_00_more'
 
         self.xml_file = self.xml_scene_root / self.scene_name / self.xml_filename
         self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})
@@ -105,6 +102,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.shape_params_dict = shape_params_dict
         self.emitter_params_dict = emitter_params_dict
         self.mi_params_dict = mi_params_dict
+        variant = mi_params_dict.get('variant', '')
+        mi.set_variant(variant if variant != '' else mi_variant_dict[self.host])
 
         # self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
         # self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
@@ -121,9 +120,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         # self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
         self.pcd_color = None
-        self.if_loaded_colors = False
-        self.if_loaded_shapes = False
-        self.if_loaded_layout = False
 
         ''''
         flags to set
@@ -246,22 +242,16 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        variant = mi_params_dict.get('variant', '')
-        if variant != '':
-            mi.set_variant(variant)
-        else:
-            mi.set_variant(mi_variant_dict[self.host])
-
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_scene()
         else:
             self.mi_scene = mi.load_file(str(self.xml_file))
-            if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
-            if if_also_dump_xml_with_lit_area_lights_only:
-                from lib.utils_mitsuba import dump_Indoor_area_lights_only_xml_for_mi
-                xml_file_lit_up_area_lights_only = dump_Indoor_area_lights_only_xml_for_mi(str(self.xml_file))
-                print(blue_text('XML (lit_up_area_lights_only) for Mitsuba dumped to: %s')%str(xml_file_lit_up_area_lights_only))
-                self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
+            # if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
+            # if if_also_dump_xml_with_lit_area_lights_only:
+            #     from lib.utils_mitsuba import dump_Indoor_area_lights_only_xml_for_mi
+            #     xml_file_lit_up_area_lights_only = dump_Indoor_area_lights_only_xml_for_mi(str(self.xml_file))
+            #     print(blue_text('XML (lit_up_area_lights_only) for Mitsuba dumped to: %s')%str(xml_file_lit_up_area_lights_only))
+            #     self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
 
     def process_mi_scene(self, mi_params_dict={}):
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
@@ -327,13 +317,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if hasattr(self, 'pose_list'): return
         if cam_params_dict.get('if_sample_poses', False):
             # assert False, 'disabled; use '
-            if_resample = 'n'
-            # if hasattr(self, 'pose_list'):
-            #     if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
-            # if self.pose_file.exists():
-            #     if_resample = input(red("pose file exists: %s. Resample pose? [y/n]"%str(self.pose_file)))
-            # if if_resample in ['Y', 'y']:
-            self.sample_poses(cam_params_dict.get('sample_pose_num'))
+            if_resample = 'y'
+            if hasattr(self, 'pose_list'):
+                if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
+            if self.pose_file.exists():
+                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(read_cam_params(self.pose_file)))))
+            if not if_resample in ['N', 'n']:
+                self.sample_poses(cam_params_dict.get('sample_pose_num'))
             return
             # else:
             #     print(yellow('ABORTED resample pose.'))
@@ -569,7 +559,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_shape(shape_params_dict=shape_params_dict)
         else:
-            if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
+            if_sample_pts_on_mesh = shape_params_dict.get('if_sample_pts_on_mesh', False)
             sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
             sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
             sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
@@ -581,7 +571,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
             remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
 
-            if if_sample_mesh:
+            if if_sample_pts_on_mesh:
                 self.sample_pts_list = []
 
             print(white_blue('[mitsubaScene3D] load_shapes for scene...'))
@@ -625,7 +615,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
                     
                 # --sample mesh--
-                if if_sample_mesh:
+                if if_sample_pts_on_mesh:
                     sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
                     self.sample_pts_list.append(sample_pts)
                     # print(sample_pts.shape[0])
@@ -733,106 +723,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             lighting_global_pts_list.append(lighting_global_pts)
         return lighting_global_xyz_list, lighting_global_pts_list
 
-    def sample_poses(self, sample_pose_num: int):
-        '''
-        sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)
-        '''
-        from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
-        assert self.up_axis == 'y+', 'not supporting other axes for now'
-        if not self.if_loaded_layout: self.load_layout()
-
-        lverts = self.layout_box_3d_transformed
-        boxes = [[bverts, bfaces] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) if not shape['is_layout']]
-        cads = [[vertices, faces] for vertices, faces, shape in zip(self.vertices_list, self.faces_list, self.shape_list_valid) if not shape['is_layout']]
-
-        assert sample_pose_num is not None
-        assert sample_pose_num > 0
-        self.cam_params_dict['samplePoint'] = sample_pose_num
-
-        origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
-            mitsubaScene=self, 
-            scene_dict={
-                'lverts': lverts, 
-                'boxes': boxes, 
-                'cads': cads, 
-            }, 
-            program_dict={}, 
-            param_dict=self.cam_params_dict, 
-            path_dict={},
-        ) # [pointLoc; target; up]
-
-        pose_list = []
-        origin_lookatvector_up_list = []
-        for cam_param in origin_lookat_up_list:
-            origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-            (R, t), at_vector = origin_lookat_up_to_R_t(origin, lookat, up)
-            pose_list.append(np.hstack((R, t)))
-            origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
-
-        # self.pose_list = pose_list[:sample_pose_num]
-        # return
-
-        H, W = self.im_H_load//4, self.im_W_load//4
-        scale_factor = [t / s for t, s in zip((H, W), (self.im_H_load, self.im_W_load))]
-        K = resize_intrinsics(self.K, scale_factor)
-        tmp_cam_rays_list = self.get_cam_rays_list(H, W, [K]*len(pose_list), pose_list)
-        normal_costs = []
-        depth_costs = []
-        normal_list = []
-        depth_list = []
-        for _, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(tmp_cam_rays_list)):
-            rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
-
-            xs_mi = mi.Point3f(self.to_d(rays_o_flatten))
-            ds_mi = mi.Vector3f(self.to_d(rays_d_flatten))
-            rays_mi = mi.Ray3f(xs_mi, ds_mi)
-            ret = self.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
-            rays_v_flatten = ret.t.numpy()[:, np.newaxis] * rays_d_flatten
-
-            mi_depth = np.sum(rays_v_flatten.reshape(H, W, 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
-            invalid_depth_mask = np.logical_or(np.isnan(mi_depth), np.isinf(mi_depth))
-            mi_depth[invalid_depth_mask] = 0
-            depth_list.append(mi_depth)
-
-            mi_normal = ret.n.numpy().reshape(H, W, 3)
-            mi_normal[invalid_depth_mask, :] = 0
-            normal_list.append(mi_normal)
-
-            mi_normal = mi_normal.astype(np.float32)
-            mi_normal_gradx = np.abs(mi_normal[:, 1:] - mi_normal[:, 0:-1])[~invalid_depth_mask[:, 1:]]
-            mi_normal_grady = np.abs(mi_normal[1:, :] - mi_normal[0:-1, :])[~invalid_depth_mask[1:, :]]
-            ncost = (np.mean(mi_normal_gradx) + np.mean(mi_normal_grady)) / 2.
-        
-            dcost = np.mean(np.log(mi_depth + 1)[~invalid_depth_mask])
-
-            assert not np.isnan(ncost) and not np.isnan(dcost)
-            normal_costs.append(ncost)
-            # depth_costs.append(dcost)
-
-        normal_costs = np.array(normal_costs, dtype=np.float32)
-        # depth_costs = np.array(depth_costs, dtype=np.float32)
-        # normal_costs = (normal_costs - normal_costs.min()) \
-        #         / (normal_costs.max() - normal_costs.min())
-        # depth_costs = (depth_costs - depth_costs.min()) \
-        #         / (depth_costs.max() - depth_costs.min())
-        # totalCosts = normal_costs + 0.3 * depth_costs
-        totalCosts = normal_costs
-        camIndex = np.argsort(totalCosts)[::-1]
-
-        tmp_rendering_path = self.PATH_HOME / 'mitsuba' / 'tmp_sample_poses_rendering'
-        if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path))
-        tmp_rendering_path.mkdir(parents=True, exist_ok=True)
-        print(blue_text('Dumping tmp normal and depth by Mitsuba: %s')%str(tmp_rendering_path))
-        for i in tqdm(camIndex[:sample_pose_num]):
-            imageio.imwrite(str(tmp_rendering_path / ('normal_%04d.png'%i)), (np.clip((normal_list[camIndex[i]] + 1.)/2., 0., 1.)*255.).astype(np.uint8))
-            imageio.imwrite(str(tmp_rendering_path / ('depth_%04d.png'%i)), (np.clip(depth_list[camIndex[i]] / np.amax(depth_list[camIndex[i]]+1e-6), 0., 1.)*255.).astype(np.uint8))
-        print(blue_text('DONE.'))
-        # print(normal_costs[camIndex])
-
-        self.pose_list = [pose_list[_] for _ in camIndex[:sample_pose_num]]
-        self.origin_lookatvector_up_list = [origin_lookatvector_up_list[_] for _ in camIndex[:sample_pose_num]]
-        print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
-    
         # with open(str(self.pose_file), 'w') as camOut:
         #     cam_poses_write = [origin_lookat_up_list[_] for _ in camIndex[:sample_pose_num]]
         #     camOut.write('%d\n'%len(cam_poses_write))

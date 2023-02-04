@@ -10,7 +10,7 @@ import glob
 from collections import defaultdict
 from lib.utils_io import load_matrix, load_img, resize_img, load_HDR, scale_HDR, load_binary, load_h5, load_envmap, resize_intrinsics
 from lib.utils_matseg import get_map_aggre_map
-from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, check_list_of_tensors_size
+from lib.utils_misc import blue_text, get_list_of_keys, green, white_blue, red, yellow
 from lib.utils_openrooms import load_OR_public_poses_to_Rt
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, convert_SG_angles_to_axis_local_np
 from lib.utils_rendering_openrooms import renderingLayer
@@ -31,6 +31,7 @@ class openroomsScene2D(scene2DBase):
         modality_list: list, 
         modality_filename_dict: dict, 
         im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640}, 
+        cam_params_dict: dict={'near': 0.1, 'far': 10.}, 
         BRDF_params_dict: dict={}, 
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
         if_debug_info: bool=False, 
@@ -58,6 +59,7 @@ class openroomsScene2D(scene2DBase):
         assert self.meta_split in ['main_xml', 'mainDiffMat_xml', 'mainDiffLight_xml', 'main_xml1', 'mainDiffMat_xml1', 'mainDiffLight_xml1']
         assert self.scene_name.startswith('scene')
         self.scene_name_short = '_'.join(self.scene_name.split('_')[:2]) # e.g. scene_name: scene0552_00_more, scene_name_short: scene0552_00
+        self.scene_name_full = '_'.join([self.meta_split, self.scene_name]) # e.g. 'main_xml_scene0008_00_more'
 
         self.openrooms_version = scene_params_dict.get('openrooms_version', 'public_re')
         assert self.openrooms_version in ['public_re', 'public'] # TODO 'public' is not tested yet!
@@ -65,6 +67,9 @@ class openroomsScene2D(scene2DBase):
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
         assert self.indexing_based in [0, 1], 'indexing of frame names (indexing_based) has to be either 0-based or 1-based! got: indexing_based = %d'%self.indexing_based
         assert self.indexing_based == {'public_re': 0, 'public': 1}[self.openrooms_version]
+
+        self.up_axis = get_list_of_keys(scene_params_dict, ['up_axis'], [str])[0]
+        assert self.up_axis in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
 
         if scene_params_dict.get('frame_id_list', []) != []: 
             self.frame_id_list = scene_params_dict.get('frame_id_list')
@@ -84,6 +89,7 @@ class openroomsScene2D(scene2DBase):
         self.scene_rendering_path = self.rendering_root / self.meta_split / self.scene_name
         self.scene_xml_path = self.xml_scene_root / (self.meta_split.split('_')[1]) / self.scene_name
         self.intrinsics_path = self.scene_rendering_path / 'intrinsic.txt'
+        self.pose_file = self.scene_xml_path / 'cam.txt'
 
         '''
         im properties
@@ -108,6 +114,11 @@ class openroomsScene2D(scene2DBase):
         self.if_convert_lighting_SG_to_global = lighting_params_dict.get('if_convert_lighting_SG_to_global', False)
         # self.rL = renderingLayer(imWidth=self.lighting_params_dict['env_col'], imHeight=self.lighting_params_dict['env_row'], isCuda=False)
         self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
+        
+        '''
+        params dicts
+        '''
+        self.cam_params_dict = cam_params_dict
 
         '''
         modalities to load
@@ -125,7 +136,7 @@ class openroomsScene2D(scene2DBase):
         '''
         load everything
         '''
-        self.load_intrinsics()
+        # self.load_intrinsics()
         self.load_modalities()
         # self.est = {}
 
@@ -194,6 +205,7 @@ class openroomsScene2D(scene2DBase):
             result_ = scene2DBase.load_modality_(self, _)
             if not (result_ == False):
                 continue
+            # if _ == 'poses': self.load_poses(self.cam_params_dict)
             if _ == 'seg': self.load_seg()
             if _ == 'lighting_SG': self.load_lighting_SG()
             if _ == 'semseg': self.load_semseg()
@@ -216,6 +228,11 @@ class openroomsScene2D(scene2DBase):
     def load_im_hdr(self):
         '''
         load im in HDR; RGB, (H, W, 3), [0., inf]
+
+        e.g. frame 0:
+            - original max: 308.0
+            - hdr scale: 0.07422680412371133
+            - after scaled: 22.861856
         '''
 
         print(white_blue('[openroomsScene] load_im_hdr for %d frames...'%len(self.frame_id_list)))
@@ -289,11 +306,11 @@ class openroomsScene2D(scene2DBase):
         with open(str(transform_file), 'rb') as fIn:
             self.transforms = pickle.load(fIn)
 
-    def load_poses(self):
+    def load_poses(self, cam_params_dict={}):
         '''
         pose_list: list of pose matrices (**camera-to-world** transformation), each (3, 4): [R|t] (OpenCV convention: right-down-forward)
         '''
-
+        self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
 
         print(white_blue('[openroomsScene] load_poses for %d frames...'%len(self.frame_id_list)))
@@ -301,12 +318,17 @@ class openroomsScene2D(scene2DBase):
         if not hasattr(self, 'transforms'):
             self.load_transforms()
 
-        self.pose_list, self.origin_lookatvector_up_list = load_OR_public_poses_to_Rt(self.transforms, self.scene_xml_path, self.frame_id_list, False, if_1_based=self.indexing_based==1)
+        if not self.pose_file.exists():
+            print(yellow('[%s] cam file not found, skipped load poses. %s'%(str(self.__class__.__name__), str(self.pose_file))))
+            return
+        
+        print(blue_text('[%s] loading poses from %s'%(str(self.__class__.__name__), self.pose_file)))
+        self.pose_list, self.origin_lookatvector_up_list = load_OR_public_poses_to_Rt(self.pose_file, self.frame_id_list, False, if_1_based=self.indexing_based==1)
 
         if self.if_resize_im:
             pass # IMPORTANT! do nothing; keep the 3D scene (cameras and geometry), but instead resize intrinsics to account for the smaller image
         
-        print(blue_text('[openroomsScene] DONE. load_poses'))
+        print(blue_text('[openroomsScene] DONE. load_poses (%d poses)'%len(self.origin_lookatvector_up_list)))
 
     def load_albedo(self):
         '''
@@ -399,7 +421,7 @@ class openroomsScene2D(scene2DBase):
         assert all([tuple(_.shape)==(env_row, env_col, self.lighting_params_dict['SG_num'], 7) for _ in self.lighting_SG_local_list])
 
         if self.if_convert_lighting_SG_to_global:
-            if hasattr(self, 'pose_list'): self.load_poses()
+            if hasattr(self, 'pose_list'): self.load_poses(self.cam_params_dict)
 
             self.lighting_SG_global_list = []
             for lighting_SG_local, pose, normal in zip(self.lighting_SG_local_list, self.pose_list, self.normal_list):

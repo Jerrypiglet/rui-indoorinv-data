@@ -67,8 +67,8 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         self.scene_name, (_shape_normalized, shape_file) = get_list_of_keys(scene_params_dict, ['scene_name', 'shape_file'], [str, tuple])
         self.frame_id_list = get_list_of_keys(scene_params_dict, ['frame_id_list'], [list])[0]
         self.up_axis = get_list_of_keys(scene_params_dict, ['up_axis'], [str])[0]
-        self.indexing_based = scene_params_dict.get('indexing_based', 0)
         assert self.up_axis in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
+        self.indexing_based = scene_params_dict.get('indexing_based', 0)
 
         self.scene_path = self.rendering_root / self.scene_name
         self.scene_rendering_path = self.scene_path
@@ -109,7 +109,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         # self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
         # self.pcd_color = None
         # self.if_loaded_colors = False
-        self.if_loaded_shapes = False
+        # self.if_loaded_shapes = False
         # self.if_loaded_layout = False
 
         ''''
@@ -299,7 +299,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
             if self.pose_file.exists():
-                if_resample = input(red("pose file exists: %s. Resample pose? [y/n]"%str(self.pose_file)))
+                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(read_cam_params(self.pose_file)))))
             if if_resample in ['Y', 'y']:
                 self.sample_poses(self.mi_params_dict.get('sample_pose_num'), cam_params_dict)
             else:

@@ -7,16 +7,14 @@ import torch
 import time
 from pathlib import Path
 import imageio
+import shutil
 # Import the library using the alias "mi"
 import mitsuba as mi
-# Set the variant of the renderer
-# from lib.global_vars import mi_variant
-# mi.set_variant(mi_variant)
-
-from lib.utils_io import load_img
+from lib.utils_io import load_img, resize_intrinsics, read_cam_params
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue
+from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
+from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 
 from lib.utils_monosdf_scene import load_monosdf_shape, load_monosdf_scale_offset
 
@@ -31,6 +29,10 @@ class mitsubaBase():
     ): 
         self.device = device
         self.if_debug_info = if_debug_info
+
+        # self.if_loaded_colors = False
+        # self.if_loaded_shapes = False
+        # self.if_loaded_layout = False
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
@@ -120,7 +122,7 @@ class mitsubaBase():
 
     def load_monosdf_scene(self):
         shape_file = Path(self.monosdf_shape_dict['shape_file'])
-        if_shape_normalized = Path(self.monosdf_shape_dict['_shape_normalized']) == 'normalized'
+        if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
         (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
         # self.mi_scene = mi.load_file(str(self.xml_file))
         '''
@@ -144,7 +146,7 @@ class mitsubaBase():
         '''
         load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
         '''
-        if_shape_normalized = Path(self.monosdf_shape_dict['_shape_normalized']) == 'normalized'
+        if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
         if if_shape_normalized:
             scale_offset_tuple, _ = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
         else:
@@ -206,6 +208,129 @@ class mitsubaBase():
             self.mi_seg_dict_of_lists['obj'].append(mi_seg_obj) # non-emitter objects
 
         print(green_text('DONE. [mi_get_segs] for %d frames...'%len(self.mi_rays_ret_list)))
+
+    def sample_poses(self, sample_pose_num: int):
+        '''
+        sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)
+        '''
+        from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
+        assert self.up_axis == 'y+', 'not supporting other axes for now'
+        if not self.if_loaded_layout: self.load_layout()
+
+        lverts = self.layout_box_3d_transformed
+        boxes = [[bverts, bfaces] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) if not shape['is_layout']]
+        cads = [[vertices, faces] for vertices, faces, shape in zip(self.vertices_list, self.faces_list, self.shape_list_valid) if not shape['is_layout']]
+
+        assert sample_pose_num is not None
+        assert sample_pose_num > 0
+        self.cam_params_dict['samplePoint'] = sample_pose_num
+
+        for _tmp_folder in ['mi_seg_emitter']:
+            tmp_folder = self.scene_rendering_path / _tmp_folder
+            if tmp_folder.exists():
+                shutil.rmtree(str(tmp_folder))
+
+        origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
+            mitsubaScene=self, 
+            scene_dict={
+                'lverts': lverts, 
+                'boxes': boxes, 
+                'cads': cads, 
+            }, 
+            program_dict={}, 
+            param_dict=self.cam_params_dict, 
+            path_dict={},
+        ) # [pointLoc; target; up]
+
+        pose_list = []
+        origin_lookatvector_up_list = []
+        for cam_param in origin_lookat_up_list:
+            origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+            (R, t), at_vector = origin_lookat_up_to_R_t(origin, lookat, up)
+            pose_list.append(np.hstack((R, t)))
+            origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+
+        # self.pose_list = pose_list[:sample_pose_num]
+        # return
+
+        H, W = self.im_H_load//4, self.im_W_load//4
+        scale_factor = [t / s for t, s in zip((H, W), (self.im_H_load, self.im_W_load))]
+        K = resize_intrinsics(self.K, scale_factor)
+        tmp_cam_rays_list = self.get_cam_rays_list(H, W, [K]*len(pose_list), pose_list)
+        normal_costs = []
+        depth_costs = []
+        normal_list = []
+        depth_list = []
+        for _, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(tmp_cam_rays_list)):
+            rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
+
+            xs_mi = mi.Point3f(self.to_d(rays_o_flatten))
+            ds_mi = mi.Vector3f(self.to_d(rays_d_flatten))
+            rays_mi = mi.Ray3f(xs_mi, ds_mi)
+            ret = self.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+            rays_v_flatten = ret.t.numpy()[:, np.newaxis] * rays_d_flatten
+
+            mi_depth = np.sum(rays_v_flatten.reshape(H, W, 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
+            invalid_depth_mask = np.logical_or(np.isnan(mi_depth), np.isinf(mi_depth))
+            mi_depth[invalid_depth_mask] = 0
+            depth_list.append(mi_depth)
+
+            mi_normal = ret.n.numpy().reshape(H, W, 3)
+            mi_normal[invalid_depth_mask, :] = 0
+            normal_list.append(mi_normal)
+
+            mi_normal = mi_normal.astype(np.float32)
+            mi_normal_gradx = np.abs(mi_normal[:, 1:] - mi_normal[:, 0:-1])[~invalid_depth_mask[:, 1:]]
+            mi_normal_grady = np.abs(mi_normal[1:, :] - mi_normal[0:-1, :])[~invalid_depth_mask[1:, :]]
+            ncost = (np.mean(mi_normal_gradx) + np.mean(mi_normal_grady)) / 2.
+        
+            dcost = np.mean(np.log(mi_depth + 1)[~invalid_depth_mask])
+
+            assert not np.isnan(ncost) and not np.isnan(dcost)
+            normal_costs.append(ncost)
+            # depth_costs.append(dcost)
+
+        normal_costs = np.array(normal_costs, dtype=np.float32)
+        # depth_costs = np.array(depth_costs, dtype=np.float32)
+        # normal_costs = (normal_costs - normal_costs.min()) \
+        #         / (normal_costs.max() - normal_costs.min())
+        # depth_costs = (depth_costs - depth_costs.min()) \
+        #         / (depth_costs.max() - depth_costs.min())
+        # totalCosts = normal_costs + 0.3 * depth_costs
+        totalCosts = normal_costs
+        camIndex = np.argsort(totalCosts)[::-1][:sample_pose_num]
+
+        tmp_rendering_path = Path(self.scene_rendering_path) / 'tmp_sample_poses_rendering'
+        if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path))
+        tmp_rendering_path.mkdir(parents=True, exist_ok=True)
+        print(blue_text('Dumping tmp normal and depth by Mitsuba: %s')%str(tmp_rendering_path))
+        for _, i in enumerate(camIndex):
+            imageio.imwrite(str(tmp_rendering_path / ('normal_%04d.png'%_)), (np.clip((normal_list[i] + 1.)/2., 0., 1.)*255.).astype(np.uint8))
+            imageio.imwrite(str(tmp_rendering_path / ('depth_%04d.png'%_)), (np.clip(depth_list[i] / np.amax(depth_list[i]+1e-6), 0., 1.)*255.).astype(np.uint8))
+            print(_, 'min depth:', np.amin(depth_list[i][depth_list[i]>0]))
+        print(blue_text('DONE.'))
+        # print(normal_costs[camIndex])
+
+        self.pose_list = [pose_list[i] for i in camIndex]
+        self.origin_lookatvector_up_list = [origin_lookatvector_up_list[i] for i in camIndex]
+        self.origin_lookat_up_list = [origin_lookat_up_list[i] for i in camIndex]
+        self.frame_id_list = list(range(len(self.pose_list)))
+
+        print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
+        
+        if_overwrite_pose_file = 'Y'
+        if self.pose_file.exists():
+            if_overwrite_pose_file = input(red('pose file exists: %s (%d poses). Overwrite? [y/n]'%(str(self.pose_file), len(read_cam_params(self.pose_file)))))
+            
+        if if_overwrite_pose_file in ['Y', 'y']:
+            with open(str(self.pose_file), 'w') as camOut:
+                camOut.write('%d\n'%len(self.origin_lookat_up_list))
+                print('Final sampled camera poses: %d'%len(self.origin_lookat_up_list))
+                for camPose in self.origin_lookat_up_list:
+                    for n in range(0, 3):
+                        camOut.write('%.3f %.3f %.3f\n'%(camPose[n, 0], camPose[n, 1], camPose[n, 2]))
+        print(yellow('Pose file written to %s (%d poses).'%(self.pose_file, len(self.origin_lookat_up_list))))
+
 
     def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False, if_lighting=False):
         '''

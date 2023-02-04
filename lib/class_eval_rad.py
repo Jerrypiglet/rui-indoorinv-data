@@ -162,8 +162,8 @@ class evaluator_scene_rad():
 
         for emitter_type_index in emitter_type_index_list:
             (emitter_type, _) = emitter_type_index
-            for emitter_index in range(len(emitter_dict[emitter_type])):
-                lpts_dict = sample_mesh_emitter(emitter_type, emitter_index=emitter_index, emitter_dict=emitter_dict, max_plate=max_plate, if_dense_sample=True)
+            for emitter_idx in range(len(emitter_dict[emitter_type])):
+                lpts_dict = sample_mesh_emitter(emitter_type, emitter_idx=emitter_idx, emitter_dict=emitter_dict, max_plate=max_plate, if_dense_sample=True)
                 rays_o_nerf = self.or2nerf_th(torch.from_numpy(lpts_dict['lpts']).to(self.device)) # convert to NeRF coordinates
                 rays_d_nerf = self.or2nerf_th(torch.from_numpy(-lpts_dict['lpts_normal']).to(self.device)) # convert to NeRF coordinates
                 # if self.dataset_type == 'Indoor':

@@ -2,6 +2,7 @@ from PIL import Image, ImageFont, ImageDraw
 from pyquaternion import Quaternion
 import numpy as np
 import open3d as o3d
+from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
 from copy import deepcopy
@@ -22,8 +23,10 @@ def text_3d(text, pos, direction=None, degree=0.0, density=10, font='/usr/share/
     if direction is None:
         direction = (0., 0., 1.)
 
+    assert Path(font).exists()
 
     font_obj = ImageFont.truetype(font, font_size * density)
+    # font_obj = ImageFont.load_default()
     font_dim = font_obj.getsize(text)
 
     img = Image.new('RGB', font_dim, color=(255, 255, 255))

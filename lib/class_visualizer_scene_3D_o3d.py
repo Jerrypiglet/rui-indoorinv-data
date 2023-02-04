@@ -16,9 +16,6 @@ import copy
 
 # Import the library using the alias "mi"
 import mitsuba as mi
-# Set the variant of the renderer
-# from lib.global_vars import mi_variant
-# mi.set_variant(mi_variant)
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
@@ -397,6 +394,17 @@ class visualizer_scene_3D_o3d(object):
             cam_center.points = o3d.utility.Vector3dVector(np.array(cam[0]).reshape(1, 3))
             cam_center.colors = o3d.utility.Vector3dVector(np.array(cam_color).reshape(1, 3))
             cam_center_list.append(cam_center)
+
+            if_labels = cam_params.get('if_labels', True)
+            if if_labels:
+                pcd_10 = text_3d(
+                    str(cam_idx), 
+                    pos=(cam[0]).tolist(), 
+                    font='/System/Library/Fonts/Helvetica.ttc' if self.os.host=='apple' else '/usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf', 
+                    direction=(0., 0., 1.), 
+                    degree=270., 
+                    font_size=50, density=3, text_color=tuple([0, 128, 128]))
+                cam_center_list.append(pcd_10)
 
             cam_axis = cam_axis_list[cam_idx]
             cam_axis_arrow = o3d.geometry.LineSet()
@@ -920,16 +928,16 @@ class visualizer_scene_3D_o3d(object):
         if_sampling_emitter = emitter_params.get('if_sampling_emitter', True)
         if if_sampling_emitter:
             max_plate = emitter_params.get('max_plate', 64)
-            radiance_scale = emitter_params.get('radiance_scale', 1.)
+            radiance_scale_vis = emitter_params.get('radiance_scale_vis', 1.)
             from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
             emitter_dict = {'lamp': self.os.lamp_list, 'window': self.os.window_list}
             for emitter_type in ['lamp']:
-                for emitter_index in range(len(emitter_dict[emitter_type])):
-                    lpts_dict = sample_mesh_emitter(emitter_type, emitter_index=emitter_index, emitter_dict=emitter_dict, max_plate=max_plate)
+                for emitter_idx in range(len(emitter_dict[emitter_type])):
+                    lpts_dict = sample_mesh_emitter(emitter_type, emitter_idx=emitter_idx, emitter_dict=emitter_dict, max_plate=max_plate)
                     # for lpts, lpts_normal, lpts_intensity in zip(lpts_dict['lpts'], lpts_dict['lpts_normal'], lpts_dict['lpts_intensity']):
                     o_ = lpts_dict['lpts']
                     d_ = lpts_dict['lpts_normal'] / (np.linalg.norm(lpts_dict['lpts_normal'], axis=-1, keepdims=True)+1e-5)
-                    lpts_end = o_ + d_ * np.linalg.norm(lpts_dict['lpts_intensity'], axis=-1) * radiance_scale
+                    lpts_end = o_ + d_ * np.linalg.norm(lpts_dict['lpts_intensity'], axis=-1) * radiance_scale_vis
                     print(white_red('GT intensity'), lpts_dict['lpts_intensity'], np.linalg.norm(lpts_dict['lpts_intensity'], axis=-1))
                     emitter_rays = o3d.geometry.LineSet()
                     emitter_rays.points = o3d.utility.Vector3dVector(np.vstack((lpts_dict['lpts'], lpts_end)))
