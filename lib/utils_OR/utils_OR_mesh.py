@@ -429,7 +429,7 @@ def minimum_bounding_rectangle(points):
     rval[2] = np.dot([x2, y1], r)
     rval[3] = np.dot([x1, y1], r)
 
-    return rval
+    return rval, hull_points
 
 def writeMesh_rect(name, vertices):
     if vertices.shape==(4, 3):

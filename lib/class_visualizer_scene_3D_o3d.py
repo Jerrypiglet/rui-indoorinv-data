@@ -656,7 +656,7 @@ class visualizer_scene_3D_o3d(object):
         layout_bbox_3d = self.os.layout_box_3d_transformed
         layout_bbox_pcd = o3d.geometry.LineSet()
         layout_bbox_pcd.points = o3d.utility.Vector3dVector(layout_bbox_3d)
-        layout_bbox_pcd.colors = o3d.utility.Vector3dVector([[1,0,0] for i in range(12)])
+        layout_bbox_pcd.colors = o3d.utility.Vector3dVector([[1,0,0] for i in range(12)]) # RED
         layout_bbox_pcd.lines = o3d.utility.Vector2iVector([[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])
 
         return return_list + [layout_bbox_pcd]

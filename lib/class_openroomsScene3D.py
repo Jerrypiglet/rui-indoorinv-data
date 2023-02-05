@@ -196,7 +196,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                     mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
                     if mesh_dump_root.exists():
                         shutil.rmtree(str(mesh_dump_root))
-                    mesh_dump_root.mkdir()
+                    mesh_dump_root.mkdir(parents=True, exist_ok=True)
 
                     for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
                         shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
@@ -474,7 +474,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         # find 2d floor contour
         self.v_2d, self.e_2d = mesh_to_contour(self.layout_mesh)
         # finding minimum 2d bbox (rectangle) from contour
-        self.layout_hull_2d = minimum_bounding_rectangle(self.v_2d)
+        self.layout_hull_2d, self.layout_hull_pts = minimum_bounding_rectangle(self.v_2d)
 
         # 2d cuvboid hull -> 3d bbox
         self.layout_box_3d = np.hstack((np.vstack((self.layout_hull_2d, self.layout_hull_2d)), np.vstack((np.zeros((4, 1)), np.zeros((4, 1))+room_height))))    

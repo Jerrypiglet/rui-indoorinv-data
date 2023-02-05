@@ -2,26 +2,14 @@
 work with Mitsuba/Blender scenes
 '''
 import sys
-
 # host = 'mm1'
 host = 'apple'
-
-PATH_HOME = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
-    'mm1': '', 
-    'qc': '', 
-}[host]
+from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
+PATH_HOME = PATH_HOME_dict[host]
 sys.path.insert(0, PATH_HOME)
-INV_NERF_ROOT = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/inv-nerf', 
-    'mm1': '/home/ruizhu/Documents/Projects/inv-nerf', 
-    'qc': '', 
-}[host]
-MONOSDF_ROOT = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/monosdf', 
-    'mm1': '/home/ruizhu/Documents/Projects/monosdf', 
-    'qc': '', 
-}[host]
+OR_RAW_ROOT = OR_RAW_ROOT_dict[host]
+INV_NERF_ROOT = INV_NERF_ROOT_dict[host]
+MONOSDF_ROOT = MONOSDF_ROOT_dict[host]
 
 from pathlib import Path
 import numpy as np
@@ -143,7 +131,7 @@ scene_obj = mitsubaScene3D(
     mi_params_dict={
         # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
-        'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
+        'debug_dump_mesh': False, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': False, # True: to sample camera rays and intersection pts given input mesh and camera poses
         'if_get_segs': False, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
@@ -192,8 +180,8 @@ scene_obj = mitsubaScene3D(
         'sampleNum': 3, 
         'heightMin' : 0.7, # camera height min
         'heightMax' : 2., # camera height max
-        'distMin': 0.2, # to wall distance min
-        'distMax': 1.5, # to wall distance max
+        'distMin': 1.0, # to wall distance min
+        'distMax': 2.5, # to wall distance max
         'thetaMin': -60, # theta min: pitch angle; up+ 
         'thetaMax' : 40, # theta max: pitch angle; up+
         'phiMin': -60, # yaw angle min

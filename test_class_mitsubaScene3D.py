@@ -6,22 +6,12 @@ import sys
 # host = 'mm1'
 host = 'apple'
 
-PATH_HOME = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
-    'mm1': '', 
-    'qc': '', 
-}[host]
+from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
+PATH_HOME = PATH_HOME_dict[host]
 sys.path.insert(0, PATH_HOME)
-INV_NERF_ROOT = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/inv-nerf', 
-    'mm1': '/home/ruizhu/Documents/Projects/inv-nerf', 
-    'qc': '', 
-}[host]
-MONOSDF_ROOT = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/monosdf', 
-    'mm1': '/home/ruizhu/Documents/Projects/monosdf', 
-    'qc': '', 
-}[host]
+OR_RAW_ROOT = OR_RAW_ROOT_dict[host]
+INV_NERF_ROOT = INV_NERF_ROOT_dict[host]
+MONOSDF_ROOT = MONOSDF_ROOT_dict[host]
 
 from pathlib import Path
 import numpy as np
@@ -33,6 +23,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
+from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
 
 from lib.class_eval_rad import evaluator_scene_rad
 from lib.class_eval_monosdf import evaluator_scene_monosdf
@@ -44,7 +35,7 @@ from lib.class_renderer_blender_mitsubaScene_3D import renderer_blender_mitsubaS
 
 parser = argparse.ArgumentParser()
 # visualizers
-# parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
+parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
 parser.add_argument('--vis_3d_o3d', type=str2bool, nargs='?', const=True, default=True, help='whether to visualize in open3D')
 parser.add_argument('--vis_2d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to show (1) pixel-space modalities (2) projection onto one image (e.g. layout, object bboxes), with plt')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=False, help='')
@@ -91,7 +82,8 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
 # scene_name = 'kitchen_re'
-scene_name = 'bathroom'
+# scene_name = 'bathroom'
+scene_name = 'living-room'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
@@ -156,7 +148,7 @@ scene_obj = mitsubaScene3D(
         # 'emission', 
         # 'depth', 'normal', 
         # 'lighting_SG', 
-        # 'layout', 
+        'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
     modality_filename_dict = {
@@ -436,22 +428,22 @@ if opt.vis_2d_plt:
         scene_obj, 
         modality_list_vis=[
             'im', 
-            # 'layout', 
+            'layout', 
             # 'shapes', 
             # 'albedo', 
             # 'roughness', 
             # 'emission', 
-            'depth', 
-            'normal', 
-            'mi_depth', 
-            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'depth', 
+            # 'normal', 
+            # 'mi_depth', 
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
             # 'seg_area', 'seg_env', 'seg_obj', 
             # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
-        frame_idx_list=[0, 1, 2, 3, 4], 
-        # frame_idx_list=[0], 
+        # frame_idx_list=[0, 1, 2, 3, 4], 
+        frame_idx_list=[0], 
     )
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:
@@ -470,6 +462,22 @@ if opt.vis_2d_plt:
     )
 
 '''
+Matploblib 3D viewer
+'''
+if opt.vis_3d_plt:
+    visualizer_3D_plt = visualizer_openroomsScene_3D_plt(
+        scene_obj, 
+        modality_list_vis = [
+            'layout', 
+            'poses', # camera center + optical axis
+            # 'shapes', # boxes and labels (no meshes in plt visualization)
+            # 'emitters', # emitter properties
+            # 'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
+            ], 
+    )
+    visualizer_3D_plt.vis_3d_with_plt()
+
+'''
 Open3D 3D viewer
 '''
 if opt.vis_3d_o3d:
@@ -480,7 +488,7 @@ if opt.vis_3d_o3d:
             'cameras', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            # 'layout', 
+            'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
             # 'mi', # mitsuba sampled rays, pts
@@ -589,8 +597,8 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
-            'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
         },
@@ -605,8 +613,8 @@ if opt.vis_3d_o3d:
             'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 10,
-            # 'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
-            # 'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
+            # 'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
+            # 'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
             'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length

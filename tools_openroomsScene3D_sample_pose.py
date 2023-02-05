@@ -3,27 +3,12 @@ import sys
 # host = 'mm1'
 host = 'apple'
 
-PATH_HOME = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
-    'mm1': '/home/ruizhu/Documents/Projects/OpenRooms_RAW_loader', 
-    'qc': '/usr2/rzh/Documents/Projects/directvoxgorui', 
-}[host]
-OR_RAW_ROOT = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/data', 
-    'mm1': '/newfoundland2/ruizhu/siggraphasia20dataset', 
-    'qc': '', 
-}[host]
-INV_NERF_ROOT = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/inv-nerf', 
-    'mm1': '/home/ruizhu/Documents/Projects/inv-nerf', 
-    'qc': '', 
-}[host]
+from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
+PATH_HOME = PATH_HOME_dict[host]
 sys.path.insert(0, PATH_HOME)
-MONOSDF_ROOT = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/monosdf', 
-    'mm1': '/home/ruizhu/Documents/Projects/monosdf', 
-    'qc': '', 
-}[host]
+OR_RAW_ROOT = OR_RAW_ROOT_dict[host]
+INV_NERF_ROOT = INV_NERF_ROOT_dict[host]
+MONOSDF_ROOT = MONOSDF_ROOT_dict[host]
 
 from pathlib import Path
 import numpy as np
@@ -88,7 +73,7 @@ shapes_root = Path(OR_RAW_ROOT) / 'uv_mapped'
 envmaps_root = Path(OR_RAW_ROOT) / 'EnvDataset' # not publicly availale
 shape_pickles_root = Path(PATH_HOME) / 'data/openrooms_shape_pickles' # for caching shape bboxes so that we do not need to load meshes very time if only bboxes are wanted
 if not shape_pickles_root.exists():
-    shape_pickles_root.mkdir()
+    shape_pickles_root.mkdir(parents=True, exist_ok=True)
 
 '''
 The classroom scene: one lamp (lit up) + one window (less sun)

@@ -275,7 +275,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             '''
             mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
             if mesh_dump_root.exists(): shutil.rmtree(str(mesh_dump_root))
-            mesh_dump_root.mkdir()
+            mesh_dump_root.mkdir(parents=True, exist_ok=True)
 
             for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
                 if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
@@ -627,7 +627,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         emitter_prop = {'intensity': radiance, 'obj_type': 'obj', 'if_lit_up': np.amax(radiance) > 1e-3}
                 else:
                     if not len(shape.findall('string')) > 0: continue
-                    _id = shape.findall('ref')[0].get('id')+'_'+random_id
+                    _id = shape.get('id')+'_'+random_id
                     # if 'wall' in _id.lower() or 'ceiling' in _id.lower():
                     #     continue
                     filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
@@ -679,6 +679,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     'is_ceiling': 'ceiling' in _id.lower(), 
                     'is_layout': 'wall' in _id.lower() or 'ceiling' in _id.lower() or 'floor' in _id.lower(), 
                 }
+                if shape_dict['is_wall']: 
+                    print('++++', _id)
                 if if_emitter:
                     shape_dict.update({'emitter_prop': emitter_prop})
                 if if_area_light:
@@ -712,7 +714,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if self.if_loaded_layout: return
         if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
 
-        vertices_all = np.vstack(self.vertices_list)
+        if any([shape_dict['is_wall'] for shape_dict in self.shape_list_valid]):
+            vertices_all = np.vstack([self.vertices_list[_] for _ in range(len(self.vertices_list)) if self.shape_list_valid[_]['is_wall']])
+        else:
+            vertices_all = np.vstack(self.vertices_list)
 
         if self.up_axis[0] == 'y':
             self.v_2d = vertices_all[:, [0, 2]]
@@ -724,7 +729,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             self.v_2d = vertices_all[:, [0, 1]]
             # room_height = np.amax(vertices_all[:, 2]) - np.amin(vertices_all[:, 2])
         # finding minimum 2d bbox (rectangle) from contour
-        self.layout_hull_2d = minimum_bounding_rectangle(self.v_2d)
+        self.layout_hull_2d, self.layout_hull_pts = minimum_bounding_rectangle(self.v_2d)
+        
         layout_hull_2d_2x = np.vstack((self.layout_hull_2d, self.layout_hull_2d))
         if self.up_axis[0] == 'y':
             self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x[:, 0:1], np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1])), layout_hull_2d_2x[:, 1:2]))

@@ -6,17 +6,13 @@ import sys
 # host = 'mm1'
 host = 'apple'
 
-PATH_HOME = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader', 
-    'mm1': '', 
-    'qc': '', 
-}[host]
+from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
+PATH_HOME = PATH_HOME_dict[host]
 sys.path.insert(0, PATH_HOME)
-INV_NERF_ROOT = {
-    'apple': '/Users/jerrypiglet/Documents/Projects/inv-nerf', 
-    'mm1': '/home/ruizhu/Documents/Projects/inv-nerf', 
-    'qc': '', 
-}[host]
+OR_RAW_ROOT = OR_RAW_ROOT_dict[host]
+INV_NERF_ROOT = INV_NERF_ROOT_dict[host]
+MONOSDF_ROOT = MONOSDF_ROOT_dict[host]
+
 from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)

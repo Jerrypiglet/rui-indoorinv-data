@@ -154,7 +154,7 @@ def colorize(gray, palette):
     return color
 
 def get_device(host: str, device_id: int=-1):
-    assert host in ['apple', 'mm1', 'qc'], 'Unsupported host: %s!'%host
+    assert host in ['apple', 'mm1', 'qc', 'liwen'], 'Unsupported host: %s!'%host
     device = 'cpu'
     if host == 'apple':
         if torch.backends.mps.is_built() and torch.backends.mps.is_available():

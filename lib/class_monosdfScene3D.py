@@ -269,7 +269,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
             '''
             mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
             if mesh_dump_root.exists(): shutil.rmtree(str(mesh_dump_root))
-            mesh_dump_root.mkdir()
+            mesh_dump_root.mkdir(parents=True, exist_ok=True)
 
             for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
                 if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue

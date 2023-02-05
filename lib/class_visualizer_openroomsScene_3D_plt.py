@@ -24,6 +24,7 @@ import mitsuba as mi
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
+from lib.class_mitsubaScene3D import mitsubaScene3D
 
 from lib.utils_OR.utils_OR_mesh import v_pairs_from_v3d_e, v_pairs_from_v2d_e
 from lib.utils_OR.utils_OR_vis_3D import vis_cube_plt, vis_axis, vis_axis_xyz, set_axes_equal, Arrow3D
@@ -41,7 +42,7 @@ class visualizer_openroomsScene_3D_plt(object):
         modality_list_vis: list, 
     ):
 
-        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene or openroomsScene3D!'
+        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D, or mitsubaScene3D!'
 
         self.os = openrooms_scene
 
