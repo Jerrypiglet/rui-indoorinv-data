@@ -424,6 +424,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         print(blue_text('[mistubaScene] DONE. load_poses (%d poses)'%len(self.pose_list)))
 
     def load_meta_json_pose(self, pose_file):
+        assert Path(pose_file).exists(), 'Pose file not found at %s! Check if exist, or if the correct pose format was chosen in key \'pose_file\' of scene_obj.'%str(pose_file)
         with open(pose_file, 'r') as f:
             meta = json.load(f)
         Rt_c2w_b_list = []
@@ -640,14 +641,15 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     '''
                     non-rectangle shape should not have very thin structures; if yes, discard
                     '''
-                    if np.any(np.amax(vertices, axis=0) - np.amin(vertices, axis=0) < 1e-2): # very thin objects (<1cm)
-                        # import ipdb; ipdb.set_trace()
-                        __ = np.amin(np.amax(vertices, axis=0) - np.amin(vertices, axis=0))
-                        print(yellow('Discarded shape (%s) whose smallest shape dimension is %.4f < 0.01'%(_id, __))); continue
-                    if np.any(np.amax(bverts, axis=0) - np.amin(bverts, axis=0) < 1e-2): # very thin objects (<1cm)
-                        # import ipdb; ipdb.set_trace()
-                        __ = np.amin(np.amax(bverts, axis=0) - np.amin(bverts, axis=0))
-                        print(yellow('Discarded shape (%s) whose smallest bbox dimension is %.4f < 0.01'%(_id, __))); continue
+                    # if np.any(np.amax(vertices, axis=0) - np.amin(vertices, axis=0) < 1e-2): # very thin objects (<1cm)
+                    #     # import ipdb; ipdb.set_trace()
+                    #     __ = np.amin(np.amax(vertices, axis=0) - np.amin(vertices, axis=0))
+                    #     print(yellow('Discarded shape (%s) whose smallest shape dimension is %.4f < 0.01'%(_id, __))); continue
+                    # if np.any(np.amax(bverts, axis=0) - np.amin(bverts, axis=0) < 1e-2): # very thin objects (<1cm)
+                    #     # import ipdb; ipdb.set_trace()
+                    #     __ = np.amin(np.amax(bverts, axis=0) - np.amin(bverts, axis=0))
+                    #     print(yellow('Discarded shape (%s) whose smallest bbox dimension is %.4f < 0.01'%(_id, __))); continue
+                    pass
 
                 # --sample mesh--
                 if if_sample_pts_on_mesh:

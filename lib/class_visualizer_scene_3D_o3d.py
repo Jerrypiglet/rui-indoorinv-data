@@ -322,7 +322,7 @@ class visualizer_scene_3D_o3d(object):
         
     def collect_cameras(self, cam_params: dict={}):
         if not self.os.if_has_poses: 
-            print(yellow('[%s] No poses found in scene_object!'%str(self.__class__.__name__))); return []
+            print(yellow('[%s] No poses found in scene_object! Did you include \'poses\' in modality_list of scene_obj?'%str(self.__class__.__name__))); return []
 
         if_cam_axis_only = cam_params.get('if_cam_axis_only', False)
         if_cam_traj = cam_params.get('if_cam_traj', False)
