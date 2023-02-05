@@ -269,7 +269,7 @@ def vis_envmap(envmap, downsample_ratio: int=10, downsize_ratio_hw: int=1, downs
 
     return b
 
-def read_cam_params(camFile: Path) -> list:
+def read_cam_params_OR(camFile: Path) -> list:
     assert Path(camFile).exists()
     with open(str(camFile), 'r') as camIn:
     #     camNum = int(camIn.readline().strip() )

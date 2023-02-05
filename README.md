@@ -488,7 +488,11 @@ Val:
 
 ## Other utilities
 ### Sample camera poses for new [Mitsuba] scene
-Set `--if_sample_poses True`. Change parameters in `mitsuba_scene->cam_params_dict{}` to adjust parameters in sampling camera poses (e.g. range of random yaw/pitch angles, number of samples, min distance to the wall, min/median distances of all camera rays to the scene).
+Set `--if_sample_poses True`. Set desired num of frames and split in two locations: `split = #SPLIT; frame_ids = list(range(#N_FRAMES))` and `'sample_pose_num': N_FRAMES`.
+
+Change parameters in `mitsuba_scene->cam_params_dict{}` to adjust parameters in sampling camera poses (e.g. range of random yaw/pitch angles, number of samples, min distance to the wall, min/median distances of all camera rays to the scene).
+
+For debugging, set `sample_pose_if_vis_plt: True` to view a [bird-eye-view visualization](images/demo_sample_pose_bathroom.png) of the room and sampled poses.
 
 **Optionally**, set `--eval_scene True` to show view [coverage visualization](images/demo_eval_scene_shapes-vis_count-train-kitchen_0.png) under current poses.
 

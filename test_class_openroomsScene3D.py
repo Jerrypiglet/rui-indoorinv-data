@@ -234,7 +234,7 @@ scene_obj = openroomsScene3D(
         'phiMin': -60, # yaw angle min
         'phiMax': 60, # yaw angle max
         'distRaysMin': 0.3, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
-        'distRaysMedian': 0.6, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'distRaysMedianMin': 0.6, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
         'sample_pose_num': 200, # Number of poses to sample; set to -1 if not sampling

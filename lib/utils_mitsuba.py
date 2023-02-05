@@ -155,7 +155,7 @@ def dump_OR_xml_for_mi(
 
     # sensor: set transform as first frame
     # cam_file = scene_xml_dir / 'cam.txt'
-    # cam_params = read_cam_params(cam_file)
+    # cam_params = read_cam_params_OR(cam_file)
     # cam_param = cam_params[0]
     # if cam_param is not None:
     if origin_lookatvector_up_tuple != ():

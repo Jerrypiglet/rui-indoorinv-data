@@ -90,23 +90,40 @@ intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScen
 The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
-scene_name = 'kitchen'
+# scene_name = 'kitchen_re'
+# scene_name = 'bathroom'
+scene_name = 'living-room'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
 # split = 'train'; frame_ids = [0]
-# split = 'train'; frame_ids = list(range(202))
+split = 'train'; frame_ids = list(range(200))
 # split = 'val'; frame_ids = list(range(10))
-split = 'val'; frame_ids = [0]
+# split = 'val'; frame_ids = [0]
 
+'''
+default
+'''
+eval_models_dict = {
+    'inv-MLP_ckpt_path': '20230111-191305-inv_kitchen_190-10_specT/last.ckpt', 
+    'rad-MLP_ckpt_path': '20230110-132112-rad_kitchen_190-10_specT/last.ckpt', 
+    }
+monosdf_shape_dict = {}
+
+'''
+umcomment👇 to use estimated geometry and radiance from monosdf
+'''
 # monosdf_shape_dict = {
 #     '_shape_normalized': 'normalized', 
 #     'shape_file': str(Path(MONOSDF_ROOT) / 'exps/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/plots/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply'), 
 #     'camera_file': str(Path(MONOSDF_ROOT) / 'data/kitchen/trainval/cameras.npz'), 
+#     'monosdf_conf_path': '20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/runconf.conf', 
+#     'monosdf_ckpt_path': 'kitchen_HDR_EST_grids_gamma2_randomPixel_fixedDepthHDR_trainval/2023_01_23_21_23_38/checkpoints/ModelParameters/latest.pth', 
+#     'inv-MLP_ckpt_path': '20230127-001044-inv-kitchen/last.ckpt' # OVERRIDING eval_models_dict
 #     } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
-monosdf_shape_dict = {}
+# monosdf_shape_dict = {}
 
-mitsuba_scene = mitsubaScene3D(
+scene_obj = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root}, 
@@ -124,15 +141,15 @@ mitsuba_scene = mitsubaScene3D(
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
-        'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
+        # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
-        'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
+        'if_sample_rays_pts': False, # True: to sample camera rays and intersection pts given input mesh and camera poses
         'if_get_segs': False, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        'poses', 
+        # 'poses', 
         # 'im_hdr', 
         # 'im_sdr', 
         # 'lighting_envmap', 
@@ -175,18 +192,30 @@ mitsuba_scene = mitsubaScene3D(
         'sampleNum': 3, 
         'heightMin' : 0.7, # camera height min
         'heightMax' : 2., # camera height max
-        'distMin': 1., # to wall distance min
-        'distMax': 4.5, # to wall distance max
+        'distMin': 0.2, # to wall distance min
+        'distMax': 1.5, # to wall distance max
         'thetaMin': -60, # theta min: pitch angle; up+ 
         'thetaMax' : 40, # theta max: pitch angle; up+
         'phiMin': -60, # yaw angle min
         'phiMax': 60, # yaw angle max
-        'distRaysMin': 0.3, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
-        'distRaysMedian': 0.6, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'distRaysMin': 0.3, # min dist of all camera rays to the scene; should be relatively relaxed; [!!!] set to -1 to disable checking
+        'distRaysMedianMin': 0.6, # median dist of all camera rays to the scene; should be relatively STRICT to avoid e.g. camera too close to walls; [!!!] set to -1 to disable checking
+
+        # 'heightMin' : 0.7, # camera height min
+        # 'heightMax' : 2., # camera height max
+        # 'distMin': 0.1, # to wall distance min
+        # 'distMax': 2.5, # to wall distance max
+        # 'thetaMin': -60, # theta min: pitch angle; up+ 
+        # 'thetaMax' : 40, # theta max: pitch angle; up+
+        # 'phiMin': -60, # yaw angle min
+        # 'phiMax': 60, # yaw angle max
+        # 'distRaysMin': -1, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        # 'distRaysMedianMin': 0.2, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        'sample_pose_num': 20, # Number of poses to sample; set to -1 if not sampling
-        'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png
+        'sample_pose_num': 200, # Number of poses to sample; set to -1 if not sampling
+        'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     }, 
     lighting_params_dict={
         'SG_num': 12, 
@@ -202,7 +231,7 @@ mitsuba_scene = mitsubaScene3D(
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
 
-        'if_sample_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
+        'if_sample_pts_on_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
         'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
         'sample_mesh_min': 10, 
         'sample_mesh_max': 100, 
@@ -234,7 +263,7 @@ if opt.render_2d:
         ]
     if opt.renderer == 'mi':
         renderer = renderer_mi_mitsubaScene_3D(
-            mitsuba_scene, 
+            scene_obj, 
             modality_list=modality_list, 
             im_params_dict={}, 
             cam_params_dict={}, 
@@ -242,7 +271,7 @@ if opt.render_2d:
         )
     if opt.renderer == 'blender':
         renderer = renderer_blender_mitsubaScene_3D(
-            mitsuba_scene, 
+            scene_obj, 
             modality_list=modality_list, 
             host=host, 
             FORMAT='OPEN_EXR', 
@@ -261,9 +290,9 @@ Evaluator for rad-MLP
 if opt.eval_rad:
     evaluator_rad = evaluator_scene_rad(
         host=host, 
-        scene_object=mitsuba_scene, 
+        scene_object=scene_obj, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='20230110-132112-rad_kitchen_190-10_specT/last.ckpt', # 110
+        ckpt_path=monosdf_shape_dict.get('rad-MLP_ckpt_path', eval_models_dict['rad-MLP_ckpt_path']), 
         dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
         split=split, 
         rad_scale=1., 
@@ -315,19 +344,21 @@ Evaluator for inv-MLP
 if opt.eval_inv:
     evaluator_inv = evaluator_scene_inv(
         host=host, 
-        scene_object=mitsuba_scene, 
+        scene_object=scene_obj, 
         INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='20230111-191305-inv_kitchen_190-10_specT/last.ckpt', # 110
+        ckpt_path=monosdf_shape_dict.get('inv-MLP_ckpt_path', eval_models_dict['inv-MLP_ckpt_path']), 
         dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
         split=split, 
         spec=True, 
+        if_monosdf=monosdf_shape_dict=={}, 
+        monosdf_shape_dict=monosdf_shape_dict, 
     )
 
     '''
     sample emission mask on shape vertices
     '''
     _ = evaluator_inv.sample_shapes(
-        sample_type='emission_mask', # ['']
+        sample_type='emission_mask_bin', # ['emission_mask', 'emission_mask_bin', 'albedo', 'metallic', 'roughness']
         shape_params={
         }
     )
@@ -340,10 +371,10 @@ if opt.eval_inv:
 if opt.eval_monosdf:
     evaluator_monosdf = evaluator_scene_monosdf(
         host=host, 
-        scene_object=mitsuba_scene, 
+        scene_object=scene_obj, 
         MONOSDF_ROOT = MONOSDF_ROOT, 
-        conf_path='20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/runconf.conf', 
-        ckpt_path='kitchen_HDR_EST_grids_gamma2_randomPixel_fixedDepthHDR_trainval/2023_01_23_21_23_38/checkpoints/ModelParameters/latest.pth', 
+        conf_path=monosdf_shape_dict['monosdf_conf_path'], 
+        ckpt_path=monosdf_shape_dict['monosdf_ckpt_path'], 
         rad_scale=1., 
     )
 
@@ -379,7 +410,7 @@ Evaluator for scene
 if opt.eval_scene:
     evaluator_scene = evaluator_scene_scene(
         host=host, 
-        scene_object=mitsuba_scene, 
+        scene_object=scene_obj, 
     )
 
     '''
@@ -403,7 +434,7 @@ Matploblib 2D viewer
 '''
 if opt.vis_2d_plt:
     visualizer_2D = visualizer_scene_2D(
-        mitsuba_scene, 
+        scene_obj, 
         modality_list_vis=[
             'im', 
             # 'layout', 
@@ -426,7 +457,7 @@ if opt.vis_2d_plt:
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:
             if modality in eval_return_dict:
-                mitsuba_scene.add_modality(eval_return_dict[modality], modality, 'EST')
+                scene_obj.add_modality(eval_return_dict[modality], modality, 'EST')
 
     visualizer_2D.vis_2d_with_plt(
         lighting_params={
@@ -444,7 +475,7 @@ Open3D 3D viewer
 '''
 if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
-        mitsuba_scene, 
+        scene_obj, 
         modality_list_vis=[
             # 'dense_geo', # fused from 2D
             'cameras', 
@@ -452,7 +483,7 @@ if opt.vis_3d_o3d:
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
-            'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
+            # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
             # 'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
@@ -517,7 +548,7 @@ if opt.vis_3d_o3d:
         #             }),
         #         ]) 
 
-    # for frame_idx, (rays_o, rays_d, _) in enumerate(mitsuba_scene.cam_rays_list):
+    # for frame_idx, (rays_o, rays_d, _) in enumerate(scene_obj.cam_rays_list):
     #     normal_up = np.cross(rays_d[0][0], rays_d[0][-1])
     #     normal_down = np.cross(rays_d[-1][-1], rays_d[-1][0])
     #     normal_left = np.cross(rays_d[-1][0], rays_d[0][0])
@@ -558,12 +589,11 @@ if opt.vis_3d_o3d:
             # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
-            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
+            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
             'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            'if_sampled_pts': False, # [OPTIONAL] is show samples pts from mitsuba_scene.sample_pts_list if available
-            'mesh_color_type': 'eval-count', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count', 'eval-t']
-            # 'mesh_color_type': 'eval-t', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count]
+            'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
+            'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
         },
         emitter_params={
             # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)

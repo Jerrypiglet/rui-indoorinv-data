@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_io import read_cam_params, normalize_v
+from lib.utils_io import read_cam_params_OR, normalize_v
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
 # from collections import defaultdict
@@ -63,6 +63,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             modality_list=modality_list, 
             modality_filename_dict=modality_filename_dict, 
             im_params_dict=im_params_dict, 
+            cam_params_dict=cam_params_dict, 
             BRDF_params_dict=BRDF_params_dict, 
             lighting_params_dict=lighting_params_dict, 
             if_debug_info=if_debug_info, 
@@ -82,6 +83,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         assert self.split in ['train', 'val']
         assert self.up_axis in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
 
+        self.host = host
+        self.device = get_device(self.host, device_id)
+
         self.scene_path = self.rendering_root / self.scene_name
         self.scene_rendering_path = self.rendering_root / self.scene_name / self.split
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
@@ -98,7 +102,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         # self.im_params_dict = im_params_dict
         # self.lighting_params_dict = lighting_params_dict
-        self.cam_params_dict = cam_params_dict
+        self.near = cam_params_dict.get('near', 0.1)
+        self.far = cam_params_dict.get('far', 10.)
         self.shape_params_dict = shape_params_dict
         self.emitter_params_dict = emitter_params_dict
         self.mi_params_dict = mi_params_dict
@@ -112,11 +117,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
         assert self.im_lighting_HW_ratios[0] > 0 and self.im_lighting_HW_ratios[1] > 0
 
-        self.near = cam_params_dict.get('near', 0.1)
-        self.far = cam_params_dict.get('far', 10.)
-
-        self.host = host
-        self.device = get_device(self.host, device_id)
 
         # self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
         self.pcd_color = None
@@ -136,12 +136,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         )
 
         self.load_mi_scene(self.mi_params_dict)
-        self.load_poses(self.cam_params_dict)
+        if 'poses' in self.modality_list:
+            self.load_poses(self.cam_params_dict) # attempt to generate poses indicated in cam_params_dict
 
         self.load_modalities()
 
-        self.get_cam_rays(self.cam_params_dict)
-        self.process_mi_scene(self.mi_params_dict)
+        if hasattr(self, 'pose_list'): 
+            self.get_cam_rays(self.cam_params_dict)
+        self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
 
     def num_frames(self):
         return len(self.frame_id_list)
@@ -150,6 +152,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
     def valid_modalities(self):
         return [
             'im_hdr', 'im_sdr', 
+            'poses', 
             'albedo', 
             'roughness', 
             'depth', 
@@ -253,7 +256,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             #     print(blue_text('XML (lit_up_area_lights_only) for Mitsuba dumped to: %s')%str(xml_file_lit_up_area_lights_only))
             #     self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
 
-    def process_mi_scene(self, mi_params_dict={}):
+    def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True):
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
             '''
@@ -278,17 +281,19 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
                 # print(type(shape), isinstance(shape, mi.llvm_ad_rgb.Mesh))
                 shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
+            print(blue_text('Mitsuba scene shapes dumped to: %s')%str(mesh_dump_root))
 
-        if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
-        if if_sample_rays_pts:
-            self.mi_sample_rays_pts(self.cam_rays_list)
-            self.pts_from['mi'] = True
-        
-        if_get_segs = mi_params_dict.get('if_get_segs', True)
-        if if_get_segs:
-            assert if_sample_rays_pts
-            self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
-            self.seg_from['mi'] = True
+        if if_postprocess_mi_frames:
+            if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
+            if if_sample_rays_pts:
+                self.mi_sample_rays_pts(self.cam_rays_list)
+                self.pts_from['mi'] = True
+            
+            if_get_segs = mi_params_dict.get('if_get_segs', True)
+            if if_get_segs:
+                assert if_sample_rays_pts
+                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
+                self.seg_from['mi'] = True
 
     def load_intrinsics(self):
         '''
@@ -303,11 +308,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             scale_factor = [t / s for t, s in zip((self.H, self.W), (self.im_H_load, self.im_W_load))]
             self.K = resize_intrinsics(self.K, scale_factor)
 
-        if self.pose_format == 'json':
-            with open(self.pose_file, 'r') as f:
-                self.meta = json.load(f)
-            f_xy = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length
-            assert min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3, 'computed f_xy is different than read from intrinsics!'
 
     def load_poses(self, cam_params_dict):
         '''
@@ -315,16 +315,25 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
+        if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
+        if not hasattr(self, 'mi_scene'): self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=False)
+
+        if_resample = 'y'
         if cam_params_dict.get('if_sample_poses', False):
             # assert False, 'disabled; use '
-            if_resample = 'y'
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
             if self.pose_file.exists():
-                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(read_cam_params(self.pose_file)))))
+                assert self.pose_format in ['json']
+                try:
+                    _num_poses = len(self.load_meta_json_pose(self.pose_file)[1])
+                except: 
+                    _num_poses = -1
+                # if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(self.load_meta_json_pose(self.pose_file)[1]))))
+                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), _num_poses)))
             if not if_resample in ['N', 'n']:
                 self.sample_poses(cam_params_dict.get('sample_pose_num'))
-            return
+                return
             # else:
             #     print(yellow('ABORTED resample pose.'))
         # else:
@@ -341,7 +350,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             '''
             OpenRooms convention (matrices containing origin, lookat, up); The camera coordinates is in OpenCV convention (right-down-forward).
             '''
-            cam_params = read_cam_params(self.pose_file)
+            cam_params = read_cam_params_OR(self.pose_file)
             assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
 
             for cam_param in cam_params:
@@ -383,12 +392,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     self.t_c2w_b_list.append(cam_params[idx][0].reshape((3, 1)).astype(np.float32))
             
             elif self.pose_format == 'json':
-                for idx in self.frame_id_list:
-                    pose = np.array(self.meta['frames'][idx]['transform_matrix'])[:3, :4].astype(np.float32)
-                    R_, t_ = np.split(pose, (3,), axis=1)
-                    R_ = R_ / np.linalg.norm(R_, axis=1, keepdims=True) # somehow R_ was mistakenly scaled by self.scale_m2b; need to recover to det(R)=1
-                    self.R_c2w_b_list.append(R_)
-                    self.t_c2w_b_list.append(t_)
+                self.meta, _Rt_c2w_b_list = self.load_meta_json_pose(self.pose_file)
+                self.R_c2w_b_list = [_Rt_c2w_b_list[_][0] for _ in self.frame_id_list]
+                self.t_c2w_b_list = [_Rt_c2w_b_list[_][1] for _ in self.frame_id_list]
+
+                f_xy = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length
+                assert min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3, 'computed f_xy is different than read from intrinsics!'
 
             self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
             self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
@@ -413,6 +422,18 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.origin_lookatvector_up_list = origin_lookatvector_up_list
 
         print(blue_text('[mistubaScene] DONE. load_poses (%d poses)'%len(self.pose_list)))
+
+    def load_meta_json_pose(self, pose_file):
+        with open(pose_file, 'r') as f:
+            meta = json.load(f)
+        Rt_c2w_b_list = []
+        for idx in range(len(meta['frames'])):
+            pose = np.array(meta['frames'][idx]['transform_matrix'])[:3, :4].astype(np.float32)
+            R_, t_ = np.split(pose, (3,), axis=1)
+            R_ = R_ / np.linalg.norm(R_, axis=1, keepdims=True) # somehow R_ was mistakenly scaled by scale_m2b; need to recover to det(R)=1
+            Rt_c2w_b_list.append((R_, t_))
+        import ipdb; ipdb.set_trace()
+        return meta, Rt_c2w_b_list
 
     def get_cam_rays(self, cam_params_dict={}):
         self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
@@ -606,7 +627,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 else:
                     if not len(shape.findall('string')) > 0: continue
                     _id = shape.findall('ref')[0].get('id')+'_'+random_id
-                    # if 'walls' in _id.lower() or 'ceiling' in _id.lower():
+                    # if 'wall' in _id.lower() or 'ceiling' in _id.lower():
                     #     continue
                     filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
                     obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
@@ -614,6 +635,20 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py; faces is 1-based!
                     assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
                     
+                bverts, bfaces = computeBox(vertices)
+                if shape.get('type') == 'obj':
+                    '''
+                    non-rectangle shape should not have very thin structures; if yes, discard
+                    '''
+                    if np.any(np.amax(vertices, axis=0) - np.amin(vertices, axis=0) < 1e-2): # very thin objects (<1cm)
+                        # import ipdb; ipdb.set_trace()
+                        __ = np.amin(np.amax(vertices, axis=0) - np.amin(vertices, axis=0))
+                        print(yellow('Discarded shape (%s) whose smallest shape dimension is %.4f < 0.01'%(_id, __))); continue
+                    if np.any(np.amax(bverts, axis=0) - np.amin(bverts, axis=0) < 1e-2): # very thin objects (<1cm)
+                        # import ipdb; ipdb.set_trace()
+                        __ = np.amin(np.amax(bverts, axis=0) - np.amin(bverts, axis=0))
+                        print(yellow('Discarded shape (%s) whose smallest bbox dimension is %.4f < 0.01'%(_id, __))); continue
+
                 # --sample mesh--
                 if if_sample_pts_on_mesh:
                     sample_pts, face_index = sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max)
@@ -626,7 +661,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     if N_triangles != faces.shape[0]:
                         print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
 
-                bverts, bfaces = computeBox(vertices)
                 self.vertices_list.append(vertices)
                 self.faces_list.append(faces)
                 self.bverts_list.append(bverts)
@@ -639,14 +673,18 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     'id': _id, 
                     'random_id': random_id, 
                     # [IMPORTANT] currently relying on definition of walls and ceiling in XML file to identify those, becuase sometimes they can be complex meshes instead of thin rectangles
-                    'is_wall': 'walls' in _id.lower(), 
+                    'is_wall': 'wall' in _id.lower(), 
                     'is_ceiling': 'ceiling' in _id.lower(), 
-                    'is_layout': 'walls' in _id.lower() or 'ceiling' in _id.lower(), 
+                    'is_layout': 'wall' in _id.lower() or 'ceiling' in _id.lower() or 'floor' in _id.lower(), 
                 }
                 if if_emitter:
                     shape_dict.update({'emitter_prop': emitter_prop})
                 if if_area_light:
-                    self.lamp_list.append((shape_dict, vertices, faces))
+                    # self.lamp_list.append((shape_dict, vertices, faces))
+                    self.lamp_list.append(
+                        {'emitter_prop': shape_dict['emitter_prop'], 'vertices': vertices, 'faces': faces}
+                    )
+
                 self.shape_list_valid.append(shape_dict)
 
                 self.xyz_max = np.maximum(np.amax(vertices, axis=0), self.xyz_max)
@@ -657,8 +695,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         
         print(blue_text('[mitsubaScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
             len(self.shape_list_valid), 
-            len([_ for _ in self.window_list if _[0]['emitter_prop']['if_lit_up']]), len(self.window_list), 
-            len([_ for _ in self.lamp_list if _[0]['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
+            len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
+            len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
             )))
 
     def load_layout(self):

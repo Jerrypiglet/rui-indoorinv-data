@@ -10,7 +10,7 @@ import imageio
 import shutil
 # Import the library using the alias "mi"
 import mitsuba as mi
-from lib.utils_io import load_img, resize_intrinsics, read_cam_params
+from lib.utils_io import load_img, resize_intrinsics, read_cam_params_OR
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
@@ -218,7 +218,8 @@ class mitsubaBase():
         if not self.if_loaded_layout: self.load_layout()
 
         lverts = self.layout_box_3d_transformed
-        boxes = [[bverts, bfaces] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) if not shape['is_layout']]
+        boxes = [[bverts, bfaces] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) \
+            if (not shape['is_layout'] and np.all(np.amax(bverts, axis=0)-np.amin(bverts, axis=0)>1e-2))] # discard thin objects
         cads = [[vertices, faces] for vertices, faces, shape in zip(self.vertices_list, self.faces_list, self.shape_list_valid) if not shape['is_layout']]
 
         assert sample_pose_num is not None
@@ -229,7 +230,7 @@ class mitsubaBase():
             tmp_folder = self.scene_rendering_path / _tmp_folder
             if tmp_folder.exists():
                 shutil.rmtree(str(tmp_folder))
-
+        
         origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
             mitsubaScene=self, 
             scene_dict={
@@ -261,6 +262,7 @@ class mitsubaBase():
         depth_costs = []
         normal_list = []
         depth_list = []
+        print(white_blue('Rendering depth/normals for %d candidate poses... could be slow...'%len(tmp_cam_rays_list)))
         for _, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(tmp_cam_rays_list)):
             rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
 
@@ -283,10 +285,12 @@ class mitsubaBase():
             mi_normal_gradx = np.abs(mi_normal[:, 1:] - mi_normal[:, 0:-1])[~invalid_depth_mask[:, 1:]]
             mi_normal_grady = np.abs(mi_normal[1:, :] - mi_normal[0:-1, :])[~invalid_depth_mask[1:, :]]
             ncost = (np.mean(mi_normal_gradx) + np.mean(mi_normal_grady)) / 2.
+            if np.isnan(ncost): import ipdb; ipdb.set_trace()
+            assert not np.isnan(ncost)
         
-            dcost = np.mean(np.log(mi_depth + 1)[~invalid_depth_mask])
+            # dcost = np.mean(np.log(mi_depth + 1)[~invalid_depth_mask])
+            # assert not np.isnan(dcost)
 
-            assert not np.isnan(ncost) and not np.isnan(dcost)
             normal_costs.append(ncost)
             # depth_costs.append(dcost)
 
@@ -319,17 +323,18 @@ class mitsubaBase():
         print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
         
         if_overwrite_pose_file = 'Y'
-        if self.pose_file.exists():
-            if_overwrite_pose_file = input(red('pose file exists: %s (%d poses). Overwrite? [y/n]'%(str(self.pose_file), len(read_cam_params(self.pose_file)))))
+        pose_file_write = self.pose_file.parent / 'cam.txt'
+        if pose_file_write.exists():
+            if_overwrite_pose_file = input(red('pose file exists: %s (%d poses). Overwrite? [y/n]'%(str(pose_file_write), len(read_cam_params_OR(pose_file_write)))))
             
         if if_overwrite_pose_file in ['Y', 'y']:
-            with open(str(self.pose_file), 'w') as camOut:
+            with open(str(pose_file_write), 'w') as camOut:
                 camOut.write('%d\n'%len(self.origin_lookat_up_list))
                 print('Final sampled camera poses: %d'%len(self.origin_lookat_up_list))
                 for camPose in self.origin_lookat_up_list:
                     for n in range(0, 3):
                         camOut.write('%.3f %.3f %.3f\n'%(camPose[n, 0], camPose[n, 1], camPose[n, 2]))
-        print(yellow('Pose file written to %s (%d poses).'%(self.pose_file, len(self.origin_lookat_up_list))))
+        print(yellow('Pose file written to %s (%d poses).'%(pose_file_write, len(self.origin_lookat_up_list))))
 
 
     def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False, if_lighting=False):

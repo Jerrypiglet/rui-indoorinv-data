@@ -39,7 +39,7 @@ def fuse_depth_pcd_tr(depth_list, pose_list, hwf, subsample_rate=1):
 
 from pathlib import Path
 import pickle
-from lib.utils_io import read_cam_params, normalize_v
+from lib.utils_io import read_cam_params_OR, normalize_v
 
 def load_OR_public_poses_to_Rt(cam_file: Path, frame_id_list: list, if_inverse_y: bool=False, if_1_based: bool=True):
     '''
@@ -59,7 +59,7 @@ def load_OR_public_poses_to_Rt(cam_file: Path, frame_id_list: list, if_inverse_y
     # rotMat_inv_scene = np.linalg.inv(rotMat_scene)
     # trans_scene = transforms[0][2][1].reshape((3, 1)) # (3,1)
 
-    cam_params = read_cam_params(str(cam_file))
+    cam_params = read_cam_params_OR(str(cam_file))
 
     pose_list = []
     origin_lookatvector_up_list = []

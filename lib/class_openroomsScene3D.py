@@ -29,7 +29,7 @@ from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world
 from lib.utils_misc import get_device
-from lib.utils_io import read_cam_params
+from lib.utils_io import read_cam_params_OR
 
 class openroomsScene3D(openroomsScene2D, mitsubaBase):
     '''
@@ -158,7 +158,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         else:
             assert False, 'Unsupported modality: ' + modality
 
-    def load_mi(self, mi_params_dict={}, if_postprocess_mi=True):
+    def load_mi(self, mi_params_dict={}, if_postprocess_mi_frames=True):
         '''
         load scene representation into Mitsuba 3
         '''
@@ -216,7 +216,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
                     print(blue_text('DONE.'))
 
-        if if_postprocess_mi:
+        if if_postprocess_mi_frames:
             if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
             if if_sample_rays_pts and not self.pts_from['mi']:
                 self.mi_sample_rays_pts(self.cam_rays_list)
@@ -235,14 +235,14 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
         if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
-        if not hasattr(self, 'mi_scene'): self.load_mi(self.mi_params_dict, if_postprocess_mi=False)
+        if not hasattr(self, 'mi_scene'): self.load_mi(self.mi_params_dict, if_postprocess_mi_frames=False)
 
         if_resample = 'y'
         if cam_params_dict.get('if_sample_poses', False):
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
             if self.pose_file.exists():
-                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(read_cam_params(self.pose_file)))))
+                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(read_cam_params_OR(self.pose_file)))))
             if not if_resample in ['N', 'n']:
                 self.sample_poses(cam_params_dict.get('sample_pose_num'))
                 return
@@ -409,9 +409,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
                 is_layout = 'layoutMesh' in str(obj_path) or 'uv_mapped.obj' in str(obj_path)
                 shape_dict.update({'is_wall': is_layout, 'is_ceiling': is_layout, 'is_layout': is_layout})
-                    # 'is_wall': 'walls' in _id.lower(), 
+                    # 'is_wall': 'wall' in _id.lower(), 
                     # 'is_ceiling': 'ceiling' in _id.lower(), 
-                    # 'is_layout': 'walls' in _id.lower() or 'ceiling' in _id.lower(), 
+                    # 'is_layout': 'wall' in _id.lower() or 'ceiling' in _id.lower(), 
             
                 obj_path_list.append(obj_path)
         

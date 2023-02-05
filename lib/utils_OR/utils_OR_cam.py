@@ -8,7 +8,7 @@ sys.path.insert(0,parentdir)
 from utils_OR.utils_OR_geo import isect_line_plane_v3
 from lib.utils_io import normalize_v
 
-def read_cam_params(camFile):
+def read_cam_params_OR(camFile):
     assert osp.isfile(str(camFile))
     with open(str(camFile), 'r') as camIn:
     #     camNum = int(camIn.readline().strip() )

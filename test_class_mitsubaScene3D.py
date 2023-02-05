@@ -96,9 +96,9 @@ emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1;
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
 # split = 'train'; frame_ids = [0]
-# split = 'train'; frame_ids = list(range(202))
+split = 'train'; frame_ids = list(range(200))
 # split = 'val'; frame_ids = list(range(10))
-split = 'val'; frame_ids = [0]
+# split = 'val'; frame_ids = [0]
 
 '''
 default
@@ -135,20 +135,20 @@ scene_obj = mitsubaScene3D(
         'intrinsics_path': intrinsics_path, 
         'up_axis': 'y+', 
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
-        # 'pose_file': ('OpenRooms', 'cam.txt'), 
-        'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+        'pose_file': ('OpenRooms', 'cam.txt'), 
+        # 'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
         # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
-        'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
+        'if_sample_rays_pts': False, # True: to sample camera rays and intersection pts given input mesh and camera poses
         'if_get_segs': False, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        # 'poses', 
+        'poses', 
         # 'im_hdr', 
         # 'im_sdr', 
         # 'lighting_envmap', 
@@ -191,18 +191,30 @@ scene_obj = mitsubaScene3D(
         'sampleNum': 3, 
         'heightMin' : 0.7, # camera height min
         'heightMax' : 2., # camera height max
-        'distMin': 1., # to wall distance min
-        'distMax': 4.5, # to wall distance max
+        'distMin': 0.2, # to wall distance min
+        'distMax': 2.5, # to wall distance max
         'thetaMin': -60, # theta min: pitch angle; up+ 
         'thetaMax' : 40, # theta max: pitch angle; up+
         'phiMin': -60, # yaw angle min
         'phiMax': 60, # yaw angle max
-        'distRaysMin': 0.3, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
-        'distRaysMedian': 0.6, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'distRaysMin': 0.3, # min dist of all camera rays to the scene; should be relatively relaxed; [!!!] set to -1 to disable checking
+        'distRaysMedianMin': 0.6, # median dist of all camera rays to the scene; should be relatively STRICT to avoid e.g. camera too close to walls; [!!!] set to -1 to disable checking
+
+        # 'heightMin' : 0.7, # camera height min
+        # 'heightMax' : 2., # camera height max
+        # 'distMin': 0.1, # to wall distance min
+        # 'distMax': 2.5, # to wall distance max
+        # 'thetaMin': -60, # theta min: pitch angle; up+ 
+        # 'thetaMax' : 40, # theta max: pitch angle; up+
+        # 'phiMin': -60, # yaw angle min
+        # 'phiMax': 60, # yaw angle max
+        # 'distRaysMin': -1, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        # 'distRaysMedianMin': 0.2, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        'sample_pose_num': 20, # Number of poses to sample; set to -1 if not sampling
-        'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png
+        'sample_pose_num': 200, # Number of poses to sample; set to -1 if not sampling
+        'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     }, 
     lighting_params_dict={
         'SG_num': 12, 
@@ -470,7 +482,7 @@ if opt.vis_3d_o3d:
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
-            'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
+            # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
             # 'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
@@ -576,7 +588,7 @@ if opt.vis_3d_o3d:
             # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
-            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
+            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
             'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available

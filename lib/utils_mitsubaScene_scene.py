@@ -1,13 +1,13 @@
 import numpy as np
 from pathlib import Path, PosixPath
-from utils_OR.utils_OR_cam import read_cam_params
+from utils_OR.utils_OR_cam import read_cam_params_OR
 from utils_misc import get_list_of_keys
 
 def get_cam_params(scene_info_dict):
     dest_scene_path = get_list_of_keys(scene_info_dict, ['dest_scene_path'], [PosixPath])[0]
     cam_file = dest_scene_path / 'cam.txt'
     assert cam_file.exists(), 'cam_file does not exist! %s'%(str(cam_file))
-    cam_params = read_cam_params(cam_file)
+    cam_params = read_cam_params_OR(cam_file)
     return cam_params, len(cam_params)
 
 def writeScene(name, boxes):
@@ -29,6 +29,11 @@ def checkOverlapApproximate(bverts1, bverts2):
     xLen = np.sqrt(np.sum(axis_1 * axis_1))
     axis_2 = (bverts1[3, :] - bverts1[0, :]).reshape(1, 3)
     zLen = np.sqrt(np.sum(axis_2 * axis_2))
+
+    # if not xLen > 1e-5:
+    #     import ipdb; ipdb.set_trace()
+    assert xLen > 1e-5
+    assert zLen > 1e-5
 
     origin = bverts1[0, :]
     xCoord = np.sum( (bverts2[0:4, :] - origin) * axis_1 / xLen, axis=1)
@@ -54,12 +59,13 @@ def findSupport(lverts, boxes, cats):
     for n in range(0, len(boxes)):
         bList = []
         top = boxes[n][0][:, 1].max()
+        assert np.all(np.amax(boxes[n][0], axis=0)-np.amin(boxes[n][0], axis=0)) > 1e-5
 
         for m in range(0, len(boxes)):
+
             if m != n:
                 bverts = boxes[m][0]
                 minY, maxY = bverts[:, 1].min(), bverts[:, 1].max()
-
                 bottom = minY
                 if np.abs(top - bottom) < 0.75 * (maxY - minY) and np.abs(top - bottom) < 1:
                     isOverlap = checkOverlapApproximate(boxes[n][0], boxes[m][0])

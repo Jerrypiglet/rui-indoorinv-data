@@ -34,7 +34,7 @@ class scene2DBase():
         im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640, 'spp': 1024}, 
         BRDF_params_dict: dict={}, 
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
-        # cam_params_dict: dict={'near': 0.1, 'far': 10.}, 
+        cam_params_dict: dict={'near': 0.1, 'far': 10.}, 
         # shape_params_dict: dict={'if_load_mesh': True}, 
         # emitter_params_dict: dict={'N_ambient_rep': '3SG-SkyGrd'},
         # mi_params_dict: dict={'if_sample_rays_pts': True, 'if_sample_poses': False}, 
@@ -59,6 +59,7 @@ class scene2DBase():
 
         # im params
         self.im_params_dict = im_params_dict
+        self.cam_params_dict = cam_params_dict
 
         self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
         self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
@@ -72,7 +73,9 @@ class scene2DBase():
         self.est = {}
 
         # set up modalities to load
-        self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
+        self.modality_list = modality_list
+        if self.cam_params_dict.get('if_sample_poses', False): self.modality_list.append('poses')
+        self.modality_list = self.check_and_sort_modalities(list(set(self.modality_list)))
 
         self.modality_filename_dict = modality_filename_dict
         for modality in modality_filename_dict.keys():

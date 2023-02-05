@@ -35,7 +35,7 @@ def func_mitsubaScene_sample_poses(
     phiMin = sample_params_dict['phiMin']
     phiMax = sample_params_dict['phiMax']
     distRaysMin = sample_params_dict['distRaysMin']
-    distRaysMedian = sample_params_dict['distRaysMedian']
+    distRaysMedian = sample_params_dict['distRaysMedianMin']
 
     wallVertices = []
     floorHeight = lverts[:, 1].min()
@@ -85,7 +85,7 @@ def func_mitsubaScene_sample_poses(
         plt.figure(figsize=(15, 12))
         plt.scatter(0, 0, color='g')
         # for i in range(4):
-            # plt.plot(wallVertices[i][[0, 2]], wallVertices[(i-1)%4][[0, 2]])
+        #     plt.plot(wallVertices[i][[0, 2]], wallVertices[(i-1)%4][[0, 2]])
 
     normal_list = []
     midPoint_list = []
@@ -100,7 +100,7 @@ def func_mitsubaScene_sample_poses(
         direc = np.array( [X[i] - X[j], 0, Z[i] - Z[j]], dtype = np.float32)
         if sample_pose_if_vis_plt:
             print('=====', i, j, X[i], X[j])
-            plt.plot(np.array([X[i], X[j]]), np.array([Z[i], Z[j]]), 'k-')
+            plt.plot(np.array([X[i], X[j]]), np.array([Z[i], Z[j]]), 'm-') # layout contour as magenta solid line
         totalLen = np.sqrt(np.sum(direc * direc))
         if totalLen == 0:
             continue
@@ -136,7 +136,12 @@ def func_mitsubaScene_sample_poses(
             print('sampleNum', sampleNum)
             print('normal', normal)
             plt.scatter(midPoint[0], midPoint[2], c='r')
-            plt.plot([midPoint[0], midPoint[0]+normal[0]], [midPoint[2], midPoint[2]+normal[2]], 'k--')
+            plt.plot([midPoint[0], midPoint[0]+normal[0]], [midPoint[2], midPoint[2]+normal[2]], 'k--') # wall normal as black dashed line
+
+    if sample_pose_if_vis_plt:
+        for box in boxes:
+            bverts = box[0][0:4, :]
+            plt.plot(box[0][[0,1,2,3,0], 0], box[0][[0,1,2,3,0], 2], 'g--') # furnitures as green dashed line
 
     for i, origin, normal, direc, midPoint, totalLen in tqdm(zip(range(len(wallVertices)), origin_list, normal_list, direc_list, midPoint_list, totalLen_list)):
         accumLen = 0.2 * segLen
@@ -160,10 +165,10 @@ def func_mitsubaScene_sample_poses(
                 dist_to_wall = min(dist_to_wall_list)
 
                 if not isIn:
-                    print(cnt, 'Warning: %d point is outside the room'%validPointCount)
+                    print(cnt, yellow_text('DISCARDED pose: point is outside the room'))
                     continue
                 elif dist_to_wall < distMin:
-                    print(cnt, 'Warning: %d point closer to walls than distMin (%.2f<%.2f)'%(validPointCount, dist_to_wall, distMin))
+                    print(cnt, yellow_text('DISCARDED pose: point closer to walls than distMin (%.2f<%.2f)'%(dist_to_wall, distMin)))
                     continue
                 else:
                     # check if the point will in any bounding boxes
@@ -179,7 +184,7 @@ def func_mitsubaScene_sample_poses(
                                 break
 
                     if isOverlap:
-                        print(cnt, 'Warning: %d point overlaps with furniture'%validPointCount)
+                        print(cnt, yellow_text('DISCARDED pose: point overlaps with furniture'))
                         continue
 
                     validPointCount += 1
@@ -214,7 +219,7 @@ def func_mitsubaScene_sample_poses(
                     up = zAxis - np.sum(zAxis * targetDirec) * targetDirec
                     up = up / np.sqrt(np.sum(up *  up))
 
-                    print('pitch y: %.2f'%targetDirec[1], 'targetDirec:', targetDirec, 'up:', up)
+                    # print('pitch y: %.2f'%targetDirec[1], 'targetDirec:', targetDirec, 'up:', up)
 
                     camPose[1, :] = target
                     camPose[2, :] = up
@@ -222,6 +227,7 @@ def func_mitsubaScene_sample_poses(
                     '''
                     render depth with current pose
                     '''
+                    min_depth = -1.
                     if distRaysMin > 0:
                         _origin, _lookat, _up = np.split(camPose.T, 3, axis=1)
                         (_R, _t), _at_vector = origin_lookat_up_to_R_t(_origin, _lookat, _up)
@@ -242,10 +248,12 @@ def func_mitsubaScene_sample_poses(
                         mi_depth = np.sum(rays_v_flatten.reshape(H, W, 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
                         invalid_depth_mask = np.logical_or(np.isnan(mi_depth), np.isinf(mi_depth))
                         mi_depth_ = mi_depth[~invalid_depth_mask] # (N,)
+                        if mi_depth_.size == 0:
+                            continue
                         min_depth = np.min(mi_depth_)
                         median_depth = np.median(mi_depth_)
                         if min_depth < distRaysMin or median_depth < distRaysMedian:
-                            print(yellow_text('camera too close to the scene: min=%.2f(thres %.2f), median=%.2f(thres %.2f); discarded.'%(min_depth, distRaysMin, median_depth, distRaysMedian)))
+                            print(yellow_text('DISCARDED pose: camera too close to the scene: min=%.2f(thres %.2f), median=%.2f(thres %.2f); discarded.'%(min_depth, distRaysMin, median_depth, distRaysMedian)))
                             '''
                             uncomment to show invalid image
                             '''

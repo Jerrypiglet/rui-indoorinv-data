@@ -31,7 +31,7 @@ import sys
 sys.path.append(str(Path(PATH_HOME) / 'lib'))
 from utils_misc import gen_random_str
 from utils_OR.utils_OR_xml import transformToXml
-from utils_io import read_cam_params
+from utils_io import read_cam_params_OR
 
 
 layout_root = Path(OR_RAW_ROOT) / 'layoutMesh'
@@ -97,7 +97,7 @@ sampler.set('type', 'independent')
 
 # sensor: set transform as first frame
 cam_file = scene_xml_dir / 'cam.txt'
-cam_params = read_cam_params(cam_file)
+cam_params = read_cam_params_OR(cam_file)
 cam_param = cam_params[0]
 origin, lookat, up = np.split(cam_param.T, 3, axis=1)
 sensor_transform = et.SubElement(

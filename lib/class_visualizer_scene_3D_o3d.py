@@ -7,12 +7,12 @@ import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 import open3d.visualization as vis
 
-import trimesh
+# import trimesh
 # from sympy import Point3D, Line3D, Plane, sympify, Rational
 # from copy import deepcopy
 # import torch
 from pathlib import Path
-import copy
+# import copy
 
 # Import the library using the alias "mi"
 import mitsuba as mi
@@ -22,7 +22,7 @@ from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_monosdfScene3D import monosdfScene3D
 
-from lib.utils_misc import get_list_of_keys, gen_random_str, yellow, white_red
+from lib.utils_misc import get_list_of_keys, gen_random_str, yellow, yellow, white_red
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_OR.utils_OR_mesh import writeMesh, colorize_o3d_mesh_faces
@@ -43,14 +43,14 @@ class visualizer_scene_3D_o3d(object):
     '''
     def __init__(
         self, 
-        openrooms_scene, 
+        scene_object, 
         modality_list_vis: list, 
         if_debug_info: bool=False, 
     ):
 
-        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D, mitsubaScene3D!'
+        assert type(scene_object) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D, mitsubaScene3D!'
 
-        self.os = openrooms_scene
+        self.os = scene_object
         self.if_debug_info = if_debug_info
 
         self.modality_list_vis = list(set(modality_list_vis))
@@ -321,7 +321,8 @@ class visualizer_scene_3D_o3d(object):
         return pcd_color
         
     def collect_cameras(self, cam_params: dict={}):
-        assert self.os.if_has_poses
+        if not self.os.if_has_poses: 
+            print(yellow('[%s] No poses found in scene_object!'%str(self.__class__.__name__))); return []
 
         if_cam_axis_only = cam_params.get('if_cam_axis_only', False)
         if_cam_traj = cam_params.get('if_cam_traj', False)
@@ -933,6 +934,7 @@ class visualizer_scene_3D_o3d(object):
             emitter_dict = {'lamp': self.os.lamp_list, 'window': self.os.window_list}
             for emitter_type in ['lamp']:
                 for emitter_idx in range(len(emitter_dict[emitter_type])):
+                    assert isinstance(emitter_dict, dict)
                     lpts_dict = sample_mesh_emitter(emitter_type, emitter_idx=emitter_idx, emitter_dict=emitter_dict, max_plate=max_plate)
                     # for lpts, lpts_normal, lpts_intensity in zip(lpts_dict['lpts'], lpts_dict['lpts_normal'], lpts_dict['lpts_intensity']):
                     o_ = lpts_dict['lpts']
