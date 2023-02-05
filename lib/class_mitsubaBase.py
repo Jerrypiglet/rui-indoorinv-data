@@ -261,6 +261,7 @@ class mitsubaBase():
         normal_costs = []
         depth_costs = []
         normal_list = []
+        valid_normal_mask_list = []
         depth_list = []
         print(white_blue('Rendering depth/normals for %d candidate poses... could be slow...'%len(tmp_cam_rays_list)))
         for _, (rays_o, rays_d, ray_d_center) in tqdm(enumerate(tmp_cam_rays_list)):
@@ -278,15 +279,21 @@ class mitsubaBase():
             depth_list.append(mi_depth)
 
             mi_normal = ret.n.numpy().reshape(H, W, 3)
+            invalid_normal_mask = np.abs(np.linalg.norm(mi_normal, axis=2) - np.ones((H, W), dtype=np.float32)) > 1e-4
+            invalid_normal_mask == np.logical_or(invalid_normal_mask, invalid_depth_mask)
             mi_normal[invalid_depth_mask, :] = 0
             normal_list.append(mi_normal)
+            valid_normal_mask_list.append(~invalid_normal_mask)
 
             mi_normal = mi_normal.astype(np.float32)
-            mi_normal_gradx = np.abs(mi_normal[:, 1:] - mi_normal[:, 0:-1])[~invalid_depth_mask[:, 1:]]
-            mi_normal_grady = np.abs(mi_normal[1:, :] - mi_normal[0:-1, :])[~invalid_depth_mask[1:, :]]
-            ncost = (np.mean(mi_normal_gradx) + np.mean(mi_normal_grady)) / 2.
-            if np.isnan(ncost): import ipdb; ipdb.set_trace()
-            assert not np.isnan(ncost)
+            if np.sum(~invalid_normal_mask[:, 1:]) < (H*W*0.1):
+                ncost = -100000. # <10% pixels with valid normals
+            else:    
+                mi_normal_gradx = np.abs(mi_normal[:, 1:] - mi_normal[:, 0:-1])[~invalid_normal_mask[:, 1:]]
+                mi_normal_grady = np.abs(mi_normal[1:, :] - mi_normal[0:-1, :])[~invalid_normal_mask[1:, :]]
+                ncost = (np.mean(mi_normal_gradx) + np.mean(mi_normal_grady)) / 2.
+                if np.isnan(ncost): import ipdb; ipdb.set_trace()
+                assert not np.isnan(ncost)
         
             # dcost = np.mean(np.log(mi_depth + 1)[~invalid_depth_mask])
             # assert not np.isnan(dcost)
@@ -310,8 +317,9 @@ class mitsubaBase():
         print(blue_text('Dumping tmp normal and depth by Mitsuba: %s')%str(tmp_rendering_path))
         for _, i in enumerate(camIndex):
             imageio.imwrite(str(tmp_rendering_path / ('normal_%04d.png'%_)), (np.clip((normal_list[i] + 1.)/2., 0., 1.)*255.).astype(np.uint8))
+            imageio.imwrite(str(tmp_rendering_path / ('valid_normal_mask_%04d.png'%_)), (valid_normal_mask_list[i].astype(np.float32)*255.).astype(np.uint8))
             imageio.imwrite(str(tmp_rendering_path / ('depth_%04d.png'%_)), (np.clip(depth_list[i] / np.amax(depth_list[i]+1e-6), 0., 1.)*255.).astype(np.uint8))
-            print(_, 'min depth:', np.amin(depth_list[i][depth_list[i]>0]))
+            print(_, i, 'min depth:', np.amin(depth_list[i][depth_list[i]>0]), 'cost:', totalCosts[i])
         print(blue_text('DONE.'))
         # print(normal_costs[camIndex])
 
