@@ -237,8 +237,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
         if not hasattr(self, 'mi_scene'): self.load_mi(self.mi_params_dict, if_postprocess_mi_frames=False)
 
-        if_resample = 'y'
+        if_resample = 'n'
         if cam_params_dict.get('if_sample_poses', False):
+            if_resample = 'y'
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
             if self.pose_file.exists():

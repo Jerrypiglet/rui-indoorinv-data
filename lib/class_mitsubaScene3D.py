@@ -214,7 +214,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 continue
 
             if _ == 'emission': self.load_emission()
-            if _ == 'layout': self.load_layout()
+            if _ == 'layout': self.load_layout(self.shape_params_dict)
             if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
 
             if _ == 'depth':
@@ -235,7 +235,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             return self.mi_normal_global_list
         elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
             seg_key = modality.split('_')[-1] 
-            return self.mi_seg_dict_of_lists[seg_key]
+            return self.mi_seg_dict_of_lists[seg_key] # Set scene_obj->mi_params_dict={'if_get_segs': True
+
         elif modality == 'emission': 
             return self.emission_list
         else:
@@ -318,13 +319,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
         if not hasattr(self, 'mi_scene'): self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=False)
 
-        if_resample = 'y'
+        if_resample = 'n'
         if cam_params_dict.get('if_sample_poses', False):
+            if_resample = 'y'
             # assert False, 'disabled; use '
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
             if self.pose_file.exists():
-                assert self.pose_format in ['json']
+                # assert self.pose_format in ['json']
                 try:
                     _num_poses = len(self.load_meta_json_pose(self.pose_file)[1])
                 except: 
@@ -378,8 +380,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             '''
             [NOTE] scene.obj from Liwen is much smaller (s.t. scaling and translation here) compared to scene loaded from scene_v3.xml
             '''
-            self.scale_m2b = np.array([0.206, 0.206, 0.206], dtype=np.float32).reshape((3, 1))
-            self.trans_m2b = np.array([-0.074684, 0.23965, -0.30727], dtype=np.float32).reshape((3, 1))
+            # self.scale_m2b = np.array([0.206, 0.206, 0.206], dtype=np.float32).reshape((3, 1))
+            # self.trans_m2b = np.array([-0.074684, 0.23965, -0.30727], dtype=np.float32).reshape((3, 1))
             self.t_c2w_b_list, self.R_c2w_b_list = [], []
 
             if self.pose_format == 'Blender':
@@ -399,16 +401,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 f_xy = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length
                 assert min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3, 'computed f_xy is different than read from intrinsics!'
 
-            self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
-            self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
-
+            # self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
+            # self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
+            T_ = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]], dtype=np.float32) # flip x, y: Liwen's new pose (left-up-forward) -> OpenCV (right-down-forward)
             for R_c2w_b, t_c2w_b in zip(self.R_c2w_b_list, self.t_c2w_b_list):
-                assert abs(1.-np.linalg.det(R_c2w_b))<1e-6
-                t_c2w_b = (t_c2w_b - self.trans_m2b) / self.scale_m2b
-                t = self.T_w_b2m @ t_c2w_b # -> t_c2w_w
-
-                R = self.T_w_b2m @ R_c2w_b @ self.T_c_b2m # https://i.imgur.com/nkzfvwt.png
-
+                R = R_c2w_b @ T_
+                t = t_c2w_b
                 _, __, at_vector = np.split(R, 3, axis=-1)
                 at_vector = normalize_v(at_vector)
                 up = normalize_v(-__) # (3, 1)
@@ -417,6 +415,26 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
                 pose_list.append(np.hstack((R, t)))
                 origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+
+            '''
+            Obselete code, when Liwen was using Blender poses...
+            '''
+
+            # for R_c2w_b, t_c2w_b in zip(self.R_c2w_b_list, self.t_c2w_b_list):
+            #     assert abs(1.-np.linalg.det(R_c2w_b))<1e-6
+            #     t_c2w_b = (t_c2w_b - self.trans_m2b) / self.scale_m2b
+            #     t = self.T_w_b2m @ t_c2w_b # -> t_c2w_w
+
+            #     R = self.T_w_b2m @ R_c2w_b @ self.T_c_b2m # https://i.imgur.com/nkzfvwt.png
+
+            #     _, __, at_vector = np.split(R, 3, axis=-1)
+            #     at_vector = normalize_v(at_vector)
+            #     up = normalize_v(-__) # (3, 1)
+            #     assert np.abs(np.sum(at_vector * up)) < 1e-3
+            #     origin = t
+
+            #     pose_list.append(np.hstack((R, t)))
+            #     origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
 
         self.pose_list = pose_list
         self.origin_lookatvector_up_list = origin_lookatvector_up_list
@@ -433,10 +451,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             R_, t_ = np.split(pose, (3,), axis=1)
             R_ = R_ / np.linalg.norm(R_, axis=1, keepdims=True) # somehow R_ was mistakenly scaled by scale_m2b; need to recover to det(R)=1
             Rt_c2w_b_list.append((R_, t_))
-        import ipdb; ipdb.set_trace()
         return meta, Rt_c2w_b_list
 
     def get_cam_rays(self, cam_params_dict={}):
+        if hasattr(self, 'cam_rays_list'):  return
         self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
 
     def get_room_center_pose(self):
@@ -703,7 +721,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
             )))
 
-    def load_layout(self):
+    def load_layout(self, shape_params_dict={}):
         '''
         load and visualize layout in 3D & 2D; assuming room up direction is axis-aligned
         images/demo_layout_mitsubaScene_3D_1.png
@@ -714,7 +732,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if self.if_loaded_layout: return
         if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
 
-        if any([shape_dict['is_wall'] for shape_dict in self.shape_list_valid]):
+        if shape_params_dict.get('if_layout_as_walls', True) and any([shape_dict['is_wall'] for shape_dict in self.shape_list_valid]):
             vertices_all = np.vstack([self.vertices_list[_] for _ in range(len(self.vertices_list)) if self.shape_list_valid[_]['is_wall']])
         else:
             vertices_all = np.vstack(self.vertices_list)

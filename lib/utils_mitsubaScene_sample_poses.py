@@ -21,21 +21,23 @@ from utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 def func_mitsubaScene_sample_poses(
         mitsubaScene, 
         lverts, boxes,
-        sample_params_dict, 
+        cam_params_dict, 
         sample_pose_if_vis_plt: bool=False):
 
-    samplePoint = sample_params_dict['samplePoint']
-    sampleNum = sample_params_dict['sampleNum']
-    heightMin = sample_params_dict['heightMin']
-    heightMax = sample_params_dict['heightMax']
-    distMin = sample_params_dict['distMin']
-    distMax = sample_params_dict['distMax']
-    thetaMin = sample_params_dict['thetaMin']
-    thetaMax = sample_params_dict['thetaMax']
-    phiMin = sample_params_dict['phiMin']
-    phiMax = sample_params_dict['phiMax']
-    distRaysMin = sample_params_dict['distRaysMin']
-    distRaysMedian = sample_params_dict['distRaysMedianMin']
+    samplePoint = cam_params_dict['samplePoint']
+    sampleNum = cam_params_dict['sampleNum']
+    heightMin = cam_params_dict['heightMin']
+    heightMax = cam_params_dict['heightMax']
+    distMin = cam_params_dict['distMin']
+    distMax = cam_params_dict['distMax']
+    thetaMin = cam_params_dict['thetaMin']
+    thetaMax = cam_params_dict['thetaMax']
+    phiMin = cam_params_dict['phiMin']
+    phiMax = cam_params_dict['phiMax']
+    distRaysMin = cam_params_dict['distRaysMin']
+    distRaysMedian = cam_params_dict['distRaysMedianMin']
+
+    cam_loc_bbox = cam_params_dict.get('cam_loc_bbox', [])
 
     wallVertices = []
     floorHeight = lverts[:, 1].min()
@@ -83,7 +85,8 @@ def func_mitsubaScene_sample_poses(
 
     if sample_pose_if_vis_plt:
         plt.figure(figsize=(15, 12))
-        plt.scatter(0, 0, color='g')
+        plt.title('[each wall & cams sampled along each wall & normal of each wall] thick solid line (R-G-B-grey)')
+        plt.scatter(0, 0, marker='*', color='m')
         # for i in range(4):
         #     plt.plot(wallVertices[i][[0, 2]], wallVertices[(i-1)%4][[0, 2]])
 
@@ -92,15 +95,25 @@ def func_mitsubaScene_sample_poses(
     origin_list = []
     direc_list = []
     totalLen_list = []
+    cam_colors = [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.], [0.5, 0.5, 0.5]]
 
     print('Sampling poses...')
+
+    # visualize additional camera location constraining bbox
+    if cam_loc_bbox != [] and sample_pose_if_vis_plt:
+        for ii, cam_loc_v in enumerate(cam_loc_bbox):
+            jj = (ii + 1) % len(cam_loc_bbox)
+            v1 = cam_loc_bbox[ii]; v2 = cam_loc_bbox[jj]
+            # print(i, j, v1, v2)
+            plt.plot(np.array([v1[0], v2[0]]), np.array([v1[1], v2[1]]), color='k', ls='-', linewidth=6) # additional wall contour as solid line: BLACK
+
 
     for i in tqdm(range(len(wallVertices))):
         # compute the segment direction
         direc = np.array( [X[i] - X[j], 0, Z[i] - Z[j]], dtype = np.float32)
         if sample_pose_if_vis_plt:
-            print('=====', i, j, X[i], X[j])
-            plt.plot(np.array([X[i], X[j]]), np.array([Z[i], Z[j]]), 'm-') # layout contour as magenta solid line
+            # print('=====', i, j, X[i], X[j])
+            plt.plot(np.array([X[i], X[j]]), np.array([Z[i], Z[j]]), color=cam_colors[i], ls='-', linewidth=6) # wall contour as solid line: R-G-B-grey
         totalLen = np.sqrt(np.sum(direc * direc))
         if totalLen == 0:
             continue
@@ -136,15 +149,19 @@ def func_mitsubaScene_sample_poses(
             print('sampleNum', sampleNum)
             print('normal', normal)
             plt.scatter(midPoint[0], midPoint[2], c='r')
-            plt.plot([midPoint[0], midPoint[0]+normal[0]], [midPoint[2], midPoint[2]+normal[2]], 'k--') # wall normal as black dashed line
+            plt.plot([midPoint[0], midPoint[0]+normal[0]], [midPoint[2], midPoint[2]+normal[2]], color=cam_colors[i], ls='-') # wall normal as dashed line; same color as wall
 
     if sample_pose_if_vis_plt:
         for box in boxes:
             bverts = box[0][0:4, :]
-            plt.plot(box[0][[0,1,2,3,0], 0], box[0][[0,1,2,3,0], 2], 'g--') # furnitures as green dashed line
+            plt.plot(box[0][[0,1,2,3,0], 0], box[0][[0,1,2,3,0], 2], color='y', ls='--') # furnitures as green dashed line
 
+    '''
+    wallVertices: [np.array(3,)] * 4, clock-wise dir
+    '''
     for i, origin, normal, direc, midPoint, totalLen in tqdm(zip(range(len(wallVertices)), origin_list, normal_list, direc_list, midPoint_list, totalLen_list)):
         accumLen = 0.2 * segLen
+        cam_color = cam_colors[i]
 
         while accumLen < totalLen:
             # compute point location
@@ -152,12 +169,18 @@ def func_mitsubaScene_sample_poses(
             for cnt in range(0, sampleNum):
             # while cnt < sampleNum:
                 pointLoc = origin + accumLen * direc
-                if sample_pose_if_vis_plt:
-                    plt.scatter(pointLoc[0], pointLoc[2], color='y', marker='*')
+                # if sample_pose_if_vis_plt:
+                #     plt.scatter(pointLoc[0], pointLoc[2], color='y', marker='*')
                 pointLoc += (np.random.random() * (distMax - distMin) \
                         + distMin) * normal
                 pointLoc[1] = np.random.random() * (heightMax - heightMin) \
                         + heightMin + floorHeight
+
+                if cam_loc_bbox != []:
+                    is_in_cam_loc_bbox = checkPointInPolygon([[_v[0], 0., _v[1]] for _v in cam_loc_bbox], pointLoc)
+                    if not is_in_cam_loc_bbox:
+                        print(cnt, yellow_text('DISCARDED pose: point is outside **cam_loc_bbox**'))
+                        continue
 
                 isIn = checkPointInPolygon(wallVertices, pointLoc)
                 # isIn = checkPointInPolygon(wallVertices_smaller, pointLoc)
@@ -173,6 +196,7 @@ def func_mitsubaScene_sample_poses(
                 else:
                     # check if the point will in any bounding boxes
                     isOverlap = False
+                    overlap_shape_id = 'N/A'
                     for box in boxes:
                         bverts = box[0][0:4, :]
                         bminY = box[0][0, 1]
@@ -181,38 +205,28 @@ def func_mitsubaScene_sample_poses(
                         if pointLoc[1] > bminY and pointLoc[1] < bmaxY:
                             isOverlap = checkPointInPolygon(bverts, pointLoc)
                             if isOverlap:
+                                overlap_shape_id = box[2]
                                 break
 
                     if isOverlap:
-                        print(cnt, yellow_text('DISCARDED pose: point overlaps with furniture'))
+                        print(cnt, yellow_text('DISCARDED pose: point overlaps with %s'%overlap_shape_id))
                         continue
 
                     validPointCount += 1
                     camPose = np.zeros((3, 3), dtype=np.float32)
                     camPose[0, :] = pointLoc
 
-                    # zAxis = normal
-                    # zAxis = zAxis / np.maximum(np.sqrt(
-                    #     np.sum(zAxis * zAxis)), 1e-6)
-                    # yAxis = np.array([0, 1, 0], dtype=np.float32)
-                    # xAxis = np.cross(yAxis, zAxis)
-
-                    # yaw = (xMax - xMin) * np.random.random() + xMin
-                    # pitch = (yMax - yMin) * np.random.random() + yMin
-
-                    # targetDirec_ =  zAxis + pitch * yAxis + yaw * xAxis
-                    # targetDirec = targetDirec_ / np.sqrt(np.sum(targetDirec_ * targetDirec_))
-
                     xAxis = normal
                     xAxis = xAxis / np.maximum(np.sqrt(
                         np.sum(xAxis * xAxis)), 1e-6)
-                    zAxis = np.array([0, 1, 0], dtype=np.float32)
+                    zAxis = np.array([0, 1, 0], dtype=np.float32) # ASSUME y+ is up
                     yAxis = np.cross(zAxis, xAxis)
 
                     Az_phi = (phiMax - phiMin) * np.random.random() + phiMin # on ground plane
+                    # Az_phi = 0. # debug: camera points towards wall normal (zero yaw)
                     El_theta = (thetaMax - thetaMin) * np.random.random() + thetaMin # along up
-                    lx = np.sin(Az_phi) * np.cos(El_theta)
-                    ly = np.cos(Az_phi) * np.cos(El_theta)
+                    ly = np.sin(Az_phi) * np.cos(El_theta)
+                    lx = np.cos(Az_phi) * np.cos(El_theta)
                     lz = np.sin(El_theta)
                     targetDirec = xAxis * lx + yAxis * ly + zAxis * lz
                     target = pointLoc + targetDirec
@@ -268,15 +282,11 @@ def func_mitsubaScene_sample_poses(
                     camPoses.append(camPose)
                     print('Appended valid pose; min_depth: %.2f'%min_depth)
 
-                    # if (camPose[1, :] - camPose[0, :])[1] > np.sin(20/180*np.pi):
-                    #     import ipdb; ipdb.set_trace()
-                    # if (camPose[1, :] - camPose[0, :])[1] <np.sin(-60/180*np.pi):
-                    #     import ipdb; ipdb.set_trace()
-
                     if sample_pose_if_vis_plt:
-                        plt.scatter(pointLoc[0], pointLoc[2], c='b')
-                        plt.text(pointLoc[0]+0.1, pointLoc[2]+0.1, '%.2f'%dist_to_wall)
-                        plt.plot([pointLoc[0], target[0]], [pointLoc[2], target[2]], 'b-')
+                        plt.scatter(pointLoc[0], pointLoc[2], color=cam_color)
+                        plt.text(pointLoc[0]+0.1, pointLoc[2]+0.1, '%.2f'%dist_to_wall, color=cam_color)
+                        targetVis = pointLoc + 0.5 * targetDirec
+                        plt.plot([pointLoc[0], targetVis[0]], [pointLoc[2], targetVis[2]], color=cam_color, ls='-')
 
                     cnt += 1
             accumLen += segLen
@@ -284,48 +294,28 @@ def func_mitsubaScene_sample_poses(
     if sample_pose_if_vis_plt:
         plt.grid()
         plt.axis('equal')
-        plt.title('a')
+        # plt.title('a')
         plt.show()
 
     return camPoses
 
     
-def mitsubaScene_sample_poses_one_scene(mitsubaScene, scene_dict: dict, program_dict: dict, param_dict: dict, path_dict: dict):
+def mitsubaScene_sample_poses_one_scene(mitsubaScene, scene_dict: dict, cam_params_dict: dict, path_dict: dict):
     '''
     generate camera files for one scene: cam.txt, camInitial.txt -> dest_scene_path
 
     Adapted from code/utils_OR/DatasetCreation/sampleCameraPose.py
     '''
 
-    threshold = param_dict.get('threshold', 0.3) # 'the threshold to decide low quality mesh.'
-    samplePoint = param_dict.get('samplePoint', 100)
+    threshold = cam_params_dict.get('threshold', 0.3) # 'the threshold to decide low quality mesh.'
+    samplePoint = cam_params_dict.get('samplePoint', 100)
 
-    sample_pose_if_vis_plt = param_dict.get('sample_pose_if_vis_plt', False)
+    sample_pose_if_vis_plt = cam_params_dict.get('sample_pose_if_vis_plt', False)
     print(yellow('Num of sample points %d'%(samplePoint)))
 
     lverts = scene_dict['lverts']
     boxes = scene_dict['boxes']
     cads = scene_dict['cads']
-
-    '''
-    dump scene: buggy
-    '''
-    # import copy
-    # num_vertices = 0
-    # f_list = []
-    # v_list = []
-    # # for _ in cads:
-    # #     vertices, faces = _[0], _[1]
-    # #     f_list.append(copy.deepcopy(faces + num_vertices))
-    # #     v_list.append(copy.deepcopy(vertices + num_vertices))
-    # #     num_vertices += vertices.shape[0]
-    # f = np.array(lfaces)
-    # f_list.append(f+num_vertices)
-
-    # v = np.array(lverts)
-    # v_list.append(v+num_vertices)
-    
-    # writeMesh('./tmp_mesh.obj', np.vstack(v_list), np.vstack(f_list))
 
     # Build the relationship and adjust heights
     floorList, boxList = findSupport(lverts, boxes, cats=['']*len(boxes))
@@ -344,7 +334,7 @@ def mitsubaScene_sample_poses_one_scene(mitsubaScene, scene_dict: dict, program_
     camPoses = func_mitsubaScene_sample_poses(
             mitsubaScene=mitsubaScene, 
             lverts=lverts, boxes=boxes, \
-            sample_params_dict=param_dict, 
+            cam_params_dict=cam_params_dict, 
             sample_pose_if_vis_plt=sample_pose_if_vis_plt)
     
     camNum = len(camPoses)

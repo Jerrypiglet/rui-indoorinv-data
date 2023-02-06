@@ -61,7 +61,8 @@ class evaluator_scene_scene():
             max_vis_count = 0
             vis_frustum_normals_list = []
             vis_frustum_centers_list = []
-            for frame_idx, (rays_o, rays_d, _) in enumerate(self.os.cam_rays_list):
+            for frame_idx, (rays_o, rays_d, _) in enumerate(self.os.cam_rays_list): # [1] make sure 'poses' in scene_obj->modality_list if not sample poses ad-hoc; [2] Set scene_obj->mi_params_dict={'if_sample_rays_pts': True
+
                 normal_up = np.cross(rays_d[0][0], rays_d[0][-1])
                 normal_down = np.cross(rays_d[-1][-1], rays_d[-1][0])
                 normal_left = np.cross(rays_d[-1][0], rays_d[0][0])

@@ -72,7 +72,7 @@ opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
-intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
+# intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
 '''
 The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
@@ -80,13 +80,17 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 xml_filename = 'scene_v3.xml'
 # scene_name = 'kitchen_re'
 # scene_name = 'bathroom'
-scene_name = 'living-room'
+# scene_name = 'living-room-2'
+scene_name = 'bedroom'
+
+# scene_name = 'living-room_re'
+# scene_name = 'bathroom2'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
 # split = 'train'; frame_ids = [0]
-split = 'train'; frame_ids = list(range(200))
-# split = 'val'; frame_ids = list(range(10))
+# split = 'train'; frame_ids = list(range(190))
+split = 'val'; frame_ids = list(range(10))
 # split = 'val'; frame_ids = [0]
 
 '''
@@ -121,11 +125,11 @@ scene_obj = mitsubaScene3D(
         'split': split, 
         'frame_id_list': frame_ids, 
         'mitsuba_version': '3.0.0', 
-        'intrinsics_path': intrinsics_path, 
+        'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
         'up_axis': 'y+', 
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
-        # 'pose_file': ('OpenRooms', 'cam.txt'), 
-        'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+        'pose_file': ('OpenRooms', 'cam.txt'), 
+        # 'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
@@ -178,16 +182,18 @@ scene_obj = mitsubaScene3D(
         'near': 0.1, 'far': 10., 
         # == params for sample camera poses
         'sampleNum': 3, 
-        'heightMin' : 0.7, # camera height min
+        'heightMin' : 0.5, # camera height min
         'heightMax' : 2., # camera height max
-        'distMin': 1.0, # to wall distance min
+        'distMin': 0.3, # to wall distance min
         'distMax': 2.5, # to wall distance max
-        'thetaMin': -60, # theta min: pitch angle; up+ 
-        'thetaMax' : 40, # theta max: pitch angle; up+
+        'thetaMin': -40, # theta min: pitch angle; down-
+        'thetaMax': 30, # theta max: pitch angle; up+
         'phiMin': -60, # yaw angle min
         'phiMax': 60, # yaw angle max
-        'distRaysMin': 0.3, # min dist of all camera rays to the scene; should be relatively relaxed; [!!!] set to -1 to disable checking
-        'distRaysMedianMin': 0.6, # median dist of all camera rays to the scene; should be relatively STRICT to avoid e.g. camera too close to walls; [!!!] set to -1 to disable checking
+        'distRaysMin': 0.6, # min dist of all camera rays to the scene; should be relatively relaxed; [!!!] set to -1 to disable checking
+        'distRaysMedianMin': 0.8, # median dist of all camera rays to the scene; should be relatively STRICT to avoid e.g. camera too close to walls; [!!!] set to -1 to disable checking
+        # 'cam_loc_bbox': [], # list of (2,) lists, each as one vertex (vertexes are ordered: clockwise/counter-clockwise) of a polygon on the ground plane constraining sampled camera locations
+        # 'cam_loc_bbox': [[ 4.3537, -3.0471], [ 0.7683, -3.0471], [ 0.7683, -0.3138], [ 4.3537, -0.3138]], 
 
         # 'heightMin' : 0.7, # camera height min
         # 'heightMax' : 2., # camera height max
@@ -202,8 +208,8 @@ scene_obj = mitsubaScene3D(
 
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        'sample_pose_num': 200, # Number of poses to sample; set to -1 if not sampling
-        'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
+        'sample_pose_num': 10, # Number of poses to sample; set to -1 if not sampling
+        'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     }, 
     lighting_params_dict={
         'SG_num': 12, 
@@ -216,6 +222,8 @@ scene_obj = mitsubaScene3D(
         'env_height': 256, 'env_width': 512, 
     }, 
     shape_params_dict={
+        'if_layout_as_walls': False, # True: use min bbox of vertices of meshes with label 'wall' as layout; False: use min bbox of all object vertices as layout
+
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
 
@@ -523,55 +531,12 @@ if opt.vis_3d_o3d:
             assert opt.eval_rad or opt.eval_inv or opt.eval_scene or opt.eval_monosdf
             visualizer_3D_o3d.extra_input_dict['samples_v_dict'] = eval_return_dict['samples_v_dict']
         
-        # vertex normals
-
-        # if 'samples_v_dict' in eval_return_dict:
-        #     assert opt.eval_rad
-        #     for _id in eval_return_dict['samples_v_dict']:
-        #         lpts, lpts_d = eval_return_dict['samples_v_dict'][_id]['v'], eval_return_dict['samples_v_dict'][_id]['d']
-        #         lpts_end = lpts + 0.1 * lpts_d
-        #         visualizer_3D_o3d.add_extra_geometry([
-        #             ('rays', {
-        #                 'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 1., 0.]]*lpts.shape[0]), # green
-        #             }),
-        #         ]) 
-
-    # for frame_idx, (rays_o, rays_d, _) in enumerate(scene_obj.cam_rays_list):
-    #     normal_up = np.cross(rays_d[0][0], rays_d[0][-1])
-    #     normal_down = np.cross(rays_d[-1][-1], rays_d[-1][0])
-    #     normal_left = np.cross(rays_d[-1][0], rays_d[0][0])
-    #     normal_right = np.cross(rays_d[0][-1], rays_d[-1][-1])
-    #     normals = np.stack((normal_up, normal_down, normal_left, normal_right), axis=0)
-    #     cam_o = rays_o[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
-    #     visualizer_3D_o3d.add_extra_geometry([
-    #         ('rays', {
-    #             'ray_o': cam_o[0:1], 'ray_e': cam_o[0:1] + normals[0:1], 'ray_c': np.array([[0., 0., 0.]]*1), # black
-    #         }),
-    #         ('rays', {
-    #             'ray_o': cam_o[1:2], 'ray_e': cam_o[1:2] + normals[1:2], 'ray_c': np.array([[1., 0., 0.]]*1), # r
-    #         }),
-    #         ('rays', {
-    #             'ray_o': cam_o[2:3], 'ray_e': cam_o[2:3] + normals[2:3], 'ray_c': np.array([[0., 1., 0.]]*1), # g
-    #         }),
-    #         ('rays', {
-    #             'ray_o': cam_o[3:4], 'ray_e': cam_o[3:4] + normals[3:4], 'ray_c': np.array([[0., 0., 1.]]*1), # b
-    #         }),
-    #     ]) 
-
 
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
             'if_cam_axis_only': False, 
             }, 
-        # dense_geo_params={
-        #     'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
-        #     'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
-        #     'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
-        #     'if_normal': False, # [OPTIONAL] turn off normals to avoid clusters
-        #     'subsample_normal_rate_x': 2, 
-        #     'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
-        #     }, 
         lighting_params=lighting_params_vis, 
         shapes_params={
             # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis

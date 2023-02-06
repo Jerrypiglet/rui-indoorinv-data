@@ -65,8 +65,15 @@ meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
 emitter_type_index_list = [('lamp', 0)]
 # frame_ids = list(range(0, 345, 1))
-frame_ids = [0]
+# frame_ids = [0]
 # radiance_scale = 0.001
+
+dataset_version = 'public_re_0203'
+meta_split = 'mainDiffLight_xml1'
+scene_name = 'scene0552_00_more'
+frame_ids = list(range(200))
+radiance_rescale = 1./2.
+
 scan_id = 'scan1'
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
@@ -77,7 +84,12 @@ openrooms_scene = openroomsScene3D(
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
         'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root}, 
-    scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
+    scene_params_dict={
+        'meta_split': meta_split, 
+        'scene_name': scene_name, 
+        'frame_id_list': frame_ids, 
+        'up_axis': 'y+', 
+        }, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'im_sdr', 
@@ -138,7 +150,7 @@ openrooms_scene = openroomsScene3D(
         'sample_mesh_min': 10, 
         'sample_mesh_max': 100, 
 
-        'if_simplify_mesh': True,  # default True: simply triangles
+        'if_simplify_mesh': False,  # default True: simply triangles
         'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
         'simplify_mesh_min': 100, 
         'simplify_mesh_max': 1000,
@@ -265,7 +277,7 @@ for scene, out_name in zip(scenes, out_names):
         # ==== HDR
         target_image_hdr = os.path.join(out_path, "image/%06d.exr"%(idx))
         # shutil.copy(openrooms_scene.im_hdr_file_list[idx], target_image_hdr)
-        im_hdr_liwenScale = openrooms_scene.im_hdr_list[idx] / openrooms_scene.hdr_scale_list[idx] * (1./5.) # original max (300.) / 5. -> max ~= 60
+        im_hdr_liwenScale = openrooms_scene.im_hdr_list[idx] / openrooms_scene.hdr_scale_list[idx] * radiance_rescale # original max (300.) / 5. -> max ~= 60
         mi.util.write_bitmap(str(target_image_hdr), im_hdr_liwenScale)
 
         # ==== SDR

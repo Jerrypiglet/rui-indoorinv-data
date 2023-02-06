@@ -488,17 +488,23 @@ Val:
 
 ## Other utilities
 ### Sample camera poses for new [Mitsuba] scene
+
+``` bash
+python utils_class_mitsubaScene3D_sample_pose.py --if_sample_poses True --vis_2d_plt False --vis_3d_o3d True [--eval_scene True]
+```
+
 Set `--if_sample_poses True`. Set desired num of frames and split in two locations: `split = #SPLIT; frame_ids = list(range(#N_FRAMES))` and `'sample_pose_num': N_FRAMES`.
+
+Set `cam_loc_bbox` to add additional bbox for valid camera locations.
+
+Set `'if_layout_as_walls': False` to enable/disable getting layout (walls to sample camera along) from wall meshes.
+
+For debugging, set `sample_pose_if_vis_plt: True` to view a [bird-eye-view visualization](images/demo_sample_pose_living-room.png) of the room and sampled poses.
 
 Change parameters in `mitsuba_scene->cam_params_dict{}` to adjust parameters in sampling camera poses (e.g. range of random yaw/pitch angles, number of samples, min distance to the wall, min/median distances of all camera rays to the scene).
 
-For debugging, set `sample_pose_if_vis_plt: True` to view a [bird-eye-view visualization](images/demo_sample_pose_bathroom.png) of the room and sampled poses.
-
 **Optionally**, set `--eval_scene True` to show view [coverage visualization](images/demo_eval_scene_shapes-vis_count-train-kitchen_0.png) under current poses.
 
-``` bash
-python utils_class_mitsubaScene3D_sample_pose.py --if_sample_poses True --vis_2d_plt False --vis_3d_o3d True
-```
 
 ### Sample camera poses for new [Openrooms] scene
 
@@ -513,6 +519,7 @@ Put basic scene files from original OR dataset to:
       - XML file (e.g. main.xml), transform.dat
 
 Tested on Mac:
+
 ``` bash
 python test_class_openroomsScene3D.py --vis_2d_plt False --vis_3d_o3d True --if_sample_poses True --eval_scene
 ```
@@ -527,6 +534,7 @@ Small normal/depth maps of sampled poses will be dumped to `data/public_re_3_v3p
 - Check you have the data 
 
 # Todolist
+- [] load windows for Mitsuba scene
 - [] eval-inv:
   - [] GT emission, albedo, roughness, metallic
 - [x] vis envmap in 2D plt

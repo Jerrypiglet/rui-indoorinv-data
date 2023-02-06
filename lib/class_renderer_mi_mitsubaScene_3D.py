@@ -37,7 +37,7 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
             'im', 
             # 'seg', 
             # 'albedo', 'roughness', 
-            # 'depth', 'normal', 
+            'depth', 'normal', 
             # 'lighting_envmap', 
         ]
 

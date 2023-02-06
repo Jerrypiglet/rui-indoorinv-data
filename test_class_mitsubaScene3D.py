@@ -75,7 +75,7 @@ opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
-intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
+# intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
 '''
 The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
@@ -83,14 +83,16 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 xml_filename = 'scene_v3.xml'
 # scene_name = 'kitchen_re'
 # scene_name = 'bathroom'
-scene_name = 'living-room'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
-# split = 'train'; frame_ids = [0]
-split = 'train'; frame_ids = list(range(200))
+split = 'train'; frame_ids = [9]
+# split = 'train'; frame_ids = list(range(200))
 # split = 'val'; frame_ids = list(range(10))
 # split = 'val'; frame_ids = [0]
+
+scene_name = 'living-room' # images/demo_eval_scene_shapes-vis_count-train-living-room_1.png
+# split = 'train'; frame_ids = list(range(189))
 
 '''
 default
@@ -124,25 +126,25 @@ scene_obj = mitsubaScene3D(
         'split': split, 
         'frame_id_list': frame_ids, 
         'mitsuba_version': '3.0.0', 
-        'intrinsics_path': intrinsics_path, 
+        'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
         'up_axis': 'y+', 
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
-        'pose_file': ('OpenRooms', 'cam.txt'), 
-        # 'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+        # 'pose_file': ('OpenRooms', 'cam.txt'), 
+        'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
         # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
-        'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
+        'debug_render_test_image': True, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
         'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
-        'if_sample_rays_pts': False, # True: to sample camera rays and intersection pts given input mesh and camera poses
-        'if_get_segs': False, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
+        'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
+        'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'poses', 
-        # 'im_hdr', 
-        # 'im_sdr', 
+        'im_hdr', 
+        'im_sdr', 
         # 'lighting_envmap', 
         # 'albedo', 'roughness', 
         # 'emission', 
@@ -249,8 +251,8 @@ if opt.render_2d:
         # 'seg', 
         # 'albedo', 
         # 'roughness', 
-        # 'depth', 'normal', 
-        'lighting_envmap', 
+        'depth', 'normal', 
+        # 'lighting_envmap', 
         ]
     if opt.renderer == 'mi':
         renderer = renderer_mi_mitsubaScene_3D(
@@ -428,19 +430,19 @@ if opt.vis_2d_plt:
         scene_obj, 
         modality_list_vis=[
             'im', 
-            'layout', 
+            # 'layout', 
             # 'shapes', 
             # 'albedo', 
             # 'roughness', 
             # 'emission', 
             # 'depth', 
             # 'normal', 
-            # 'mi_depth', 
-            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            'mi_depth', 
+            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
             # 'seg_area', 'seg_env', 'seg_obj', 
-            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         # frame_idx_list=[0, 1, 2, 3, 4], 
         frame_idx_list=[0], 
@@ -491,7 +493,7 @@ if opt.vis_3d_o3d:
             'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
-            # 'mi', # mitsuba sampled rays, pts
+            'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -542,55 +544,11 @@ if opt.vis_3d_o3d:
             assert opt.eval_rad or opt.eval_inv or opt.eval_scene or opt.eval_monosdf
             visualizer_3D_o3d.extra_input_dict['samples_v_dict'] = eval_return_dict['samples_v_dict']
         
-        # vertex normals
-
-        # if 'samples_v_dict' in eval_return_dict:
-        #     assert opt.eval_rad
-        #     for _id in eval_return_dict['samples_v_dict']:
-        #         lpts, lpts_d = eval_return_dict['samples_v_dict'][_id]['v'], eval_return_dict['samples_v_dict'][_id]['d']
-        #         lpts_end = lpts + 0.1 * lpts_d
-        #         visualizer_3D_o3d.add_extra_geometry([
-        #             ('rays', {
-        #                 'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 1., 0.]]*lpts.shape[0]), # green
-        #             }),
-        #         ]) 
-
-    # for frame_idx, (rays_o, rays_d, _) in enumerate(scene_obj.cam_rays_list):
-    #     normal_up = np.cross(rays_d[0][0], rays_d[0][-1])
-    #     normal_down = np.cross(rays_d[-1][-1], rays_d[-1][0])
-    #     normal_left = np.cross(rays_d[-1][0], rays_d[0][0])
-    #     normal_right = np.cross(rays_d[0][-1], rays_d[-1][-1])
-    #     normals = np.stack((normal_up, normal_down, normal_left, normal_right), axis=0)
-    #     cam_o = rays_o[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
-    #     visualizer_3D_o3d.add_extra_geometry([
-    #         ('rays', {
-    #             'ray_o': cam_o[0:1], 'ray_e': cam_o[0:1] + normals[0:1], 'ray_c': np.array([[0., 0., 0.]]*1), # black
-    #         }),
-    #         ('rays', {
-    #             'ray_o': cam_o[1:2], 'ray_e': cam_o[1:2] + normals[1:2], 'ray_c': np.array([[1., 0., 0.]]*1), # r
-    #         }),
-    #         ('rays', {
-    #             'ray_o': cam_o[2:3], 'ray_e': cam_o[2:3] + normals[2:3], 'ray_c': np.array([[0., 1., 0.]]*1), # g
-    #         }),
-    #         ('rays', {
-    #             'ray_o': cam_o[3:4], 'ray_e': cam_o[3:4] + normals[3:4], 'ray_c': np.array([[0., 0., 1.]]*1), # b
-    #         }),
-    #     ]) 
-
-
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
-            'if_cam_axis_only': False, 
+            'if_cam_axis_only': True, 
             }, 
-        # dense_geo_params={
-        #     'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
-        #     'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
-        #     'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
-        #     'if_normal': False, # [OPTIONAL] turn off normals to avoid clusters
-        #     'subsample_normal_rate_x': 2, 
-        #     'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
-        #     }, 
         lighting_params=lighting_params_vis, 
         shapes_params={
             # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis
@@ -616,7 +574,7 @@ if opt.vis_3d_o3d:
             # 'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
             # 'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
-            'if_cam_rays': False, 
+            'if_cam_rays': True, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             

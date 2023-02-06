@@ -218,7 +218,7 @@ class mitsubaBase():
         if not self.if_loaded_layout: self.load_layout()
 
         lverts = self.layout_box_3d_transformed
-        boxes = [[bverts, bfaces] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) \
+        boxes = [[bverts, bfaces, shape['id']] for bverts, bfaces, shape in zip(self.bverts_list, self.bfaces_list, self.shape_list_valid) \
             if (not shape['is_layout'] and np.all(np.amax(bverts, axis=0)-np.amin(bverts, axis=0)>1e-2))] # discard thin objects
         cads = [[vertices, faces] for vertices, faces, shape in zip(self.vertices_list, self.faces_list, self.shape_list_valid) if not shape['is_layout']]
 
@@ -238,8 +238,7 @@ class mitsubaBase():
                 'boxes': boxes, 
                 'cads': cads, 
             }, 
-            program_dict={}, 
-            param_dict=self.cam_params_dict, 
+            cam_params_dict=self.cam_params_dict, 
             path_dict={},
         ) # [pointLoc; target; up]
 
@@ -342,8 +341,12 @@ class mitsubaBase():
                 for camPose in self.origin_lookat_up_list:
                     for n in range(0, 3):
                         camOut.write('%.3f %.3f %.3f\n'%(camPose[n, 0], camPose[n, 1], camPose[n, 2]))
-        print(yellow('Pose file written to %s (%d poses).'%(pose_file_write, len(self.origin_lookat_up_list))))
-
+            print(yellow('Pose file written to %s (%d poses).'%(pose_file_write, len(self.origin_lookat_up_list))))
+            
+            cam_params_dict_write = str(self.pose_file.parent / 'cam_params_dict.txt')
+            with open(str(cam_params_dict_write), 'w') as camOut:
+                for k, v in self.cam_params_dict.items():
+                    camOut.write('%s: %s\n'%(k, str(v)))
 
     def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False, if_lighting=False):
         '''

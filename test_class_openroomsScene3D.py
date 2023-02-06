@@ -84,16 +84,6 @@ data/public_re_3/main_xml1/scene0552_00_more/im_4.png
 # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
 
 '''
-The classroom scene: one lamp (dark) + one window (directional sun)
-data/public_re_3/mainDiffLight_xml1/scene0552_00_more/im_4.png
-'''
-meta_split = 'mainDiffLight_xml1'
-scene_name = 'scene0552_00_more'
-frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
-frame_ids = [2]
-# frame_ids = list(range(87))
-
-'''
 The lounge with very specular floor and 3 lamps
 data/public_re_3/main_xml/scene0008_00_more/im_58.png
 '''
@@ -130,8 +120,15 @@ emitter_type_index_list = [('lamp', 0)]
 # frame_ids = list(range(0, 345, 10))
 frame_ids = list(range(200))
 
-# frame_ids =[0]
-# frame_ids = [0, 3]
+'''
+The classroom scene: one lamp (dark) + one window (directional sun)
+data/public_re_3/mainDiffLight_xml1/scene0552_00_more/im_4.png
+'''
+dataset_version = 'public_re_0203'
+meta_split = 'mainDiffLight_xml1'
+scene_name = 'scene0552_00_more'
+frame_ids = list(range(200))
+
 radiance_scale_vis = 0.001 # GT max radiance ~300. -> ~3.
 
 base_root = Path(PATH_HOME) / 'data' / dataset_version
@@ -182,7 +179,7 @@ scene_obj = openroomsScene3D(
         # 'lighting_envmap', 
         # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
-        # 'mi', # mitsuba scene, loading from scene xml file
+        'mi', # mitsuba scene, loading from scene xml file
         ], 
     modality_filename_dict = {
         # 'poses', 
@@ -248,7 +245,7 @@ scene_obj = openroomsScene3D(
         'sample_mesh_min': 10, 
         'sample_mesh_max': 100, 
 
-        'if_simplify_mesh': True,  # default True: simply triangles
+        'if_simplify_mesh': False,  # default True: simply triangles
         'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
         'simplify_mesh_min': 100, 
         'simplify_mesh_max': 1000,

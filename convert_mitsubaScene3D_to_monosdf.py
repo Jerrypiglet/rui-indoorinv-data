@@ -49,18 +49,17 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 
 base_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
-intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
 '''
 The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
-scene_name = 'kitchen_re'
-# split = 'train'; scan_id = 'scan1'; frame_ids = list(range(202))
-# split = 'val'; scan_id = 'scan2'; frame_ids = list(range(10))
+scene_name = 'living-room'; frame_ids_train = list(range(190)); frame_ids_val = list(range(10))
+# scene_name = 'kitchen_re'; frame_ids_train = list(range(202)); frame_ids_val = list(range(10))
 
 mitsuba_scene_dict = {}
-for split, frame_ids in zip(['train', 'val'], [list(range(202)), list(range(10))]):
+for split, frame_ids in zip(['train', 'val'], [frame_ids_train, frame_ids_val]):
+# for split, frame_ids in zip(['val'], [frame_ids_val]):
     mitsuba_scene_dict[split] = mitsubaScene3D(
         if_debug_info=False, 
         host=host, 
@@ -71,7 +70,7 @@ for split, frame_ids in zip(['train', 'val'], [list(range(202)), list(range(10))
             'split': split, 
             'frame_id_list': frame_ids, 
             'mitsuba_version': '3.0.0', 
-            'intrinsics_path': intrinsics_path, 
+            'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
             'up_axis': 'y+', 
             'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
             }, 
@@ -228,7 +227,7 @@ for scene, out_name in zip(scenes, out_names):
  
     center = (min_vertices + max_vertices) / 2.
     scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
-    print('--center, scale--', center, scale)
+    print('[pose normalization to unit cube] --center, scale--', center, scale)
 
     # we should normalized to unit cube
     scale_mat = np.eye(4).astype(np.float32)

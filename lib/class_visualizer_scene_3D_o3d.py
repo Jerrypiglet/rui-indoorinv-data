@@ -961,7 +961,7 @@ class visualizer_scene_3D_o3d(object):
         if_cam_rays = mi_params.get('if_cam_rays', True) # if show per-pixel rays
         cam_rays_if_pts = mi_params.get('cam_rays_if_pts', True) # if cam rays end in surface intersections
         if cam_rays_if_pts:
-            assert self.os.if_has_mitsuba_rays_pts
+            assert self.os.if_has_mitsuba_rays_pts, 'Set scene_obj->mi_params_dict={\'if_sample_rays_pts\': True'
         cam_rays_subsample = mi_params.get('cam_rays_subsample', 10)
 
         if if_cam_rays: 
