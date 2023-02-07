@@ -121,7 +121,7 @@ with open('scene.xml', 'w') as xmlOut:
 Render.
 Should be consistent with OpenRooms renderings in layout:
 - mitsuba/my_first_render.png
-- /home/ruizhu/Documents/Projects/renderOpenRooms/public_re_3/main_xml1/scene0552_00_more/im_0.png
+- /home/ruizhu/Documents/Projects/renderOpenRooms/public_re_3/main_xml1/scene0552_00/im_0.png
 '''
 scene = mi.load_file("scene.xml")
 

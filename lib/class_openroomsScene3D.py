@@ -64,7 +64,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             BRDF_params_dict = BRDF_params_dict, 
             lighting_params_dict = lighting_params_dict, 
         )
-
         self.host = host
         self.device = get_device(self.host)
 
@@ -91,7 +90,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             self.load_poses(self.cam_params_dict) # attempt to generate poses indicated in cam_params_dict
         if hasattr(self, 'pose_list'): 
             self.load_cam_rays(self.cam_params_dict)
-
         if 'mi' in self.modality_list:
             mitsubaBase.__init__(
                 self, 
@@ -218,7 +216,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         if if_postprocess_mi_frames:
             if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
-            if if_sample_rays_pts and not self.pts_from['mi']:
+            if if_sample_rays_pts and not self.pts_from['mi'] and hasattr(self, 'cam_rays_list'):
                 self.mi_sample_rays_pts(self.cam_rays_list)
                 self.pts_from['mi'] = True
 
@@ -378,7 +376,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                     trimesh.repair.fix_normals(_)
                     # trimesh.repair.fill_holes(_)
                     # trimesh.repair.fix_winding(_)
-                    vertices, faces = _.vertices, _.faces+1
+                    vertices, faces = np.array(_.vertices), np.array(_.faces+1)
 
                     # --sample mesh--
                     if if_sample_pts_on_mesh:

@@ -77,56 +77,45 @@ if not shape_pickles_root.exists():
 
 '''
 The classroom scene: one lamp (lit up) + one window (less sun)
-data/public_re_3/main_xml1/scene0552_00_more/im_4.png
+data/public_re_3/main_xml1/scene0552_00/im_4.png
 '''
 # meta_split = 'main_xml1'
-# scene_name = 'scene0552_00_more'
+# scene_name = 'scene0552_00'
 # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
+
+
+'''
+- more & better cameras
+'''
+emitter_type_index_list = [('lamp', 0)]
 
 '''
 The lounge with very specular floor and 3 lamps
 data/public_re_3/main_xml/scene0008_00_more/im_58.png
 '''
-meta_split = 'main_xml'
-scene_name = 'scene0008_00_more'
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-# frame_ids = [114]
-frame_ids = list(range(102))
-
-'''
-The conference room with one lamp
-data/public_re_3/main_xml/scene0005_00_more/im_3.png
-'''
-meta_split = 'main_xml'
-scene_name = 'scene0005_00_more'
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-# frame_ids = [3]
-# frame_ids = list(range(102))
-frame_ids = list(range(3, 102, 10))
-
-'''
-- more & better cameras
-'''
-dataset_version = 'public_re_3_v3pose_2048'
-
+# dataset_version = 'public_re_3_v3pose_2048'
 # meta_split = 'main_xml'
 # scene_name = 'scene0008_00_more'
 # emitter_type_index_list = [('lamp', 0)]
 # frame_ids = list(range(0, 345, 10))
 
-meta_split = 'main_xml1'
-scene_name = 'scene0552_00'
-emitter_type_index_list = [('lamp', 0)]
-# frame_ids = list(range(0, 345, 10))
-frame_ids = list(range(200))
-
 '''
 The classroom scene: one lamp (dark) + one window (directional sun)
-data/public_re_3/mainDiffLight_xml1/scene0552_00_more/im_4.png
+data/public_re_3/mainDiffLight_xml1/scene0552_00/im_4.png
 '''
 dataset_version = 'public_re_0203'
 meta_split = 'mainDiffLight_xml1'
-scene_name = 'scene0552_00_more'
+scene_name = 'scene0552_00'
+frame_ids = list(range(200))
+
+'''
+The conference room with one lamp
+data/public_re_3/main_xml/scene0005_00/im_3.png
+images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0005_00.png
+'''
+dataset_version = 'public_re_0203'
+meta_split = 'main_xml'
+scene_name = 'scene0005_00'
 frame_ids = list(range(200))
 
 radiance_scale_vis = 0.001 # GT max radiance ~300. -> ~3.
@@ -613,8 +602,8 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
-            'if_ceiling': False, 
-            'if_walls': False, 
+            'if_ceiling': True, 
+            'if_walls': True, 
             'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
         },
         emitter_params={

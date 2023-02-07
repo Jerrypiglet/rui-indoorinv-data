@@ -679,6 +679,8 @@ class visualizer_scene_3D_o3d(object):
         if_ceiling = shapes_params.get('if_ceiling', False)
         if_walls = shapes_params.get('if_walls', False)
 
+        exclude_obj_id_list = shapes_params.get('exclude_obj_id_list', [])
+
         mesh_color_type = shapes_params.get('mesh_color_type', 'obj_color')
         assert mesh_color_type in ['obj_color', 'face_normal'] or mesh_color_type.startswith('eval-')
 
@@ -710,8 +712,14 @@ class visualizer_scene_3D_o3d(object):
                 continue # skipping layout as an object
             # if shape_dict['random_id'] in emitters_obj_random_id_list and not if_emitter: # SKIP emitters
             #     continue # skip shape if it is also in the list as an emitter (so that we don't create two shapes for one emitters)
-            if not if_walls and shape_dict.get('is_wall', False): continue
+            # print(_id, if_walls, shape_dict.get('is_wall', False))
+            if not if_walls and shape_dict.get('is_wall', False): 
+                # print('!!!!!!', _id, shape_dict['filename']); 
+                continue
             if not if_ceiling and shape_dict.get('is_ceiling', False): continue
+            if _id in exclude_obj_id_list: 
+                print(yellow('[%s] Skipped: %s, in exclude_obj_id_list'%(str(self.__class__.__name__), _id)))
+                continue
 
             if_default_color = True
             if self.os.if_loaded_colors:
@@ -766,6 +774,7 @@ class visualizer_scene_3D_o3d(object):
                 shape_mesh.compute_vertex_normals()
                 shape_mesh.compute_triangle_normals()
                 assert np.array(shape_mesh.vertices).shape[0] == vertices.shape[0]
+                # print('------>', shape_dict.get('is_wall', False), _id, shape_dict['filename']);
 
                 if mesh_color_type.startswith('eval-'):
                     if 'samples_v_dict' in self.extra_input_dict and _id in self.extra_input_dict['samples_v_dict']:

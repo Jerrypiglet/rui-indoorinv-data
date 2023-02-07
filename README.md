@@ -157,11 +157,11 @@ For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-
   - OpenRooms_public_scene_dataset_2
     - scenes
       - xml1
-        - scene0552_00_more
+        - scene0552_00
           - cam.txt # camera poses where rows are origin, lookat, up
           - main.xml # the scene XML file
     - main_xml1 # renderings
-      - scene0552_00_more
+      - scene0552_00
         - im_%d.png/im_%d.hdr # RGB (PNG is only for reference; scales may be inconsistent)
         - imdepth_%d.dat # depth maps
         - imnormal_%d.png # normals in 2D

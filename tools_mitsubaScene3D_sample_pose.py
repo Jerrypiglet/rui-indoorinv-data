@@ -73,15 +73,23 @@ opt = parser.parse_args()
 base_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 # intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
+exclude_obj_id_list = []
 
 '''
 The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
-# scene_name = 'kitchen_re'
+# scene_name = 'kitchen'
 # scene_name = 'bathroom'
 # scene_name = 'living-room-2'
-scene_name = 'bedroom'
+# scene_name = 'bedroom'
+# scene_name = 'living-room' # images/demo_eval_scene_shapes-vis_count-train-living-room_1.png
+
+# images/demo_eval_scene_shapes-vis_count-train-bathroom2_1.png
+# images/demo_eval_scene_shapes-vis_count-train-bathroom2_2.png
+# images/demo_eval_scene_shapes-vis_count-train-bathroom2_3.png
+scene_name = 'bathroom2'; exclude_obj_id_list = ['Trims_RZPK0'] # very large room (10x scale) and a bunch of empty large objects
+exclude_obj_id_list += ['rectangle_WCD0C', 'rectangle_AOSQR', 'rectangle_VYPN9', 'rectangle_J1PMC', 'rectangle_5Z6QY', 'rectangle_EOHB8', 'rectangle_HFHNT', 'rectangle_F99FO', 'rectangle_Y5R7L', 'rectangle_RRYHV'] # double wall planes surrounding the room
 
 # scene_name = 'living-room_re'
 # scene_name = 'bathroom2'
@@ -89,8 +97,8 @@ emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1;
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
 # split = 'train'; frame_ids = [0]
-# split = 'train'; frame_ids = list(range(190))
-split = 'val'; frame_ids = list(range(10))
+split = 'train'; frame_ids = list(range(190))
+# split = 'val'; frame_ids = list(range(10))
 # split = 'val'; frame_ids = [0]
 
 '''
@@ -141,7 +149,7 @@ scene_obj = mitsubaScene3D(
         },
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
-        # 'poses', 
+        'poses', 
         # 'im_hdr', 
         # 'im_sdr', 
         # 'lighting_envmap', 
@@ -182,18 +190,25 @@ scene_obj = mitsubaScene3D(
         'near': 0.1, 'far': 10., 
         # == params for sample camera poses
         'sampleNum': 3, 
-        'heightMin' : 0.5, # camera height min
-        'heightMax' : 2., # camera height max
-        'distMin': 0.3, # to wall distance min
-        'distMax': 2.5, # to wall distance max
         'thetaMin': -40, # theta min: pitch angle; down-
         'thetaMax': 30, # theta max: pitch angle; up+
         'phiMin': -60, # yaw angle min
         'phiMax': 60, # yaw angle max
-        'distRaysMin': 0.6, # min dist of all camera rays to the scene; should be relatively relaxed; [!!!] set to -1 to disable checking
-        'distRaysMedianMin': 0.8, # median dist of all camera rays to the scene; should be relatively STRICT to avoid e.g. camera too close to walls; [!!!] set to -1 to disable checking
+        # 'heightMin' : 0.5, # camera height min
+        # 'heightMax' : 2., # camera height max
+        # 'distMin': 0.3, # to wall distance min
+        # 'distMax': 2.5, # to wall distance max
+        # 'distRaysMin': 0.6, # min dist of all camera rays to the scene; should be relatively relaxed; [!!!] set to -1 to disable checking
+        # 'distRaysMedianMin': 0.8, # median dist of all camera rays to the scene; should be relatively STRICT to avoid e.g. camera too close to walls; [!!!] set to -1 to disable checking
+        'heightMin' : 10, # camera height min
+        'heightMax' : 25., # camera height max
+        'distMin': 3, # to wall distance min
+        'distMax': 25, # to wall distance max
+        'distRaysMin': 6, # min dist of all camera rays to the scene; should be relatively relaxed; [!!!] set to -1 to disable checking
+        'distRaysMedianMin': 8, # median dist of all camera rays to the scene; should be relatively STRICT to avoid e.g. camera too close to walls; [!!!] set to -1 to disable checking
         # 'cam_loc_bbox': [], # list of (2,) lists, each as one vertex (vertexes are ordered: clockwise/counter-clockwise) of a polygon on the ground plane constraining sampled camera locations
         # 'cam_loc_bbox': [[ 4.3537, -3.0471], [ 0.7683, -3.0471], [ 0.7683, -0.3138], [ 4.3537, -0.3138]], 
+        'exclude_obj_id_list': exclude_obj_id_list, # skip those objects for camer-object collision detection
 
         # 'heightMin' : 0.7, # camera height min
         # 'heightMax' : 2., # camera height max
@@ -208,7 +223,7 @@ scene_obj = mitsubaScene3D(
 
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        'sample_pose_num': 10, # Number of poses to sample; set to -1 if not sampling
+        'sample_pose_num': 190 if not opt.if_sample_poses else max(frame_ids), # Number of poses to sample; set to -1 if not sampling
         'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     }, 
     lighting_params_dict={
@@ -542,11 +557,12 @@ if opt.vis_3d_o3d:
             # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
-            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
+            'if_voxel_volume': True, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
             'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
+            'exclude_obj_id_list': exclude_obj_id_list, 
         },
         emitter_params={
             # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)

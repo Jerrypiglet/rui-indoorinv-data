@@ -38,6 +38,7 @@ def func_mitsubaScene_sample_poses(
     distRaysMedian = cam_params_dict['distRaysMedianMin']
 
     cam_loc_bbox = cam_params_dict.get('cam_loc_bbox', [])
+    exclude_obj_id_list = cam_params_dict.get('exclude_obj_id_list', [])
 
     wallVertices = []
     floorHeight = lverts[:, 1].min()
@@ -208,7 +209,7 @@ def func_mitsubaScene_sample_poses(
                                 overlap_shape_id = box[2]
                                 break
 
-                    if isOverlap:
+                    if isOverlap and overlap_shape_id not in exclude_obj_id_list:
                         print(cnt, yellow_text('DISCARDED pose: point overlaps with %s'%overlap_shape_id))
                         continue
 

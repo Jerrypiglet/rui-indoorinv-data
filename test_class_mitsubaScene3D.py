@@ -81,17 +81,20 @@ xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
-# scene_name = 'kitchen_re'
-# scene_name = 'bathroom'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
+
+# scene_name = 'kitchen'
+# scene_name = 'bathroom'
+# scene_name = 'bedroom'
+scene_name = 'living-room' # images/demo_eval_scene_shapes-vis_count-train-living-room_1.png
+# scene_name = 'living-room-2'
+
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
-split = 'train'; frame_ids = [9]
+split = 'train'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(200))
 # split = 'val'; frame_ids = list(range(10))
 # split = 'val'; frame_ids = [0]
-
-scene_name = 'living-room' # images/demo_eval_scene_shapes-vis_count-train-living-room_1.png
 # split = 'train'; frame_ids = list(range(189))
 
 '''

@@ -309,7 +309,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             scale_factor = [t / s for t, s in zip((self.H, self.W), (self.im_H_load, self.im_W_load))]
             self.K = resize_intrinsics(self.K, scale_factor)
 
-
     def load_poses(self, cam_params_dict):
         '''
         pose_list: list of pose matrices (**camera-to-world** transformation), each (3, 4): [R|t] (OpenCV convention: right-down-forward)
@@ -399,7 +398,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 self.t_c2w_b_list = [_Rt_c2w_b_list[_][1] for _ in self.frame_id_list]
 
                 f_xy = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length
-                assert min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3, 'computed f_xy is different than read from intrinsics!'
+                if not min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3:
+                    print(self.K, f_xy)
+                    import ipdb; ipdb.set_trace()
+                    assert False, red('computed f_xy is different than read from intrinsics!')
 
             # self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
             # self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
@@ -622,6 +624,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             for shape in tqdm(shapes):
                 random_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
                 if_emitter = False; if_window = False; if_area_light = False
+                filename = None
                 if shape.get('type') != 'obj':
                     assert shape.get('type') == 'rectangle'
                     '''
@@ -688,7 +691,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 self.ids_list.append(_id)
                 
                 shape_dict = {
-                    'filename': filename.get('value'), 
+                    'filename': filename.get('value') if filename is not None else 'N/A', 
                     'if_in_emitter_dict': if_emitter, 
                     'id': _id, 
                     'random_id': random_id, 
@@ -698,8 +701,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     'is_layout': 'wall' in _id.lower() or 'ceiling' in _id.lower() or 'floor' in _id.lower(), 
                 }
                 if shape_dict['is_wall']: 
-                    print('++++', _id)
+                    print('++++ is_wall:', _id, shape_dict['filename'])
                 if if_emitter:
+                    print('**** if_emitter:', _id, shape_dict['filename'])
                     shape_dict.update({'emitter_prop': emitter_prop})
                 if if_area_light:
                     # self.lamp_list.append((shape_dict, vertices, faces))

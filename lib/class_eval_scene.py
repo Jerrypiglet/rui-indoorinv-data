@@ -75,15 +75,16 @@ class evaluator_scene_scene():
             assert np.amin(faces) == 1
             if sample_type == 'vis_count':
                 assert self.os.if_has_poses
-                assert self.os.if_has_mitsuba_scene
+                assert self.os.if_has_mitsuba_scene # scene_obj->modality_list=['mi'
+
                 vis_count = np.zeros((vertices.shape[0]), dtype=np.int64)
                 for frame_idx, (origin, _, _) in enumerate(self.os.origin_lookatvector_up_list):
                     visibility_frustum = np.all(((vertices-vis_frustum_centers_list[frame_idx]) @ vis_frustum_normals_list[frame_idx]) > 0, axis=1)
                     # visibility = visibility_frustum
 
                     origin = np.tile(np.array(origin).reshape((1, 3)), (vertices.shape[0], 1))
-                    ds = vertices - origin
-                    ds = ds / (np.linalg.norm(ds, axis=1, keepdims=1)+1e-6)
+                    ds_ = vertices - origin
+                    ds = ds_ / (np.linalg.norm(ds_, axis=1, keepdims=1)+1e-6)
 
                     xs = origin
                     xs_mi = mi.Point3f(xs)
@@ -93,9 +94,9 @@ class evaluator_scene_scene():
                     ret = self.os.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
                     # returned structure contains intersection location, nomral, ray step, ...
                     ts = ret.t.numpy()
-                    visibility = np.logical_not(ts < (np.linalg.norm(ds, axis=1, keepdims=False)-1e-4))
-    
+                    visibility = np.logical_not(ts < (np.linalg.norm(ds_, axis=1, keepdims=False)))
                     visibility = np.logical_and(visibility, visibility_frustum)
+
                     vis_count += visibility
 
                 samples_v_dict[_id] = ('vis_count', vis_count)

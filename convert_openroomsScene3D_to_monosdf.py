@@ -70,7 +70,13 @@ emitter_type_index_list = [('lamp', 0)]
 
 dataset_version = 'public_re_0203'
 meta_split = 'mainDiffLight_xml1'
-scene_name = 'scene0552_00_more'
+scene_name = 'scene0552_00'
+frame_ids = list(range(200))
+radiance_rescale = 1./20.
+
+dataset_version = 'public_re_0203'
+meta_split = 'main_xml'
+scene_name = 'scene0005_00'
 frame_ids = list(range(200))
 radiance_rescale = 1./2.
 
@@ -173,7 +179,7 @@ openrooms_scene = openroomsScene3D(
 '''
 CONVERT
 '''
-dump_scene_name = '-'.join([dataset_version, meta_split, scene_name]) + 'rescaledSDR'
+dump_scene_name = '-'.join([dataset_version, meta_split, scene_name]) + '_rescaledSDR'
 out_path_prefix = str(base_root / 'monosdf' / dump_scene_name)
 scenes = [dump_scene_name]
 out_names = [scan_id]
@@ -285,7 +291,7 @@ for scene, out_name in zip(scenes, out_names):
         # shutil.copy(openrooms_scene.im_sdr_file_list[idx], target_image)
 
         # option 2: rescale and convert from HDR
-        _ = np.clip((im_hdr_liwenScale/10.) ** (1./2.2), 0., 1.)
+        _ = np.clip((im_hdr_liwenScale) ** (1./2.2), 0., 1.)
         img = Image.fromarray((_*255.).astype(np.uint8))
         img.save(target_image)
 

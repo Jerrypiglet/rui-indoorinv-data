@@ -66,7 +66,6 @@ parser.add_argument('--if_sample_poses', type=str2bool, nargs='?', const=True, d
 
 opt = parser.parse_args()
 
-# intrinsics_path = Path(PATH_HOME) / 'data/intrinsic.txt'
 semantic_labels_root = Path(PATH_HOME) / 'files_openrooms'
 layout_root = Path(OR_RAW_ROOT) / 'layoutMesh'
 shapes_root = Path(OR_RAW_ROOT) / 'uv_mapped'
@@ -77,42 +76,13 @@ if not shape_pickles_root.exists():
 
 '''
 The classroom scene: one lamp (lit up) + one window (less sun)
-data/public_re_3/main_xml1/scene0552_00_more/im_4.png
+data/public_re_3/main_xml1/scene0552_00/im_4.png
 '''
 # meta_split = 'main_xml1'
-# scene_name = 'scene0552_00_more'
+# scene_name = 'scene0552_00'
 # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
 
-'''
-The classroom scene: one lamp (dark) + one window (directional sun)
-data/public_re_3/mainDiffLight_xml1/scene0552_00_more/im_4.png
-'''
-meta_split = 'mainDiffLight_xml1'
-scene_name = 'scene0552_00_more'
-frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
-frame_ids = [2]
-# frame_ids = list(range(87))
 
-'''
-The lounge with very specular floor and 3 lamps
-data/public_re_3/main_xml/scene0008_00_more/im_58.png
-'''
-meta_split = 'main_xml'
-scene_name = 'scene0008_00_more'
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-# frame_ids = [114]
-frame_ids = list(range(102))
-
-'''
-The conference room with one lamp
-data/public_re_3/main_xml/scene0005_00_more/im_3.png
-'''
-meta_split = 'main_xml'
-scene_name = 'scene0005_00_more'
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 102, 10))
-# frame_ids = [3]
-# frame_ids = list(range(102))
-frame_ids = list(range(3, 102, 10))
 
 '''
 - more & better cameras
@@ -124,22 +94,35 @@ dataset_version = 'public_re_3_v3pose_2048'
 # emitter_type_index_list = [('lamp', 0)]
 # frame_ids = list(range(0, 345, 10))
 
+'''
+The classroom scene: one lamp (dark) + one window (directional sun)
+data/public_re_3/mainDiffLight_xml1/scene0552_00/im_4.png
+'''
+dataset_version = 'public_re_0203'
 meta_split = 'main_xml1'
 scene_name = 'scene0552_00'
 emitter_type_index_list = [('lamp', 0)]
 # frame_ids = list(range(0, 345, 10))
 frame_ids = list(range(200))
 
-# frame_ids =[0]
-# frame_ids = [0, 3]
-radiance_scale_vis = 0.001 # GT max radiance ~300. -> ~3.
+'''
+The conference room with one lamp
+data/public_re_3/main_xml/scene0005_00_more/im_3.png
+'''
+dataset_version = 'public_re_0203'
+meta_split = 'main_xml'
+scene_name = 'scene0005_00'
+frame_ids = list(range(200))
+# frame_ids = [0]
 
-base_root = Path(PATH_HOME) / 'data' / dataset_version
-xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
 
 '''
 default
 '''
+base_root = Path(PATH_HOME) / 'data' / dataset_version
+xml_root = Path(PATH_HOME) / 'data' / dataset_version / 'scenes'
+radiance_scale_vis = 0.001 # GT max radiance ~300. -> ~3.
+
 eval_models_dict = {
     'inv-MLP_ckpt_path': '20230109-014709-inv_v3pose_2048_main_xml_scene0008_00_more_specT_re/last.ckpt', 
     'rad-MLP_ckpt_path': '20230104-162138-rad_v3pose_2048_main_xml_scene0008_00_more_specT/last.ckpt', 
@@ -182,7 +165,7 @@ scene_obj = openroomsScene3D(
         # 'lighting_envmap', 
         # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
-        # 'mi', # mitsuba scene, loading from scene xml file
+        'mi', # mitsuba scene, loading from scene xml file
         ], 
     modality_filename_dict = {
         # 'poses', 
@@ -210,7 +193,7 @@ scene_obj = openroomsScene3D(
         'near': 0.1, 'far': 10., 
         # == params for sample camera poses
         'sampleNum': 3, 
-        'heightMin' : 0.5, # camera height min
+        'heightMin' : 0.3, # camera height min
         'heightMax' : 2.2, # camera height max
         'distMin': 0.5, # to wall distance min
         'distMax': 4.5, # to wall distance max
@@ -218,8 +201,8 @@ scene_obj = openroomsScene3D(
         'thetaMax' : 60, # theta max: pitch angle; up+
         'phiMin': -60, # yaw angle min
         'phiMax': 60, # yaw angle max
-        'distRaysMin': 0.3, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
-        'distRaysMedian': 0.6, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'distRaysMin': 0.5, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'distRaysMedianMin': 0.8, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
         'sample_pose_num': 200, # Number of poses to sample; set to -1 if not sampling
@@ -248,7 +231,7 @@ scene_obj = openroomsScene3D(
         'sample_mesh_min': 10, 
         'sample_mesh_max': 100, 
 
-        'if_simplify_mesh': True,  # default True: simply triangles
+        'if_simplify_mesh': False,  # default True: simply triangles
         'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
         'simplify_mesh_min': 100, 
         'simplify_mesh_max': 1000,
@@ -602,22 +585,22 @@ if opt.vis_3d_o3d:
             'if_cam_traj': False, 
             'if_labels': True, 
             }, 
-        dense_geo_params={
-            'subsample_pcd_rate': 100, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
-            'if_ceiling': False, # remove ceiling points to better see the furniture 
-            'if_walls': True, # remove wall points to better see the furniture 
-            'if_normal': False, # turn off normals to avoid clusters
-            'subsample_normal_rate_x': 2, 
-            'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
-            }, 
+        # dense_geo_params={
+        #     'subsample_pcd_rate': 100, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
+        #     'if_ceiling': False, # remove ceiling points to better see the furniture 
+        #     'if_walls': True, # remove wall points to better see the furniture 
+        #     'if_normal': False, # turn off normals to avoid clusters
+        #     'subsample_normal_rate_x': 2, 
+        #     'pcd_color_mode': opt.pcd_color_mode_dense_geo, 
+        #     }, 
         lighting_params=lighting_params_vis, 
         shapes_params={
             'simply_mesh_ratio_vis': 0.1, # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
-            'if_ceiling': False, 
-            'if_walls': False, 
+            'if_ceiling': True, 
+            'if_walls': True, 
             'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
         },
         emitter_params={

@@ -58,7 +58,7 @@ class openroomsScene2D(scene2DBase):
         self.meta_split, self.scene_name = get_list_of_keys(scene_params_dict, ['meta_split', 'scene_name'])
         assert self.meta_split in ['main_xml', 'mainDiffMat_xml', 'mainDiffLight_xml', 'main_xml1', 'mainDiffMat_xml1', 'mainDiffLight_xml1']
         assert self.scene_name.startswith('scene')
-        self.scene_name_short = '_'.join(self.scene_name.split('_')[:2]) # e.g. scene_name: scene0552_00_more, scene_name_short: scene0552_00
+        self.scene_name_short = '_'.join(self.scene_name.split('_')[:2]) # e.g. scene_name: scene0552_00, scene_name_short: scene0552_00
         self.scene_name_full = '_'.join([self.meta_split, self.scene_name]) # e.g. 'main_xml_scene0008_00_more'
 
         self.openrooms_version = scene_params_dict.get('openrooms_version', 'public_re')
@@ -88,7 +88,7 @@ class openroomsScene2D(scene2DBase):
 
         self.scene_rendering_path = self.rendering_root / self.meta_split / self.scene_name
         self.scene_xml_path = self.xml_scene_root / (self.meta_split.split('_')[1]) / self.scene_name
-        self.intrinsics_path = self.scene_rendering_path / 'intrinsic.txt'
+        self.intrinsics_path = self.xml_scene_root / 'intrinsic.txt'
         self.pose_file = self.scene_xml_path / 'cam.txt'
 
         '''
