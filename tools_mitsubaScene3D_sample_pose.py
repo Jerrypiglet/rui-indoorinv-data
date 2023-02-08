@@ -81,15 +81,15 @@ The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 xml_filename = 'scene_v3.xml'
 # scene_name = 'kitchen'
 # scene_name = 'bathroom'
-# scene_name = 'living-room-2'
+# scene_name = 'livingroom'
 # scene_name = 'bedroom'
-# scene_name = 'living-room' # images/demo_eval_scene_shapes-vis_count-train-living-room_1.png
+scene_name = 'livingroom0' # images/demo_eval_scene_shapes-vis_count-train-living-room_1.png
 
 # images/demo_eval_scene_shapes-vis_count-train-bathroom2_1.png
 # images/demo_eval_scene_shapes-vis_count-train-bathroom2_2.png
 # images/demo_eval_scene_shapes-vis_count-train-bathroom2_3.png
-scene_name = 'bathroom2'; exclude_obj_id_list = ['Trims_RZPK0'] # very large room (10x scale) and a bunch of empty large objects
-exclude_obj_id_list += ['rectangle_WCD0C', 'rectangle_AOSQR', 'rectangle_VYPN9', 'rectangle_J1PMC', 'rectangle_5Z6QY', 'rectangle_EOHB8', 'rectangle_HFHNT', 'rectangle_F99FO', 'rectangle_Y5R7L', 'rectangle_RRYHV'] # double wall planes surrounding the room
+# scene_name = 'bathroom2'; exclude_obj_id_list = ['Trims_RZPK0'] # very large room (10x scale) and a bunch of empty large objects
+# exclude_obj_id_list += ['rectangle_WCD0C', 'rectangle_AOSQR', 'rectangle_VYPN9', 'rectangle_J1PMC', 'rectangle_5Z6QY', 'rectangle_EOHB8', 'rectangle_HFHNT', 'rectangle_F99FO', 'rectangle_Y5R7L', 'rectangle_RRYHV'] # double wall planes surrounding the room
 
 # scene_name = 'living-room_re'
 # scene_name = 'bathroom2'
@@ -247,7 +247,7 @@ scene_obj = mitsubaScene3D(
         'sample_mesh_min': 10, 
         'sample_mesh_max': 100, 
 
-        'if_simplify_mesh': False,  # default True: simply triangles
+        'if_simplify_mesh': True,  # default True: simply triangles
         'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
         'simplify_mesh_min': 100, 
         'simplify_mesh_max': 1000, 
@@ -557,9 +557,9 @@ if opt.vis_3d_o3d:
             # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
-            'if_voxel_volume': True, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
-            'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
+            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
             'exclude_obj_id_list': exclude_obj_id_list, 

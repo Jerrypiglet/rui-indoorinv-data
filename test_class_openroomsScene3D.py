@@ -105,6 +105,7 @@ data/public_re_3/mainDiffLight_xml1/scene0552_00/im_4.png
 '''
 dataset_version = 'public_re_0203'
 meta_split = 'mainDiffLight_xml1'
+# meta_split = 'main_xml1'
 scene_name = 'scene0552_00'
 frame_ids = list(range(200))
 
@@ -113,10 +114,21 @@ The conference room with one lamp
 data/public_re_3/main_xml/scene0005_00/im_3.png
 images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0005_00.png
 '''
+# dataset_version = 'public_re_0203'
+# meta_split = 'main_xml'
+# scene_name = 'scene0005_00'
+# frame_ids = list(range(200))
+
+'''
+The classroom scene: one lamp (lit up) + one window (less sun)
+data/public_re_0203/main_xml1/scene0552_00/im_4.png
+'''
 dataset_version = 'public_re_0203'
-meta_split = 'main_xml'
-scene_name = 'scene0005_00'
-frame_ids = list(range(200))
+meta_split = 'main_xml1'
+scene_name = 'scene0552_00'
+# frame_ids = list(range(200))
+frame_ids = [0]
+# radiance_rescale = 1./5. # RE
 
 radiance_scale_vis = 0.001 # GT max radiance ~300. -> ~3.
 
@@ -499,7 +511,7 @@ if opt.vis_3d_o3d:
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
-            # 'emitters', # emitter properties (e.g. SGs, half envmaps)
+            'emitters', # emitter properties (e.g. SGs, half envmaps)
             # 'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
@@ -602,12 +614,14 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
-            'if_ceiling': True, 
-            'if_walls': True, 
+            'if_ceiling': False, 
+            'if_walls': False, 
+            # 'if_ceiling': True, 
+            # 'if_walls': True, 
             'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
         },
         emitter_params={
-            'if_half_envmap': False, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)
+            'if_half_envmap': True, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)
             'scale_SG_length': 2., 
             'if_sampling_emitter': True, # if sample and visualize points on emitter surface; show intensity as vectors along normals (RED for GT): images/demo_emitter_o3d_sampling.png
             'max_plate': 64, 

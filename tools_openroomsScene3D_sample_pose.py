@@ -74,21 +74,9 @@ shape_pickles_root = Path(PATH_HOME) / 'data/openrooms_shape_pickles' # for cach
 if not shape_pickles_root.exists():
     shape_pickles_root.mkdir(parents=True, exist_ok=True)
 
-'''
-The classroom scene: one lamp (lit up) + one window (less sun)
-data/public_re_3/main_xml1/scene0552_00/im_4.png
-'''
-# meta_split = 'main_xml1'
-# scene_name = 'scene0552_00'
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
 
-
-
-'''
-- more & better cameras
-'''
 dataset_version = 'public_re_3_v3pose_2048'
-
+up_axis = 'y+'
 # meta_split = 'main_xml'
 # scene_name = 'scene0008_00_more'
 # emitter_type_index_list = [('lamp', 0)]
@@ -108,6 +96,7 @@ frame_ids = list(range(200))
 '''
 The conference room with one lamp
 data/public_re_3/main_xml/scene0005_00_more/im_3.png
+images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0005_00.png
 '''
 dataset_version = 'public_re_0203'
 meta_split = 'main_xml'
@@ -115,6 +104,42 @@ scene_name = 'scene0005_00'
 frame_ids = list(range(200))
 # frame_ids = [0]
 
+'''
+The classroom scene: one lamp (lit up) + one window (less sun)
+data/public_re_3/main_xml1/scene0552_00/im_4.png
+'''
+dataset_version = 'public_re_0203'
+meta_split = 'main_xml1'
+scene_name = 'scene0552_00'
+frame_ids = list(range(200))
+# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
+
+'''
+orange-ish room with direct light
+images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0002_00.png
+'''
+dataset_version = 'public_re_0203'
+meta_split = 'main_xml'
+scene_name = 'scene0002_00'
+frame_ids = list(range(200))
+
+'''
+green-ish room with window, with guitar
+images/demo_eval_scene_shapes-vis_count-train-public_re_0203_mainDiffMat_xml1_scene0608_01.png
+'''
+dataset_version = 'public_re_0203'
+meta_split = 'mainDiffMat_xml1'
+scene_name = 'scene0608_01'
+frame_ids = list(range(200))
+
+'''
+toy room with lit lamp and dark window
+images/demo_eval_scene_shapes-vis_count-train-public_re_0203_mainDiffMat_xml_scene0603_00.png
+'''
+dataset_version = 'public_re_0203'
+meta_split = 'mainDiffMat_xml'
+scene_name = 'scene0603_00'
+frame_ids = list(range(200))
 
 '''
 default
@@ -150,7 +175,7 @@ scene_obj = openroomsScene3D(
         'meta_split': meta_split, 
         'scene_name': scene_name, 
         'frame_id_list': frame_ids, 
-        'up_axis': 'y+', 
+        'up_axis': up_axis, 
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
@@ -165,7 +190,7 @@ scene_obj = openroomsScene3D(
         # 'lighting_envmap', 
         # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
-        'mi', # mitsuba scene, loading from scene xml file
+        # 'mi', # mitsuba scene, loading from scene xml file
         ], 
     modality_filename_dict = {
         # 'poses', 
@@ -193,8 +218,8 @@ scene_obj = openroomsScene3D(
         'near': 0.1, 'far': 10., 
         # == params for sample camera poses
         'sampleNum': 3, 
-        'heightMin' : 0.3, # camera height min
-        'heightMax' : 2.2, # camera height max
+        'heightMin' : 0.8, # camera height min
+        'heightMax' : 1.8, # camera height max
         'distMin': 0.5, # to wall distance min
         'distMax': 4.5, # to wall distance max
         'thetaMin': -60, # theta min: pitch angle; up+ 
@@ -434,7 +459,7 @@ if opt.vis_2d_plt:
         scene_obj, 
         modality_list_vis=[
             'im', 
-            # 'layout', 
+            'layout', 
             # 'shapes', 
             # 'albedo', 
             # 'roughness', 
@@ -474,7 +499,7 @@ if opt.vis_3d_plt:
         scene_obj, 
         modality_list_vis = [
             'layout', 
-            'poses', # camera center + optical axis
+            # 'poses', # camera center + optical axis
             # 'shapes', # boxes and labels (no meshes in plt visualization)
             # 'emitters', # emitter properties
             # 'emitter_envs', # emitter envmaps for (1) global envmap (2) half envmap & SG envmap of each window
@@ -601,6 +626,8 @@ if opt.vis_3d_o3d:
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
             'if_ceiling': True, 
             'if_walls': True, 
+            # 'if_ceiling': False, 
+            # 'if_walls': False, 
             'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
         },
         emitter_params={

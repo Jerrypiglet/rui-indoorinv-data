@@ -73,10 +73,12 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         variant = mi_params_dict.get('variant', '')
         mi.set_variant(variant if variant != '' else mi_variant_dict[self.host])
 
-        if self.cam_params_dict.get('if_sample_poses', False): self.modality_list.append('mi') # need mi scene to sample poses
+        if self.cam_params_dict.get('if_sample_poses', False): 
+            self.modality_list.append('mi') # need mi scene to sample poses
+            self.modality_list.append('poses')
         self.modality_list = self.check_and_sort_modalities(list(set(self.modality_list)))
         self.shapes_root, self.layout_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'layout_root', 'envmaps_root'], [PosixPath, PosixPath, PosixPath])
-        self.xml_file = self.scene_xml_path / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
+        self.xml_file = self.scene_xml_root / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
         self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})
         if '_shape_normalized' in self.monosdf_shape_dict:
             assert self.monosdf_shape_dict['_shape_normalized'] in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%_shape_normalized
@@ -181,7 +183,27 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                     if_no_emitter_shape=False, 
                     if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only, 
                     )
-                print(blue_text('XML for Mitsuba dumped to: %s')%str(self.mi_xml_dump_path))
+                print(blue_text('[%s][load_mi] XML for Mitsuba dumped to: %s')%(str(self.__class__.__name__), str(self.mi_xml_dump_path)))
+                
+                '''
+                tools for fixing broken meshes
+                '''
+                # for _, shape in enumerate(self.shape_list_ori):
+                #     shape_file = Path(shape['filename'])
+                #     print(_, shape_file)
+                #     shape_scene_dict = {
+                #         'type': 'scene',
+                #         'shape_id': {
+                #             'type': shape_file.suffix[1:],
+                #             'filename': str(shape_file), 
+                #         }
+                #     }
+                #     _ = mi.load_dict(shape_scene_dict)
+                # ff = '/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03211117/d0959256c79f60872a9c9a7e9520eea/alignedNew.obj'
+                # mesh = load_trimesh(ff)
+                # trimesh.repair.fix_normals(mesh)
+                # mesh.export(ff)
+
                 self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
                 # if if_also_dump_xml_with_lit_area_lights_only:
                 #     self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'))
@@ -308,7 +330,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
             self.shape_list_ori, self.emitter_list = parse_XML_for_shapes_global(
                 root=root, 
-                scene_xml_path=self.scene_xml_path, 
+                scene_xml_root=self.scene_xml_root, 
                 root_uv_mapped=self.shapes_root, 
                 root_layoutMesh=self.layout_root, 
                 root_EnvDataset=self.envmaps_root, 
@@ -320,8 +342,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             assert self.emitter_list[0]['emitter_prop']['if_env'] == True # first of emitter_list is the env
 
             # start to load objects
-
-            
             if if_sample_pts_on_mesh:
                 self.sample_pts_list = []
 
@@ -348,6 +368,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             #         obj_path = shape_dict['filename']
                 else:
                     obj_path = shape_dict['filename']
+                    
 
                 bbox_file_path = obj_path.replace('.obj', '.pickle')
                 if 'layoutMesh' in bbox_file_path:
@@ -430,6 +451,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 self.shape_list_valid.append(shape_dict)
 
                 if if_emitter:
+                    # if 'obj_type' not in shape_dict['emitter_prop']:
+                    #     import ipdb; ipdb.set_trace()
                     if shape_dict['emitter_prop']['obj_type'] == 'window':
                         # self.window_list.append((shape_dict, vertices_transformed, faces))
                         self.window_list.append(
@@ -492,7 +515,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         self.layout_mesh_transformed = trimesh.Trimesh(vertices=v_transformed, faces=self.layout_mesh.faces) # original mesh to TRANSFORMED coordinates
 
         self.layout_box_3d_transformed = transform_v(self.layout_box_3d, T_layout)
-        self.v_2d_transformed = transform_v(np.hstack((self.v_2d, np.zeros((6, 1), dtype=self.v_2d.dtype))), T_layout)[:, [0, 2]]
+        self.v_2d_transformed = transform_v(np.hstack((self.v_2d, np.zeros((self.v_2d.shape[0], 1), dtype=self.v_2d.dtype))), T_layout)[:, [0, 2]]
         self.layout_hull_2d_transformed = self.layout_box_3d_transformed[:4, [0, 2]]
 
         print(blue_text('[openroomsScene3D] DONE. load_layout'))

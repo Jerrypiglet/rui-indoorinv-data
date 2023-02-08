@@ -87,9 +87,9 @@ class openroomsScene2D(scene2DBase):
         self.semantic_labels_root = self.root_path_dict['semantic_labels_root']
 
         self.scene_rendering_path = self.rendering_root / self.meta_split / self.scene_name
-        self.scene_xml_path = self.xml_scene_root / (self.meta_split.split('_')[1]) / self.scene_name
+        self.scene_xml_root = self.xml_scene_root / (self.meta_split.split('_')[1]) / self.scene_name
         self.intrinsics_path = self.xml_scene_root / 'intrinsic.txt'
-        self.pose_file = self.scene_xml_path / 'cam.txt'
+        self.pose_file = self.scene_xml_root / 'cam.txt'
 
         '''
         im properties
@@ -302,7 +302,7 @@ class openroomsScene2D(scene2DBase):
 
     def load_transforms(self):
         # load transformations # writeShapeToXML.py L588
-        transform_file = self.scene_xml_path / 'transform.dat'
+        transform_file = self.scene_xml_root / 'transform.dat'
         with open(str(transform_file), 'rb') as fIn:
             self.transforms = pickle.load(fIn)
 

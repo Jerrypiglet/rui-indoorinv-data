@@ -58,8 +58,8 @@ shapes_root = Path(OR_RAW_ROOT) / 'uv_mapped'
 envmaps_root = Path(OR_RAW_ROOT) / 'EnvDataset' # not publicly availale
 shape_pickles_root = Path(PATH_HOME) / 'data/openrooms_shape_pickles' # for caching shape bboxes so that we do not need to load meshes very time if only bboxes are wanted
 
-'''
-'''
+postfix = ''
+
 dataset_version = 'public_re_3_v3pose_2048'
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
@@ -78,7 +78,52 @@ dataset_version = 'public_re_0203'
 meta_split = 'main_xml'
 scene_name = 'scene0005_00'
 frame_ids = list(range(200))
-radiance_rescale = 1./2.
+# radiance_rescale = 1./2.
+postfix = '_darker'; radiance_rescale = 1./10.
+
+'''
+The classroom scene: one lamp (lit up) + one window (less sun)
+data/public_re_0203/main_xml1/scene0552_00/im_4.png
+'''
+# dataset_version = 'public_re_0203'
+# meta_split = 'main_xml1'
+# scene_name = 'scene0552_00'
+# frame_ids = list(range(200))
+# radiance_rescale = 1./5. # RE
+
+# '''
+# orange-ish room with direct light
+# data/public_re_0203/main_xml/scene0002_00/im_4.png
+# images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0002_00.png
+# '''
+# dataset_version = 'public_re_0203'
+# meta_split = 'main_xml'
+# scene_name = 'scene0002_00'
+# frame_ids = list(range(200))
+# radiance_rescale = 1.
+
+# '''
+# green-ish room with window, with guitar (vert noisy)
+# data/public_re_0203/mainDiffMat_xml1/scene0608_01/im_1.png
+# images/demo_eval_scene_shapes-vis_count-train-public_re_0203_mainDiffMat_xml1_scene0608_01.png
+# '''
+# dataset_version = 'public_re_0203'
+# meta_split = 'mainDiffMat_xml1'
+# scene_name = 'scene0608_01'
+# frame_ids = list(range(200))
+# radiance_rescale = 5.
+
+# '''
+# toy room with lit lamp and dark window
+# data/public_re_0203/mainDiffMat_xml/scene0603_00/im_46.png
+# images/demo_eval_scene_shapes-vis_count-train-public_re_0203_mainDiffMat_xml_scene0603_00.png
+# '''
+# dataset_version = 'public_re_0203'
+# meta_split = 'mainDiffMat_xml'
+# scene_name = 'scene0603_00'
+# frame_ids = list(range(200))
+# radiance_rescale = 1./2.
+# postfix = '_darker'; radiance_rescale = 1./10.
 
 scan_id = 'scan1'
 
@@ -179,7 +224,7 @@ openrooms_scene = openroomsScene3D(
 '''
 CONVERT
 '''
-dump_scene_name = '-'.join([dataset_version, meta_split, scene_name]) + '_rescaledSDR'
+dump_scene_name = '-'.join([dataset_version, meta_split, scene_name]) + '_rescaledSDR' + postfix
 out_path_prefix = str(base_root / 'monosdf' / dump_scene_name)
 scenes = [dump_scene_name]
 out_names = [scan_id]

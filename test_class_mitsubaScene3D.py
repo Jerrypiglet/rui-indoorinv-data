@@ -87,14 +87,14 @@ scene_name = 'kitchen'
 # scene_name = 'bathroom'
 # scene_name = 'bedroom'
 # scene_name = 'living-room' # images/demo_eval_scene_shapes-vis_count-train-living-room_1.png
-# scene_name = 'living-room-2'
+scene_name = 'livingroom-test'
 
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
-split = 'train'; frame_ids = [0]
+# split = 'train'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(200))
 # split = 'val'; frame_ids = list(range(10))
-# split = 'val'; frame_ids = [0]
+split = 'val'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(189))
 
 '''
@@ -146,8 +146,8 @@ scene_obj = mitsubaScene3D(
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'poses', 
-        'im_hdr', 
-        'im_sdr', 
+        # 'im_hdr', 
+        # 'im_sdr', 
         # 'lighting_envmap', 
         # 'albedo', 'roughness', 
         # 'emission', 
@@ -249,12 +249,12 @@ Mitsuba/Blender 2D renderer
 if opt.render_2d:
     assert opt.renderer in ['mi', 'blender']
     modality_list = [
-        # 'im', # both hdr and sdr
+        'im', # both hdr and sdr
         # 'poses', 
         # 'seg', 
         # 'albedo', 
         # 'roughness', 
-        'depth', 'normal', 
+        # 'depth', 'normal', 
         # 'lighting_envmap', 
         ]
     if opt.renderer == 'mi':

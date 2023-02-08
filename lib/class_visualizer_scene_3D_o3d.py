@@ -913,7 +913,9 @@ class visualizer_scene_3D_o3d(object):
                 light_center = np.mean(bverts, 0).flatten()
                 label_SG_list = ['', 'Sky', 'Grd']
                 for label_SG, color, scale in zip(label_SG_list, ['k', 'b', 'g'], [1*scale_SG_length, 0.5*scale_SG_length, 0.5*scale_SG_length]):
-                    light_axis = np.asarray(shape_dict['emitter_prop']['axis%s_world'%label_SG]).flatten()
+                    _label_SG = 'axis%s_world'%label_SG
+                    if _label_SG not in shape_dict['emitter_prop']: continue
+                    light_axis = np.asarray(shape_dict['emitter_prop'][_label_SG]).flatten()
                 
                     light_axis_world = np.asarray(light_axis).reshape(3,) # transform back to world system
                     light_axis_world = light_axis_world / np.linalg.norm(light_axis_world)

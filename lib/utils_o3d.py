@@ -4,7 +4,7 @@ import numpy as np
 import open3d as o3d
 from pathlib import Path
 import matplotlib
-import matplotlib.pyplot as plt
+import torch
 from copy import deepcopy
 
 def text_3d(text, pos, direction=None, degree=0.0, density=10, font='/usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf', font_size=10, text_color=(0, 0, 0)):

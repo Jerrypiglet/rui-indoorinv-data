@@ -54,11 +54,11 @@ xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
 '''
 xml_filename = 'scene_v3.xml'
-# scene_name = 'living-room'; frame_ids_train = list(range(190)); frame_ids_val = list(range(10))
-# scene_name = 'kitchen'; frame_ids_train = list(range(202)); frame_ids_val = list(range(10))
-# scene_name = 'bathroom'; frame_ids_train = list(range(109)); frame_ids_val = list(range(10))
-# scene_name = 'bedroom'; frame_ids_train = list(range(203)); frame_ids_val = list(range(10))
-scene_name = 'living-room-2'; frame_ids_train = list(range(213)); frame_ids_val = list(range(10))
+# scene_name = 'kitchen'; frame_ids_train = list(range(202)); frame_ids_val = list(range(10)) # data/indoor_synthetic/kitchen/TungstenRender.png
+# scene_name = 'bathroom'; frame_ids_train = list(range(109)); frame_ids_val = list(range(10)) # data/indoor_synthetic/bathroom/TungstenRender.png
+# scene_name = 'bedroom'; frame_ids_train = list(range(203)); frame_ids_val = list(range(10)) # data/indoor_synthetic/bedroom/TungstenRender.png
+# scene_name = 'livingroom'; frame_ids_train = list(range(213)); frame_ids_val = list(range(10)) # data/indoor_synthetic/livingroom/TungstenRender.png
+scene_name = 'livingroom0'; frame_ids_train = list(range(197)); frame_ids_val = list(range(10)) # data/indoor_synthetic/livingroom0/TungstenRender.png
 
 mitsuba_scene_dict = {}
 for split, frame_ids in zip(['train', 'val'], [frame_ids_train, frame_ids_val]):
