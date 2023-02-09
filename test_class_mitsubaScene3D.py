@@ -3,8 +3,8 @@ work with Mitsuba/Blender scenes
 '''
 import sys
 
-# host = 'mm1'
-host = 'apple'
+host = 'mm1'
+# host = 'apple'
 
 from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
 PATH_HOME = PATH_HOME_dict[host]
@@ -92,9 +92,9 @@ scene_name = 'livingroom-test'
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
 # split = 'train'; frame_ids = [0]
-# split = 'train'; frame_ids = list(range(200))
-# split = 'val'; frame_ids = list(range(10))
-split = 'val'; frame_ids = [0]
+# split = 'train'; frame_ids = list(range(197))
+split = 'val'; frame_ids = list(range(10))
+# split = 'val'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(189))
 
 '''
@@ -177,8 +177,8 @@ scene_obj = mitsubaScene3D(
         'im_H_resize': 320, 'im_W_resize': 640, 
         # 'im_H_resize': 1, 'im_W_resize': 2, 
         # 'im_H_resize': 32, 'im_W_resize': 64, 
-        # 'spp': 2048, 
-        'spp': 16, 
+        'spp': 4096, 
+        # 'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
         # 'im_hdr_ext': 'exr', 
         }, 

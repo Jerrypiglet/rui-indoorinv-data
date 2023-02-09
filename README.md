@@ -154,7 +154,7 @@ For Pytorch on M1 Mac, follow https://towardsdatascience.com/installing-pytorch-
       - val
         - ...
       - scene_v3.xml
-  - OpenRooms_public_scene_dataset_2
+  - openrooms_scene_dataset_2
     - scenes
       - xml1
         - scene0552_00

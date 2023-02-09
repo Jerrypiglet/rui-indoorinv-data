@@ -85,11 +85,12 @@ postfix = '_darker'; radiance_rescale = 1./10.
 The classroom scene: one lamp (lit up) + one window (less sun)
 data/public_re_0203/main_xml1/scene0552_00/im_4.png
 '''
-# dataset_version = 'public_re_0203'
-# meta_split = 'main_xml1'
-# scene_name = 'scene0552_00'
-# frame_ids = list(range(200))
+dataset_version = 'public_re_0203'
+meta_split = 'main_xml1'
+scene_name = 'scene0552_00'
+frame_ids = list(range(200))
 # radiance_rescale = 1./5. # RE
+postfix = '_darker'; radiance_rescale = 1./20.
 
 # '''
 # orange-ish room with direct light
