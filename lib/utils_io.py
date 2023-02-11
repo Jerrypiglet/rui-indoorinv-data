@@ -94,7 +94,6 @@ def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if
 
 def load_HDR(path: Path, expected_shape: tuple=(), target_HW: Tuple[int, int]=()) -> np.ndarray:
     if not path.exists():
-        import ipdb; ipdb.set_trace()
         if str(path).endswith('.hdr'):
             if not Path(str(path).replace('.hdr', '.rgbe')).exists():
                 path = Path(str(path).replace('.hdr', '.rgbe'))

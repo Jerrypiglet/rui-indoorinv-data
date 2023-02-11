@@ -75,7 +75,7 @@ if not shape_pickles_root.exists():
     shape_pickles_root.mkdir(parents=True, exist_ok=True)
 
 
-dataset_version = 'public_re_3_v3pose_2048'
+# dataset_version = 'public_re_3_v3pose_2048'
 up_axis = 'y+'
 # meta_split = 'main_xml'
 # scene_name = 'scene0008_00_more'
@@ -86,60 +86,60 @@ up_axis = 'y+'
 The classroom scene: one lamp (dark) + one window (directional sun)
 data/public_re_3/mainDiffLight_xml1/scene0552_00/im_4.png
 '''
-dataset_version = 'public_re_0203'
-meta_split = 'main_xml1'
+dataset_version = 'public_re_0203_tmp'
+meta_split = 'mainDiffLight_xml1'
 scene_name = 'scene0552_00'
 emitter_type_index_list = [('lamp', 0)]
 # frame_ids = list(range(0, 345, 10))
 frame_ids = list(range(200))
 
-'''
-The conference room with one lamp
-data/public_re_3/main_xml/scene0005_00_more/im_3.png
-images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0005_00.png
-'''
-dataset_version = 'public_re_0203'
-meta_split = 'main_xml'
-scene_name = 'scene0005_00'
-frame_ids = list(range(200))
-# frame_ids = [0]
+# '''
+# The conference room with one lamp
+# data/public_re_3/main_xml/scene0005_00_more/im_3.png
+# images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0005_00.png
+# '''
+# dataset_version = 'public_re_0203'
+# meta_split = 'main_xml'
+# scene_name = 'scene0005_00'
+# frame_ids = list(range(200))
+# # frame_ids = [0]
 
-'''
-The classroom scene: one lamp (lit up) + one window (less sun)
-data/public_re_3/main_xml1/scene0552_00/im_4.png
-'''
-dataset_version = 'public_re_0203'
-meta_split = 'main_xml1'
-scene_name = 'scene0552_00'
-frame_ids = list(range(200))
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
+# '''
+# The classroom scene: one lamp (lit up) + one window (less sun)
+# data/public_re_3/main_xml1/scene0552_00/im_4.png
+# '''
+# dataset_version = 'public_re_0203'
+# meta_split = 'main_xml1'
+# scene_name = 'scene0552_00'
+# frame_ids = list(range(200))
+# # frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
 
-'''
-orange-ish room with direct light
-images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0002_00.png
-'''
-dataset_version = 'public_re_0203'
-meta_split = 'main_xml'
-scene_name = 'scene0002_00'
-frame_ids = list(range(200))
+# '''
+# orange-ish room with direct light
+# images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0002_00.png
+# '''
+# dataset_version = 'public_re_0203'
+# meta_split = 'main_xml'
+# scene_name = 'scene0002_00'
+# frame_ids = list(range(200))
 
-'''
-green-ish room with window, with guitar
-images/demo_eval_scene_shapes-vis_count-train-public_re_0203_mainDiffMat_xml1_scene0608_01.png
-'''
-dataset_version = 'public_re_0203'
-meta_split = 'mainDiffMat_xml1'
-scene_name = 'scene0608_01'
-frame_ids = list(range(200))
+# '''
+# green-ish room with window, with guitar
+# images/demo_eval_scene_shapes-vis_count-train-public_re_0203_mainDiffMat_xml1_scene0608_01.png
+# '''
+# dataset_version = 'public_re_0203'
+# meta_split = 'mainDiffMat_xml1'
+# scene_name = 'scene0608_01'
+# frame_ids = list(range(200))
 
-'''
-toy room with lit lamp and dark window
-images/demo_eval_scene_shapes-vis_count-train-public_re_0203_mainDiffMat_xml_scene0603_00.png
-'''
-dataset_version = 'public_re_0203'
-meta_split = 'mainDiffMat_xml'
-scene_name = 'scene0603_00'
-frame_ids = list(range(200))
+# '''
+# toy room with lit lamp and dark window
+# images/demo_eval_scene_shapes-vis_count-train-public_re_0203_mainDiffMat_xml_scene0603_00.png
+# '''
+# dataset_version = 'public_re_0203'
+# meta_split = 'mainDiffMat_xml'
+# scene_name = 'scene0603_00'
+# frame_ids = list(range(200))
 
 '''
 default
@@ -219,19 +219,20 @@ scene_obj = openroomsScene3D(
         # == params for sample camera poses
         'sampleNum': 3, 
         'heightMin' : 0.8, # camera height min
-        'heightMax' : 1.8, # camera height max
-        'distMin': 0.5, # to wall distance min
-        'distMax': 4.5, # to wall distance max
-        'thetaMin': -60, # theta min: pitch angle; up+ 
-        'thetaMax' : 60, # theta max: pitch angle; up+
+        'heightMax' : 1.2, # camera height max
+        'distMin': 0.3, # to wall distance min
+        'distMax': 1.5, # to wall distance max
+        'thetaMin': -20, # theta min: pitch angle; up+ 
+        'thetaMax' : 80, # theta max: pitch angle; up+
         'phiMin': -60, # yaw angle min
         'phiMax': 60, # yaw angle max
         'distRaysMin': 0.5, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
         'distRaysMedianMin': 0.8, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'cam_loc_bbox': [[-3., -4.], [-3., -0.5], [-0.5, -0.5], [-0.5, -4.]],
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
         'sample_pose_num': 200, # Number of poses to sample; set to -1 if not sampling
-        'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png
+        'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png
     }, 
     lighting_params_dict={
         'SG_num': 12,
@@ -606,7 +607,7 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
-            'if_cam_axis_only': False, 
+            'if_cam_axis_only': True, 
             'if_cam_traj': False, 
             'if_labels': True, 
             }, 
@@ -624,10 +625,10 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
-            'if_ceiling': True, 
-            'if_walls': True, 
-            # 'if_ceiling': False, 
-            # 'if_walls': False, 
+            # 'if_ceiling': True, 
+            # 'if_walls': True, 
+            'if_ceiling': False, 
+            'if_walls': False, 
             'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
         },
         emitter_params={

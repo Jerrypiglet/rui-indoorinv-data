@@ -976,7 +976,7 @@ class visualizer_scene_3D_o3d(object):
         cam_rays_subsample = mi_params.get('cam_rays_subsample', 10)
 
         if if_cam_rays: 
-            for frame_idx, (rays_o, rays_d, _) in enumerate(self.os.cam_rays_list[0:1]): # show only first frame
+            for frame_idx, (rays_o, rays_d, _) in enumerate(self.os.cam_rays_list[:2]): # show only first frame
                 rays_of_a_view = o3d.geometry.LineSet()
 
                 if cam_rays_if_pts:
@@ -990,7 +990,7 @@ class visualizer_scene_3D_o3d(object):
 
                 rays_end_flatten = rays_o_flatten + rays_d_flatten * rays_t_flatten
                 rays_of_a_view.points = o3d.utility.Vector3dVector(np.vstack((rays_o_flatten, rays_end_flatten)))
-                rays_of_a_view.colors = o3d.utility.Vector3dVector([[0.3, 0.3, 0.3]]*rays_o_flatten.shape[0])
+                rays_of_a_view.colors = o3d.utility.Vector3dVector([[0., 0., 0.]]*rays_o_flatten.shape[0])
                 rays_of_a_view.lines = o3d.utility.Vector2iVector([[_, _+rays_o_flatten.shape[0]] for _ in range(rays_o_flatten.shape[0])])
                 geometry_list.append(rays_of_a_view)
 

@@ -107,7 +107,8 @@ dataset_version = 'public_re_0203'
 meta_split = 'mainDiffLight_xml1'
 # meta_split = 'main_xml1'
 scene_name = 'scene0552_00'
-frame_ids = list(range(200))
+# frame_ids = list(range(200))
+frame_ids = [0]
 
 '''
 The conference room with one lamp
@@ -122,12 +123,13 @@ images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0005_
 '''
 The classroom scene: one lamp (lit up) + one window (less sun)
 data/public_re_0203/main_xml1/scene0552_00/im_4.png
+
 '''
-dataset_version = 'public_re_0203'
-meta_split = 'main_xml1'
-scene_name = 'scene0552_00'
-# frame_ids = list(range(200))
-frame_ids = [0]
+# dataset_version = 'public_re_0203'
+# meta_split = 'main_xml1'
+# scene_name = 'scene0552_00'
+# # frame_ids = list(range(200))
+# frame_ids = [0]
 # radiance_rescale = 1./5. # RE
 
 radiance_scale_vis = 0.001 # GT max radiance ~300. -> ~3.
@@ -512,7 +514,7 @@ if opt.vis_3d_o3d:
             # 'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             'emitters', # emitter properties (e.g. SGs, half envmaps)
-            # 'mi', # mitsuba sampled rays, pts
+            'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -634,7 +636,7 @@ if opt.vis_3d_o3d:
             'if_ceiling': False, # remove ceiling points to better see the furniture 
             'if_walls': True, # remove wall points to better see the furniture 
 
-            'if_cam_rays': False, 
+            'if_cam_rays': True, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             
