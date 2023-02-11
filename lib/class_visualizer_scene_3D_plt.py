@@ -31,7 +31,7 @@ from lib.utils_OR.utils_OR_vis_3D import vis_cube_plt, vis_axis, vis_axis_xyz, s
 from lib.utils_io import load_HDR, to_nonHDR
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world, render_3SG_envmap, vis_envmap_plt
 
-class visualizer_openroomsScene_3D_plt(object):
+class visualizer_scene_3D_plt(object):
     '''
     matplotlib visualizer (debug only; for better visualizations, use lib.class_visualizer_openroomsScene_o3d.visualizer_openroomsScene_o3d)
     A class used to **visualize** OpenRooms (public/public-re versions) scene contents (2D/2.5D per-pixel DENSE properties for inverse rendering + 3D semantics).

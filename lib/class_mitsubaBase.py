@@ -7,6 +7,7 @@ import torch
 import time
 from pathlib import Path
 import imageio
+import json
 import shutil
 # Import the library using the alias "mi"
 import mitsuba as mi
@@ -16,7 +17,7 @@ from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, wh
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 
-from lib.utils_monosdf_scene import load_monosdf_shape, load_monosdf_scale_offset
+from lib.utils_monosdf_scene import load_shape_dict_from_shape_file, load_monosdf_scale_offset
 
 class mitsubaBase():
     '''
@@ -151,17 +152,21 @@ class mitsubaBase():
             scale_offset_tuple, _ = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
         else:
             scale_offset_tuple = ()
-        monosdf_shape_dict = load_monosdf_shape(Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, scale_offset_tuple)
-        self.vertices_list.append(monosdf_shape_dict['vertices'])
-        self.faces_list.append(monosdf_shape_dict['faces'])
-        self.bverts_list.append(monosdf_shape_dict['bverts'])
-        self.bfaces_list.append(monosdf_shape_dict['bfaces'])
-        self.ids_list.append(monosdf_shape_dict['_id'])
-        
-        self.shape_list_valid.append(monosdf_shape_dict['shape_dict'])
+        monosdf_shape_dict = load_shape_dict_from_shape_file(Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, scale_offset_tuple)
+        self.append_shape(monosdf_shape_dict)
 
-        self.xyz_max = np.maximum(np.amax(monosdf_shape_dict['vertices'], axis=0), self.xyz_max)
-        self.xyz_min = np.minimum(np.amin(monosdf_shape_dict['vertices'], axis=0), self.xyz_min)
+    def append_shape(self, shape_dict):
+        self.vertices_list.append(shape_dict['vertices'])
+        self.faces_list.append(shape_dict['faces'])
+        self.bverts_list.append(shape_dict['bverts'])
+        self.bfaces_list.append(shape_dict['bfaces'])
+        self.ids_list.append(shape_dict['_id'])
+        
+        self.shape_list_valid.append(shape_dict['shape_dict'])
+
+        self.xyz_max = np.maximum(np.amax(shape_dict['vertices'], axis=0), self.xyz_max)
+        self.xyz_min = np.minimum(np.amin(shape_dict['vertices'], axis=0), self.xyz_min)
+
 
     def mi_get_segs(self, if_also_dump_xml_with_lit_area_lights_only=True, if_dump=True):
         '''
@@ -189,7 +194,7 @@ class mitsubaBase():
             mi_seg_area_file_path = mi_seg_area_file_folder / ('mi_seg_emitter_%d.png'%(self.frame_id_list[frame_idx]))
             if_get_from_scratch = True
             if mi_seg_area_file_path.exists():
-                mi_seg_area = load_img(mi_seg_area_file_path, (self.H, self.W), ext='png', target_HW=self.im_target_HW, if_attempt_load=True)
+                mi_seg_area = load_img(mi_seg_area_file_path, (self.H, self.W), ext='png', target_HW=self.im_HW_target, if_attempt_load=True)
                 if mi_seg_area is None:
                     mi_seg_area_file_path.unlink()
                 else:
@@ -348,6 +353,18 @@ class mitsubaBase():
                 for k, v in self.cam_params_dict.items():
                     camOut.write('%s: %s\n'%(k, str(v)))
 
+    def load_meta_json_pose(self, pose_file):
+        assert Path(pose_file).exists(), 'Pose file not found at %s! Check if exist, or if the correct pose format was chosen in key \'pose_file\' of scene_obj.'%str(pose_file)
+        with open(pose_file, 'r') as f:
+            meta = json.load(f)
+        Rt_c2w_b_list = []
+        for idx in range(len(meta['frames'])):
+            pose = np.array(meta['frames'][idx]['transform_matrix'])[:3, :4].astype(np.float32)
+            R_, t_ = np.split(pose, (3,), axis=1)
+            R_ = R_ / np.linalg.norm(R_, axis=1, keepdims=True) # somehow R_ was mistakenly scaled by scale_m2b; need to recover to det(R)=1
+            Rt_c2w_b_list.append((R_, t_))
+        return meta, Rt_c2w_b_list
+
     def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False, if_lighting=False):
         '''
         fuse depth maps (and RGB, normals) into point clouds in global coordinates of OpenCV convention
@@ -437,7 +454,7 @@ class mitsubaBase():
             normal_global = (R @ normal.T).T
             normal_global_list.append(normal_global)
 
-        print(blue_text('[openroomsScene] DONE. fuse_3D_geometry'))
+        print(blue_text('[%s] DONE. fuse_3D_geometry'%self.parent_class_name))
 
         X_global = np.vstack(X_global_list)[::subsample_rate_pts]
         rgb_global = np.vstack(rgb_global_list)[::subsample_rate_pts]
@@ -520,7 +537,7 @@ class mitsubaBase():
             if lighting_source == 'lighting_SG':
                 lamb_list.append(lamb_np)
 
-        print(blue_text('[mitsubaBase] DONE. fuse_3D_lighting'))
+        print(blue_text('[%s] DONE. fuse_3D_lighting'%self.parent_class_name))
 
         axis_global = np.vstack(axis_global_list)[::subsample_rate_pts, ::subsample_rate_wi]
         weight = np.vstack(weight_list)[::subsample_rate_pts, ::subsample_rate_wi]
@@ -547,3 +564,10 @@ class mitsubaBase():
         axis_np_global = lighting_envmap_position - lighting_envmap_o
         axis_np_global = axis_np_global / (np.linalg.norm(axis_np_global, axis=-1, keepdims=True)+1e-6)
         return axis_np_global
+
+    def load_colors(self):
+        '''
+        load mapping from obj cat id to RGB
+        '''
+        self.if_loaded_colors = False
+        return

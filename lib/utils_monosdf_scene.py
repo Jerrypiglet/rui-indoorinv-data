@@ -3,7 +3,7 @@ import numpy as np
 import trimesh
 from utils_OR.utils_OR_mesh import sample_mesh, simplify_mesh, computeBox
 
-def load_monosdf_shape(shape_file: Path, shape_params_dict={}, scale_offset: tuple=()):
+def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scale_offset: tuple=()):
     if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
     sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
     sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)

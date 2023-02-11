@@ -23,7 +23,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
-from lib.class_visualizer_openroomsScene_3D_plt import visualizer_openroomsScene_3D_plt
+from lib.class_visualizer_scene_3D_plt import visualizer_scene_3D_plt
 
 from lib.class_eval_rad import evaluator_scene_rad
 from lib.class_eval_monosdf import evaluator_scene_monosdf
@@ -470,7 +470,7 @@ if opt.vis_2d_plt:
 Matploblib 3D viewer
 '''
 if opt.vis_3d_plt:
-    visualizer_3D_plt = visualizer_openroomsScene_3D_plt(
+    visualizer_3D_plt = visualizer_scene_3D_plt(
         scene_obj, 
         modality_list_vis = [
             'layout', 

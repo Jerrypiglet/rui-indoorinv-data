@@ -553,7 +553,7 @@ Small normal/depth maps of sampled poses will be dumped to `data/public_re_3_v3p
 - [ ] multi-gpu support
 - [x] vis 3D grid of unit length in o3d visualizer
 - [ ] vis projection of layout+objects in visualizer_scene_2D()
-- [x] vis 3D layout+objects+**camera poses** in visualizer_openroomsScene_3D_plt()
+- [x] vis 3D layout+objects+**camera poses** in visualizer_scene_3D_plt()
 - [ ] **Interactive mode**: map keys to load/offload modalities on-the-go without having to change the flags and restart the viewer
 - [ ] **Mitsuba scene**: enabling emitters and materials -> differentiable RGB rendering 
 - [ ] write ``rL.forwardEnv`` to Numpy version to replace in *utils_openrooms.py*

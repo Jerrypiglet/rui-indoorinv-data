@@ -31,7 +31,7 @@ class scene2DBase():
         scene_params_dict: dict, 
         modality_list: list, 
         modality_filename_dict: dict, 
-        im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640, 'spp': 1024}, 
+        im_params_dict: dict={}, 
         BRDF_params_dict: dict={}, 
         lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
         cam_params_dict: dict={'near': 0.1, 'far': 10.}, 
@@ -51,20 +51,21 @@ class scene2DBase():
         self.if_loaded_layout = False
 
         self.root_path_dict = root_path_dict
-        self.PATH_HOME, self.rendering_root, self.xml_scene_root = get_list_of_keys(
-            self.root_path_dict, 
-            ['PATH_HOME', 'rendering_root', 'xml_scene_root'], 
-            [PosixPath, PosixPath, PosixPath]
-            )
+        self.PATH_HOME, self.rendering_root = get_list_of_keys(self.root_path_dict, ['PATH_HOME', 'rendering_root'], [PosixPath, PosixPath])
 
         # im params
         self.im_params_dict = im_params_dict
         self.cam_params_dict = cam_params_dict
 
-        self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
-        self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
-        self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
-        self.H, self.W = self.im_H_resize, self.im_W_resize
+        if im_params_dict != {}:
+            self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
+            self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
+            self.H, self.W = self.im_H_resize, self.im_W_resize
+            self.im_HW_load = (self.im_H_load, self.im_W_load)
+            self.im_HW_target = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
+        else:
+            self.im_HW_load = ()
+            self.im_HW_target = ()
 
         # lighting params
         self.lighting_params_dict = lighting_params_dict
@@ -79,7 +80,7 @@ class scene2DBase():
 
         self.modality_filename_dict = modality_filename_dict
         for modality in modality_filename_dict.keys():
-            assert modality in self.valid_modalities, 'Invalid modality: %s in modality_filename_dict!'%modality
+            assert modality in self.valid_modalities, 'Invalid key [%s] in modality_filename_dict: NOT in self.valid_modalities!'%modality
 
     @property
     @abstractmethod
@@ -99,6 +100,11 @@ class scene2DBase():
             return self.K_list[frame_idx]
         else:
             raise ValueError('No intrinsics found for %s'%self.parent_class_name)
+
+    @property
+    def if_has_global_HW(self):
+        return hasattr(self, 'im_H') and hasattr(self, 'im_W')
+
 
     def check_and_sort_modalities(self, modalitiy_list):
         modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
@@ -187,7 +193,8 @@ class scene2DBase():
         im_sdr_ext = filename.split('.')[-1]
 
         self.im_sdr_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
-        self.im_sdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=im_sdr_ext, target_HW=self.im_target_HW)/255. for _ in self.im_sdr_file_list]
+        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        self.im_sdr_list = [load_img(_, expected_shape=__, ext=im_sdr_ext, target_HW=self.im_HW_target)/255. for _, __ in zip(self.im_sdr_file_list, expected_shape_list)]
 
         print(blue_text('[%s] DONE. load_im_sdr')%self.parent_class_name)
 
@@ -202,7 +209,8 @@ class scene2DBase():
         im_sdr_ext = self.modality_filename_dict['im_sdr'].split('.')[-1]
 
         self.im_hdr_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
-        self.im_hdr_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext=im_hdr_ext, target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
+        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        self.im_hdr_list = [load_img(_, expected_shape=__, ext=im_hdr_ext, target_HW=self.im_HW_target) for _, __ in zip(self.im_hdr_file_list, expected_shape_list)]
         self.hdr_scale_list = [1.] * len(self.im_hdr_list)
 
         for im_hdr_file, im_hdr in zip(self.im_hdr_file_list, self.im_hdr_list):

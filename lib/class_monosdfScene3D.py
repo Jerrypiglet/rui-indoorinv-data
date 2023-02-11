@@ -30,7 +30,7 @@ from lib.class_scene2DBase import scene2DBase
 
 from lib.utils_misc import get_device
 from lib.utils_from_monosdf import rend_util
-from lib.utils_monosdf_scene import load_monosdf_shape, load_monosdf_scale_offset
+from lib.utils_monosdf_scene import load_shape_dict_from_shape_file, load_monosdf_scale_offset
 class monosdfScene3D(mitsubaBase, scene2DBase):
     '''
     A class used to visualize/render scenes from MonoSDF preprocessed dataset format (e.g. scannet)
@@ -94,7 +94,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
 
         self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
         self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
-        self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
+        self.im_HW_target = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
         self.H, self.W = self.im_H_resize, self.im_W_resize
         # self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
         # assert self.im_lighting_HW_ratios[0] > 0 and self.im_lighting_HW_ratios[1] > 0
@@ -415,7 +415,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         print(white_blue('[%s] load_depth for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.depth_file_list = [self.scene_rendering_path / (self.modality_filename_dict['depth']%i) for i in self.frame_id_list]
-        self.depth_list = [load_img(depth_file, (self.im_H_load, self.im_W_load), ext='npy', target_HW=self.im_target_HW).astype(np.float32)[:, :] for depth_file in self.depth_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
+        self.depth_list = [load_img(depth_file, (self.im_H_load, self.im_W_load), ext='npy', target_HW=self.im_HW_target).astype(np.float32)[:, :] for depth_file in self.depth_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
 
         print(blue_text('[%s] DONE. load_depth')%self.parent_class_name)
 
@@ -433,7 +433,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         self.normal_file_list = [self.scene_rendering_path / (self.modality_filename_dict['normal']%i) for i in self.frame_id_list]
         # aa = np.load(str(self.normal_file_list[0]))
         # import ipdb; ipdb.set_trace()
-        self.normal_list = [load_img(normal_file, (self.im_H_load, self.im_W_load, 3), ext='npy', target_HW=self.im_target_HW, npy_if_channel_first=True).astype(np.float32) for normal_file in self.normal_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
+        self.normal_list = [load_img(normal_file, (self.im_H_load, self.im_W_load, 3), ext='npy', target_HW=self.im_HW_target, npy_if_channel_first=True).astype(np.float32) for normal_file in self.normal_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
         # self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
         self.normal_list = [normal * 2. - 1. for normal in self.normal_list]
         
@@ -457,18 +457,8 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
         
-        monosdf_shape_dict = load_monosdf_shape(self.shape_file, shape_params_dict)
-
-        self.vertices_list.append(monosdf_shape_dict['vertices'])
-        self.faces_list.append(monosdf_shape_dict['faces'])
-        self.bverts_list.append(monosdf_shape_dict['bverts'])
-        self.bfaces_list.append(monosdf_shape_dict['bfaces'])
-        self.ids_list.append(monosdf_shape_dict['_id'])
-        
-        self.shape_list_valid.append(monosdf_shape_dict['shape_dict'])
-
-        self.xyz_max = np.maximum(np.amax(monosdf_shape_dict['vertices'], axis=0), self.xyz_max)
-        self.xyz_min = np.minimum(np.amin(monosdf_shape_dict['vertices'], axis=0), self.xyz_min)
+        shape_dict = load_shape_dict_from_shape_file(self.shape_file, shape_params_dict)
+        self.append_shape(shape_dict)
 
         self.if_loaded_shapes = True
         
@@ -476,10 +466,3 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
             self.parent_class_name, 
             len(self.shape_list_valid), 
             )))
-
-    def load_colors(self):
-        '''
-        load mapping from obj cat id to RGB
-        '''
-        self.if_loaded_colors = False
-        return

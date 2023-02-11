@@ -466,7 +466,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         self.if_loaded_shapes = True
 
-        print(blue_text('[openroomsScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
+        print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
+            self.parent_class_name, 
             len(self.shape_list_valid), 
             len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
             len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
@@ -518,7 +519,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         self.v_2d_transformed = transform_v(np.hstack((self.v_2d, np.zeros((self.v_2d.shape[0], 1), dtype=self.v_2d.dtype))), T_layout)[:, [0, 2]]
         self.layout_hull_2d_transformed = self.layout_box_3d_transformed[:4, [0, 2]]
 
-        print(blue_text('[openroomsScene3D] DONE. load_layout'))
+        print(blue_text('[%s] DONE. load_layout'%self.parent_class_name))
 
         self.if_loaded_layout = True
 

@@ -61,7 +61,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         # Color image, convert BGR to RGB
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
-    if expected_shape != ():
+    if expected_shape != () and len(expected_shape) != 1: # not empty, or channel only e.g. (3,)
         if tuple(im.shape) != expected_shape:
             if if_attempt_load:
                 return None

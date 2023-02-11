@@ -25,7 +25,6 @@ from lib.utils_io import load_matrix, resize_intrinsics
 # from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
 from .class_scene2DBase import scene2DBase
-from .class_monosdfScene3D import load_monosdf_scale_offset, load_monosdf_shape
 
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, sample_mesh, simplify_mesh
 from lib.utils_OR.utils_OR_xml import get_XML_root
@@ -68,12 +67,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             lighting_params_dict=lighting_params_dict, 
             if_debug_info=if_debug_info, 
             )
-        # self.root_path_dict = root_path_dict
-        # self.PATH_HOME, self.rendering_root, self.xml_scene_root = get_list_of_keys(
-        #     self.root_path_dict, 
-        #     ['PATH_HOME', 'rendering_root', 'xml_scene_root'], 
-        #     [PosixPath, PosixPath, PosixPath]
-        #     )
+        self.xml_scene_root = get_list_of_keys(self.root_path_dict, ['xml_scene_root'], [PosixPath])[0]
 
         self.xml_filename, self.scene_name, self.mitsuba_version, self.intrinsics_path = get_list_of_keys(scene_params_dict, ['xml_filename', 'scene_name', 'mitsuba_version', 'intrinsics_path'], [str, str, str, PosixPath])
         self.split, self.frame_id_list = get_list_of_keys(scene_params_dict, ['split', 'frame_id_list'], [str, list])
@@ -110,10 +104,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         variant = mi_params_dict.get('variant', '')
         mi.set_variant(variant if variant != '' else mi_variant_dict[self.host])
 
-        # self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
-        # self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
-        # self.im_target_HW = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
-        # self.H, self.W = self.im_H_resize, self.im_W_resize
         self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
         assert self.im_lighting_HW_ratios[0] > 0 and self.im_lighting_HW_ratios[1] > 0
 
@@ -145,6 +135,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             self.get_cam_rays(self.cam_params_dict)
         self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
 
+    @property
     def num_frames(self):
         return len(self.frame_id_list)
 
@@ -306,7 +297,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.im_H_load = int(self.K[1][2] * 2)
 
         if self.im_W_load != self.W or self.im_H_load != self.H:
-            scale_factor = [t / s for t, s in zip((self.H, self.W), (self.im_H_load, self.im_W_load))]
+            scale_factor = [t / s for t, s in zip((self.H, self.W), self.im_HW_load)]
             self.K = resize_intrinsics(self.K, scale_factor)
 
     def load_poses(self, cam_params_dict):
@@ -342,7 +333,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         #     # if not hasattr(self, 'pose_list'):
         #         self.get_room_center_pose()
 
-        print(white_blue('[mitsubaScene] load_poses from %s'%str(self.pose_file)))
+        print(white_blue('[%s] load_poses from %s'%str(self.pose_file)))
          
         pose_list = []
         origin_lookatvector_up_list = []
@@ -441,19 +432,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.pose_list = pose_list
         self.origin_lookatvector_up_list = origin_lookatvector_up_list
 
-        print(blue_text('[mistubaScene] DONE. load_poses (%d poses)'%len(self.pose_list)))
-
-    def load_meta_json_pose(self, pose_file):
-        assert Path(pose_file).exists(), 'Pose file not found at %s! Check if exist, or if the correct pose format was chosen in key \'pose_file\' of scene_obj.'%str(pose_file)
-        with open(pose_file, 'r') as f:
-            meta = json.load(f)
-        Rt_c2w_b_list = []
-        for idx in range(len(meta['frames'])):
-            pose = np.array(meta['frames'][idx]['transform_matrix'])[:3, :4].astype(np.float32)
-            R_, t_ = np.split(pose, (3,), axis=1)
-            R_ = R_ / np.linalg.norm(R_, axis=1, keepdims=True) # somehow R_ was mistakenly scaled by scale_m2b; need to recover to det(R)=1
-            Rt_c2w_b_list.append((R_, t_))
-        return meta, Rt_c2w_b_list
+        print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
 
     def get_cam_rays(self, cam_params_dict={}):
         if hasattr(self, 'cam_rays_list'):  return
@@ -473,12 +452,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         return emission in HDR; (H, W, 3)
         '''
-        print(white_blue('[mitsubaScene] load_emission for %d frames...'%len(self.frame_id_list)))
+        print(white_blue('[%s] load_emission for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.emission_file_list = [self.scene_rendering_path / 'Emit' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
-        self.emission_list = [load_img(_, expected_shape=(self.im_H_load, self.im_W_load, 3), ext='exr', target_HW=self.im_target_HW) for _ in self.emission_file_list]
+        self.emission_list = [load_img(_, expected_shape=self.im_HW_load+(3,), ext='exr', target_HW=self.im_HW_target) for _ in self.emission_file_list]
 
-        print(blue_text('[mitsubaScene] DONE. load_emission'))
+        print(blue_text('[%s] DONE. load_emission'%self.parent_class_name))
 
     def load_albedo(self):
         '''
@@ -487,12 +466,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if hasattr(self, 'albedo_list'): return
 
-        print(white_blue('[mistubaScene] load_albedo for %d frames...'%len(self.frame_id_list)))
+        print(white_blue('[%s] load_albedo for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.albedo_file_list = [self.scene_rendering_path / 'DiffCol' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
-        self.albedo_list = [load_img(albedo_file, (self.im_H_load, self.im_W_load, 3), ext='exr', target_HW=self.im_target_HW).astype(np.float32) for albedo_file in self.albedo_file_list]
+        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        self.albedo_list = [load_img(albedo_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for albedo_file, __ in zip(self.albedo_file_list, expected_shape_list)]
         
-        print(blue_text('[mistubaScene] DONE. load_albedo'))
+        print(blue_text('[%s] DONE. load_albedo'%self.parent_class_name))
 
     def load_roughness(self):
         '''
@@ -501,12 +481,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if hasattr(self, 'roughness_list'): return
 
-        print(white_blue('[mistubaScene] load_roughness for %d frames...'%len(self.frame_id_list)))
+        print(white_blue('[%s] load_roughness for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.roughness_file_list = [self.scene_rendering_path / 'Roughness' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
-        self.roughness_list = [load_img(roughness_file, (self.im_H_load, self.im_W_load, 3), ext='exr', target_HW=self.im_target_HW)[:, :, 0:1].astype(np.float32) for roughness_file in self.roughness_file_list]
+        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        self.roughness_list = [load_img(roughness_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target)[:, :, 0:1].astype(np.float32) for roughness_file, __ in zip(self.roughness_file_list, expected_shape_list)]
 
-        print(blue_text('[mistubaScene] DONE. load_roughness'))
+        print(blue_text('[%s] DONE. load_roughness'%self.parent_class_name))
 
     def load_depth(self):
         '''
@@ -515,13 +496,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if hasattr(self, 'depth_list'): return
 
-        print(white_blue('[mistubaScene] load_depth for %d frames...'%len(self.frame_id_list)))
+        print(white_blue('[%s] load_depth for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.depth_file_list = [self.scene_rendering_path / 'Depth' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
-        # self.depth_list = [load_binary(depth_file, (self.im_H_load, self.im_W_load), target_HW=self.im_target_HW, resize_method='area')for depth_file in self.depth_file_list] # TODO: better resize method for depth for anti-aliasing purposes and better boundaries, and also using segs?
-        self.depth_list = [load_img(depth_file, (self.im_H_load, self.im_W_load, 3), ext='exr', target_HW=self.im_target_HW).astype(np.float32)[:, :, 0] for depth_file in self.depth_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
+        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        self.depth_list = [load_img(depth_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32)[:, :, 0] for depth_file, __ in zip(self.depth_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
 
-        print(blue_text('[mistubaScene] DONE. load_depth'))
+        print(blue_text('[%s] DONE. load_depth'%self.parent_class_name))
 
         self.pts_from['depth'] = True
 
@@ -532,13 +513,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if hasattr(self, 'normal_list'): return
 
-        print(white_blue('[mistubaScene] load_normal for %d frames...'%len(self.frame_id_list)))
+        print(white_blue('[%s] load_normal for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.normal_file_list = [self.scene_rendering_path / 'Normal' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
-        self.normal_list = [load_img(normal_file, (self.im_H_load, self.im_W_load, 3), ext='exr', target_HW=self.im_target_HW).astype(np.float32) for normal_file in self.normal_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
+        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        self.normal_list = [load_img(normal_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for normal_file, __ in zip(self.normal_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
         self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
         
-        print(blue_text('[mistubaScene] DONE. load_normal'))
+        print(blue_text('[%s] DONE. load_normal'%self.parent_class_name))
 
     def load_lighting_envmap(self):
         '''
@@ -550,7 +532,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         rendered with Blender: lib/class_renderer_blender_mitsubaScene_3D->renderer_blender_mitsubaScene_3D(); 
         '''
-        print(white_blue('[mitsubaScene] load_lighting_envmap'))
+        print(white_blue('[%s] load_lighting_envmap'))
 
         self.lighting_envmap_list = []
         self.lighting_envmap_position_list = []
@@ -578,7 +560,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
 
-        print(blue_text('[mitsubaScene] DONE. load_lighting_envmap'))
+        print(blue_text('[%s] DONE. load_lighting_envmap'%self.parent_class_name))
 
     def load_shapes(self, shape_params_dict={}):
         '''
@@ -719,7 +701,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         self.if_loaded_shapes = True
         
-        print(blue_text('[mitsubaScene3D] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
+        print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
+            self.parent_class_name, 
             len(self.shape_list_valid), 
             len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
             len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
@@ -762,16 +745,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             # self.layout_box_3d_transformed = np.hstack((, np.vstack((np.zeros((4, 1)), np.zeros((4, 1))+room_height))))    
             assert False
 
-        print(blue_text('[mitsubaScene3D] DONE. load_layout'))
+        print(blue_text('[%s] DONE. load_layout'%self.parent_class_name))
 
         self.if_loaded_layout = True
-
-    def load_colors(self):
-        '''
-        load mapping from obj cat id to RGB
-        '''
-        self.if_loaded_colors = False
-        return
 
     def get_envmap_axes(self):
         from utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np
