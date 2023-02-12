@@ -28,6 +28,7 @@
   - [Other utilities](#other-utilities)
     - [Sample camera poses for new \[Mitsuba\] scene](#sample-camera-poses-for-new-mitsuba-scene)
     - [Sample camera poses for new \[Openrooms\] scene](#sample-camera-poses-for-new-openrooms-scene)
+- [Other datasets](#other-datasets)
 - [Checklist for getting started](#checklist-for-getting-started)
 - [Todolist](#todolist)
 
@@ -528,6 +529,14 @@ Small normal/depth maps of sampled poses will be dumped to `data/public_re_3_v3p
 
 ![](images/demo_sample_poses_OR_main_xml1_scene0552_00.png)
 
+# Other datasets
+
+Loaders for other datasets are documented at [README_data](README_data.md)
+
+Datasets include:
+
+- Freeviewpoint (Philip et al.'21)
+
 # Checklist for getting started
 - Install all dependencies (especially Mitsuba, Open3D (opengl-supported display required))
 - Change `host` and `PATH_HOME` in the beginning of a script before running it.
@@ -539,6 +548,7 @@ Small normal/depth maps of sampled poses will be dumped to `data/public_re_3_v3p
   - [] GT emission, albedo, roughness, metallic
 - [x] vis envmap in 2D plt
 - [ ] 1./rad* -> * rad_mul
+- [ ] change all idx to 0-based: get rid of if_1_based
 - [x] compute visibility and vis for room coverage count
 - [x] densely sample pts on shape surface
 - [ ] make faces always 0-based acorss utils_mesh and trimesh

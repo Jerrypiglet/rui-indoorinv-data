@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_io import read_cam_params_OR, normalize_v
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up, read_cam_params_OR, normalize_v
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
 # from collections import defaultdict
@@ -134,9 +134,6 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
 
         self.get_cam_rays(self.cam_params_dict)
         self.process_mi_scene(self.mi_params_dict)
-
-    def num_frames(self):
-        return len(self.frame_id_list)
 
     @property
     def valid_modalities(self):
@@ -383,12 +380,9 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
                 t = pose[:3, 3:4].astype(np.float32)
                 assert np.abs(np.linalg.det(R) - 1.) < 1e-5
 
-                _, __, at_vector = np.split(R, 3, axis=-1)
-                at_vector = normalize_v(at_vector)
-                up = normalize_v(-__) # (3, 1)
-                assert np.abs(np.sum(at_vector * up)) < 1e-3
-                origin = t
-                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
+                
+                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
         print(blue_text('[%s] DONE. load_poses'%self.parent_class_name))
 

@@ -8,16 +8,9 @@ import scipy.ndimage as ndimage
 np.set_printoptions(suppress=True)
 import os
 import glob
-from collections import defaultdict
-from lib.utils_io import load_matrix, load_img, resize_img, load_HDR, scale_HDR, load_binary, load_h5, load_envmap, resize_intrinsics
-from lib.utils_matseg import get_map_aggre_map
+from lib.utils_io import load_img
 from lib.utils_misc import blue_text, get_list_of_keys, green, yellow, white_blue, red, check_list_of_tensors_size
-from lib.utils_openrooms import load_OR_public_poses_to_Rt
-from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, convert_SG_angles_to_axis_local_np
-from lib.utils_rendering_openrooms import renderingLayer
-from tqdm import tqdm
-import pickle
-from lib.utils_io import load_matrix, load_img, convert_write_png
+from lib.utils_io import load_img, convert_write_png
 
 
 class scene2DBase():
@@ -42,7 +35,10 @@ class scene2DBase():
         # host: str='', 
     ):
 
-        self.if_save_storage = scene_params_dict.get('if_save_storage', False) # set to True to enable removing duplicated renderer files (e.g. only one copy of geometry files in main, or emitter files only in main and mainDiffMat)
+        self.scene_params_dict = scene_params_dict
+        if 'frame_id_list' not in self.scene_params_dict:
+            self.scene_params_dict['frame_id_list'] = []
+        self.if_save_storage = self.scene_params_dict.get('if_save_storage', False) # set to True to enable removing duplicated renderer files (e.g. only one copy of geometry files in main, or emitter files only in main and mainDiffMat)
         self.if_debug_info = if_debug_info
         self.parent_class_name = parent_class_name
 
@@ -89,10 +85,9 @@ class scene2DBase():
 
     @property
     @abstractmethod
-    def num_frames(self):
+    def frame_num(self):
         ...
 
-    @property
     def _K(self, frame_idx: int):
         if hasattr(self, 'K'):
             return self.K
@@ -101,10 +96,25 @@ class scene2DBase():
         else:
             raise ValueError('No intrinsics found for %s'%self.parent_class_name)
 
+    def _H(self, frame_idx: int):
+        if hasattr(self, 'H'):
+            return self.H
+        elif hasattr(self, 'H_list'):
+            return self.H_list[frame_idx]
+        else:
+            raise ValueError('No im H found for %s'%self.parent_class_name)
+
+    def _W(self, frame_idx: int):
+        if hasattr(self, 'W'):
+            return self.W
+        elif hasattr(self, 'W_list'):
+            return self.W_list[frame_idx]
+        else:
+            raise ValueError('No im W found for %s'%self.parent_class_name)
+
     @property
     def if_has_global_HW(self):
         return hasattr(self, 'im_H') and hasattr(self, 'im_W')
-
 
     def check_and_sort_modalities(self, modalitiy_list):
         modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]
@@ -193,7 +203,7 @@ class scene2DBase():
         im_sdr_ext = filename.split('.')[-1]
 
         self.im_sdr_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
-        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_sdr_list = [load_img(_, expected_shape=__, ext=im_sdr_ext, target_HW=self.im_HW_target)/255. for _, __ in zip(self.im_sdr_file_list, expected_shape_list)]
 
         print(blue_text('[%s] DONE. load_im_sdr')%self.parent_class_name)
@@ -209,7 +219,7 @@ class scene2DBase():
         im_sdr_ext = self.modality_filename_dict['im_sdr'].split('.')[-1]
 
         self.im_hdr_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
-        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_hdr_list = [load_img(_, expected_shape=__, ext=im_hdr_ext, target_HW=self.im_HW_target) for _, __ in zip(self.im_hdr_file_list, expected_shape_list)]
         self.hdr_scale_list = [1.] * len(self.im_hdr_list)
 

@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_io import read_cam_params_OR, normalize_v
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up, read_cam_params_OR, normalize_v
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
 # from collections import defaultdict
@@ -71,11 +71,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         self.xml_filename, self.scene_name, self.mitsuba_version, self.intrinsics_path = get_list_of_keys(scene_params_dict, ['xml_filename', 'scene_name', 'mitsuba_version', 'intrinsics_path'], [str, str, str, PosixPath])
         self.split, self.frame_id_list = get_list_of_keys(scene_params_dict, ['split', 'frame_id_list'], [str, list])
-        self.mitsuba_version, self.up_axis = get_list_of_keys(scene_params_dict, ['mitsuba_version', 'up_axis'], [str, str])
+        self.mitsuba_version, self.axis_up = get_list_of_keys(scene_params_dict, ['mitsuba_version', 'axis_up'], [str, str])
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
         assert self.split in ['train', 'val']
-        assert self.up_axis in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
+        assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
 
         self.host = host
         self.device = get_device(self.host, device_id)
@@ -136,7 +136,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
 
     @property
-    def num_frames(self):
+    def frame_num(self):
         return len(self.frame_id_list)
 
     @property
@@ -193,10 +193,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
     @property
     def if_has_colors(self): # no semantic label colors
         return False
-
-    @property
-    def frame_num(self):
-        return len(self.frame_id_list)
 
     def load_modalities(self):
         for _ in self.modality_list:
@@ -343,21 +339,24 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             OpenRooms convention (matrices containing origin, lookat, up); The camera coordinates is in OpenCV convention (right-down-forward).
             '''
             cam_params = read_cam_params_OR(self.pose_file)
+            if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
             assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
 
-            for cam_param in cam_params:
+            # for cam_param in cam_params:
+            for idx in self.frame_id_list:
+                cam_param = cam_params[idx]
                 origin, lookat, up = np.split(cam_param.T, 3, axis=1)
                 origin = origin.flatten()
                 lookat = lookat.flatten()
                 up = up.flatten()
-                at_vector = normalize_v(lookat - origin)
-                assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
+                lookatvector = normalize_v(lookat - origin)
+                assert np.amax(np.abs(np.dot(lookatvector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
 
                 t = origin.reshape((3, 1)).astype(np.float32)
-                R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
+                R = np.stack((np.cross(-up, lookatvector), -up, lookatvector), -1).astype(np.float32)
                 
                 pose_list.append(np.hstack((R, t)))
-                origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+                origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
         elif self.pose_format in ['Blender', 'json']:
             '''
@@ -377,6 +376,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             if self.pose_format == 'Blender':
                 cam_params = np.load(self.pose_file)
                 assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
+                if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
                 for idx in self.frame_id_list:
                     R_ = scipy.spatial.transform.Rotation.from_euler('xyz', [cam_params[idx][1][0], cam_params[idx][1][1], cam_params[idx][1][2]])
                     self.R_c2w_b_list.append(R_.as_matrix())
@@ -385,6 +385,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             
             elif self.pose_format == 'json':
                 self.meta, _Rt_c2w_b_list = self.load_meta_json_pose(self.pose_file)
+                if self.frame_id_list == []: self.frame_id_list = list(range(len(_Rt_c2w_b_list)))
                 self.R_c2w_b_list = [_Rt_c2w_b_list[_][0] for _ in self.frame_id_list]
                 self.t_c2w_b_list = [_Rt_c2w_b_list[_][1] for _ in self.frame_id_list]
 
@@ -400,14 +401,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             for R_c2w_b, t_c2w_b in zip(self.R_c2w_b_list, self.t_c2w_b_list):
                 R = R_c2w_b @ T_
                 t = t_c2w_b
-                _, __, at_vector = np.split(R, 3, axis=-1)
-                at_vector = normalize_v(at_vector)
-                up = normalize_v(-__) # (3, 1)
-                assert np.abs(np.sum(at_vector * up)) < 1e-3
-                origin = t
+
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
 
                 pose_list.append(np.hstack((R, t)))
-                origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+                origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
             '''
             Obselete code, when Liwen was using Blender poses...
@@ -420,14 +418,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
             #     R = self.T_w_b2m @ R_c2w_b @ self.T_c_b2m # https://i.imgur.com/nkzfvwt.png
 
-            #     _, __, at_vector = np.split(R, 3, axis=-1)
-            #     at_vector = normalize_v(at_vector)
+            #     _, __, lookatvector = np.split(R, 3, axis=-1)
+            #     lookatvector = normalize_v(lookatvector)
             #     up = normalize_v(-__) # (3, 1)
-            #     assert np.abs(np.sum(at_vector * up)) < 1e-3
+            #     assert np.abs(np.sum(lookatvector * up)) < 1e-3
             #     origin = t
 
             #     pose_list.append(np.hstack((R, t)))
-            #     origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+            #     origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
         self.pose_list = pose_list
         self.origin_lookatvector_up_list = origin_lookatvector_up_list
@@ -469,7 +467,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         print(white_blue('[%s] load_albedo for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.albedo_file_list = [self.scene_rendering_path / 'DiffCol' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
-        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.albedo_list = [load_img(albedo_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for albedo_file, __ in zip(self.albedo_file_list, expected_shape_list)]
         
         print(blue_text('[%s] DONE. load_albedo'%self.parent_class_name))
@@ -484,7 +482,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         print(white_blue('[%s] load_roughness for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.roughness_file_list = [self.scene_rendering_path / 'Roughness' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
-        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.roughness_list = [load_img(roughness_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target)[:, :, 0:1].astype(np.float32) for roughness_file, __ in zip(self.roughness_file_list, expected_shape_list)]
 
         print(blue_text('[%s] DONE. load_roughness'%self.parent_class_name))
@@ -499,7 +497,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         print(white_blue('[%s] load_depth for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.depth_file_list = [self.scene_rendering_path / 'Depth' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
-        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.depth_list = [load_img(depth_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32)[:, :, 0] for depth_file, __ in zip(self.depth_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
 
         print(blue_text('[%s] DONE. load_depth'%self.parent_class_name))
@@ -516,7 +514,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         print(white_blue('[%s] load_normal for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
         self.normal_file_list = [self.scene_rendering_path / 'Normal' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
-        expected_shape_list = [_+(3,) for _ in self.im_HW_load_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.num_frames
+        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.normal_list = [load_img(normal_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for normal_file, __ in zip(self.normal_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
         self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
         
@@ -568,17 +566,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if self.if_loaded_shapes: return
         
-        self.shape_list_valid = []
-        self.vertices_list = []
-        self.faces_list = []
-        self.ids_list = []
-        self.bverts_list = []
-        self.bfaces_list = []
-
-        self.window_list = []
-        self.lamp_list = []
-        self.xyz_max = np.zeros(3,)-np.inf
-        self.xyz_min = np.zeros(3,)+np.inf
+        mitsubaBase._prepare_shapes(self)
         
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_shape(shape_params_dict=shape_params_dict)
@@ -724,24 +712,24 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         else:
             vertices_all = np.vstack(self.vertices_list)
 
-        if self.up_axis[0] == 'y':
+        if self.axis_up[0] == 'y':
             self.v_2d = vertices_all[:, [0, 2]]
             # room_height = np.amax(vertices_all[:, 1]) - np.amin(vertices_all[:, 1])
-        elif self.up_axis[0] == 'x':
+        elif self.axis_up[0] == 'x':
             self.v_2d = vertices_all[:, [1, 3]]
             # room_height = np.amax(vertices_all[:, 0]) - np.amin(vertices_all[:, 0])
-        elif self.up_axis[0] == 'z':
+        elif self.axis_up[0] == 'z':
             self.v_2d = vertices_all[:, [0, 1]]
             # room_height = np.amax(vertices_all[:, 2]) - np.amin(vertices_all[:, 2])
         # finding minimum 2d bbox (rectangle) from contour
         self.layout_hull_2d, self.layout_hull_pts = minimum_bounding_rectangle(self.v_2d)
         
         layout_hull_2d_2x = np.vstack((self.layout_hull_2d, self.layout_hull_2d))
-        if self.up_axis[0] == 'y':
+        if self.axis_up[0] == 'y':
             self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x[:, 0:1], np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1])), layout_hull_2d_2x[:, 1:2]))
-        elif self.up_axis[0] == 'x':
+        elif self.axis_up[0] == 'x':
             assert False
-        elif self.up_axis[0] == 'z':
+        elif self.axis_up[0] == 'z':
             # self.layout_box_3d_transformed = np.hstack((, np.vstack((np.zeros((4, 1)), np.zeros((4, 1))+room_height))))    
             assert False
 

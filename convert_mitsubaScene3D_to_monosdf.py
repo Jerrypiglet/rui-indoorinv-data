@@ -74,7 +74,7 @@ for split, frame_ids in zip(['train', 'val'], [frame_ids_train, frame_ids_val]):
             'frame_id_list': frame_ids, 
             'mitsuba_version': '3.0.0', 
             'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
-            'up_axis': 'y+', 
+            'axis_up': 'y+', 
             'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
             }, 
         mi_params_dict={

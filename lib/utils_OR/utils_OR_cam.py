@@ -99,13 +99,22 @@ def origin_lookat_up_to_R_t(origin, lookat, up):
     origin = origin.flatten()
     lookat = lookat.flatten()
     up = up.flatten()
-    at_vector = normalize_v(lookat - origin)
-    assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
+    lookatvector = normalize_v(lookat - origin)
+    assert np.amax(np.abs(np.dot(lookatvector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
     t = origin.reshape((3, 1)).astype(np.float32)
-    R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
+    R = np.stack((np.cross(-up, lookatvector), -up, lookatvector), -1).astype(np.float32)
 
-    return (R, t), at_vector
+    return (R, t), lookatvector
     
+def R_t_to_origin_lookatvector_up(R, t):
+    _, __, lookatvector = np.split(R, 3, axis=-1)
+    lookatvector = normalize_v(lookatvector)
+    up = normalize_v(-__) # (3, 1)
+    assert np.abs(np.sum(lookatvector * up)) < 1e-3
+    origin = t
+
+    return (origin, lookatvector, up)
+
 # def project_v_homo(v, cam_transformation4x4, cam_K):
 #     # https://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/img30.gif
 #     # https://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/node3.html

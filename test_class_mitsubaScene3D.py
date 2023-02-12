@@ -130,7 +130,7 @@ scene_obj = mitsubaScene3D(
         'frame_id_list': frame_ids, 
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
-        'up_axis': 'y+', 
+        'axis_up': 'y+', 
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
         'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
@@ -490,7 +490,7 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             # 'dense_geo', # fused from 2D
-            'cameras', 
+            'poses', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             'layout', 

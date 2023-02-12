@@ -29,7 +29,7 @@ from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal
 from lib.utils_OR.utils_OR_transform import transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_emitter import load_emitter_dat_world
 from lib.utils_misc import get_device
-from lib.utils_io import read_cam_params_OR
+from lib.utils_OR.utils_OR_cam import read_cam_params_OR
 
 class openroomsScene3D(openroomsScene2D, mitsubaBase):
     '''
@@ -287,18 +287,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         if self.if_loaded_shapes: return
         if not self.if_loaded_layout: self.load_layout()
 
-        self.vertices_list = []
-        self.faces_list = []
-        self.ids_list = []
-        self.bverts_list = []
-        self.bfaces_list = []
-
-        self.shape_list_valid = []
-
-        self.window_list = []
-        self.lamp_list = []
-        self.xyz_max = np.zeros(3,)-np.inf
-        self.xyz_min = np.zeros(3,)+np.inf
+        mitsubaBase._prepare_shapes(self)
 
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_shape(shape_params_dict=shape_params_dict)

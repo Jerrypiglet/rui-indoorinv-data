@@ -4,6 +4,8 @@ import imageio.v2 as imageio
 import numpy as np
 import cv2
 import scipy.ndimage as ndimage
+
+from lib.utils_OR.utils_OR_cam import read_cam_params_OR
 np.set_printoptions(suppress=True)
 import os
 import glob
@@ -68,8 +70,8 @@ class openroomsScene2D(scene2DBase):
         assert self.indexing_based in [0, 1], 'indexing of frame names (indexing_based) has to be either 0-based or 1-based! got: indexing_based = %d'%self.indexing_based
         assert self.indexing_based == {'public_re': 0, 'public': 1}[self.openrooms_version]
 
-        self.up_axis = get_list_of_keys(scene_params_dict, ['up_axis'], [str])[0]
-        assert self.up_axis in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
+        self.axis_up = get_list_of_keys(scene_params_dict, ['axis_up'], [str])[0]
+        assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
 
         if scene_params_dict.get('frame_id_list', []) != []: 
             self.frame_id_list = scene_params_dict.get('frame_id_list')
@@ -139,9 +141,6 @@ class openroomsScene2D(scene2DBase):
         # self.load_intrinsics()
         self.load_modalities()
         # self.est = {}
-
-    def num_frames(self):
-        return len(self.frame_id_list)
 
     @property
     def valid_modalities(self):
@@ -225,45 +224,45 @@ class openroomsScene2D(scene2DBase):
             scale_factor = [t / s for t, s in zip((self.im_H_resize, self.im_W_resize), (self.im_H_load, self.im_W_load))]
             self.K = resize_intrinsics(self.K, scale_factor)
         
-    def load_im_hdr(self):
-        '''
-        load im in HDR; RGB, (H, W, 3), [0., inf]
+    # def load_im_hdr(self):
+    #     '''
+    #     load im in HDR; RGB, (H, W, 3), [0., inf]
 
-        e.g. frame 0:
-            - original max: 308.0
-            - hdr scale: 0.07422680412371133
-            - after scaled: 22.861856
-        '''
+    #     e.g. frame 0:
+    #         - original max: 308.0
+    #         - hdr scale: 0.07422680412371133
+    #         - after scaled: 22.861856
+    #     '''
 
-        print(white_blue('[openroomsScene] load_im_hdr for %d frames...'%len(self.frame_id_list)))
+    #     print(white_blue('[openroomsScene] load_im_hdr for %d frames...'%len(self.frame_id_list)))
 
-        # self.im_hdr_ext in ['hdr'] # .rgbe not supported for now
-        filename = self.modality_filename_dict['im_hdr']
-        im_hdr_ext = filename.split('.')[-1]
+    #     # self.im_hdr_ext in ['hdr'] # .rgbe not supported for now
+    #     filename = self.modality_filename_dict['im_hdr']
+    #     im_hdr_ext = filename.split('.')[-1]
 
-        self.im_hdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, im_hdr_ext)) for i in self.frame_id_list]
-        self.im_hdr_list = [load_HDR(_, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
+    #     self.im_hdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, im_hdr_ext)) for i in self.frame_id_list]
+    #     self.im_hdr_list = [load_HDR(_, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
 
-        if self.if_scale_hdr:
-            if not hasattr(self, 'seg_dict_of_lists'):
-                self.load_seg()
+    #     if self.if_scale_hdr:
+    #         if not hasattr(self, 'seg_dict_of_lists'):
+    #             self.load_seg()
 
-            self.hdr_scale_list = []
-            if self.if_scale_hdr_per_frame:
-                hdr_scale_global = None
-            else:
-                hdr_scale_list_ = []
-                for im_hdr, seg_ori in zip(self.im_hdr_list, self.seg_dict_of_lists['ori']):
-                    hdr_scale_ = scale_HDR(im_hdr, seg_ori[..., np.newaxis], fixed_scale=True, if_return_scale_only=True)
-                    hdr_scale_list_.append(hdr_scale_)
-                hdr_scale_global = np.median(hdr_scale_list_)
+    #         self.hdr_scale_list = []
+    #         if self.if_scale_hdr_per_frame:
+    #             hdr_scale_global = None
+    #         else:
+    #             hdr_scale_list_ = []
+    #             for im_hdr, seg_ori in zip(self.im_hdr_list, self.seg_dict_of_lists['ori']):
+    #                 hdr_scale_ = scale_HDR(im_hdr, seg_ori[..., np.newaxis], fixed_scale=True, if_return_scale_only=True)
+    #                 hdr_scale_list_.append(hdr_scale_)
+    #             hdr_scale_global = np.median(hdr_scale_list_)
 
-            for _, (im_hdr, seg_ori) in enumerate(zip(self.im_hdr_list, self.seg_dict_of_lists['ori'])):
-                im_hdr_scaled, hdr_scale = scale_HDR(im_hdr, seg_ori[..., np.newaxis], scale_input=hdr_scale_global, if_clip_to_01=self.if_clip_HDR_to_01)
-                self.im_hdr_list[_] = im_hdr_scaled
-                self.hdr_scale_list.append(hdr_scale)
+    #         for _, (im_hdr, seg_ori) in enumerate(zip(self.im_hdr_list, self.seg_dict_of_lists['ori'])):
+    #             im_hdr_scaled, hdr_scale = scale_HDR(im_hdr, seg_ori[..., np.newaxis], scale_input=hdr_scale_global, if_clip_to_01=self.if_clip_HDR_to_01)
+    #             self.im_hdr_list[_] = im_hdr_scaled
+    #             self.hdr_scale_list.append(hdr_scale)
 
-        print(blue_text('[openroomsScene] DONE. load_im_hdr'))
+    #     print(blue_text('[openroomsScene] DONE. load_im_hdr'))
 
 
     def load_seg(self):
@@ -323,7 +322,10 @@ class openroomsScene2D(scene2DBase):
             return
         
         print(blue_text('[%s] loading poses from %s'%(str(self.__class__.__name__), self.pose_file)))
-        self.pose_list, self.origin_lookatvector_up_list = load_OR_public_poses_to_Rt(self.pose_file, self.frame_id_list, False, if_1_based=self.indexing_based==1)
+        cam_params = read_cam_params_OR(str(self.pose_file))
+        if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
+
+        self.pose_list, self.origin_lookatvector_up_list = load_OR_public_poses_to_Rt(cam_params, self.frame_id_list, False, if_1_based=self.indexing_based==1)
 
         if self.if_resize_im:
             pass # IMPORTANT! do nothing; keep the 3D scene (cameras and geometry), but instead resize intrinsics to account for the smaller image

@@ -48,15 +48,15 @@ class visualizer_scene_3D_o3d(object):
         modality_list_vis: list, 
         if_debug_info: bool=False, 
     ):
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, freeviewpointScene3D]
-        assert type(scene_object) in valid_scene_object_classes, '[visualizer_openroomsScene] has to take an object of %s!'%(' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D]
+        assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, self.parent_class_name, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
         self.if_debug_info = if_debug_info
 
         self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
-            assert _ in ['dense_geo', 'cameras', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi']
+            assert _ in ['dense_geo', 'poses', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi']
         if 'mi' in self.modality_list_vis:
             self.mi_pcd_color_list = None
         self.extra_geometry_list = []
@@ -195,7 +195,7 @@ class visualizer_scene_3D_o3d(object):
 
         o3d_geometry_list += [o3d.geometry.TriangleMesh.create_coordinate_frame()]
 
-        if 'cameras' in modality_list:
+        if 'poses' in modality_list:
             o3d_geometry_list += self.collect_cameras(cam_params)
 
         if 'dense_geo' in modality_list:
@@ -357,8 +357,8 @@ class visualizer_scene_3D_o3d(object):
         #     cam_list.append(cam)
 
         cam_list = []
-        cam_axis_list = []
-        for (rays_o, rays_d, _) in self.os.cam_rays_list:
+        cam_axis_list = []; cam_up_list = []
+        for cam_idx, (rays_o, rays_d, _) in enumerate(self.os.cam_rays_list):
             cam_o = rays_o[0,0] # (3,)
             cam_d = rays_d[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
             cam_list.append(np.array([cam_o, *(cam_o+cam_d*max(near, far*0.05))]))
@@ -366,9 +366,12 @@ class visualizer_scene_3D_o3d(object):
             cam_axis = cam_d.mean(0)
             cam_axis_list.append(np.array([cam_o, cam_o+cam_axis]))
 
-        c2w_list = pose_list
-
+            cam_up = self.os.origin_lookatvector_up_list[cam_idx][2].reshape(-1)
+            cam_up_list.append(np.array([cam_o, cam_o+cam_up]))
+        
+        # c2w_list = pose_list
         cam_axis_arrow_list = []
+        cam_up_arrow_list = []
 
         for cam_idx, cam in enumerate(cam_list):
             # cam_color = [0.5, 0.5, 0.5]
@@ -415,6 +418,13 @@ class visualizer_scene_3D_o3d(object):
             cam_axis_arrow.lines = o3d.utility.Vector2iVector([[0,1]])
             cam_axis_arrow_list.append(cam_axis_arrow)
             
+            cam_up = cam_up_list[cam_idx]
+            cam_up_arrow = o3d.geometry.LineSet()
+            cam_up_arrow.points = o3d.utility.Vector3dVector(cam_up)
+            cam_up_arrow.colors = o3d.utility.Vector3dVector([cam_color for i in range(2)])
+            cam_up_arrow.lines = o3d.utility.Vector2iVector([[0,1]])
+            cam_up_arrow_list.append(cam_up_arrow)
+
             if if_cam_traj and cam_idx < len(cam_list)-1:
                 cam_traj = o3d.geometry.LineSet()   
                 cam_traj.points = o3d.utility.Vector3dVector(np.array([cam_list[cam_idx][0], cam_list[cam_idx+1][1]]))
@@ -427,11 +437,11 @@ class visualizer_scene_3D_o3d(object):
 
         if if_cam_axis_only:
             geometry_list = [
-                *cam_axis_arrow_list, *cam_center_list, *cam_traj_list, # pcd + cams
+                *cam_axis_arrow_list, *cam_center_list, *cam_traj_list, *cam_up_arrow_list, # pcd + cams
             ]
         else:
             geometry_list = [
-                *cam_frustrm_list, *cam_center_list, *cam_traj_list, # pcd + cams
+                *cam_frustrm_list, *cam_center_list, *cam_traj_list, *cam_up_arrow_list, # pcd + cams
             ]
 
         return geometry_list
@@ -480,8 +490,10 @@ class visualizer_scene_3D_o3d(object):
             pcd_color = copy.deepcopy(self.pcd_color)
         assert pcd_color.shape[0] == xyz_pcd.shape[0]
 
+        axis_up = self.os.axis_up
         if not if_ceiling:
-            xyz_pcd, pcd_color = remove_ceiling(xyz_pcd, pcd_color, if_debug_info=self.if_debug_info)
+            xyz_mask = remove_ceiling(xyz_pcd, axis_up=axis_up, if_debug_info=self.if_debug_info)
+            xyz_pcd = xyz_pcd[xyz_mask]; pcd_color = pcd_color[xyz_mask]
         if not if_walls:
             assert self.os.if_has_layout
             layout_bbox_3d = self.os.layout_box_3d_transformed
@@ -771,6 +783,12 @@ class visualizer_scene_3D_o3d(object):
 
                 # shape_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based # Trimesh does not support non-mesh (e.g. triangle soup) well
                 # shape_mesh = shape_mesh.as_open3d
+                if not if_ceiling:
+                    axis_up = self.os.axis_up
+                    vertices_valid_mask = ~remove_ceiling(vertices, axis_up=axis_up, if_debug_info=True)
+                    faces_mask = np.all(vertices_valid_mask.reshape(-1)[faces-1], axis=1) # (N_total_faces,), bool
+                    faces = faces[faces_mask] # (faces_emitters, 3), int, containing 1-based vertex indexes
+
                 shape_mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(vertices), o3d.utility.Vector3iVector(faces-1))
                 shape_mesh.compute_vertex_normals()
                 shape_mesh.compute_triangle_normals()
@@ -1032,7 +1050,10 @@ class visualizer_scene_3D_o3d(object):
                     mi_color_ = self.mi_pcd_color_list[frame_idx][::pts_subsample]
 
                 if not if_ceiling:
-                    mi_pts_, mi_color_ = remove_ceiling(mi_pts_, mi_color_, if_debug_info=self.if_debug_info)
+                    axis_up = self.os.axis_up
+                    xyz_mask = remove_ceiling(mi_pts_, axis_up=axis_up, if_debug_info=self.if_debug_info)
+                    mi_pts_ = mi_pts_[xyz_mask]; mi_color_ = mi_color_[xyz_mask]
+
                 if not if_walls:
                     assert self.os.if_has_layout
                     layout_bbox_3d = self.os.layout_box_3d_transformed

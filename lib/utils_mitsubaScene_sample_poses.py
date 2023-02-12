@@ -245,7 +245,7 @@ def func_mitsubaScene_sample_poses(
                     min_depth = -1.
                     if distRaysMin > 0:
                         _origin, _lookat, _up = np.split(camPose.T, 3, axis=1)
-                        (_R, _t), _at_vector = origin_lookat_up_to_R_t(_origin, _lookat, _up)
+                        (_R, _t), _lookatvector = origin_lookat_up_to_R_t(_origin, _lookat, _up)
                         H, W = mitsubaScene.im_H_load//4, mitsubaScene.im_W_load//4
                         scale_factor = [t / s for t, s in zip((H, W), (mitsubaScene.im_H_load, mitsubaScene.im_W_load))]
                         K = resize_intrinsics(mitsubaScene.K, scale_factor)

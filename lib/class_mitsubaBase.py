@@ -11,7 +11,8 @@ import json
 import shutil
 # Import the library using the alias "mi"
 import mitsuba as mi
-from lib.utils_io import load_img, resize_intrinsics, read_cam_params_OR
+from lib.utils_io import load_img, resize_intrinsics
+from lib.utils_OR.utils_OR_cam import read_cam_params_OR
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
@@ -40,11 +41,13 @@ class mitsubaBase():
             return x
         return torch.from_numpy(x).to(self.device)
 
-    def get_cam_rays_list(self, H: int, W: int, K_list: list, pose_list: list, convention: str='opencv'):
+    def get_cam_rays_list(self, H_list: list, W_list: list, K_list: list, pose_list: list, convention: str='opencv'):
         assert convention in ['opengl', 'opencv']
         cam_rays_list = []
         if not isinstance(K_list, list): K_list = [K_list] * len(pose_list)
-        for _, (pose, K) in enumerate(zip(pose_list, K_list)):
+        if not isinstance(H_list, list): H_list = [H_list] * len(pose_list)
+        if not isinstance(W_list, list): W_list = [W_list] * len(pose_list)
+        for _, (H, W, pose, K) in enumerate(zip(H_list, W_list, pose_list, K_list)):
             rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=(convention=='opencv'))
             cam_rays_list.append((rays_o, rays_d, ray_d_center))
         return cam_rays_list
@@ -90,13 +93,13 @@ class mitsubaBase():
             self.mi_rays_t_list.append(rays_t)
 
             rays_v_flatten = rays_t[:, np.newaxis] * rays_d_flatten
-            mi_depth = np.sum(rays_v_flatten.reshape(self.H, self.W, 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
+            mi_depth = np.sum(rays_v_flatten.reshape(self._H(frame_idx), self._W(frame_idx), 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
             invalid_depth_mask = np.logical_or(np.isnan(mi_depth), np.isinf(mi_depth))
             self.mi_invalid_depth_mask_list.append(invalid_depth_mask)
             mi_depth[invalid_depth_mask] = np.inf
             self.mi_depth_list.append(mi_depth)
 
-            mi_normal_global = ret.n.numpy().reshape(self.H, self.W, 3)
+            mi_normal_global = ret.n.numpy().reshape(self._H(frame_idx), self._W(frame_idx), 3)
             # FLIP inverted normals!
             normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normal_global, axis=-1) > 0, np.any(mi_normal_global != np.inf, axis=-1))
             mi_normal_global[normals_flip_mask] = -mi_normal_global[normals_flip_mask]
@@ -114,7 +117,7 @@ class mitsubaBase():
             if np.all(ret.t.numpy()==np.inf):
                 print(white_red('no rays hit any surface!'))
             # assert np.amax(np.abs((mi_pts - ret.p.numpy())[ret.t.numpy()!=np.inf, :])) < 1e-3 # except in window areas
-            mi_pts = mi_pts.reshape(self.H, self.W, 3)
+            mi_pts = mi_pts.reshape(self._H(frame_idx), self._W(frame_idx), 3)
             mi_pts[invalid_depth_mask, :] = np.inf
 
             self.mi_pts_list.append(mi_pts)
@@ -194,7 +197,8 @@ class mitsubaBase():
             mi_seg_area_file_path = mi_seg_area_file_folder / ('mi_seg_emitter_%d.png'%(self.frame_id_list[frame_idx]))
             if_get_from_scratch = True
             if mi_seg_area_file_path.exists():
-                mi_seg_area = load_img(mi_seg_area_file_path, (self.H, self.W), ext='png', target_HW=self.im_HW_target, if_attempt_load=True)
+                expected_shape = self.im_HW_load_list[frame_idx] if hasattr(self, 'im_HW_load_list') else self.im_HW_load
+                mi_seg_area = load_img(mi_seg_area_file_path, expected_shape=expected_shape, ext='png', target_HW=self.im_HW_target, if_attempt_load=True)
                 if mi_seg_area is None:
                     mi_seg_area_file_path.unlink()
                 else:
@@ -203,7 +207,7 @@ class mitsubaBase():
                     mi_seg_area = (mi_seg_area / 255.).astype(np.bool)
 
             if if_get_from_scratch:
-                mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self.H, self.W)
+                mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self._H(frame_idx), self._W(frame_idx))
                 imageio.imwrite(str(mi_seg_area_file_path), (mi_seg_area*255.).astype(np.uint8))
                 print(green_text('[mi_get_segs] mi_seg_area -> %s'%str(mi_seg_area_file_path)))
 
@@ -219,7 +223,7 @@ class mitsubaBase():
         sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)
         '''
         from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
-        assert self.up_axis == 'y+', 'not supporting other axes for now'
+        assert self.axis_up == 'y+', 'not supporting other axes for now'
         if not self.if_loaded_layout: self.load_layout()
 
         lverts = self.layout_box_3d_transformed
@@ -251,9 +255,9 @@ class mitsubaBase():
         origin_lookatvector_up_list = []
         for cam_param in origin_lookat_up_list:
             origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-            (R, t), at_vector = origin_lookat_up_to_R_t(origin, lookat, up)
+            (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
             pose_list.append(np.hstack((R, t)))
-            origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+            origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
         # self.pose_list = pose_list[:sample_pose_num]
         # return
@@ -571,3 +575,20 @@ class mitsubaBase():
         '''
         self.if_loaded_colors = False
         return
+
+    def _prepare_shapes(self):
+        '''
+        base function: prepare for shape lists/dicts
+        '''
+        self.shape_list_valid = []
+        self.vertices_list = []
+        self.faces_list = []
+        self.ids_list = []
+        self.bverts_list = []
+        self.bfaces_list = []
+
+        self.window_list = []
+        self.lamp_list = []
+        self.xyz_max = np.zeros(3,)-np.inf
+        self.xyz_min = np.zeros(3,)+np.inf
+

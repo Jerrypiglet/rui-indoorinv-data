@@ -167,7 +167,7 @@ scene_obj = openroomsScene3D(
         'meta_split': meta_split, 
         'scene_name': scene_name, 
         'frame_id_list': frame_ids, 
-        'up_axis': 'y+', 
+        'axis_up': 'y+', 
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
@@ -508,7 +508,7 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             # 'dense_geo', 
-            'cameras', 
+            'poses', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 

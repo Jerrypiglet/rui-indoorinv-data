@@ -224,8 +224,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
     #             pts_b = (T_w_m2b @ (pts.T)).T #  # Mitsuba -> Blender => xyz axes in blender coords
     #             self.cam.location = pts_b[0].reshape(3, ) # pts_b[0], pts_b[1], pts_b[2] should be the same
 
-    #             at_vector_m = xyz[0]; up_m = xyz[2] # follow OpenRooms local hemisphere camera: images/openrooms_hemisphere.jpeg
-    #             R_m = np.stack((np.cross(-up_m, at_vector_m), -up_m, at_vector_m), -1)
+    #             lookatvector_m = xyz[0]; up_m = xyz[2] # follow OpenRooms local hemisphere camera: images/openrooms_hemisphere.jpeg
+    #             R_m = np.stack((np.cross(-up_m, lookatvector_m), -up_m, lookatvector_m), -1)
     #             assert np.abs(np.linalg.det(R_m)-1) < 1e-5
     #             R_b = T_w_m2b @ R_m @ T_c_m2b # Mitsuba -> Blender
     #             euler_ = scipy.spatial.transform.Rotation.from_matrix(R_b).as_euler('xyz')
@@ -290,8 +290,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                 pts_b = (T_w_m2b @ (pts.T)).T #  # Mitsuba -> Blender => xyz axes in blender coords
                 cam_new.location = pts_b[0].reshape(3, ) # pts_b[0], pts_b[1], pts_b[2] should be the same
 
-                at_vector_m = xyz[0]; up_m = xyz[2] # follow OpenRooms local hemisphere camera: images/openrooms_hemisphere.jpeg
-                R_m = np.stack((np.cross(-up_m, at_vector_m), -up_m, at_vector_m), -1)
+                lookatvector_m = xyz[0]; up_m = xyz[2] # follow OpenRooms local hemisphere camera: images/openrooms_hemisphere.jpeg
+                R_m = np.stack((np.cross(-up_m, lookatvector_m), -up_m, lookatvector_m), -1)
                 assert np.abs(np.linalg.det(R_m)-1) < 1e-5
                 R_b = T_w_m2b @ R_m @ T_c_m2b # Mitsuba -> Blender
                 euler_ = scipy.spatial.transform.Rotation.from_matrix(R_b).as_euler('xyz')

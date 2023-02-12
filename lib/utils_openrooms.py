@@ -39,9 +39,9 @@ def fuse_depth_pcd_tr(depth_list, pose_list, hwf, subsample_rate=1):
 
 from pathlib import Path
 import pickle
-from lib.utils_io import read_cam_params_OR, normalize_v
+from lib.utils_OR.utils_OR_cam import read_cam_params_OR, normalize_v
 
-def load_OR_public_poses_to_Rt(cam_file: Path, frame_id_list: list, if_inverse_y: bool=False, if_1_based: bool=True):
+def load_OR_public_poses_to_Rt(cam_params: list, frame_id_list: list, if_inverse_y: bool=False, if_1_based: bool=True):
     '''
     load OpenRooms public pose files (cam.txt and transform.dat[NOT DOING THIS]) and convert to list of per-frame R, t
 
@@ -59,7 +59,6 @@ def load_OR_public_poses_to_Rt(cam_file: Path, frame_id_list: list, if_inverse_y
     # rotMat_inv_scene = np.linalg.inv(rotMat_scene)
     # trans_scene = transforms[0][2][1].reshape((3, 1)) # (3,1)
 
-    cam_params = read_cam_params_OR(str(cam_file))
 
     pose_list = []
     origin_lookatvector_up_list = []
@@ -82,15 +81,15 @@ def load_OR_public_poses_to_Rt(cam_file: Path, frame_id_list: list, if_inverse_y
         lookat = lookat.flatten()
         up = up.flatten()
 
-        at_vector = normalize_v(lookat - origin)
-        assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
+        lookatvector = normalize_v(lookat - origin)
+        assert np.amax(np.abs(np.dot(lookatvector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
 
         t = origin.reshape((3, 1)).astype(np.float32)
-        R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
+        R = np.stack((np.cross(-up, lookatvector), -up, lookatvector), -1).astype(np.float32)
         # R = R @ np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]])
         
         pose_list.append(np.hstack((R, t)))
-        origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+        origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
     return pose_list, origin_lookatvector_up_list
 

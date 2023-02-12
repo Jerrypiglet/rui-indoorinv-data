@@ -70,10 +70,11 @@ parser.add_argument('--if_sample_poses', type=str2bool, nargs='?', const=True, d
 opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/free-viewpoint'
+assert base_root.exists()
 
 xml_filename = 'scene_v3.xml'
 scene_name = 'asianRoom1'
-frame_ids = [0]
+frame_ids = [0, 1, 123]
 
 scene_obj = freeviewpointScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -81,9 +82,9 @@ scene_obj = freeviewpointScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
-        'frame_id_list': frame_ids, 
-        'up_axis': 'z+', 
-        # 'pose_file': 'transforms.json', # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+        'frame_id_list': frame_ids, # comment out to use all frames
+        'axis_up': 'z+', 
+        'if_scale_scene': True, # whether to scale the scene to metric in meters, with given scale in scale.txt
         }, 
     mi_params_dict={
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
@@ -92,10 +93,10 @@ scene_obj = freeviewpointScene3D(
         'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
     modality_list = [
-        # 'poses', 
-        # 'im_hdr', 
-        # 'im_sdr', 
-        # 'im_mask', 
+        'poses', 
+        'im_hdr', 
+        'im_sdr', 
+        'im_mask', 
         'shapes', 
         ], 
     modality_filename_dict = {
@@ -162,15 +163,15 @@ if opt.vis_2d_plt:
         scene_obj, 
         modality_list_vis=[
             'im', 
+            'im_mask', 
             'mi_depth', 
             'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
-        frame_idx_list=[0], 
+        # frame_idx_list=[0], 
     )
     visualizer_2D.vis_2d_with_plt(
         lighting_params={
-            'lighting_scale': 1., # rescaling the brightness of the envmap
             }, 
         other_params={
             'mi_normal_vis_coords': 'opencv', 
@@ -186,9 +187,9 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             # 'dense_geo', # fused from 2D
-            # 'cameras', 
+            'poses', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
-            'mi', # mitsuba sampled rays, pts
+            # 'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -201,14 +202,14 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
-            'if_cam_axis_only': True, 
+            'if_cam_axis_only': False, 
             }, 
         lighting_params={}, 
         shapes_params={
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
-            'if_voxel_volume': True, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
-            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
+            'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]

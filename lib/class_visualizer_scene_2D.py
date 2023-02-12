@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 import imageio
 import matplotlib.pyplot as plt
+from lib.class_freeviewpointScene3D import freeviewpointScene3D
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
@@ -19,14 +20,15 @@ class visualizer_scene_2D(object):
     '''
     def __init__(
         self, 
-        openrooms_scene, 
+        scene_object, 
         modality_list_vis: list, 
-        frame_idx_list, # 0-based indexing, [0, ..., os.frame_num-1]
+        frame_idx_list=None, # 0-based indexing, [0, ..., os.frame_num-1]
     ):
 
-        assert type(openrooms_scene) in [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D], '[visualizer_openroomsScene] has to take an object of openroomsScene, openroomsScene3D or mitsubaScene3D!'
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D]
+        assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
-        self.os = openrooms_scene
+        self.os = scene_object
 
         self.modality_list_vis = self.check_and_sort_modalities(list(set(modality_list_vis)))
         if frame_idx_list is None:
@@ -35,6 +37,7 @@ class visualizer_scene_2D(object):
             assert isinstance(frame_idx_list, list)
             self.frame_idx_list = frame_idx_list
         assert max(self.frame_idx_list) < self.os.frame_num
+        self.frame_idx_list = self.frame_idx_list[:6]
 
         self.N_frames = min(len(self.frame_idx_list), len(self.os.frame_id_list))
         assert self.N_frames >= 1
@@ -56,6 +59,7 @@ class visualizer_scene_2D(object):
     def valid_modalities_2D_vis(self):
         return [
             'im', 
+            'im_mask', 
             'albedo', 'roughness', 'depth', 'normal', 
             'lighting_SG', # convert to lighting_envmap and vis
             'lighting_envmap', 
@@ -175,6 +179,7 @@ class visualizer_scene_2D(object):
         _list = self.os.get_modality(modality, source=source)
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
             _im = _list[frame_idx]
+            H, W = self.os._H(frame_idx), self.os._W(frame_idx)
 
             if modality == 'normal':
                 _im = (_im + 1.) / 2. 
@@ -187,7 +192,7 @@ class visualizer_scene_2D(object):
                 assert mi_normal_vis_coords in ['opengl', 'opencv', 'mitsuba-json', 'world', 'world-blender'] # 'mitsuba-json': consistent with json pose files in MitsubaScene
 
                 if mi_normal_vis_coords in ['opengl', 'opencv']:
-                    mi_normal_cam = (R.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.H, self.os.W, 3) # images/demo_normal_gt_scannetScene_opencv.png
+                    mi_normal_cam = (R.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(H, W, 3) # images/demo_normal_gt_scannetScene_opencv.png
                     # transform mi_normal from OpenCV (right-down-forward) to OpenGL convention (right-up-backward)
                     if mi_normal_vis_coords == 'opengl': # images/demo_normal_gt_openroomsScene_opengl.png
                         mi_normal_cam = np.stack([mi_normal_cam[:, :, 0], -mi_normal_cam[:, :, 1], -mi_normal_cam[:, :, 2]], axis=-1)
@@ -195,13 +200,13 @@ class visualizer_scene_2D(object):
                 elif mi_normal_vis_coords in ['mitsuba-json']:
                     R_mitsuba = (self.os.T_w_b2m.T) @ R @ (self.os.T_c_b2m.T)
                     assert abs(np.linalg.det(R_mitsuba) - 1) < 1e-4
-                    mi_normal_cam = (R_mitsuba.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.H, self.os.W, 3)
+                    mi_normal_cam = (R_mitsuba.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(H, W, 3)
 
                 elif mi_normal_vis_coords in ['world']: # opencv
                     mi_normal_cam = mi_normal_global
 
                 elif mi_normal_vis_coords in ['world-blender']: # images/demo_normal_gt_mitsubaScene_world-blender.png
-                    mi_normal_cam = (self.os.T_w_b2m.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(self.os.H, self.os.W, 3)
+                    mi_normal_cam = (self.os.T_w_b2m.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(H, W, 3)
 
                 _im = np.clip((mi_normal_cam+1.)/2., 0., 1.)
                 _im[mi_normal_global==np.inf] = 0.
@@ -221,8 +226,8 @@ class visualizer_scene_2D(object):
                 plt.colorbar(plot, ax=ax)
                 continue
                 
-            if modality.startswith('mi_seg_'):
-                plot = ax.imshow(_im, vmin=0., vmax=1., cmap='jet')
+            if modality.startswith('mi_seg_') or modality in ['im_mask']:
+                plot = ax.imshow(_im.astype(np.float32), vmin=0., vmax=1., cmap='jet')
                 plt.colorbar(plot, ax=ax)
                 continue
 

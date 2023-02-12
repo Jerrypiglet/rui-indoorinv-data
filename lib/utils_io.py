@@ -66,7 +66,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
             if if_attempt_load:
                 return None
             else:
-                raise RuntimeError('%s != %s'%(str(tuple(im.shape)), str(expected_shape)))
+                raise RuntimeError('%s != %s: %s'%(str(tuple(im.shape)), str(expected_shape), str(path)))
 
     if target_HW != ():
         im = resize_img(im, target_HW, resize_method)
@@ -269,18 +269,18 @@ def vis_envmap(envmap, downsample_ratio: int=10, downsize_ratio_hw: int=1, downs
 
     return b
 
-def read_cam_params_OR(camFile: Path) -> list:
-    assert Path(camFile).exists()
-    with open(str(camFile), 'r') as camIn:
-    #     camNum = int(camIn.readline().strip() )
-        cam_data = camIn.read().splitlines()
-    if cam_data == []:
-        return []
-    cam_num = int(cam_data[0])
-    cam_params = np.array([x.split(' ') for x in cam_data[1:]]).astype(np.float32)
-    assert cam_params.shape[0] == cam_num * 3
-    cam_params = np.split(cam_params, cam_num, axis=0) # [[origin, lookat, up], ...]
-    return cam_params
+# def read_cam_params_OR(camFile: Path) -> list:
+#     assert Path(camFile).exists()
+#     with open(str(camFile), 'r') as camIn:
+#     #     camNum = int(camIn.readline().strip() )
+#         cam_data = camIn.read().splitlines()
+#     if cam_data == []:
+#         return []
+#     cam_num = int(cam_data[0])
+#     cam_params = np.array([x.split(' ') for x in cam_data[1:]]).astype(np.float32)
+#     assert cam_params.shape[0] == cam_num * 3
+#     cam_params = np.split(cam_params, cam_num, axis=0) # [[origin, lookat, up], ...]
+#     return cam_params
 
 def normalize_v(x) -> np.ndarray:
     return x / np.linalg.norm(x)

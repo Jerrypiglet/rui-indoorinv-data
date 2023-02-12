@@ -140,7 +140,7 @@ openrooms_scene = openroomsScene3D(
         'meta_split': meta_split, 
         'scene_name': scene_name, 
         'frame_id_list': frame_ids, 
-        'up_axis': 'y+', 
+        'axis_up': 'y+', 
         }, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
