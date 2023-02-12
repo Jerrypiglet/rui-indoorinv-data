@@ -12,7 +12,7 @@ import shutil
 # Import the library using the alias "mi"
 import mitsuba as mi
 from lib.utils_io import load_img, resize_intrinsics
-from lib.utils_OR.utils_OR_cam import read_cam_params_OR
+from lib.utils_OR.utils_OR_cam import read_cam_params_OR, dump_cam_params_OR
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
@@ -337,25 +337,8 @@ class mitsubaBase():
         self.frame_id_list = list(range(len(self.pose_list)))
 
         print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
-        
-        if_overwrite_pose_file = 'Y'
-        pose_file_write = self.pose_file.parent / 'cam.txt'
-        if pose_file_write.exists():
-            if_overwrite_pose_file = input(red('pose file exists: %s (%d poses). Overwrite? [y/n]'%(str(pose_file_write), len(read_cam_params_OR(pose_file_write)))))
-            
-        if if_overwrite_pose_file in ['Y', 'y']:
-            with open(str(pose_file_write), 'w') as camOut:
-                camOut.write('%d\n'%len(self.origin_lookat_up_list))
-                print('Final sampled camera poses: %d'%len(self.origin_lookat_up_list))
-                for camPose in self.origin_lookat_up_list:
-                    for n in range(0, 3):
-                        camOut.write('%.3f %.3f %.3f\n'%(camPose[n, 0], camPose[n, 1], camPose[n, 2]))
-            print(yellow('Pose file written to %s (%d poses).'%(pose_file_write, len(self.origin_lookat_up_list))))
-            
-            cam_params_dict_write = str(self.pose_file.parent / 'cam_params_dict.txt')
-            with open(str(cam_params_dict_write), 'w') as camOut:
-                for k, v in self.cam_params_dict.items():
-                    camOut.write('%s: %s\n'%(k, str(v)))
+
+        dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=origin_lookat_up_list, cam_params_dict=self.cam_params_dict)
 
     def load_meta_json_pose(self, pose_file):
         assert Path(pose_file).exists(), 'Pose file not found at %s! Check if exist, or if the correct pose format was chosen in key \'pose_file\' of scene_obj.'%str(pose_file)
@@ -591,4 +574,16 @@ class mitsubaBase():
         self.lamp_list = []
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
+
+    def dump_mi_meshes(self, mi_scene, mesh_dump_root: Path):
+        '''
+        dump mi scene objects as separate objects
+        '''
+        if mesh_dump_root.exists(): shutil.rmtree(str(mesh_dump_root))
+        mesh_dump_root.mkdir(parents=True, exist_ok=True)
+
+        for shape_idx, shape, in enumerate(mi_scene.shapes()):
+            if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
+            shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
+        print(blue_text('Scene shapes dumped to: %s')%str(mesh_dump_root))
 

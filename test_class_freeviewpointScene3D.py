@@ -65,7 +65,8 @@ parser.add_argument('--eval_monosdf', type=str2bool, nargs='?', const=True, defa
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 
 # utils
-parser.add_argument('--if_sample_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
+parser.add_argument('--if_convert_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
+parser.add_argument('--if_dump_shape', type=str2bool, nargs='?', const=True, default=False, help='if dump shape of entire scene')
 
 opt = parser.parse_args()
 
@@ -73,8 +74,14 @@ base_root = Path(PATH_HOME) / 'data/free-viewpoint'
 assert base_root.exists()
 
 xml_filename = 'scene_v3.xml'
-scene_name = 'asianRoom1'
-frame_ids = [0, 1, 123]
+# scene_name = 'asianRoom1'
+# scene_name = 'asianRoom2'
+# scene_name = 'Hall'
+# scene_name = 'Kitchen'
+scene_name = 'Salon2' # Living room
+# scene_name = 'sofa91'
+
+frame_ids = [0, 1, 2]
 
 scene_obj = freeviewpointScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -84,6 +91,8 @@ scene_obj = freeviewpointScene3D(
         'scene_name': scene_name, 
         'frame_id_list': frame_ids, # comment out to use all frames
         'axis_up': 'z+', 
+        'pose_file': ('bundle', 'bundle.out'), 
+        # 'pose_file': ('OpenRooms', 'cam.txt'), # after dump to cam.txt
         'if_scale_scene': True, # whether to scale the scene to metric in meters, with given scale in scale.txt
         }, 
     mi_params_dict={
@@ -107,22 +116,24 @@ scene_obj = freeviewpointScene3D(
     im_params_dict={
         }, 
     cam_params_dict={
+        'if_convert': opt.if_convert_poses, # True to convert poses to cam.txt and K_list.txt
     }, 
     shape_params_dict={
-        'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
+        # 'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
         # 'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
+        'if_dump_shape': opt.if_dump_shape, # True to dump fixed shape to obj file
 
-        'if_sample_pts_on_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
-        'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
-        'sample_mesh_min': 10, 
-        'sample_mesh_max': 100, 
+        # 'if_sample_pts_on_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
+        # 'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
+        # 'sample_mesh_min': 10, 
+        # 'sample_mesh_max': 100, 
 
-        'if_simplify_mesh': False,  # default True: simply triangles
-        'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
-        'simplify_mesh_min': 100, 
-        'simplify_mesh_max': 1000, 
-        'if_remesh': True, # False: images/demo_shapes_3D_kitchen_NO_remesh.png; True: images/demo_shapes_3D_kitchen_YES_remesh.png
-        'remesh_max_edge': 0.15,  
+        # 'if_simplify_mesh': False,  # default True: simply triangles
+        # 'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
+        # 'simplify_mesh_min': 100, 
+        # 'simplify_mesh_max': 1000, 
+        # 'if_remesh': True, # False: images/demo_shapes_3D_kitchen_NO_remesh.png; True: images/demo_shapes_3D_kitchen_YES_remesh.png
+        # 'remesh_max_edge': 0.15,  
         },
     emitter_params_dict={
         },
@@ -209,7 +220,7 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
-            'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]

@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up
+from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up
 from lib.utils_io import load_img, load_matrix
 # from collections import defaultdict
 # import trimesh
@@ -23,7 +23,7 @@ from lib.utils_io import load_matrix, resize_intrinsics
 from .class_mitsubaBase import mitsubaBase
 from .class_scene2DBase import scene2DBase
 
-from lib.utils_monosdf_scene import load_shape_dict_from_shape_file
+from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_dict_from_shape_file
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, sample_mesh, simplify_mesh
 from lib.utils_OR.utils_OR_xml import get_XML_root
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, get_rectangle_mesh
@@ -82,7 +82,10 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         self.scene_rendering_path = self.scene_path
         self.scene_name_full = self.scene_name # e.g.'asianRoom1'
 
-        self.pose_file = self.scene_path / 'cameras' / 'bundle.out'
+        self.pose_format, pose_file = scene_params_dict['pose_file']
+        assert self.pose_format in ['OpenRooms', 'bundle'], 'Unsupported pose file: '+pose_file
+        self.pose_file = self.scene_path / 'cameras' / pose_file
+
         self.shape_file = self.scene_path / 'meshes' / 'recon.ply'
         self.shape_params_dict = shape_params_dict
         self.mi_params_dict = mi_params_dict
@@ -127,12 +130,12 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         assert Path(self.scene_metadata_file).exists()
         with open(str(self.scene_metadata_file), 'r') as camIn:
             scene_metadata = camIn.read().splitlines()
-        frame_info_list = [_ for _ in scene_metadata if '.exr' in _] # e.g. '00000.exr 997 665'
-        assert frame_info_list[0].startswith('00000.exr')
+        frame_info_list = [_ for _ in scene_metadata if ('.exr' in _) or ('.jpg' in _)] # e.g. '00000.exr 997 665'
+        assert frame_info_list[0].startswith('00000.')
         frame_id_all_list = [int(_.split(' ')[0].split('.')[0]) for _ in frame_info_list]
         assert frame_id_all_list[0] == 0
         assert frame_id_all_list[-1] == len(frame_id_all_list) - 1
-        assert frame_info_list[-1].startswith('%05d.exr'%frame_id_all_list[-1])
+        assert frame_info_list[-1].startswith('%05d.'%frame_id_all_list[-1])
         
         self.im_HW_load_list = [(int(_.split(' ')[2])+1, int(_.split(' ')[1])+1) for _ in frame_info_list]
         assert 'im_H_resize' not in self.im_params_dict and 'im_W_resize' not in self.im_params_dict
@@ -278,45 +281,67 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         '''
         bundle.out format: https://www.cs.cornell.edu/~snavely/bundler/bundler-v0.3-manual.html#S6
         '''
-        with open(str(self.pose_file), 'r') as camIn:
-            cam_data = camIn.read().splitlines()
 
-        frame_num_all = int(cam_data[1].split(' ')[0])
-        if self.frame_id_list == []: self.frame_id_list = list(range(frame_num_all))
-        assert frame_num_all >= self.frame_num
+        print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file))))
 
         self.pose_list = []
         self.K_list = []
         self.origin_lookatvector_up_list = []
 
-        print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file))))
+        if self.pose_format == 'OpenRooms':
+            cam_params = read_cam_params_OR(self.pose_file)
+            if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
+            assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
 
-        for frame_id in tqdm(self.frame_id_list):
-            cam_lines = cam_data[(2+frame_id*5):(2+frame_id*5+5)]
-            f = cam_lines[0].split(' ')[0]
-            assert cam_lines[0].split(' ')[1:] == ['0', '0'] # no distortion
-            '''
-            laoded R, t are: [1] world-to-camera, [2] OpenGL convention: https://www.cs.cornell.edu/~snavely/bundler/bundler-v0.3-manual.html#S6
-            '''
-            R_lines = [[float(_) for _ in R_line.split(' ')] for R_line in cam_lines[1:4]]
-            R_ = np.array(R_lines).reshape(3, 3)
-            t_line = [float(_) for _ in cam_lines[4].split(' ')]
-            t_ = np.array(t_line).reshape(3, 1)
-            assert np.isclose(np.linalg.det(R_), 1.)
-            R = R_.T
-            t = -R_.T @ t_
-            if self.if_scale_scene:
-                t = t / self.scene_scale
-            R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
-            self.pose_list.append(np.hstack((R, t)))
+            for idx in self.frame_id_list:
+                cam_param = cam_params[idx]
+                origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+                (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
+                self.pose_list.append(np.hstack((R, t)))
+                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
-            (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
-            self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+            self.K_list = read_K_list_OR(str(self.pose_file.parent / 'K_list.txt'))
+            assert len(self.K_list) == len(self.pose_list)
 
-            K = np.array([[float(f), 0, self._W(frame_id)/2.], [0, float(f), self._H(frame_id)/2.], [0, 0, 1]], dtype=np.float32)
-            self.K_list.append(K)
+        elif self.pose_format in ['bundle']:
+            with open(str(self.pose_file), 'r') as camIn:
+                cam_data = camIn.read().splitlines()
 
-        print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
+            frame_num_all = int(cam_data[1].split(' ')[0])
+            if self.frame_id_list == []: self.frame_id_list = list(range(frame_num_all))
+            assert frame_num_all >= self.frame_num
+
+            for frame_id in tqdm(self.frame_id_list):
+                cam_lines = cam_data[(2+frame_id*5):(2+frame_id*5+5)]
+                f = cam_lines[0].split(' ')[0]
+                assert cam_lines[0].split(' ')[1:] == ['0', '0'] # no distortion
+                '''
+                laoded R, t are: [1] world-to-camera, [2] OpenGL convention: https://www.cs.cornell.edu/~snavely/bundler/bundler-v0.3-manual.html#S6
+                '''
+                R_lines = [[float(_) for _ in R_line.split(' ')] for R_line in cam_lines[1:4]]
+                R_ = np.array(R_lines).reshape(3, 3)
+                t_line = [float(_) for _ in cam_lines[4].split(' ')]
+                t_ = np.array(t_line).reshape(3, 1)
+                assert np.isclose(np.linalg.det(R_), 1.)
+                R = R_.T
+                t = -R_.T @ t_
+                if self.if_scale_scene:
+                    t = t / self.scene_scale
+                R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
+                self.pose_list.append(np.hstack((R, t)))
+
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
+                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+
+                K = np.array([[float(f), 0, self._W(frame_id)/2.], [0, float(f), self._H(frame_id)/2.], [0, 0, 1]], dtype=np.float32)
+                self.K_list.append(K)
+
+            print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
+
+            if cam_params_dict.get('if_convert_poses', False):
+                print(white_blue('[%s] convert poses to OpenRooms format')%self.parent_class_name)
+                origin_lookat_up_mtx_list = [np.hstack((_[0], _[1]+_[0], _[2])).T for _ in self.origin_lookatvector_up_list]
+                dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=origin_lookat_up_mtx_list, cam_params_dict=cam_params_dict, K_list=self.K_list, frame_num_all=frame_num_all)
 
     def load_im_mask(self):
         '''
@@ -359,3 +384,6 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
             len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
             len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
             )))
+
+        if shape_params_dict.get('if_dump_shape', False):
+            dump_shape_dict_to_shape_file(shape_dict, self.shape_file)

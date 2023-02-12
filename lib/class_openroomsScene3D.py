@@ -179,7 +179,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                     layout_root=self.layout_root, 
                     envmaps_root=self.envmaps_root, 
                     xml_dump_dir=xml_dump_dir, 
-                    # origin_lookatvector_up_tuple=self.origin_lookatvector_up_list[0], # [debug] set to any frame_idx
                     if_no_emitter_shape=False, 
                     if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only, 
                     )
@@ -214,12 +213,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                     images/demo_mitsuba_dump_meshes.png
                     '''
                     mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
-                    if mesh_dump_root.exists():
-                        shutil.rmtree(str(mesh_dump_root))
-                    mesh_dump_root.mkdir(parents=True, exist_ok=True)
-
-                    for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
-                        shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
+                    self.dump_mi_meshes(self.mi_scene, mesh_dump_root=mesh_dump_root)
 
                 debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
                 if debug_render_test_image:
@@ -294,7 +288,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             self.shape_name_full = self.scene_name_full + '--' + Path(self.monosdf_shape_dict['shape_file']).stem
         else:
             self.shape_name_full = self.scene_name_full
-            if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', False)
+            if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', True)
             if_load_emitter_mesh = shape_params_dict.get('if_load_emitter_mesh', False)
             print(white_blue('[openroomsScene3D] load_shapes for scene...'))
 

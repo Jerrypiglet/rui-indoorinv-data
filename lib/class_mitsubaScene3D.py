@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up, read_cam_params_OR, normalize_v
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up, origin_lookat_up_to_R_t, read_cam_params_OR, normalize_v
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
 # from collections import defaultdict
@@ -262,14 +262,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             images/demo_mitsuba_dump_meshes.png
             '''
             mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
-            if mesh_dump_root.exists(): shutil.rmtree(str(mesh_dump_root))
-            mesh_dump_root.mkdir(parents=True, exist_ok=True)
-
-            for shape_idx, shape, in enumerate(self.mi_scene.shapes()):
-                if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
-                # print(type(shape), isinstance(shape, mi.llvm_ad_rgb.Mesh))
-                shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
-            print(blue_text('Mitsuba scene shapes dumped to: %s')%str(mesh_dump_root))
+            self.dump_mi_meshes(self.mi_scene, mesh_dump_root)
 
         if if_postprocess_mi_frames:
             if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
@@ -331,8 +324,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         print(white_blue('[%s] load_poses from %s'%str(self.pose_file)))
          
-        pose_list = []
-        origin_lookatvector_up_list = []
+        self.pose_list = []
+        self.origin_lookatvector_up_list = []
 
         if self.pose_format == 'OpenRooms':
             '''
@@ -342,21 +335,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
             assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
 
-            # for cam_param in cam_params:
             for idx in self.frame_id_list:
                 cam_param = cam_params[idx]
                 origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-                origin = origin.flatten()
-                lookat = lookat.flatten()
-                up = up.flatten()
-                lookatvector = normalize_v(lookat - origin)
-                assert np.amax(np.abs(np.dot(lookatvector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
-
-                t = origin.reshape((3, 1)).astype(np.float32)
-                R = np.stack((np.cross(-up, lookatvector), -up, lookatvector), -1).astype(np.float32)
-                
-                pose_list.append(np.hstack((R, t)))
-                origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+                (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
+                self.pose_list.append(np.hstack((R, t)))
+                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
         elif self.pose_format in ['Blender', 'json']:
             '''
@@ -404,8 +388,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
                 (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
 
-                pose_list.append(np.hstack((R, t)))
-                origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+                self.pose_list.append(np.hstack((R, t)))
+                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
             '''
             Obselete code, when Liwen was using Blender poses...
@@ -426,9 +410,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
             #     pose_list.append(np.hstack((R, t)))
             #     origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
-
-        self.pose_list = pose_list
-        self.origin_lookatvector_up_list = origin_lookatvector_up_list
 
         print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
 
@@ -754,15 +735,3 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             lighting_global_xyz_list.append(lighting_global_xyz)
             lighting_global_pts_list.append(lighting_global_pts)
         return lighting_global_xyz_list, lighting_global_pts_list
-
-        # with open(str(self.pose_file), 'w') as camOut:
-        #     cam_poses_write = [origin_lookat_up_list[_] for _ in camIndex[:sample_pose_num]]
-        #     camOut.write('%d\n'%len(cam_poses_write))
-        #     print('Final sampled camera poses: %d'%len(cam_poses_write))
-        #     for camPose in cam_poses_write:
-        #         for n in range(0, 3):
-        #             camOut.write('%.3f %.3f %.3f\n'%\
-        #                 (camPose[n, 0], camPose[n, 1], camPose[n, 2]))
-        # print(blue_text('cam.txt written to %s.'%str(self.pose_file)))
-
-

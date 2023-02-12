@@ -4,7 +4,8 @@ import os,sys,inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir) 
-# print(sys.path)
+from pathlib import Path
+from utils_misc import red, yellow
 from utils_OR.utils_OR_geo import isect_line_plane_v3
 from lib.utils_io import normalize_v
 
@@ -15,9 +16,57 @@ def read_cam_params_OR(camFile):
         cam_data = camIn.read().splitlines()
     cam_num = int(cam_data[0])
     cam_params = np.array([x.split(' ') for x in cam_data[1:]]).astype(np.float)
+    if not np.any(cam_params): return []
     assert cam_params.shape[0] == cam_num * 3
     cam_params = np.split(cam_params, cam_num, axis=0) # [[origin, lookat, up], ...]
     return cam_params
+
+def read_K_list_OR(K_list_file):
+    assert osp.isfile(str(K_list_file))
+    with open(str(K_list_file), 'r') as camIn:
+        K_data = camIn.read().splitlines()
+    K_num = int(K_data[0])
+    K_list = np.array([x.split(' ') for x in K_data[1:]]).astype(np.float)
+    if not np.any(K_list): return []
+    assert K_list.shape[0] == K_num * 3
+    K_list = np.split(K_list, K_num, axis=0) # [[origin, lookat, up], ...]
+    return K_list
+
+def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, cam_params_dict: dict={}, K_list: list=[], frame_num_all: int=-1):
+    if frame_num_all != -1 and len(origin_lookat_up_mtx_list) != frame_num_all:
+        if_write_pose_file = input(red('pose num to write %d is less than total pose num %d. Write? [y/n]'%(len(origin_lookat_up_mtx_list), frame_num_all)))
+        if if_write_pose_file in ['N', 'n']:
+            print('Aborted writing poses to cam.txt.')
+            return
+
+    if_overwrite_pose_file = 'Y'
+    pose_file_write = pose_file_root / 'cam.txt'
+    if pose_file_write.exists():
+        if_overwrite_pose_file = input(red('pose file exists: %s (%d poses). Overwrite? [y/n]'%(str(pose_file_write), len(read_cam_params_OR(pose_file_write)))))
+        
+    if if_overwrite_pose_file in ['Y', 'y']:
+        with open(str(pose_file_write), 'w') as camOut:
+            camOut.write('%d\n'%len(origin_lookat_up_mtx_list))
+            print('Final sampled camera poses: %d'%len(origin_lookat_up_mtx_list))
+            for camPose in origin_lookat_up_mtx_list:
+                for n in range(0, 3):
+                    camOut.write('%.3f %.3f %.3f\n'%(camPose[n, 0], camPose[n, 1], camPose[n, 2]))
+        print(yellow('Pose file written to %s (%d poses).'%(pose_file_write, len(origin_lookat_up_mtx_list))))
+        
+        cam_params_dict_write = str(pose_file_root / 'cam_params_dict.txt')
+        with open(str(cam_params_dict_write), 'w') as camOut:
+            for k, v in cam_params_dict.items():
+                camOut.write('%s: %s\n'%(k, str(v)))
+
+        if K_list is not None and len(K_list) > 0:
+            K_list_file = str(pose_file_root / 'K_list.txt')
+            with open(str(K_list_file), 'w') as camOut:
+                camOut.write('%d\n'%len(K_list))
+                for K in K_list:
+                    assert K.shape == (3, 3)
+                    for n in range(0, 3):
+                        camOut.write('%.3f %.3f %.3f\n'%(K[n, 0], K[n, 1], K[n, 2]))
+            print(yellow('K_list file written to %s (%d Ks).'%(K_list_file, len(K_list))))
 
 def normalize(x):
     return x / np.linalg.norm(x)
