@@ -10,12 +10,10 @@ from PIL import Image
 import struct
 import h5py
 import random
+import imageio
+import subprocess
 from skimage.measure import block_reduce 
 from skimage.measure import block_reduce 
-
-'''
-utils take from Yinhao
-'''
 
 def load_matrix(path: Path, if_inverse_y: bool=False) -> np.ndarray:
     """Read a 1d or 2d matrix from a file (as saved by np.savetxt)"""
@@ -41,7 +39,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         raise FileNotFoundError(path)
         
     assert path.suffix[1:] == ext
-    assert ext in ['png', 'jpg', 'hdr', 'npy', 'exr']
+    assert ext in ['png', 'jpg', 'hdr', 'npy', 'exr', 'jxr'], f"Unsupported image format: {ext}"
     if ext in ['png', 'jpg']:
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     elif ext in ['exr']:
@@ -91,6 +89,24 @@ def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if
     im_SDR = np.clip(im_hdr_scaled**(1.0/2.2), 0., 1.)
     im_SDR_uint8 = (255. * im_SDR).astype(np.uint8)
     Image.fromarray(im_SDR_uint8).save(str(png_image_path))
+
+def tone_mapping_16bit(im_16bit, dest_dtype=np.float32):
+    '''
+    https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_hdr_images
+    -> float32
+    '''
+    assert im_16bit.dtype == np.uint16
+    assert len(im_16bit.shape) == 3 and im_16bit.shape[2] == 3
+    im_return = np.empty_like(im_16bit, dtype=dest_dtype)
+    # for (int i = 0; i < 3; i++) {
+    #     if (jxr_val[i] <= 3000) col_val[i] = jxr_val[i] * 8e-8
+    #     else col_val[i] = 0.00024 * 1.0002 ** (jxr_val[i] - 3000)
+    #     }
+    im_return[im_16bit<=3000] = im_16bit[im_16bit<=3000] * 8e-8
+    im_return[im_16bit>3000] = 0.00024 * 1.0002 ** (im_16bit[im_16bit>3000] - 3000)
+    im_return = im_return * (np.array([0.8, 1.0, 1.6]).reshape(1, 1, 3))
+
+    return im_return
 
 def load_HDR(path: Path, expected_shape: tuple=(), target_HW: Tuple[int, int]=()) -> np.ndarray:
     if not path.exists():

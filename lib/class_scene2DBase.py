@@ -75,8 +75,13 @@ class scene2DBase():
         self.modality_list = self.check_and_sort_modalities(list(set(self.modality_list)))
 
         self.modality_filename_dict = modality_filename_dict
-        for modality in modality_filename_dict.keys():
+        self.modality_ext_dict = {}
+        self.modality_folder_dict = {}
+        for modality, filename in modality_filename_dict.items():
             assert modality in self.valid_modalities, 'Invalid key [%s] in modality_filename_dict: NOT in self.valid_modalities!'%modality
+            self.modality_ext_dict[modality] = filename.split('.')[-1] if isinstance(filename, str) else filename[-1]
+            self.modality_folder_dict[modality] = filename.split('/')[0] if isinstance(filename, str) else filename[0]
+        self.modality_file_list_dict = {}
 
     @property
     @abstractmethod
@@ -199,12 +204,14 @@ class scene2DBase():
         '''
         print(white_blue('[%s] load_im_sdr')%self.parent_class_name)
 
-        filename = self.modality_filename_dict['im_sdr']
-        im_sdr_ext = filename.split('.')[-1]
+        if not 'im_sdr' in self.modality_file_list_dict:
+            filename = self.modality_filename_dict['im_sdr']
+            self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
 
-        self.im_sdr_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
-        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
-        self.im_sdr_list = [load_img(_, expected_shape=__, ext=im_sdr_ext, target_HW=self.im_HW_target)/255. for _, __ in zip(self.im_sdr_file_list, expected_shape_list)]
+        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
+        self.im_sdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_sdr'], target_HW=self.im_HW_target)/255. for _, __ in zip(self.modality_file_list_dict['im_sdr'], expected_shape_list)]
+
+        # print(self.modality_file_list_dict['im_sdr'])
 
         print(blue_text('[%s] DONE. load_im_sdr')%self.parent_class_name)
 
@@ -214,17 +221,16 @@ class scene2DBase():
         '''
         print(white_blue('[%s] load_im_hdr'%self.parent_class_name))
 
-        filename = self.modality_filename_dict['im_hdr']
-        im_hdr_ext = filename.split('.')[-1]
-        im_sdr_ext = self.modality_filename_dict['im_sdr'].split('.')[-1]
+        if not 'im_hdr' in self.modality_file_list_dict:
+            filename = self.modality_filename_dict['im_hdr']
+            self.modality_file_list_dict['im_hdr'] = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
 
-        self.im_hdr_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
-        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
-        self.im_hdr_list = [load_img(_, expected_shape=__, ext=im_hdr_ext, target_HW=self.im_HW_target) for _, __ in zip(self.im_hdr_file_list, expected_shape_list)]
+        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
+        self.im_hdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_hdr'], target_HW=self.im_HW_target) for _, __ in zip(self.modality_file_list_dict['im_hdr'], expected_shape_list)]
         self.hdr_scale_list = [1.] * len(self.im_hdr_list)
 
-        for im_hdr_file, im_hdr in zip(self.im_hdr_file_list, self.im_hdr_list):
-            im_sdr_file = Path(str(im_hdr_file).replace(im_hdr_ext, im_sdr_ext))
+        for im_hdr_file, im_hdr in zip(self.modality_file_list_dict['im_hdr'], self.im_hdr_list):
+            im_sdr_file = Path(str(im_hdr_file).replace(self.modality_ext_dict['im_hdr'], self.modality_ext_dict['im_sdr']))
             if not im_sdr_file.exists():
                 print(yellow('[%s] load_im_hdr: converting HDR to SDR and write to disk'))
                 print('-> %s'%str(im_sdr_file))

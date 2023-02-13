@@ -19,7 +19,7 @@ np.set_printoptions(suppress=True)
 from lib.utils_misc import str2bool
 import argparse
 
-from lib.class_freeviewpointScene3D import freeviewpointScene3D
+from lib.class_matterportScene3D import matterportScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
@@ -70,19 +70,13 @@ parser.add_argument('--if_dump_shape', type=str2bool, nargs='?', const=True, def
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/free-viewpoint'
+base_root = Path(PATH_HOME) / 'data/Matterport3D'
 assert base_root.exists()
 
-# scene_name = 'asianRoom1'
-# scene_name = 'asianRoom2'
-# scene_name = 'Hall'
-# scene_name = 'Kitchen'
-scene_name = 'Salon2' # Living room
-# scene_name = 'sofa91'
+scene_name = '17DRP5sb8fy'; region_id = 5; 
+frame_ids = [10, 40, 120, 150, 60]
 
-frame_ids = [0, 1, 2]
-
-scene_obj = freeviewpointScene3D(
+scene_obj = matterportScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
@@ -90,9 +84,11 @@ scene_obj = freeviewpointScene3D(
         'scene_name': scene_name, 
         'frame_id_list': frame_ids, # comment out to use all frames
         'axis_up': 'z+', 
-        'pose_file': ('bundle', 'bundle.out'), 
+        'region_id': region_id, 
+        'if_undist': False, # True to use undistorted images/poses
+        # 'pose_file': ('bundle', 'bundle.out'), 
         # 'pose_file': ('OpenRooms', 'cam.txt'), # after dump to cam.txt
-        'if_scale_scene': True, # whether to scale the scene to metric in meters, with given scale in scale.txt
+        # 'if_scale_scene': True, # whether to scale the scene to metric in meters, with given scale in scale.txt
         }, 
     mi_params_dict={
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
@@ -102,15 +98,23 @@ scene_obj = freeviewpointScene3D(
         },
     modality_list = [
         'poses', 
-        'im_hdr', 
+        # 'im_hdr', 
         'im_sdr', 
-        'im_mask', 
+        # 'depth', 
+        # 'im_mask', 
         'shapes', 
         ], 
     modality_filename_dict = {
-        'im_hdr': 'images/%05d.exr', 
-        'im_sdr': 'images/%05d.jpg', 
-        'im_mask': 'images/%08d_mask.png', 
+        'im_hdr': ('matterport_hdr_images', 'j', 'exr'), 
+        'im_sdr': ('matterport_color_images', 'i', 'jpg'), 
+        'depth': ('matterport_depth_images', 'd', 'png'), 
+        'poses': ('matterport_camera_poses', 'pose_', 'txt'), # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_poses
+        'im_sdr_undist': ('undistorted_color_images', 'i', 'jpg'), 
+        'depth_undist': ('undistorted_depth_images', 'd', 'png'), 
+        # 'im_hdr_undist': ('undistorted_hdr_images', 'j', 'jxr'), 
+        # 'normal_undist': ('undistorted_normal_images', 'd', 'png'), 
+        # 'im_mask': 'images/%08d_mask.png', 
+
     }, 
     im_params_dict={
         }, 
@@ -173,7 +177,7 @@ if opt.vis_2d_plt:
         scene_obj, 
         modality_list_vis=[
             'im', 
-            'im_mask', 
+            # 'im_mask', 
             'mi_depth', 
             'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
@@ -218,7 +222,7 @@ if opt.vis_3d_o3d:
         shapes_params={
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
-            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
+            'if_voxel_volume': True, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
             'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available

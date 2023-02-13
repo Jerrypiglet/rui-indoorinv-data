@@ -3,12 +3,13 @@ import numpy as np
 from pathlib import Path
 import imageio
 import matplotlib.pyplot as plt
-from lib.class_freeviewpointScene3D import freeviewpointScene3D
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_monosdfScene3D import monosdfScene3D
+from lib.class_freeviewpointScene3D import freeviewpointScene3D
+from lib.class_matterportScene3D import matterportScene3D
 
 from lib.utils_vis import vis_index_map, colorize
 from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
@@ -25,7 +26,7 @@ class visualizer_scene_2D(object):
         frame_idx_list=None, # 0-based indexing, [0, ..., os.frame_num-1]
     ):
 
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object

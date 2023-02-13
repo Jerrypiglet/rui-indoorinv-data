@@ -240,7 +240,7 @@ class openroomsScene2D(scene2DBase):
     #     filename = self.modality_filename_dict['im_hdr']
     #     im_hdr_ext = filename.split('.')[-1]
 
-    #     self.im_hdr_file_list = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, im_hdr_ext)) for i in self.frame_id_list]
+    #     self.modality_file_list_dict['im_hdr'] = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, im_hdr_ext)) for i in self.frame_id_list]
     #     self.im_hdr_list = [load_HDR(_, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
 
     #     if self.if_scale_hdr:
