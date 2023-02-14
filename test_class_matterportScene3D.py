@@ -98,7 +98,7 @@ scene_obj = matterportScene3D(
         },
     modality_list = [
         'poses', 
-        # 'im_hdr', 
+        'im_hdr', 
         'im_sdr', 
         # 'depth', 
         # 'im_mask', 

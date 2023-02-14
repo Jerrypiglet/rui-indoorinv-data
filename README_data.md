@@ -1,7 +1,7 @@
 <!--ts-->
-* [More datasets](#more-datasets)
-   * [Freeviewpoint](#freeviewpoint)
-   * [Matterport3D](#matterport3d)
+- [More datasets](#more-datasets)
+  - [Freeviewpoint](#freeviewpoint)
+  - [Matterport3D](#matterport3d)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 <!-- Added by: jerrypiglet, at: Mon Feb 13 02:05:56 PST 2023 -->
@@ -62,7 +62,7 @@ python test_class_freeviewpointScene3D.py --vis_2d_plt True
 Holes in the scene are fixed by adding a convex hull mesh to the original mesh. See demo [here](images/demo_freeviewpoint_fix_holes.png).
 
 TODO:
-- [] add option to resize all frames to same dimension
+- [ ] add option to resize all frames to same dimension
 - [x] fix holes on the wall
   
 ## Matterport3D
@@ -72,4 +72,4 @@ From Chang et al.'17, *Matterport3D: Learning from RGB-D Data in Indoor ...* [[P
 ![](images/demo_matterport_plt_2d.png)
 
 TODO:
-- [] undistord HDR images
+- [ ] undistord HDR images

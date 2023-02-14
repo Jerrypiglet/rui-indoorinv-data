@@ -418,18 +418,26 @@ class matterportScene3D(mitsubaBase, scene2DBase):
                 if _jxr_path.exists():
                     '''
                     https://github.com/niessner/Matterport/issues/3#issuecomment-575796265
+                    https://github.com/python-pillow/Pillow/issues/5248
 
                     [Mac] brew install jxrlib
                     '''
                     _tif_path = Path(str(_jxr_path).replace('.jxr', '.tif'))
                     convert_cmd = 'JxrDecApp -i %s -o %s -c 10 -a 0'%(str(_jxr_path), str(_tif_path))
                     subprocess.run(convert_cmd.split())
-                    im_tif = cv2.imread(str(_tif_path), cv2.IMREAD_UNCHANGED)
+                    im_tif = cv2.imread(str(_tif_path), cv2.IMREAD_UNCHANGED) # uint16
                     from utils_io import tone_mapping_16bit
                     im_float = tone_mapping_16bit(im_tif, dest_dtype=np.float16) * 8.
-                    # im_float = im_tif.astype(np.float32) / 65535.
-                    cv2.imwrite('/Users/jerrypiglet/Downloads/tmp.jpg', (np.clip(im_float, 0., 1.)*255.).astype(np.uint8))
+                    cv2.imwrite('/Users/jerrypiglet/Downloads/tmp_tonemapped.jpg', (np.clip(im_float, 0., 1.)*255.).astype(np.uint8))
+                    im_float = im_tif.astype(np.float32) / 65535.
+                    cv2.imwrite('/Users/jerrypiglet/Downloads/tmp_half.jpg', (np.clip(im_float, 0., 1.)*255.).astype(np.uint8))
                     # cv2.imwrite('/Users/jerrypiglet/Downloads/tmp.exr', im_tif.astype(np.float32))
+
+                    import OpenImageIO as oiio # build from source; export PYTHONPATH="/Users/jerrypiglet/Documents/Projects/oiio/build/lib/python/site-packages"
+                    from OpenImageIO import ImageBufAlgo
+                    buf = oiio.ImageBuf(str(_tif_path)) # https://stackoverflow.com/questions/58548333/what-is-the-proper-way-to-convert-from-a-32bit-exr-to-8-bit-tiff-image-using-ope
+                    dst_img = ImageBufAlgo.colorconvert(buf, "linear", 'linear')
+                    dst_img.write('/Users/jerrypiglet/Downloads/outImage.exr', 'float32')
 
                     import ipdb; ipdb.set_trace()
 
