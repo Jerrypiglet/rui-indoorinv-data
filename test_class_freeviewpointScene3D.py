@@ -78,8 +78,8 @@ assert base_root.exists()
 # scene_name = 'asianRoom2'
 # scene_name = 'Hall'
 # scene_name = 'Kitchen'
-# scene_name = 'Salon2' # Living room
-scene_name = 'sofa91'
+scene_name = 'Salon2' # Living room
+# scene_name = 'sofa91'
 
 frame_ids = [0]
 # frame_ids = [0, 1, 199]
@@ -90,7 +90,7 @@ scene_obj = freeviewpointScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
-        # 'frame_id_list': frame_ids, # comment out to use all frames
+        'frame_id_list': frame_ids, # comment out to use all frames
         'axis_up': 'z+', 
         'pose_file': ('bundle', 'bundle.out'), 
         # 'pose_file': ('OpenRooms', 'cam.txt'), # only useful after dumping poses to cam.txt
