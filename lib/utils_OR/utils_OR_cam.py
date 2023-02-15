@@ -34,7 +34,7 @@ def read_K_list_OR(K_list_file):
 
 def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, cam_params_dict: dict={}, K_list: list=[], frame_num_all: int=-1):
     if frame_num_all != -1 and len(origin_lookat_up_mtx_list) != frame_num_all:
-        if_write_pose_file = input(red('pose num to write %d is less than total pose num %d. Write? [y/n]'%(len(origin_lookat_up_mtx_list), frame_num_all)))
+        if_write_pose_file = input(red('pose num to write %d is less than total available poses in the scene (%d poses). Still write? [y/n]'%(len(origin_lookat_up_mtx_list), frame_num_all)))
         if if_write_pose_file in ['N', 'n']:
             print('Aborted writing poses to cam.txt.')
             return

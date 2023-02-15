@@ -137,6 +137,7 @@ def vis_disp_colormap(disp_array_, file=None, normalize=True, min_and_scale=None
         else:
             disp_array -= min_and_scale[0]
             disp_array = disp_array * min_and_scale[1]
+
     disp_array = np.clip(disp_array, 0., 1.)
     disp_array = (cm(disp_array)[:, :, :3] * 255).astype(np.uint8)
     

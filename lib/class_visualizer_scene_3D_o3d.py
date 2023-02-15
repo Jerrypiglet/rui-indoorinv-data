@@ -57,6 +57,7 @@ class visualizer_scene_3D_o3d(object):
 
         self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
+            if _ == '': continue
             assert _ in ['dense_geo', 'poses', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi']
         if 'mi' in self.modality_list_vis:
             self.mi_pcd_color_list = None

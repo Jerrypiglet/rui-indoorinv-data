@@ -21,7 +21,8 @@ def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scal
         sample_pts_list = []
 
     shape_tri_mesh = trimesh.load_mesh(str(shape_file))
-    if not shape_tri_mesh.is_watertight:
+    if_fix_watertight = shape_params_dict.get('if_fix_watertight', False)
+    if not shape_tri_mesh.is_watertight and if_fix_watertight:
         trimesh.repair.fill_holes(shape_tri_mesh)
         shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
         shape_tri_mesh_convex.export(str(shape_file.parent / ('%s_hull.obj'%shape_file.stem)))

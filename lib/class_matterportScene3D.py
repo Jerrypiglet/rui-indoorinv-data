@@ -10,7 +10,7 @@ import cv2
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up
 from lib.utils_io import load_img, load_matrix
 # from collections import defaultdict
 # import trimesh
@@ -18,7 +18,6 @@ from lib.utils_io import load_img, load_matrix
 import mitsuba as mi
 
 from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
-from lib.utils_io import load_matrix, resize_intrinsics
 
 # from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
@@ -405,9 +404,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
 
         if self.cam_params_dict.get('if_convert_poses', False):
-            print(white_blue('[%s] convert poses to OpenRooms format')%self.parent_class_name)
-            origin_lookat_up_mtx_list = [np.hstack((_[0], _[1]+_[0], _[2])).T for _ in self.origin_lookatvector_up_list]
-            dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=origin_lookat_up_mtx_list, cam_params_dict=self.cam_params_dict, K_list=self.K_list, frame_num_all=self.frame_num_all)
+            self.export_poses_cam_txt(self.pose_file.parent, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
     
     def load_im_hdr(self):
         for _ in self.modality_file_list_dict['im_hdr']:
@@ -441,8 +438,6 @@ class matterportScene3D(mitsubaBase, scene2DBase):
 
                     import ipdb; ipdb.set_trace()
 
-
-
     def load_im_mask(self):
         '''
         load im_mask (H, W), np.bool
@@ -453,7 +448,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         im_mask_ext = filename.split('.')[-1]
 
         self.im_mask_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
-        expected_shape_list = [self.im_HW_load_list[_] for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load]*self.frame_num
+        expected_shape_list = [self.im_HW_load_list[_] for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load]*self.frame_num
         self.im_mask_list = [load_img(_, expected_shape=__, ext=im_mask_ext, target_HW=self.im_HW_target)/255. for _, __ in zip(self.im_mask_file_list, expected_shape_list)]
         self.im_mask_list = [_.astype(np.bool) for _ in self.im_mask_list]
 

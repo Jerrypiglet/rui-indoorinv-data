@@ -85,8 +85,9 @@ class evaluator_scene_scene():
                     origin = np.tile(np.array(origin).reshape((1, 3)), (vertices.shape[0], 1))
                     ds_ = vertices - origin
                     ds = ds_ / (np.linalg.norm(ds_, axis=1, keepdims=1)+1e-6)
+                    ds = np.array(ds).astype(np.float32)
 
-                    xs = origin
+                    xs = np.array(origin).astype(np.float32)
                     xs_mi = mi.Point3f(xs)
                     ds_mi = mi.Vector3f(ds)
                     # ray origin, direction, t_max

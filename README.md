@@ -548,6 +548,7 @@ Datasets include:
   - [] GT emission, albedo, roughness, metallic
 - [x] vis envmap in 2D plt
 - [ ] 1./rad* -> * rad_mul
+- [ ] sort out frame_idx and frame_id: [0, 1, 2, ..., frame_num-1] VS [0, 5, 15, 200, ...] (0-based)
 - [ ] change all idx to 0-based: get rid of if_1_based
 - [x] compute visibility and vis for room coverage count
 - [x] densely sample pts on shape surface

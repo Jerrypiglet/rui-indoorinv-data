@@ -53,7 +53,8 @@ class scene2DBase():
         self.im_params_dict = im_params_dict
         self.cam_params_dict = cam_params_dict
 
-        if im_params_dict != {}:
+        self.if_allow_crop = im_params_dict.get('if_allow_crop', False) # crop if loaded image is larger than target size
+        if im_params_dict != {} and all([_ in im_params_dict for _ in ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize']]):
             self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
             self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
             self.H, self.W = self.im_H_resize, self.im_W_resize
@@ -204,12 +205,13 @@ class scene2DBase():
         '''
         print(white_blue('[%s] load_im_sdr')%self.parent_class_name)
 
+        if_allow_crop = self.im_params_dict.get('if_allow_crop', False)
         if not 'im_sdr' in self.modality_file_list_dict:
             filename = self.modality_filename_dict['im_sdr']
             self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
 
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
-        self.im_sdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_sdr'], target_HW=self.im_HW_target)/255. for _, __ in zip(self.modality_file_list_dict['im_sdr'], expected_shape_list)]
+        self.im_sdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_sdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop)/255. for _, __ in zip(self.modality_file_list_dict['im_sdr'], expected_shape_list)]
 
         # print(self.modality_file_list_dict['im_sdr'])
 
@@ -221,12 +223,13 @@ class scene2DBase():
         '''
         print(white_blue('[%s] load_im_hdr'%self.parent_class_name))
 
+        if_allow_crop = self.im_params_dict.get('if_allow_crop', False)
         if not 'im_hdr' in self.modality_file_list_dict:
             filename = self.modality_filename_dict['im_hdr']
             self.modality_file_list_dict['im_hdr'] = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
 
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
-        self.im_hdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_hdr'], target_HW=self.im_HW_target) for _, __ in zip(self.modality_file_list_dict['im_hdr'], expected_shape_list)]
+        self.im_hdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_hdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop) for _, __ in zip(self.modality_file_list_dict['im_hdr'], expected_shape_list)]
         self.hdr_scale_list = [1.] * len(self.im_hdr_list)
 
         for im_hdr_file, im_hdr in zip(self.modality_file_list_dict['im_hdr'], self.im_hdr_list):

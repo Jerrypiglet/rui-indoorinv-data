@@ -30,10 +30,11 @@ def load_matrix(path: Path, if_inverse_y: bool=False) -> np.ndarray:
             assert False, 'wrong input matrix dimension when if_inverse_y=True!'
     return m
 
-def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tuple[int, int]=(), resize_method: str='area', npy_if_channel_first: bool=False, if_attempt_load: bool=False) -> np.ndarray:
+def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tuple[int, int]=(), resize_method: str='area', npy_if_channel_first: bool=False, if_attempt_load: bool=False, if_allow_crop: bool=False) -> np.ndarray:
     '''
     Load an image from a file, trying to maintain its datatype (gray, 16bit, rgb)
     set target_HW to some shape to resize after loading
+    - if_allow_crop: if True, allow to crop the image to the target shape
     '''
     if not Path(path).exists():
         raise FileNotFoundError(path)
@@ -63,6 +64,9 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         if tuple(im.shape) != expected_shape:
             if if_attempt_load:
                 return None
+            elif if_allow_crop:
+                assert im.shape[0]>=expected_shape[0] and im.shape[1]>=expected_shape[1], f"Image {path} is too small to crop to {expected_shape}"
+                im = im[:expected_shape[0], :expected_shape[1]]
             else:
                 raise RuntimeError('%s != %s: %s'%(str(tuple(im.shape)), str(expected_shape), str(path)))
 

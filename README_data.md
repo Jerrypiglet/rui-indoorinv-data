@@ -46,6 +46,19 @@
       - Salon2
       - Kitchen
 
+For all datasets:
+
+To export all frames to mitsuabScene format, e.g.:
+
+``` bash
+python test_class_freeviewpointScene3D.py --if_export True --eval_scene True
+```
+
+- `--if_export True` to dump poses, K_list (intrinsics and image H W could vary between frames), im_hdr, im_sdr, im_mask (for valid area from provided mask, and area with valid depth from Mitsuba)
+- `--eval_scene True` to count in how many frames each vertex is observed; will be visualized with open3d ([demo](images/)).
+- # 'frame_id_list': frame_ids, # comment out to use all frames
+- indicate modalities to export in: `scene_obj.export_scene(modality_list = [...`
+
 ## Freeviewpoint
 
 From Philip et al.'21, *Free-viewpoint Indoor Neural Relighting from Multi-view Stereo*. [[Project]](https://repo-sam.inria.fr/fungraph/deep-indoor-relight/#code [[Code]](https://gitlab.inria.fr/sibr/projects/indoor_relighting)
@@ -59,7 +72,7 @@ python test_class_freeviewpointScene3D.py --vis_2d_plt True
 ![](images/demo_freeviewpoint_o3d.png)
 ![](images/demo_freeviewpoint_plt_2d.png)
 
-Holes in the scene are fixed by adding a convex hull mesh to the original mesh. See demo [here](images/demo_freeviewpoint_fix_holes.png).
+Holes in the scene are fixed by adding a convex hull mesh to the original mesh. See demo [here](images/demo_freeviewpoint_salon_viewcount.png).
 
 TODO:
 - [ ] add option to resize all frames to same dimension

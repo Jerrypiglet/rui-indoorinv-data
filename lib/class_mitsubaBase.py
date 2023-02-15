@@ -9,12 +9,14 @@ from pathlib import Path
 import imageio
 import json
 import shutil
+import trimesh
+import cv2
 # Import the library using the alias "mi"
 import mitsuba as mi
 from lib.utils_io import load_img, resize_intrinsics
 from lib.utils_OR.utils_OR_cam import read_cam_params_OR, dump_cam_params_OR
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red
+from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 
@@ -47,6 +49,7 @@ class mitsubaBase():
         if not isinstance(K_list, list): K_list = [K_list] * len(pose_list)
         if not isinstance(H_list, list): H_list = [H_list] * len(pose_list)
         if not isinstance(W_list, list): W_list = [W_list] * len(pose_list)
+        assert len(K_list) == len(pose_list) == len(H_list) == len(W_list)
         for _, (H, W, pose, K) in enumerate(zip(H_list, W_list, pose_list, K_list)):
             rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=(convention=='opencv'))
             cam_rays_list.append((rays_o, rays_d, ray_d_center))
@@ -96,20 +99,20 @@ class mitsubaBase():
             mi_depth = np.sum(rays_v_flatten.reshape(self._H(frame_idx), self._W(frame_idx), 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
             invalid_depth_mask = np.logical_or(np.isnan(mi_depth), np.isinf(mi_depth))
             self.mi_invalid_depth_mask_list.append(invalid_depth_mask)
-            mi_depth[invalid_depth_mask] = np.inf
+            mi_depth[invalid_depth_mask] = 0.
             self.mi_depth_list.append(mi_depth)
 
             mi_normal_global = ret.n.numpy().reshape(self._H(frame_idx), self._W(frame_idx), 3)
             # FLIP inverted normals!
             normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normal_global, axis=-1) > 0, np.any(mi_normal_global != np.inf, axis=-1))
             mi_normal_global[normals_flip_mask] = -mi_normal_global[normals_flip_mask]
-            mi_normal_global[invalid_depth_mask, :] = np.inf
+            mi_normal_global[invalid_depth_mask, :] = 0.
             self.mi_normal_global_list.append(mi_normal_global)
 
             mi_normal_cam_opencv = mi_normal_global @ self.pose_list[frame_idx][:3, :3]
             self.mi_normal_opencv_list.append(mi_normal_cam_opencv)
             mi_normal_cam_opengl = np.stack([mi_normal_cam_opencv[:, :, 0], -mi_normal_cam_opencv[:, :, 1], -mi_normal_cam_opencv[:, :, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
-            mi_normal_cam_opengl[invalid_depth_mask, :] = np.inf
+            mi_normal_cam_opengl[invalid_depth_mask, :] = 0.
             self.mi_normal_opengl_list.append(mi_normal_cam_opengl)
 
             mi_pts = ret.p.numpy()
@@ -118,7 +121,7 @@ class mitsubaBase():
                 print(white_red('no rays hit any surface!'))
             # assert np.amax(np.abs((mi_pts - ret.p.numpy())[ret.t.numpy()!=np.inf, :])) < 1e-3 # except in window areas
             mi_pts = mi_pts.reshape(self._H(frame_idx), self._W(frame_idx), 3)
-            mi_pts[invalid_depth_mask, :] = np.inf
+            mi_pts[invalid_depth_mask, :] = 0.
 
             self.mi_pts_list.append(mi_pts)
 
@@ -575,6 +578,11 @@ class mitsubaBase():
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
 
+    def export_poses_cam_txt(self, export_folder: Path, cam_params_dict={}, frame_num_all=-1):
+        print(white_blue('[%s] convert poses to OpenRooms format')%self.parent_class_name)
+        origin_lookat_up_mtx_list = [np.hstack((_[0], _[1]+_[0], _[2])).T for _ in self.origin_lookatvector_up_list]
+        dump_cam_params_OR(pose_file_root=export_folder, origin_lookat_up_mtx_list=origin_lookat_up_mtx_list, cam_params_dict=cam_params_dict, K_list=self.K_list, frame_num_all=frame_num_all)
+
     def dump_mi_meshes(self, mi_scene, mesh_dump_root: Path):
         '''
         dump mi scene objects as separate objects
@@ -587,3 +595,86 @@ class mitsubaBase():
             shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
         print(blue_text('Scene shapes dumped to: %s')%str(mesh_dump_root))
 
+    def export_scene(self, modality_list=[]):
+        '''
+        export scene to mitsubaScene data structure
+        '''
+        scene_export_path = self.rendering_root / 'scene_export' / self.scene_name
+        if scene_export_path.exists():
+            if_reexport = input(red("scene export path exists:%s . Re-export? [y/n]"%str(scene_export_path)))
+            if if_reexport in ['y', 'Y']:
+                shutil.rmtree(str(scene_export_path))
+            else:
+                print(red('Aborted export.'))
+                return
+        scene_export_path.mkdir(parents=True, exist_ok=True)
+
+        for modality in modality_list:
+            assert modality in self.modality_list, 'modality %s not in %s'%(modality, self.modality_list)
+
+            if modality == 'poses':
+                self.export_poses_cam_txt(scene_export_path, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
+            
+            if modality == 'im_hdr':
+                (scene_export_path / 'Image').mkdir(parents=True, exist_ok=True)
+                for _, frame_id in enumerate(self.frame_id_list):
+                    im_hdr_export_path = scene_export_path / 'Image' / ('%03d_0001.exr'%_)
+                    cv2.imwrite(str(im_hdr_export_path), self.im_hdr_list[_][:, :, [2, 1, 0]])
+                    print(blue_text('HDR image %s exported to: %s'%(frame_id, str(im_hdr_export_path))))
+            
+            if modality == 'im_sdr':
+                (scene_export_path / 'Image').mkdir(parents=True, exist_ok=True)
+                for _, frame_id in enumerate(self.frame_id_list):
+                    im_sdr_export_path = scene_export_path / 'Image' / ('%03d_0001.png'%_)
+                    cv2.imwrite(str(im_sdr_export_path), (np.clip(self.im_sdr_list[_][:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
+                    print(blue_text('SDR image %s exported to: %s'%(frame_id, str(im_sdr_export_path))))
+            
+            if modality == 'mi_normal':
+                (scene_export_path / 'MiNormalGlobal').mkdir(parents=True, exist_ok=True)
+                assert self.pts_from['mi']
+                for _, frame_id in enumerate(self.frame_id_list):
+                    mi_normal_export_path = scene_export_path / 'MiNormalGlobal' / ('%03d_0001.png'%_)
+                    cv2.imwrite(str(mi_normal_export_path), (np.clip(self.mi_normal_global_list[_][:, :, [2, 1, 0]]/2.+0.5, 0., 1.)*255.).astype(np.uint8))
+                    print(blue_text('Mitsuba normal (global) %s exported to: %s'%(frame_id, str(mi_normal_export_path))))
+            
+            if modality == 'mi_depth':
+                (scene_export_path / 'MiDepth').mkdir(parents=True, exist_ok=True)
+                assert self.pts_from['mi']
+                for _, frame_id in enumerate(self.frame_id_list):
+                    mi_depth_vis_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.png'%_)
+                    mi_depth = self.mi_depth_list[_].squeeze()
+                    depth_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.mi_invalid_depth_mask_list[_])
+                    cv2.imwrite(str(mi_depth_vis_export_path), depth_normalized)
+                    print(blue_text('Mitsuba depth (vis) %s exported to: %s'%(frame_id, str(mi_depth_vis_export_path))))
+                    mi_depth_npy_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.npy'%_)
+                    np.save(str(mi_depth_npy_export_path), mi_depth)
+                    print(blue_text('Mitsuba depth (npy) %s exported to: %s'%(frame_id, str(mi_depth_npy_export_path))))
+
+            if modality == 'im_mask':
+                (scene_export_path / 'ImMask').mkdir(parents=True, exist_ok=True)
+                assert self.pts_from['mi']
+                assert len(self.im_mask_list) == len(self.mi_invalid_depth_mask_list)
+                for _, frame_id in enumerate(self.frame_id_list):
+                    im_mask_export_path = scene_export_path / 'ImMask' / ('%03d_0001.png'%_)
+                    im_mask = self.im_mask_list[_]
+                    mi_invalid_depth_mask = self.mi_invalid_depth_mask_list[_]
+                    assert mi_invalid_depth_mask.shape == im_mask.shape, 'invalid depth mask shape %s not equal to im_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask.shape)
+                    im_mask = np.logical_and(im_mask, ~mi_invalid_depth_mask)
+                    cv2.imwrite(str(im_mask_export_path), (im_mask*255).astype(np.uint8))
+                    print(blue_text('Mask image (for valid depths) %s exported to: %s'%(frame_id, str(im_mask_export_path))))
+            
+            if modality == 'shapes': 
+                assert self.if_loaded_shapes, 'shapes not loaded'
+                shape_export_path = scene_export_path / 'scene.obj'
+                shape_list = []
+                for vertices, faces in zip(self.vertices_list, self.faces_list):
+                    shape_list.append(trimesh.Trimesh(vertices, faces-1))
+                shape_tri_mesh = trimesh.util.concatenate(shape_list)
+                shape_tri_mesh.export(str(shape_export_path))
+                if not shape_tri_mesh.is_watertight:
+                    trimesh.repair.fill_holes(shape_tri_mesh)
+                    shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
+                    shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull.obj'%shape_export_path.stem)))
+                    shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
+                    shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed.obj'%shape_export_path.stem)))
+                    print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s.obj, %s_hull.obj, %s_fixed.obj'%(shape_export_path.name, shape_export_path.name, shape_export_path.name)))

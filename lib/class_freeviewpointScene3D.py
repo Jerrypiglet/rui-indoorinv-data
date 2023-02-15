@@ -34,6 +34,8 @@ from .class_scene2DBase import scene2DBase
 class freeviewpointScene3D(mitsubaBase, scene2DBase):
     '''
     A class used to visualize/render scenes from Philip et al. - 2021 - Free-viewpoint Indoor Neural Relighting...
+    
+    Dataset specifications: https://gitlab.inria.fr/sibr/projects/indoor_relighting/-/blob/master/README.MD#preprocessing-your-own-data
     '''
     def __init__(
         self, 
@@ -130,14 +132,33 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         assert Path(self.scene_metadata_file).exists()
         with open(str(self.scene_metadata_file), 'r') as camIn:
             scene_metadata = camIn.read().splitlines()
-        frame_info_list = [_ for _ in scene_metadata if ('.exr' in _) or ('.jpg' in _)] # e.g. '00000.exr 997 665'
-        assert frame_info_list[0].startswith('00000.')
-        frame_id_all_list = [int(_.split(' ')[0].split('.')[0]) for _ in frame_info_list]
+        frame_info_all_list = [_ for _ in scene_metadata if ('.exr' in _) or ('.jpg' in _)] # e.g. '00000.exr 997 665'
+        assert frame_info_all_list[0].startswith('00000.')
+        frame_id_all_list = [int(_.split(' ')[0].split('.')[0]) for _ in frame_info_all_list]
         assert frame_id_all_list[0] == 0
-        assert frame_id_all_list[-1] == len(frame_id_all_list) - 1
-        assert frame_info_list[-1].startswith('%05d.'%frame_id_all_list[-1])
+
+        if_missing_frame = False
+        if frame_id_all_list[-1] != len(frame_id_all_list) - 1:
+            print(red('Warning: frame_id_all_list[-1] == len(frame_id_all_list) - 1, so some frames are missing:'))
+            print(set(list(range(len(frame_id_all_list)))) - set(frame_id_all_list))
+            if_missing_frame = True
+        else:
+            assert frame_info_all_list[-1].startswith('%05d.'%frame_id_all_list[-1])
+            
+        if self.frame_id_list == []:
+            # self.frame_id_list = list(range(len(frame_id_all_list)))
+            self.frame_id_list = frame_id_all_list
+            # if if_missing_frame:
+            #     frame_info_all_list = [_ for _ in frame_info_all_list if int(_.split(' ')[0].split('.')[0]) in self.frame_id_list]
+
+        frame_info_all_dict = {int(_.split(' ')[0].split('.')[0]): _ for _ in frame_info_all_list}
         
-        self.im_HW_load_list = [(int(_.split(' ')[2])+1, int(_.split(' ')[1])+1) for _ in frame_info_list]
+        # im_HW_load_all_list = [(int(_.split(' ')[2])+1, int(_.split(' ')[1])+1) for _ in frame_info_all_list] # +1 because im H W are mistakenly recorded here (1 less) https://gitlab.inria.fr/sibr/projects/indoor_relighting/-/blob/master/preprocess/converters/createSceneMetadataEXR.py#L21
+        # import ipdb; ipdb.set_trace()
+        # self.im_HW_load_list = [im_HW_load_all_list[_] for _ in self.frame_id_list]
+        im_HW_load_list = [frame_info_all_dict[frame_id] for frame_id in self.frame_id_list]
+        self.im_HW_load_list = [(int(_.split(' ')[2])+1, int(_.split(' ')[1])+1) for _ in im_HW_load_list]
+        assert len(im_HW_load_list) == len(self.frame_id_list)
         assert 'im_H_resize' not in self.im_params_dict and 'im_W_resize' not in self.im_params_dict
         self.H_list = [_[0] for _ in self.im_HW_load_list]
         self.W_list = [_[1] for _ in self.im_HW_load_list]
@@ -155,6 +176,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
             'im_hdr', 'im_sdr', 'im_mask', 
             'poses', 
             'shapes', 
+            'mi_normal', 'mi_depth', 
             ]
 
     @property
@@ -255,20 +277,6 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
                 self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
                 self.seg_from['mi'] = True
 
-    def load_intrinsics(self):
-        assert False
-        '''
-        -> K: (3, 3)
-        '''
-        self.K = load_matrix(self.intrinsics_path)
-        assert self.K.shape == (3, 3)
-        self.im_W_load = int(self.K[0][2] * 2)
-        self.im_H_load = int(self.K[1][2] * 2)
-
-        if self.im_W_load != self.W or self.im_H_load != self.H:
-            scale_factor = [t / s for t, s in zip((self.H, self.W), (self.im_H_load, self.im_W_load))]
-            self.K = resize_intrinsics(self.K, scale_factor)
-
     def load_poses(self, cam_params_dict):
         '''
         pose_list: list of pose matrices (**camera-to-world** transformation), each (3, 4): [R|t] (OpenCV convention: right-down-forward)
@@ -307,14 +315,15 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
             with open(str(self.pose_file), 'r') as camIn:
                 cam_data = camIn.read().splitlines()
 
-            frame_num_all = int(cam_data[1].split(' ')[0])
-            if self.frame_id_list == []: self.frame_id_list = list(range(frame_num_all))
-            assert frame_num_all >= self.frame_num
+            self.frame_num_all = int(cam_data[1].split(' ')[0])
+            if self.frame_id_list == []: self.frame_id_list = list(range(self.frame_num_all))
+            assert self.frame_num_all >= self.frame_num
 
-            for frame_id in tqdm(self.frame_id_list):
+            for frame_idx, frame_id in tqdm(enumerate(self.frame_id_list)):
                 cam_lines = cam_data[(2+frame_id*5):(2+frame_id*5+5)]
                 f = cam_lines[0].split(' ')[0]
-                assert cam_lines[0].split(' ')[1:] == ['0', '0'] # no distortion
+                if cam_lines[0].split(' ')[1:] != ['0', '0']: # no distortion
+                    import ipdb; ipdb.set_trace()
                 '''
                 laoded R, t are: [1] world-to-camera, [2] OpenGL convention: https://www.cs.cornell.edu/~snavely/bundler/bundler-v0.3-manual.html#S6
                 '''
@@ -333,15 +342,13 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
                 (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
-                K = np.array([[float(f), 0, self._W(frame_id)/2.], [0, float(f), self._H(frame_id)/2.], [0, 0, 1]], dtype=np.float32)
+                K = np.array([[float(f), 0, self._W(frame_idx)/2.], [0, float(f), self._H(frame_idx)/2.], [0, 0, 1]], dtype=np.float32)
                 self.K_list.append(K)
 
             print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
 
             if cam_params_dict.get('if_convert_poses', False):
-                print(white_blue('[%s] convert poses to OpenRooms format')%self.parent_class_name)
-                origin_lookat_up_mtx_list = [np.hstack((_[0], _[1]+_[0], _[2])).T for _ in self.origin_lookatvector_up_list]
-                dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=origin_lookat_up_mtx_list, cam_params_dict=cam_params_dict, K_list=self.K_list, frame_num_all=frame_num_all)
+                self.export_poses_cam_txt(self.pose_file.parent, cam_params_dict=cam_params_dict, frame_num_all=self.frame_num_all)
 
     def load_im_mask(self):
         '''
@@ -351,10 +358,15 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
 
         filename = self.modality_filename_dict['im_mask']
         im_mask_ext = filename.split('.')[-1]
+        if_allow_crop = self.im_params_dict.get('if_allow_crop', False)
+        if_all_ones_masks = self.im_params_dict.get('if_all_ones_masks', False)
 
         self.im_mask_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
         expected_shape_list = [self.im_HW_load_list[_] for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load]*self.frame_num
-        self.im_mask_list = [load_img(_, expected_shape=__, ext=im_mask_ext, target_HW=self.im_HW_target)/255. for _, __ in zip(self.im_mask_file_list, expected_shape_list)]
+        if if_all_ones_masks:
+            self.im_mask_list = [np.ones(_, dtype=np.bool) for _ in expected_shape_list]
+        else:
+            self.im_mask_list = [load_img(_, expected_shape=__, ext=im_mask_ext, target_HW=self.im_HW_target, if_allow_crop=if_allow_crop)/255. for _, __ in zip(self.im_mask_file_list, expected_shape_list)]
         self.im_mask_list = [_.astype(np.bool) for _ in self.im_mask_list]
 
         print(blue_text('[%s] DONE. load_im_mask')%self.parent_class_name)
@@ -369,6 +381,8 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         '''
         if self.if_loaded_shapes: return
         
+        print(white_blue('[%s] load_shapes for scene...'%self.parent_class_name))
+
         mitsubaBase._prepare_shapes(self)
 
         scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)

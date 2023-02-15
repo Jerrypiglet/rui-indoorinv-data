@@ -224,47 +224,6 @@ class openroomsScene2D(scene2DBase):
             scale_factor = [t / s for t, s in zip((self.im_H_resize, self.im_W_resize), (self.im_H_load, self.im_W_load))]
             self.K = resize_intrinsics(self.K, scale_factor)
         
-    # def load_im_hdr(self):
-    #     '''
-    #     load im in HDR; RGB, (H, W, 3), [0., inf]
-
-    #     e.g. frame 0:
-    #         - original max: 308.0
-    #         - hdr scale: 0.07422680412371133
-    #         - after scaled: 22.861856
-    #     '''
-
-    #     print(white_blue('[openroomsScene] load_im_hdr for %d frames...'%len(self.frame_id_list)))
-
-    #     # self.im_hdr_ext in ['hdr'] # .rgbe not supported for now
-    #     filename = self.modality_filename_dict['im_hdr']
-    #     im_hdr_ext = filename.split('.')[-1]
-
-    #     self.modality_file_list_dict['im_hdr'] = [self.scene_rendering_path / ('%s%d.%s'%(self.im_key, i, im_hdr_ext)) for i in self.frame_id_list]
-    #     self.im_hdr_list = [load_HDR(_, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_target_HW) for _ in self.im_hdr_file_list]
-
-    #     if self.if_scale_hdr:
-    #         if not hasattr(self, 'seg_dict_of_lists'):
-    #             self.load_seg()
-
-    #         self.hdr_scale_list = []
-    #         if self.if_scale_hdr_per_frame:
-    #             hdr_scale_global = None
-    #         else:
-    #             hdr_scale_list_ = []
-    #             for im_hdr, seg_ori in zip(self.im_hdr_list, self.seg_dict_of_lists['ori']):
-    #                 hdr_scale_ = scale_HDR(im_hdr, seg_ori[..., np.newaxis], fixed_scale=True, if_return_scale_only=True)
-    #                 hdr_scale_list_.append(hdr_scale_)
-    #             hdr_scale_global = np.median(hdr_scale_list_)
-
-    #         for _, (im_hdr, seg_ori) in enumerate(zip(self.im_hdr_list, self.seg_dict_of_lists['ori'])):
-    #             im_hdr_scaled, hdr_scale = scale_HDR(im_hdr, seg_ori[..., np.newaxis], scale_input=hdr_scale_global, if_clip_to_01=self.if_clip_HDR_to_01)
-    #             self.im_hdr_list[_] = im_hdr_scaled
-    #             self.hdr_scale_list.append(hdr_scale)
-
-    #     print(blue_text('[openroomsScene] DONE. load_im_hdr'))
-
-
     def load_seg(self):
         '''
         return 3 bool masks; (H, W), float32 0./1.
