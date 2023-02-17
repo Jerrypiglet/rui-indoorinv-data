@@ -105,3 +105,4 @@ python test_class_replicaScene3D.py --if_export True
 
 TODO: 
 - [ ] adapt sample pose to z+ up: get rid of self.extra_transform
+- [ ] add check for camera inside mesh (because no obj info available)

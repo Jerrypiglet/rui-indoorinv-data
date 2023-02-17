@@ -232,6 +232,15 @@ class scene2DBase():
         self.im_hdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_hdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop) for _, __ in zip(self.modality_file_list_dict['im_hdr'], expected_shape_list)]
         self.hdr_scale_list = [1.] * len(self.im_hdr_list)
 
+        # assert all([np.all(~np.isnan(xx)) for xx in self.im_hdr_list])
+        for frame_id, xx in zip(self.frame_id_list, self.im_hdr_list):
+            is_nan_im = np.any(np.isnan(xx), axis=-1)
+            if np.any(is_nan_im):
+                # print(frame_id)
+                # print(np.vstack((np.where(is_nan_im)[0], np.where(is_nan_im)[1])))
+                # import ipdb; ipdb.set_trace()
+                print(yellow('[Warning] NaN in im_hdr'), 'frame_id: %d'%frame_id, 'percentage: %.4f percent'%(np.sum(is_nan_im).astype(np.float32)/np.prod(is_nan_im.shape[:2])*100.))
+
         '''
         convert and write sdr files
         '''

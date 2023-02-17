@@ -93,8 +93,8 @@ radiance_scale = 1.
 # scene_name = 'office_2'; radiance_scale = 0.5; 
 # scene_name = 'office_3'
 # scene_name = 'office_4'
-# scene_name = 'room_0'; radiance_scale = 0.5; 
-scene_name = 'room_1'; radiance_scale = 0.5; 
+scene_name = 'room_0'; radiance_scale = 0.5; 
+# scene_name = 'room_1'; radiance_scale = 0.5; 
 # scene_name = 'room_2'
 
 # frame_ids = [0]
@@ -163,16 +163,16 @@ scene_obj = replicaScene3D(
         'distRaysMin': 0.3, # min dist of all camera rays to the scene; should be relatively relaxed; [!!!] set to -1 to disable checking
         'distRaysMedianMin': 0.6, # median dist of all camera rays to the scene; should be relatively STRICT to avoid e.g. camera too close to walls; [!!!] set to -1 to disable checking
 
-        # 'heightMin' : 0.7, # camera height min
-        # 'heightMax' : 2., # camera height max
-        # 'distMin': 0.1, # to wall distance min
-        # 'distMax': 2.5, # to wall distance max
-        # 'thetaMin': -60, # theta min: pitch angle; up+ 
-        # 'thetaMax' : 40, # theta max: pitch angle; up+
-        # 'phiMin': -60, # yaw angle min
-        # 'phiMax': 60, # yaw angle max
-        # 'distRaysMin': -1, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
-        # 'distRaysMedianMin': 0.2, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'heightMin' : 0.7, # camera height min
+        'heightMax' : 2., # camera height max
+        'distMin': 0.1, # to wall distance min
+        'distMax': 2.5, # to wall distance max
+        'thetaMin': -60, # theta min: pitch angle; up+ 
+        'thetaMax' : 40, # theta max: pitch angle; up+
+        'phiMin': -60, # yaw angle min
+        'phiMax': 60, # yaw angle max
+        'distRaysMin': -1, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'distRaysMedianMin': 0.2, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
 
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)

@@ -286,7 +286,7 @@ class replicaScene3D(mitsubaBase, scene2DBase):
                 # if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(self.load_meta_json_pose(self.pose_file)[1]))))
                 if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), _num_poses)))
             if not if_resample in ['N', 'n']:
-                self.sample_poses(cam_params_dict.get('sample_pose_num'), self.extra_transform_inv)
+                self.sample_poses(cam_params_dict.get('sample_pose_num'), self.extra_transform_inv, invalid_normal_thres=0.01)
                 return
 
         print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file))))

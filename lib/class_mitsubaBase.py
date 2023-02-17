@@ -223,9 +223,11 @@ class mitsubaBase():
 
         print(green_text('DONE. [mi_get_segs] for %d frames...'%len(self.mi_rays_ret_list)))
 
-    def sample_poses(self, sample_pose_num: int, extra_transform: np.ndarray=None):
+    def sample_poses(self, sample_pose_num: int, extra_transform: np.ndarray=None, invalid_normal_thres=-1):
         '''
         sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)
+        
+        invalid_normal_threshold: if pixels of invalid normals exceed this thres, discard pose
         '''
         from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
         assert self.axis_up == 'y+', 'not supporting other axes for now'
@@ -299,7 +301,7 @@ class mitsubaBase():
             valid_normal_mask_list.append(~invalid_normal_mask)
 
             mi_normal = mi_normal.astype(np.float32)
-            if np.sum(~invalid_normal_mask[:, 1:]) < (H*W*0.1):
+            if np.sum(invalid_normal_mask) > (H*W*0.1):
                 ncost = -100000. # <10% pixels with valid normals
             else:    
                 mi_normal_gradx = np.abs(mi_normal[:, 1:] - mi_normal[:, 0:-1])[~invalid_normal_mask[:, 1:]]
