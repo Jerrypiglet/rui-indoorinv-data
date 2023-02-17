@@ -123,9 +123,9 @@ def vis_disp_colormap(disp_array_, file=None, normalize=True, min_and_scale=None
     cm = plt.get_cmap(cmap_name) # the larger the hotter
     if valid_mask is not None:
         assert valid_mask.shape==disp_array.shape
-        assert valid_mask.dtype==np.bool
+        assert valid_mask.dtype==bool
     else:
-        valid_mask = np.ones_like(disp_array).astype(np.bool)
+        valid_mask = np.ones_like(disp_array).astype(bool)
     
     if normalize:
         if min_and_scale is None:

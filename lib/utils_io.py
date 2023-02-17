@@ -1,4 +1,5 @@
 from pathlib import Path
+import imagecodecs
 import numpy as np
 np.set_printoptions(precision=4)
 np.set_printoptions(suppress=True)
@@ -10,9 +11,6 @@ from PIL import Image
 import struct
 import h5py
 import random
-import imageio
-import subprocess
-from skimage.measure import block_reduce 
 from skimage.measure import block_reduce 
 
 def load_matrix(path: Path, if_inverse_y: bool=False) -> np.ndarray:
@@ -51,6 +49,16 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         im = np.load(str(path))
         if npy_if_channel_first:
             im = im.transpose(1, 2, 0)
+    elif ext in ['jxr']:
+        with open(str(path), 'rb') as fh:
+            img = fh.read()
+        img = imagecodecs.jpegxr_decode(img)
+
+        im = img.copy().astype(np.float32)
+        # print(im.shape, im.dtype, np.amax(im), np.amin(im))
+        mask = im <= 3000
+        im[mask] = im[mask]*8e-8
+        im[~mask] = 0.00024*1.0002**(im[~mask]-3000)
 
     # cv2.imread returns None when it cannot read the file
     if im is None:

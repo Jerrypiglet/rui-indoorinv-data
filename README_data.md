@@ -85,12 +85,25 @@ From Chang et al.'17, *Matterport3D: Learning from RGB-D Data in Indoor ...* [[P
 
 ![](images/demo_matterport_plt_2d.png)
 
+Download:
+
+``` bash
+(base) ➜  /Users/jerrypiglet/Documents/Projects/data python2 download_mp.py -o Matterport3D --id 2t7WUuJeko7
+```
+
+``` bash
+python test_class_matterportScene3D.py --vis_2d_plt True --if_export True --eval_scene True
+```
+
 TODO:
-- [ ] undistord HDR images
+- [ ] undistord HDR images (TODO: necessary?)
+- [ ] make sure .jxr loading is correct
 
 ## Replica
 
 From Straub et al.'19, *The Replica Dataset: A Digital Replica of Indoor Spaces* [[Code]](https://github.com/facebookresearch/Replica-Dataset)
+
+Replica renderer: https://github.com/Jerrypiglet/Replica-Dataset.git
 
 ``` bash
 # sample poses -> {scene_path}/cameras/cam.txt and cam_extra_transform.txt (for ReplicaSDK renderer)
@@ -106,3 +119,4 @@ python test_class_replicaScene3D.py --if_export True
 TODO: 
 - [ ] adapt sample pose to z+ up: get rid of self.extra_transform
 - [ ] add check for camera inside mesh (because no obj info available)
+- [ ] NaN in output exr images [issue](https://github.com/facebookresearch/Replica-Dataset/issues/19)

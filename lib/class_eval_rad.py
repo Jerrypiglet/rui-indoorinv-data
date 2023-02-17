@@ -267,7 +267,7 @@ class evaluator_scene_rad():
         for frame_idx in tqdm(range(len(self.os.frame_id_list))):
             seg_obj = self.os.mi_seg_dict_of_lists['obj'][frame_idx] # (H, W), bool, [IMPORTANT] mask off emitter area!!
             if not if_mask_off_emitters:
-                seg_obj = np.ones_like(seg_obj).astype(np.bool)
+                seg_obj = np.ones_like(seg_obj).astype(bool)
 
             env_height, env_width, env_row, env_col = get_list_of_keys(self.os.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
             downsize_ratio = self.os.lighting_params_dict.get('env_downsample_rate', 1) # over loaded envmap rows/cols

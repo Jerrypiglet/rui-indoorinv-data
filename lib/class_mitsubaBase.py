@@ -38,6 +38,8 @@ class mitsubaBase():
         self.if_loaded_shapes = False
         self.if_loaded_layout = False
 
+        self.extra_transform = None
+
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
             return x
@@ -118,7 +120,7 @@ class mitsubaBase():
             mi_pts = ret.p.numpy()
             # mi_pts = ret.t.numpy()[:, np.newaxis] * rays_d_flatten + rays_o_flatten # should be the same as above
             if np.all(ret.t.numpy()==np.inf):
-                print(white_red('no rays hit any surface!'))
+                print(white_red('no rays hit any surface! (frame_id %d, idx %d)'%(self.frame_id_list[frame_idx], frame_idx)))
             # assert np.amax(np.abs((mi_pts - ret.p.numpy())[ret.t.numpy()!=np.inf, :])) < 1e-3 # except in window areas
             mi_pts = mi_pts.reshape(self._H(frame_idx), self._W(frame_idx), 3)
             mi_pts[invalid_depth_mask, :] = 0.
@@ -207,7 +209,7 @@ class mitsubaBase():
                 else:
                     print(yellow_text('loading mi_seg_emitter from'), '%s'%str(mi_seg_area_file_folder))
                     if_get_from_scratch = False
-                    mi_seg_area = (mi_seg_area / 255.).astype(np.bool)
+                    mi_seg_area = (mi_seg_area / 255.).astype(bool)
 
             if if_get_from_scratch and if_seg_emitter:
                 mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self._H(frame_idx), self._W(frame_idx))
@@ -215,7 +217,7 @@ class mitsubaBase():
                 print(green_text('[mi_get_segs] mi_seg_area -> %s'%str(mi_seg_area_file_path)))
     
             if not if_seg_emitter:
-                mi_seg_area = np.zeros_like(mi_seg_env, dtype=np.bool)
+                mi_seg_area = np.zeros_like(mi_seg_env, dtype=bool)
             self.mi_seg_dict_of_lists['area'].append(mi_seg_area) # lit-up lamps
 
             mi_seg_obj = np.logical_and(np.logical_not(mi_seg_area), np.logical_not(mi_seg_env))
@@ -665,7 +667,8 @@ class mitsubaBase():
                 (scene_export_path / 'Image').mkdir(parents=True, exist_ok=True)
                 for _, frame_id in enumerate(self.frame_id_list):
                     im_hdr_export_path = scene_export_path / 'Image' / ('%03d_0001.exr'%_)
-                    cv2.imwrite(str(im_hdr_export_path), self.im_hdr_list[_][:, :, [2, 1, 0]])
+                    hdr_scale = self.hdr_scale_list[_]
+                    cv2.imwrite(str(im_hdr_export_path), hdr_scale * self.im_hdr_list[_][:, :, [2, 1, 0]])
                     print(blue_text('HDR image %s exported to: %s'%(frame_id, str(im_hdr_export_path))))
             
             if modality == 'im_sdr':
@@ -708,8 +711,10 @@ class mitsubaBase():
                         im_mask = self.im_mask_list[_]
                         assert mi_invalid_depth_mask.shape == im_mask.shape, 'invalid depth mask shape %s not equal to im_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask.shape)
                         im_mask = np.logical_and(im_mask, ~mi_invalid_depth_mask)
+                        print('Exporting im_mask from invalid depth mask && loaded im_mask')
                     else:
                         im_mask = ~mi_invalid_depth_mask
+                        print('Exporting im_mask from invalid depth mask only')
                     cv2.imwrite(str(im_mask_export_path), (im_mask*255).astype(np.uint8))
                     print(blue_text('Mask image (for valid depths) %s exported to: %s'%(frame_id, str(im_mask_export_path))))
             

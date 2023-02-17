@@ -230,7 +230,8 @@ class scene2DBase():
 
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_hdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_hdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop) for _, __ in zip(self.modality_file_list_dict['im_hdr'], expected_shape_list)]
-        self.hdr_scale_list = [1.] * len(self.im_hdr_list)
+        hdr_radiance_scale = self.im_params_dict.get('hdr_radiance_scale', 1.)
+        self.hdr_scale_list = [hdr_radiance_scale] * len(self.im_hdr_list)
 
         # assert all([np.all(~np.isnan(xx)) for xx in self.im_hdr_list])
         for frame_id, xx in zip(self.frame_id_list, self.im_hdr_list):
@@ -240,6 +241,8 @@ class scene2DBase():
                 # print(np.vstack((np.where(is_nan_im)[0], np.where(is_nan_im)[1])))
                 # import ipdb; ipdb.set_trace()
                 print(yellow('[Warning] NaN in im_hdr'), 'frame_id: %d'%frame_id, 'percentage: %.4f percent'%(np.sum(is_nan_im).astype(np.float32)/np.prod(is_nan_im.shape[:2])*100.))
+                xx[is_nan_im] = 0.
+                print('NaN replaced by 0.')
 
         '''
         convert and write sdr files
@@ -254,8 +257,8 @@ class scene2DBase():
             if not im_sdr_file.exists():
                 print(yellow('[%s] load_im_hdr: converting HDR to SDR and write to disk'%frame_idx))
                 print('-> %s'%str(im_sdr_file))
-                radiance_scale = self.im_params_dict.get('radiance_scale', 1.)
-                convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=radiance_scale)
+                sdr_radiance_scale = self.im_params_dict.get('sdr_radiance_scale', 1.)
+                convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=sdr_radiance_scale)
 
         print(blue_text('[%s] DONE. load_im_hdr'%self.parent_class_name))
 

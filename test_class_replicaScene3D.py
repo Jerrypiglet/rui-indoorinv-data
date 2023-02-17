@@ -76,7 +76,7 @@ opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/replica_v1'
 assert base_root.exists()
-radiance_scale = 1.
+sdr_radiance_scale = 1.
 
 # scene_name = 'apartment_0'
 # scene_name = 'apartment_1'
@@ -88,16 +88,16 @@ radiance_scale = 1.
 # scene_name = 'frl_apartment_4'
 # scene_name = 'frl_apartment_5'
 # scene_name = 'hotel_0'
-# scene_name = 'office_0'; radiance_scale = 1.; 
-# scene_name = 'office_1'; radiance_scale = 1.; 
-# scene_name = 'office_2'; radiance_scale = 0.5; 
+# scene_name = 'office_0'; sdr_radiance_scale = 1.; 
+# scene_name = 'office_1'; sdr_radiance_scale = 1.; 
+# scene_name = 'office_2'; sdr_radiance_scale = 0.5; 
 # scene_name = 'office_3'
 # scene_name = 'office_4'
-scene_name = 'room_0'; radiance_scale = 0.5; 
-# scene_name = 'room_1'; radiance_scale = 0.5; 
+# scene_name = 'room_0'; sdr_radiance_scale = 0.5; 
+scene_name = 'room_1'; sdr_radiance_scale = 0.5; 
 # scene_name = 'room_2'
 
-# frame_ids = [0]
+# frame_ids = [23]
 # frame_ids = [0, 10, 199]
 frame_ids = list(range(200))
 
@@ -145,7 +145,7 @@ scene_obj = replicaScene3D(
     im_params_dict={
         'im_H_load': 320, 'im_W_load': 640, 
         'im_H_resize': 320, 'im_W_resize': 640, 
-        'radiance_scale': radiance_scale, 
+        'sdr_radiance_scale': sdr_radiance_scale, 
         }, 
     cam_params_dict={
         'near': 0.1, 'far': 10., 

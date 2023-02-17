@@ -352,7 +352,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
 
     def load_im_mask(self):
         '''
-        load im_mask (H, W), np.bool
+        load im_mask (H, W), bool
         '''
         print(white_blue('[%s] load_im_mask')%self.parent_class_name)
 
@@ -364,10 +364,10 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         self.im_mask_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
         expected_shape_list = [self.im_HW_load_list[_] for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load]*self.frame_num
         if if_all_ones_masks:
-            self.im_mask_list = [np.ones(_, dtype=np.bool) for _ in expected_shape_list]
+            self.im_mask_list = [np.ones(_, dtype=bool) for _ in expected_shape_list]
         else:
             self.im_mask_list = [load_img(_, expected_shape=__, ext=im_mask_ext, target_HW=self.im_HW_target, if_allow_crop=if_allow_crop)/255. for _, __ in zip(self.im_mask_file_list, expected_shape_list)]
-        self.im_mask_list = [_.astype(np.bool) for _ in self.im_mask_list]
+        self.im_mask_list = [_.astype(bool) for _ in self.im_mask_list]
 
         print(blue_text('[%s] DONE. load_im_mask')%self.parent_class_name)
 

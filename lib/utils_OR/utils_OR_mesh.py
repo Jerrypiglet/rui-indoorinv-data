@@ -1,4 +1,3 @@
-from inspect import isdatadescriptor
 import trimesh
 import numpy as np
 import quaternion

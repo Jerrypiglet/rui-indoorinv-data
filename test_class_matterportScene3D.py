@@ -67,14 +67,26 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 # utils
 parser.add_argument('--if_convert_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
 parser.add_argument('--if_dump_shape', type=str2bool, nargs='?', const=True, default=False, help='if dump shape of entire scene')
+parser.add_argument('--if_export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
 
 opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/Matterport3D'
 assert base_root.exists()
 
-scene_name = '17DRP5sb8fy'; region_id = 5; 
-frame_ids = [10, 40, 120, 150, 60]
+'''
+conference room with set of lamps and white chairs
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.17DRP5sb8fy_5
+'''
+scene_name = '17DRP5sb8fy'; region_id = 5; hdr_radiance_scale = 10; 
+frame_ids = [21, 22, 46, 47]
+
+'''
+old bedroom
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.2t7WUuJeko7_5
+'''
+scene_name = '2t7WUuJeko7'; region_id = 5; hdr_radiance_scale = 1; 
+frame_ids = [18, 19, 20, 21, 22]
 
 scene_obj = matterportScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -82,7 +94,7 @@ scene_obj = matterportScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
-        'frame_id_list': frame_ids, # comment out to use all frames
+        # 'frame_id_list': frame_ids, # comment out to use all frames
         'axis_up': 'z+', 
         'region_id': region_id, 
         'if_undist': False, # True to use undistorted images/poses
@@ -105,7 +117,7 @@ scene_obj = matterportScene3D(
         'shapes', 
         ], 
     modality_filename_dict = {
-        'im_hdr': ('matterport_hdr_images', 'j', 'exr'), 
+        'im_hdr': ('matterport_hdr_images', 'j', 'jxr'), 
         'im_sdr': ('matterport_color_images', 'i', 'jpg'), 
         'depth': ('matterport_depth_images', 'd', 'png'), 
         'poses': ('matterport_camera_poses', 'pose_', 'txt'), # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_poses
@@ -117,6 +129,9 @@ scene_obj = matterportScene3D(
 
     }, 
     im_params_dict={
+        'im_H_load': 1024, 'im_W_load': 1280, 
+        'im_H_resize': 512, 'im_W_resize': 640, 
+        'hdr_radiance_scale': hdr_radiance_scale, 
         }, 
     cam_params_dict={
         'if_convert': opt.if_convert_poses, # True to convert poses to cam.txt and K_list.txt
@@ -141,6 +156,20 @@ scene_obj = matterportScene3D(
     emitter_params_dict={
         },
 )
+
+if opt.if_export:
+    scene_obj.export_scene(
+        modality_list = [
+        'poses', 
+        'im_hdr', 
+        'im_sdr', 
+        'im_mask', 
+        'shapes', 
+        'mi_normal', 
+        'mi_depth', 
+        ], 
+    )
+
 
 eval_return_dict = {}
 

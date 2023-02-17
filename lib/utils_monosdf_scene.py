@@ -2,6 +2,7 @@ from pathlib import Path
 import numpy as np
 import trimesh
 from lib.utils_misc import yellow
+
 from utils_OR.utils_OR_mesh import sample_mesh, simplify_mesh, computeBox
 
 def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scale_offset: tuple=(), extra_transform: np.ndarray=None):

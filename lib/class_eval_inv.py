@@ -161,7 +161,7 @@ class evaluator_scene_inv():
                         m_list = []
                         emitter_dict_list = []
                         for _, c_ in enumerate(cc):
-                            mask = np.zeros(len(emitters_trimesh.faces), dtype=np.bool)
+                            mask = np.zeros(len(emitters_trimesh.faces), dtype=bool)
                             mask[c_] = True
                             m_ = deepcopy(emitters_trimesh)
                             m_.update_faces(mask)

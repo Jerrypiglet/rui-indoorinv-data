@@ -33,6 +33,8 @@ bpy
 pyhocon
 cachetools
 imageio
+imagecodecs # if fails, try: conda install -c conda-forge imagecodecs
+
 
 # === Also:
 # conda install -c conda-forge ninja

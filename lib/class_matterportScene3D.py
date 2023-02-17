@@ -1,8 +1,10 @@
 import json
 from pathlib import Path, PosixPath
 import subprocess
+import imagecodecs
 import matplotlib.pyplot as plt
 import numpy as np
+from pyvista import read_texture
 np.set_printoptions(suppress=True)
 
 from tqdm import tqdm
@@ -11,7 +13,7 @@ from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
 from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up
-from lib.utils_io import load_img, load_matrix
+from lib.utils_io import load_img, resize_intrinsics
 # from collections import defaultdict
 # import trimesh
 # Import the library using the alias "mi"
@@ -24,9 +26,6 @@ from .class_mitsubaBase import mitsubaBase
 from .class_scene2DBase import scene2DBase
 
 from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_dict_from_shape_file
-from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, sample_mesh, simplify_mesh
-from lib.utils_OR.utils_OR_xml import get_XML_root
-from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, get_rectangle_mesh
 from lib.utils_misc import get_device
 
 from .class_scene2DBase import scene2DBase
@@ -231,7 +230,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             if_get_segs = mi_params_dict.get('if_get_segs', True)
             if if_get_segs:
                 assert if_sample_rays_pts
-                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
+                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True, if_seg_emitter=False)
                 self.seg_from['mi'] = True
 
     def load_meta(self):
@@ -246,7 +245,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         '''
 
         self.scene_metadata_file = self.scene_path / ('house_segmentations/%s.house'%self.scene_name)
-        assert Path(self.scene_metadata_file).exists()
+        assert Path(self.scene_metadata_file).exists(), 'No such file: %s'%str(self.scene_metadata_file)
         with open(str(self.scene_metadata_file), 'r') as camIn:
             scene_metadata = camIn.read().splitlines()
 
@@ -257,7 +256,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         house_line = scene_metadata[1].replace('  ', ' ').replace('  ', ' ').split(' '); assert house_line[0] == 'H'
         N_images, N_panoramas, N_vertices, N_surfaces, N_segments, N_objects, N_categories, self.N_regions = [int(_) for _ in house_line[3:11]]
         assert self.region_id < self.N_regions
-        print('[%s] Loading region %s from %d regions for house %s (total %d frames)...'%(self.__class__.__name__, self.region_id, self.N_regions, self.scene_name, N_images))
+        print('[%s] Loading region %s from %d regions of house %s (total %d frames for the house)...'%(self.__class__.__name__, self.region_id, self.N_regions, self.scene_name, N_images))
 
         '''
         the R line (region for self.region_id)...
@@ -307,12 +306,14 @@ class matterportScene3D(mitsubaBase, scene2DBase):
                 self.frame_id_list.append(image_index)
         self.frame_num_all = len(self.frame_id_list)
         
-        print('region %d: total %d frames for the region ([%s]...)'%(self.region_id, self.frame_num_all, ', '.join([str(_) for _ in self.frame_id_list[:5]])))
-        assert len(self.frame_id_list) > 0
+        print('region %d: total'%self.region_id, white_blue(str(self.frame_num_all)), 'frames for the region (frame_id e.g. [%s]...)'%(', '.join([str(_) for _ in self.frame_id_list[:5]])))
         if self.scene_params_dict['frame_id_list'] != []:
-            self.frame_id_list = [self.frame_id_list[_] for _ in self.scene_params_dict['frame_id_list']]
+            # self.frame_id_list = [self.frame_id_list[_] for _ in self.scene_params_dict['frame_id_list']]
+            assert all([_ in self.frame_id_list for _ in self.scene_params_dict['frame_id_list']])
+            self.frame_id_list = self.scene_params_dict['frame_id_list']
             print('region %d: SELECTED %d frames ([%s]...)'%(self.region_id, len(self.frame_id_list), ', '.join([str(_) for _ in self.frame_id_list[:3]])))
 
+        assert len(self.frame_id_list) > 0
         frame_line_valid_list = [frame_line_list[_] for _ in self.frame_id_list]
 
         self.frame_filename_list = []
@@ -320,6 +321,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         self.im_HW_load_list = []
 
         self.K_list = [] # undistorted/distorted: the same
+        self._K_orig_list = [] # only for validation purposes
         self.extrinsics_mat_list = [] # loaded from distorted
         self.pose_list = [] # undistorted/distorted: the same
         self.origin_lookatvector_up_list = []
@@ -338,8 +340,6 @@ class matterportScene3D(mitsubaBase, scene2DBase):
 
             # distorted camera parameters
             extrinsics_mat = np.array([float(_) for _ in frame_line[6:22]]).reshape(4, 4)
-            K = np.array([float(_) for _ in frame_line[22:31]]).reshape(3, 3) # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_intrinsics
-            self.K_list.append(K)
             self.extrinsics_mat_list.append(extrinsics_mat) # [world-to-camera] inverse of Rx+t
             R_ = extrinsics_mat[:3, :3]; t_ = extrinsics_mat[:3, 3:4]
             R = R_.T
@@ -353,13 +353,25 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             width, height = int(frame_line[31]), int(frame_line[32])
             self.im_HW_load_list.append((height, width))
 
+            # intrinsics
+            K = np.array([float(_) for _ in frame_line[22:31]]).reshape(3, 3) # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_intrinsics
+            self._K_orig_list.append(K.copy())
+            if width != self.W or height != self.H:
+                scale_factor = [t / s for t, s in zip((self.H, self.W), (height, width))]
+                K = resize_intrinsics(K, scale_factor)
+            self.K_list.append(K)
+
+        assert len(list(set(self.im_HW_load_list))) == 1, 'all loaded images should ideally have the same size'
+        assert self.im_HW_load == self.im_HW_load_list[0], 'loaded image size should match the specified image size'
+
         for modality, modality_filename in self.modality_filename_dict.items():
             modality_folder, modality_tag, modality_ext = modality_filename
             self.modality_file_list_dict[modality] = [self.scene_rendering_path / modality_folder / (frame_filename%(modality_tag, modality_ext)) for frame_filename in self.frame_filename_list]
         
-        assert 'im_H_resize' not in self.im_params_dict and 'im_W_resize' not in self.im_params_dict
-        self.H_list = [_[0] for _ in self.im_HW_load_list]
-        self.W_list = [_[1] for _ in self.im_HW_load_list]
+        # import ipdb; ipdb.set_trace()
+        # assert 'im_H_resize' not in self.im_params_dict and 'im_W_resize' not in self.im_params_dict
+        # self.H_list = [_[0] for _ in self.im_HW_load_list]
+        # self.W_list = [_[1] for _ in self.im_HW_load_list]
 
         self.load_undist_cam_parameters() # load undistorted camera parameters; TO DOUBLE CHECK AGAINST LOADED DISTORTED CAMERA PARAMETERS
 
@@ -391,7 +403,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             intrinsics_undist = [float(_) for _ in undist_cam_data_per_cam[0].replace('  ', ' ').split(' ')[1:]] # <fx> 0 <cx>  0 <fy> <cy> 0 0 1
             assert len(intrinsics_undist) == 9
             fx, cx, fy, cy = intrinsics_undist[0], intrinsics_undist[2], intrinsics_undist[4], intrinsics_undist[5]
-            assert np.all(np.array([[fx, 0., cx], [0., fy, cy], [0., 0., 1.]]) == self.K_list[frame_id]) # just double check to make sure: intrinsics distorted/undistorted are the same
+            assert np.all(np.array([[fx, 0., cx], [0., fy, cy], [0., 0., 1.]]) == self._K_orig_list[frame_id]) # just double check to make sure: intrinsics distorted/undistorted are the same
 
             inv_extrinsics_undist = [float(_) for _ in undist_cam_data_per_cam[1+yaw_index].replace('  ', ' ').split(' ')[3:]] # <camera-to-world-matrix>
             assert len(inv_extrinsics_undist) == 16
@@ -406,41 +418,53 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         if self.cam_params_dict.get('if_convert_poses', False):
             self.export_poses_cam_txt(self.pose_file.parent, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
     
-    def load_im_hdr(self):
-        for _ in self.modality_file_list_dict['im_hdr']:
-            if Path(_).exists():
-                pass
-            else:
-                _jxr_path = Path(str(_).replace('.exr', '.jxr'))
-                if _jxr_path.exists():
-                    '''
-                    https://github.com/niessner/Matterport/issues/3#issuecomment-575796265
-                    https://github.com/python-pillow/Pillow/issues/5248
+    # def load_im_hdr(self):
+    #     for _ in self.modality_file_list_dict['im_hdr']:
+    #         if Path(_).exists():
+    #             pass
+    #         else:
+    #             _jxr_path = Path(str(_).replace('.exr', '.jxr'))
+    #             if _jxr_path.exists():
+    #                 with open(str(_jxr_path) ,'rb') as fh:
+    #                     img = fh.read()
+    #                 img = imagecodecs.jpegxr_decode(img)
 
-                    [Mac] brew install jxrlib
-                    '''
-                    _tif_path = Path(str(_jxr_path).replace('.jxr', '.tif'))
-                    convert_cmd = 'JxrDecApp -i %s -o %s -c 10 -a 0'%(str(_jxr_path), str(_tif_path))
-                    subprocess.run(convert_cmd.split())
-                    im_tif = cv2.imread(str(_tif_path), cv2.IMREAD_UNCHANGED) # uint16
-                    from utils_io import tone_mapping_16bit
-                    im_float = tone_mapping_16bit(im_tif, dest_dtype=np.float16) * 8.
-                    cv2.imwrite('/Users/jerrypiglet/Downloads/tmp_tonemapped.jpg', (np.clip(im_float, 0., 1.)*255.).astype(np.uint8))
-                    im_float = im_tif.astype(np.float32) / 65535.
-                    cv2.imwrite('/Users/jerrypiglet/Downloads/tmp_half.jpg', (np.clip(im_float, 0., 1.)*255.).astype(np.uint8))
-                    # cv2.imwrite('/Users/jerrypiglet/Downloads/tmp.exr', im_tif.astype(np.float32))
+    #                 img_out = img.copy().astype(np.float32)
+    #                 # print(img_out.shape, img_out.dtype, np.amax(img_out), np.amin(img_out))
+    #                 mask = img_out <= 3000
+    #                 img_out[mask] = img_out[mask]*8e-8
+    #                 img_out[~mask] = 0.00024*1.0002**(img_out[~mask]-3000)
 
-                    import OpenImageIO as oiio # build from source; export PYTHONPATH="/Users/jerrypiglet/Documents/Projects/oiio/build/lib/python/site-packages"
-                    from OpenImageIO import ImageBufAlgo
-                    buf = oiio.ImageBuf(str(_tif_path)) # https://stackoverflow.com/questions/58548333/what-is-the-proper-way-to-convert-from-a-32bit-exr-to-8-bit-tiff-image-using-ope
-                    dst_img = ImageBufAlgo.colorconvert(buf, "linear", 'linear')
-                    dst_img.write('/Users/jerrypiglet/Downloads/outImage.exr', 'float32')
+                    # '''
+                    # https://github.com/niessner/Matterport/issues/3#issuecomment-575796265
+                    # https://github.com/python-pillow/Pillow/issues/5248
 
-                    import ipdb; ipdb.set_trace()
+                    # [Mac] brew install jxrlib
+                    # '''
+                    # _tif_path = Path(str(_jxr_path).replace('.jxr', '.tif'))
+                    # convert_cmd = 'JxrDecApp -i %s -o %s -c 10 -a 0'%(str(_jxr_path), str(_tif_path))
+                    # subprocess.run(convert_cmd.split())
+                    # im_tif = cv2.imread(str(_tif_path), cv2.IMREAD_UNCHANGED) # uint16
+                    # from utils_io import tone_mapping_16bit
+                    # im_float = tone_mapping_16bit(im_tif, dest_dtype=np.float16) * 8.
+                    # cv2.imwrite('/Users/jerrypiglet/Downloads/tmp_tonemapped.jpg', (np.clip(im_float, 0., 1.)*255.).astype(np.uint8))
+                    # im_float = im_tif.astype(np.float32) / 65535.
+                    # cv2.imwrite('/Users/jerrypiglet/Downloads/tmp_half.jpg', (np.clip(im_float, 0., 1.)*255.).astype(np.uint8))
+                    # # cv2.imwrite('/Users/jerrypiglet/Downloads/tmp.exr', im_tif.astype(np.float32))
+
+                    # import ipdb; ipdb.set_trace()
+
+                    # import OpenImageIO as oiio # build from source; export PYTHONPATH="/Users/jerrypiglet/Documents/Projects/oiio/build/lib/python/site-packages"
+                    # from OpenImageIO import ImageBufAlgo
+                    # buf = oiio.ImageBuf(str(_tif_path)) # https://stackoverflow.com/questions/58548333/what-is-the-proper-way-to-convert-from-a-32bit-exr-to-8-bit-tiff-image-using-ope
+                    # dst_img = ImageBufAlgo.colorconvert(buf, "linear", 'linear')
+                    # dst_img.write('/Users/jerrypiglet/Downloads/outImage.exr', 'float32')
+
+                    # import ipdb; ipdb.set_trace()
 
     def load_im_mask(self):
         '''
-        load im_mask (H, W), np.bool
+        load im_mask (H, W), bool
         '''
         print(white_blue('[%s] load_im_mask')%self.parent_class_name)
 
@@ -450,13 +474,19 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         self.im_mask_file_list = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
         expected_shape_list = [self.im_HW_load_list[_] for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load]*self.frame_num
         self.im_mask_list = [load_img(_, expected_shape=__, ext=im_mask_ext, target_HW=self.im_HW_target)/255. for _, __ in zip(self.im_mask_file_list, expected_shape_list)]
-        self.im_mask_list = [_.astype(np.bool) for _ in self.im_mask_list]
+        self.im_mask_list = [_.astype(bool) for _ in self.im_mask_list]
 
         print(blue_text('[%s] DONE. load_im_mask')%self.parent_class_name)
 
+    # def get_cam_rays(self, cam_params_dict={}):
+    #     if hasattr(self, 'cam_rays_list'):  return
+    #     self.cam_rays_list = self.get_cam_rays_list(self.H_list, self.W_list, self.K_list, self.pose_list, convention='opencv')
+
     def get_cam_rays(self, cam_params_dict={}):
         if hasattr(self, 'cam_rays_list'):  return
-        self.cam_rays_list = self.get_cam_rays_list(self.H_list, self.W_list, self.K_list, self.pose_list, convention='opencv')
+        # self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
+        # import ipdb; ipdb.set_trace()
+        self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, self.K_list, self.pose_list, convention='opencv')
 
     def load_shapes(self, shape_params_dict={}):
         '''
@@ -482,6 +512,40 @@ class matterportScene3D(mitsubaBase, scene2DBase):
 
         if shape_params_dict.get('if_dump_shape', False):
             dump_shape_dict_to_shape_file(shape_dict, self.shape_file)
+
+    def export_scene(self, modality_list=[]):
+        # find invalid frames (frames with no valid rays)
+        print(white_blue('Exporting %d frames... but remove invalid frames first'%len(self.frame_id_list)))
+        valid_frame_idx_list = []
+        for frame_idx, frame_id in enumerate(self.frame_id_list):
+            valid_mask = ~self.mi_invalid_depth_mask_list[frame_idx]
+            valid_ratio = float(np.sum(valid_mask))/np.prod(valid_mask.shape[:2])
+            if valid_ratio < 0.5:
+                print(yellow('frame %d has few valid rays (ratio %.2f), skip it.'%(frame_id, valid_ratio)))
+                # self.frame_id_list.remove(frame_id)
+            else:
+                valid_frame_idx_list.append(frame_idx)
+                print(frame_idx, '->', len(valid_frame_idx_list)-1, 'num valid pixels:', np.sum(valid_mask), 'ratio: %.2f'%(valid_ratio))
+
+        self.frame_id_list = [self.frame_id_list[_] for _ in valid_frame_idx_list]
+        self.origin_lookatvector_up_list = [self.origin_lookatvector_up_list[_] for _ in valid_frame_idx_list]
+        self.pose_list = [self.pose_list[_] for _ in valid_frame_idx_list]
+        self.K_list = [self.K_list[_] for _ in valid_frame_idx_list]
+        self.cam_rays_list = [self.cam_rays_list[_] for _ in valid_frame_idx_list]
+
+        self.hdr_scale_list = [self.hdr_scale_list[_] for _ in valid_frame_idx_list]
+        self.im_hdr_list = [self.im_hdr_list[_] for _ in valid_frame_idx_list]
+        self.im_sdr_list = [self.im_sdr_list[_] for _ in valid_frame_idx_list]
+        self.mi_depth_list = [self.mi_depth_list[_] for _ in valid_frame_idx_list]
+        self.mi_normal_global_list = [self.mi_normal_global_list[_] for _ in valid_frame_idx_list]
+
+        self.mi_invalid_depth_mask_list = [self.mi_invalid_depth_mask_list[_] for _ in valid_frame_idx_list]
+        if hasattr(self, 'im_mask_list'):
+            self.im_mask_list = [self.im_mask_list[_] for _ in valid_frame_idx_list]
+
+        print(white_blue('> Resulted in %d frames...'%len(self.frame_id_list)))
+        
+        mitsubaBase.export_scene(self, modality_list=modality_list)
 
     @property
     def region_description_dict(self):
