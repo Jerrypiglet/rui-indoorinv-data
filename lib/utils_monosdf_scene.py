@@ -26,7 +26,7 @@ def load_shape_dict_from_shape_file(shape_file_list: list, shape_params_dict={},
     shape_tri_mesh = trimesh.util.concatenate(shape_tri_mesh_list)
 
     suffix = shape_file_list[0].suffix
-    shape_file_join = shape_file_list[0].parent / ('%s.%s'%('-'.join(shape_file_join.stem for shape_file in shape_file_list), suffix))
+    shape_file_join = shape_file_list[0].parent / ('%s.%s'%('-'.join(shape_file.stem for shape_file in shape_file_list), suffix))
 
     if_fix_watertight = shape_params_dict.get('if_fix_watertight', False)
     if not shape_tri_mesh.is_watertight and if_fix_watertight:

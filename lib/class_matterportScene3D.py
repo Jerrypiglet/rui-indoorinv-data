@@ -65,9 +65,8 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             if_debug_info=if_debug_info, 
             )
 
-        self.scene_name, self.region_id_list, self.frame_id_list = get_list_of_keys(scene_params_dict, ['scene_name', 'region_id', 'frame_id_list'], [str, int, list])
+        self.scene_name, self.region_id_list, self.frame_id_list = get_list_of_keys(scene_params_dict, ['scene_name', 'region_id_list', 'frame_id_list'], [str, list, list])
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
-        if isinstance(self.region_id_list, int): self.region_id_list = [self.region_id_list]
         
         self.axis_up_native = 'z+'
         self.axis_up = scene_params_dict.get('axis_up', self.axis_up_native) # native: 'z+
@@ -328,12 +327,12 @@ class matterportScene3D(mitsubaBase, scene2DBase):
                     frame_id_list.append(image_index)
             frame_num_all = len(frame_id_list)
             
-            print('region %d: total'%region_id, white_blue(str(frame_num_all)), 'frames for the region (frame_id e.g. [%s]...)'%(', '.join([str(_) for _ in self.frame_id_list[:5]])))
+            print('region %d: total'%region_id, white_blue(str(frame_num_all)), 'frames for the region (frame_id e.g. [%s]...)'%(', '.join([str(_) for _ in frame_id_list[:5]])))
             if self.scene_params_dict['frame_id_list'] != []:
                 # self.frame_id_list = [self.frame_id_list[_] for _ in self.scene_params_dict['frame_id_list']]
                 # assert all([_ in self.frame_id_list for _ in self.scene_params_dict['frame_id_list']])
                 # self.frame_id_list = self.scene_params_dict['frame_id_list']
-                frame_id_list = [_ in frame_id_list if _ in self.scene_params_dict['frame_id_list']]
+                frame_id_list = [_ in frame_id_list for _ in self.scene_params_dict['frame_id_list']]
                 print('region %d: SELECTED %d frames ([%s]...)'%(region_id, len(frame_id_list), ', '.join([str(_) for _ in frame_id_list[:3]])))
 
             assert len(frame_id_list) > 0
@@ -383,16 +382,17 @@ class matterportScene3D(mitsubaBase, scene2DBase):
                     K = resize_intrinsics(K, scale_factor)
                 K_list.append(K)
 
-        self.frame_id_list += frame_id_list
+            self.frame_id_list += frame_id_list
+            self.frame_filename_list += frame_filename_list
+            self.frame_info_list += frame_info_list
+            self.im_HW_load_list += im_HW_load_list
+            self.K_list += K_list
+            self._K_orig_list += _K_orig_list
+            self.extrinsics_mat_list += extrinsics_mat_list
+            self.pose_list += pose_list
+            self.origin_lookatvector_up_list += origin_lookatvector_up_list
+
         self.frame_num_all = len(self.frame_id_list)
-        self.frame_filename_list += frame_filename_list
-        self.frame_info_list += frame_info_list
-        self.im_HW_load_list += im_HW_load_list
-        self.K_list += K_list
-        self._K_orig_list += _K_orig_list
-        self.extrinsics_mat_list += extrinsics_mat_list
-        self.pose_list += pose_list
-        self.origin_lookatvector_up_list += origin_lookatvector_up_list
 
         assert len(list(set(self.im_HW_load_list))) == 1, 'all loaded images should ideally have the same size'
         assert self.im_HW_load == self.im_HW_load_list[0], 'loaded image size should match the specified image size'
@@ -451,50 +451,6 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         if self.cam_params_dict.get('if_convert_poses', False):
             self.export_poses_cam_txt(self.pose_file.parent, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
     
-    # def load_im_hdr(self):
-    #     for _ in self.modality_file_list_dict['im_hdr']:
-    #         if Path(_).exists():
-    #             pass
-    #         else:
-    #             _jxr_path = Path(str(_).replace('.exr', '.jxr'))
-    #             if _jxr_path.exists():
-    #                 with open(str(_jxr_path) ,'rb') as fh:
-    #                     img = fh.read()
-    #                 img = imagecodecs.jpegxr_decode(img)
-
-    #                 img_out = img.copy().astype(np.float32)
-    #                 # print(img_out.shape, img_out.dtype, np.amax(img_out), np.amin(img_out))
-    #                 mask = img_out <= 3000
-    #                 img_out[mask] = img_out[mask]*8e-8
-    #                 img_out[~mask] = 0.00024*1.0002**(img_out[~mask]-3000)
-
-                    # '''
-                    # https://github.com/niessner/Matterport/issues/3#issuecomment-575796265
-                    # https://github.com/python-pillow/Pillow/issues/5248
-
-                    # [Mac] brew install jxrlib
-                    # '''
-                    # _tif_path = Path(str(_jxr_path).replace('.jxr', '.tif'))
-                    # convert_cmd = 'JxrDecApp -i %s -o %s -c 10 -a 0'%(str(_jxr_path), str(_tif_path))
-                    # subprocess.run(convert_cmd.split())
-                    # im_tif = cv2.imread(str(_tif_path), cv2.IMREAD_UNCHANGED) # uint16
-                    # from utils_io import tone_mapping_16bit
-                    # im_float = tone_mapping_16bit(im_tif, dest_dtype=np.float16) * 8.
-                    # cv2.imwrite('/Users/jerrypiglet/Downloads/tmp_tonemapped.jpg', (np.clip(im_float, 0., 1.)*255.).astype(np.uint8))
-                    # im_float = im_tif.astype(np.float32) / 65535.
-                    # cv2.imwrite('/Users/jerrypiglet/Downloads/tmp_half.jpg', (np.clip(im_float, 0., 1.)*255.).astype(np.uint8))
-                    # # cv2.imwrite('/Users/jerrypiglet/Downloads/tmp.exr', im_tif.astype(np.float32))
-
-                    # import ipdb; ipdb.set_trace()
-
-                    # import OpenImageIO as oiio # build from source; export PYTHONPATH="/Users/jerrypiglet/Documents/Projects/oiio/build/lib/python/site-packages"
-                    # from OpenImageIO import ImageBufAlgo
-                    # buf = oiio.ImageBuf(str(_tif_path)) # https://stackoverflow.com/questions/58548333/what-is-the-proper-way-to-convert-from-a-32bit-exr-to-8-bit-tiff-image-using-ope
-                    # dst_img = ImageBufAlgo.colorconvert(buf, "linear", 'linear')
-                    # dst_img.write('/Users/jerrypiglet/Downloads/outImage.exr', 'float32')
-
-                    # import ipdb; ipdb.set_trace()
-
     def load_im_mask(self):
         '''
         load im_mask (H, W), bool
@@ -530,7 +486,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         mitsubaBase._prepare_shapes(self)
 
         scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)
-        shape_dict = load_shape_dict_from_shape_file(self.shape_file, shape_params_dict=shape_params_dict, scale_offset=scale_offset)
+        shape_dict = load_shape_dict_from_shape_file(self.shape_file_list, shape_params_dict=shape_params_dict, scale_offset=scale_offset)
         # , scale_offset=(9.1, 0.)) # read scale.txt and resize room to metric scale in meters
         self.append_shape(shape_dict)
 
@@ -553,7 +509,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         for frame_idx, frame_id in enumerate(self.frame_id_list):
             valid_mask = ~self.mi_invalid_depth_mask_list[frame_idx]
             valid_ratio = float(np.sum(valid_mask))/np.prod(valid_mask.shape[:2])
-            if valid_ratio < 0.5:
+            if valid_ratio < 0.2:
                 print(yellow('frame %d has few valid rays (ratio %.2f), skip it.'%(frame_id, valid_ratio)))
                 # self.frame_id_list.remove(frame_id)
             else:
