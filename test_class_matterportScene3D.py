@@ -85,7 +85,7 @@ frame_ids = [21, 22, 46, 47]
 old bedroom
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.2t7WUuJeko7_5
 '''
-scene_name = '2t7WUuJeko7'; region_id = 5; hdr_radiance_scale = 1; 
+scene_name = '2t7WUuJeko7'; region_id = 5; hdr_radiance_scale = 10; 
 frame_ids = [18, 19, 20, 21, 22]
 
 scene_obj = matterportScene3D(

@@ -15,7 +15,7 @@ def read_cam_params_OR(camFile):
     #     camNum = int(camIn.readline().strip() )
         cam_data = camIn.read().splitlines()
     cam_num = int(cam_data[0])
-    cam_params = np.array([x.split(' ') for x in cam_data[1:]]).astype(np.float)
+    cam_params = np.array([x.split(' ') for x in cam_data[1:]]).astype(np.float32)
     if not np.any(cam_params): return []
     assert cam_params.shape[0] == cam_num * 3
     cam_params = np.split(cam_params, cam_num, axis=0) # [[origin, lookat, up], ...]
@@ -26,7 +26,7 @@ def read_K_list_OR(K_list_file):
     with open(str(K_list_file), 'r') as camIn:
         K_data = camIn.read().splitlines()
     K_num = int(K_data[0])
-    K_list = np.array([x.split(' ') for x in K_data[1:]]).astype(np.float)
+    K_list = np.array([x.split(' ') for x in K_data[1:]]).astype(np.float32)
     if not np.any(K_list): return []
     assert K_list.shape[0] == K_num * 3
     K_list = np.split(K_list, K_num, axis=0) # [[origin, lookat, up], ...]
