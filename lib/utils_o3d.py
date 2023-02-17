@@ -187,6 +187,7 @@ def get_sphere(scale=5., resolution=200, hemisphere_normal=None, envmap=None):
     return sphere
 
 def remove_ceiling(xyz_pcd: np.ndarray, axis_up: str='y+', if_debug_info: bool=False):
+    # import ipdb; ipdb.set_trace()
     # remove ceiling points; assuming y axis is up
     ceiling_axis = {'x+': 0, 'y+': 1, 'z+': 2, 'x-': 0, 'y-': 1, 'z-': 2}[axis_up]
     height_max = np.amax(xyz_pcd[:, ceiling_axis]) # y axis is up

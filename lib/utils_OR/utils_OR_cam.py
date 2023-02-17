@@ -32,7 +32,7 @@ def read_K_list_OR(K_list_file):
     K_list = np.split(K_list, K_num, axis=0) # [[origin, lookat, up], ...]
     return K_list
 
-def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, cam_params_dict: dict={}, K_list: list=[], frame_num_all: int=-1):
+def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt_list: list=[], cam_params_dict: dict={}, K_list: list=[], frame_num_all: int=-1, appendix='', extra_transform: np.ndarray=None):
     if frame_num_all != -1 and len(origin_lookat_up_mtx_list) != frame_num_all:
         if_write_pose_file = input(red('pose num to write %d is less than total available poses in the scene (%d poses). Still write? [y/n]'%(len(origin_lookat_up_mtx_list), frame_num_all)))
         if if_write_pose_file in ['N', 'n']:
@@ -40,7 +40,9 @@ def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, ca
             return
 
     if_overwrite_pose_file = 'Y'
-    pose_file_write = pose_file_root / 'cam.txt'
+    if not pose_file_root.exists():
+        pose_file_root.mkdir(parents=True, exist_ok=True)
+    pose_file_write = pose_file_root / ('cam%s.txt'%appendix)
     if pose_file_write.exists():
         if_overwrite_pose_file = input(red('pose file exists: %s (%d poses). Overwrite? [y/n]'%(str(pose_file_write), len(read_cam_params_OR(pose_file_write)))))
         
@@ -52,6 +54,30 @@ def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, ca
                 for n in range(0, 3):
                     camOut.write('%.3f %.3f %.3f\n'%(camPose[n, 0], camPose[n, 1], camPose[n, 2]))
         print(yellow('Pose file written to %s (%d poses).'%(pose_file_write, len(origin_lookat_up_mtx_list))))
+
+        if extra_transform is not None:
+            assert extra_transform.shape == (3, 3)
+            pose_file_write_extra_transform = str(pose_file_write).replace('.txt', '_extra_transform.txt')
+            with open(pose_file_write_extra_transform, 'w') as camOut:
+                camOut.write('%d\n'%len(origin_lookat_up_mtx_list))
+                print('Final sampled camera poses: %d'%len(origin_lookat_up_mtx_list))
+                for camPose in origin_lookat_up_mtx_list:
+                    for n in range(0, 3):
+                        camPose_ = (extra_transform @ camPose[n].reshape(3, 1)).flatten()
+                        camOut.write('%.3f %.3f %.3f\n'%(camPose_[0], camPose_[1], camPose_[2]))
+            print(yellow('Pose file (extra transform) written to %s (%d poses).'%(pose_file_write_extra_transform, len(origin_lookat_up_mtx_list))))
+
+        if Rt_list != []:
+            Rt_file_write = pose_file_root / ('Rt%s.txt'%appendix)
+            with open(str(Rt_file_write), 'w') as RtOut:
+                RtOut.write('%d\n'%len(Rt_list))
+                print('Final sampled camera poses: %d'%len(origin_lookat_up_mtx_list))
+                for R, t in Rt_list:
+                    Rt = np.hstack((R, t))
+                    Rt = np.vstack((Rt, np.array([0., 0., 0., 1]).reshape(1, 4)))
+                    for n in range(0, 4):
+                        RtOut.write('%.3f %.3f %.3f %.3f\n'%(Rt[n, 0], Rt[n, 1], Rt[n, 2], Rt[n, 3]))
+            print(yellow('Pose (Rt) file written to %s (%d poses).'%(Rt_file_write, len(Rt_list))))
         
         cam_params_dict_write = str(pose_file_root / 'cam_params_dict.txt')
         with open(str(cam_params_dict_write), 'w') as camOut:

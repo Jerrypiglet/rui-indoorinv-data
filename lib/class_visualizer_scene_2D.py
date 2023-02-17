@@ -10,6 +10,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_monosdfScene3D import monosdfScene3D
 from lib.class_freeviewpointScene3D import freeviewpointScene3D
 from lib.class_matterportScene3D import matterportScene3D
+from lib.class_replicaScene3D import replicaScene3D
 
 from lib.utils_vis import vis_index_map, colorize
 from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
@@ -26,7 +27,7 @@ class visualizer_scene_2D(object):
         frame_idx_list=None, # 0-based indexing, [0, ..., os.frame_num-1]
     ):
 
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
@@ -78,13 +79,13 @@ class visualizer_scene_2D(object):
         return modalitiy_list_new
 
     def create_im_row_ax_list(self, subfig, start_idx: int=1, if_show_im: bool=False, title: str=''):
-        assert self.os.if_has_im_sdr
+        # assert self.os.if_has_im_sdr
 
         ax_list = subfig.subplots(1, self.N_cols)
         if self.N_cols == 1: ax_list = [ax_list]
         assert len(self.frame_idx_list) == len(ax_list)
         for ax, frame_idx in zip(ax_list, self.frame_idx_list):
-            if if_show_im:
+            if if_show_im and self.os.if_has_im_sdr:
                 im = self.os.im_sdr_list[frame_idx]
                 ax.imshow(im)
 
@@ -100,10 +101,12 @@ class visualizer_scene_2D(object):
         visualize verything indicated in modality_list for the frame_idx-st frame (0-based)
         '''
         height_width_list = []
-        assert self.os.if_has_im_sdr
         for frame_idx in self.frame_idx_list:
-            im = self.os.im_sdr_list[frame_idx]
-            height, width = im.shape[:2]
+            if self.os.if_has_im_sdr:
+                im = self.os.im_sdr_list[frame_idx]
+                height, width = im.shape[:2]
+            else:
+                height, width = self.os.H, self.os.W
             height_width_list.append((height, width))
 
         compatible_modalities = ['im'] + self.valid_modalities_2D_vis
@@ -171,7 +174,7 @@ class visualizer_scene_2D(object):
         visualize 2D map for the modality the frame_idx-st frame (0-based)
 
         '''
-        assert self.os.if_has_im_sdr and self.os.if_has_poses
+        # assert self.os.if_has_im_sdr and self.os.if_has_poses
         if modality in ['depth', 'normal']: assert self.os.if_has_depth_normal
         if modality in ['albedo', 'roughness']: assert self.os.if_has_BRDF
         if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.os.if_has_seg

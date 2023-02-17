@@ -11,7 +11,7 @@ import glob
 from lib.utils_io import load_img
 from lib.utils_misc import blue_text, get_list_of_keys, green, yellow, white_blue, red, check_list_of_tensors_size
 from lib.utils_io import load_img, convert_write_png
-
+from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle
 
 class scene2DBase():
     '''
@@ -43,8 +43,8 @@ class scene2DBase():
         self.parent_class_name = parent_class_name
 
         self.if_loaded_colors = False
-        self.if_loaded_shapes = False
-        self.if_loaded_layout = False
+        # self.if_loaded_shapes = False
+        # self.if_loaded_layout = False
 
         self.root_path_dict = root_path_dict
         self.PATH_HOME, self.rendering_root = get_list_of_keys(self.root_path_dict, ['PATH_HOME', 'rendering_root'], [PosixPath, PosixPath])
@@ -232,12 +232,61 @@ class scene2DBase():
         self.im_hdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_hdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop) for _, __ in zip(self.modality_file_list_dict['im_hdr'], expected_shape_list)]
         self.hdr_scale_list = [1.] * len(self.im_hdr_list)
 
-        for im_hdr_file, im_hdr in zip(self.modality_file_list_dict['im_hdr'], self.im_hdr_list):
-            im_sdr_file = Path(str(im_hdr_file).replace(self.modality_ext_dict['im_hdr'], self.modality_ext_dict['im_sdr']))
+        '''
+        convert and write sdr files
+        '''
+        if not 'im_sdr' in self.modality_file_list_dict:
+            filename = self.modality_filename_dict['im_sdr']
+            self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
+        for frame_idx, (frame_id, im_hdr_file) in enumerate(zip(self.frame_id_list, self.modality_file_list_dict['im_hdr'])):
+
+            # im_sdr_file = Path(str(im_hdr_file).replace(self.modality_ext_dict['im_hdr'], self.modality_ext_dict['im_sdr']))
+            im_sdr_file = self.modality_file_list_dict['im_sdr'][frame_idx]
             if not im_sdr_file.exists():
-                print(yellow('[%s] load_im_hdr: converting HDR to SDR and write to disk'))
+                print(yellow('[%s] load_im_hdr: converting HDR to SDR and write to disk'%frame_idx))
                 print('-> %s'%str(im_sdr_file))
-                convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=1.)
+                radiance_scale = self.im_params_dict.get('radiance_scale', 1.)
+                convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=radiance_scale)
 
         print(blue_text('[%s] DONE. load_im_hdr'%self.parent_class_name))
 
+    def load_layout(self, shape_params_dict={}):
+        '''
+        load and visualize layout in 3D & 2D; assuming room up direction is axis-aligned
+        images/demo_layout_mitsubaScene_3D_1.png
+        images/demo_layout_mitsubaScene_3D_1_BEV.png # red is layout bbox
+        '''
+
+        print(white_blue('[mitsubaScene3D] load_layout for scene...'))
+        if self.if_loaded_layout: return
+        if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
+
+        if shape_params_dict.get('if_layout_as_walls', False) and any([shape_dict['is_wall'] for shape_dict in self.shape_list_valid]):
+            vertices_all = np.vstack([self.vertices_list[_] for _ in range(len(self.vertices_list)) if self.shape_list_valid[_]['is_wall']])
+        else:
+            vertices_all = np.vstack(self.vertices_list)
+
+        if self.axis_up[0] == 'y':
+            self.v_2d = vertices_all[:, [0, 2]]
+            # room_height = np.amax(vertices_all[:, 1]) - np.amin(vertices_all[:, 1])
+        elif self.axis_up[0] == 'x':
+            self.v_2d = vertices_all[:, [1, 3]]
+            # room_height = np.amax(vertices_all[:, 0]) - np.amin(vertices_all[:, 0])
+        elif self.axis_up[0] == 'z':
+            self.v_2d = vertices_all[:, [0, 1]]
+            # room_height = np.amax(vertices_all[:, 2]) - np.amin(vertices_all[:, 2])
+        # finding minimum 2d bbox (rectangle) from contour
+        self.layout_hull_2d, self.layout_hull_pts = minimum_bounding_rectangle(self.v_2d)
+        
+        layout_hull_2d_2x = np.vstack((self.layout_hull_2d, self.layout_hull_2d))
+        if self.axis_up[0] == 'y':
+            self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x[:, 0:1], np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1])), layout_hull_2d_2x[:, 1:2]))
+        elif self.axis_up[0] == 'x':
+            assert False
+        elif self.axis_up[0] == 'z':
+            # self.layout_box_3d_transformed = np.hstack((, np.vstack((np.zeros((4, 1)), np.zeros((4, 1))+room_height))))    
+            assert False
+
+        print(blue_text('[%s] DONE. load_layout'%self.parent_class_name))
+
+        self.if_loaded_layout = True

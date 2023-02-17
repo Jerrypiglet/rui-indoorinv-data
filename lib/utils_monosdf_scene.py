@@ -4,7 +4,7 @@ import trimesh
 from lib.utils_misc import yellow
 from utils_OR.utils_OR_mesh import sample_mesh, simplify_mesh, computeBox
 
-def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scale_offset: tuple=()):
+def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scale_offset: tuple=(), extra_transform: np.ndarray=None):
     if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
     sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
     sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
@@ -60,6 +60,10 @@ def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scal
         'is_ceiling': False, 
         'is_layout': False, 
     }
+
+    if extra_transform is not None:
+        vertices = (extra_transform @ vertices.T).T
+        bverts = (extra_transform @ bverts.T).T
 
     return {
         'vertices': vertices, 

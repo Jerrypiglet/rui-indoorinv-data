@@ -2,6 +2,7 @@
 - [More datasets](#more-datasets)
   - [Freeviewpoint](#freeviewpoint)
   - [Matterport3D](#matterport3d)
+  - [Replica](#replica)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 <!-- Added by: jerrypiglet, at: Mon Feb 13 02:05:56 PST 2023 -->
@@ -86,3 +87,21 @@ From Chang et al.'17, *Matterport3D: Learning from RGB-D Data in Indoor ...* [[P
 
 TODO:
 - [ ] undistord HDR images
+
+## Replica
+
+From Straub et al.'19, *The Replica Dataset: A Digital Replica of Indoor Spaces* [[Code]](https://github.com/facebookresearch/Replica-Dataset)
+
+``` bash
+# sample poses -> {scene_path}/cameras/cam.txt and cam_extra_transform.txt (for ReplicaSDK renderer)
+python test_class_replicaScene3D.py --if_sample_poses True --eval_scene True
+# send to ReplicaSDK renderer and transfer the rendering back to -> {scene_path}/rendering
+ruizhu@mm3:~/Documents/data/replica_v1/rendering$ rm -rf *.png && rm -rf *.exr && /home/ruizhu/Documents/Projects/Replica-Dataset/build/ReplicaSDK/ReplicaRenderer ~/Documents/data/replica_v1/office_0/mesh.ply ~/Documents/data/replica_v1/office_0/textures/  ~/Documents/data/replica_v1/room_0/glass.sur /home/ruizhu/Documents/Projects/Replica-Dataset/cam_extra_transform.txt /home/ruizhu/Documents/Projects/Replica-Dataset/intrinsic_mitsubaScene.txt
+# dump sdr files; validate 2d plt vis
+python test_class_replicaScene3D.py --if_export False  --vis_3d_o3d True --vis_2d_plt True --eval_scene True
+# export scene in mitsubaScene3D format
+python test_class_replicaScene3D.py --if_export True
+```
+
+TODO: 
+- [ ] adapt sample pose to z+ up: get rid of self.extra_transform

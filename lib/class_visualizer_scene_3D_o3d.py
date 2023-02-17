@@ -1,4 +1,6 @@
 import numpy as np
+
+from lib.class_replicaScene3D import replicaScene3D
 np.random.seed(0)
 from tqdm import tqdm
 from math import prod
@@ -49,7 +51,7 @@ class visualizer_scene_3D_o3d(object):
         modality_list_vis: list, 
         if_debug_info: bool=False, 
     ):
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object

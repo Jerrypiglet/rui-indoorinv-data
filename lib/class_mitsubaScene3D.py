@@ -77,6 +77,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         assert self.split in ['train', 'val']
         assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
 
+        self.extra_transform = None
+
         self.host = host
         self.device = get_device(self.host, device_id)
 
@@ -676,47 +678,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
             len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
             )))
-
-    def load_layout(self, shape_params_dict={}):
-        '''
-        load and visualize layout in 3D & 2D; assuming room up direction is axis-aligned
-        images/demo_layout_mitsubaScene_3D_1.png
-        images/demo_layout_mitsubaScene_3D_1_BEV.png # red is layout bbox
-        '''
-
-        print(white_blue('[mitsubaScene3D] load_layout for scene...'))
-        if self.if_loaded_layout: return
-        if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
-
-        if shape_params_dict.get('if_layout_as_walls', True) and any([shape_dict['is_wall'] for shape_dict in self.shape_list_valid]):
-            vertices_all = np.vstack([self.vertices_list[_] for _ in range(len(self.vertices_list)) if self.shape_list_valid[_]['is_wall']])
-        else:
-            vertices_all = np.vstack(self.vertices_list)
-
-        if self.axis_up[0] == 'y':
-            self.v_2d = vertices_all[:, [0, 2]]
-            # room_height = np.amax(vertices_all[:, 1]) - np.amin(vertices_all[:, 1])
-        elif self.axis_up[0] == 'x':
-            self.v_2d = vertices_all[:, [1, 3]]
-            # room_height = np.amax(vertices_all[:, 0]) - np.amin(vertices_all[:, 0])
-        elif self.axis_up[0] == 'z':
-            self.v_2d = vertices_all[:, [0, 1]]
-            # room_height = np.amax(vertices_all[:, 2]) - np.amin(vertices_all[:, 2])
-        # finding minimum 2d bbox (rectangle) from contour
-        self.layout_hull_2d, self.layout_hull_pts = minimum_bounding_rectangle(self.v_2d)
-        
-        layout_hull_2d_2x = np.vstack((self.layout_hull_2d, self.layout_hull_2d))
-        if self.axis_up[0] == 'y':
-            self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x[:, 0:1], np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1])), layout_hull_2d_2x[:, 1:2]))
-        elif self.axis_up[0] == 'x':
-            assert False
-        elif self.axis_up[0] == 'z':
-            # self.layout_box_3d_transformed = np.hstack((, np.vstack((np.zeros((4, 1)), np.zeros((4, 1))+room_height))))    
-            assert False
-
-        print(blue_text('[%s] DONE. load_layout'%self.parent_class_name))
-
-        self.if_loaded_layout = True
 
     def get_envmap_axes(self):
         from utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np

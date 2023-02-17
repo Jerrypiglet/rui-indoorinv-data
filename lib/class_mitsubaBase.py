@@ -14,7 +14,7 @@ import cv2
 # Import the library using the alias "mi"
 import mitsuba as mi
 from lib.utils_io import load_img, resize_intrinsics
-from lib.utils_OR.utils_OR_cam import read_cam_params_OR, dump_cam_params_OR
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up, read_cam_params_OR, dump_cam_params_OR
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
@@ -35,8 +35,8 @@ class mitsubaBase():
         self.if_debug_info = if_debug_info
 
         # self.if_loaded_colors = False
-        # self.if_loaded_shapes = False
-        # self.if_loaded_layout = False
+        self.if_loaded_shapes = False
+        self.if_loaded_layout = False
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
@@ -174,7 +174,7 @@ class mitsubaBase():
         self.xyz_min = np.minimum(np.amin(shape_dict['vertices'], axis=0), self.xyz_min)
 
 
-    def mi_get_segs(self, if_also_dump_xml_with_lit_area_lights_only=True, if_dump=True):
+    def mi_get_segs(self, if_also_dump_xml_with_lit_area_lights_only=True, if_dump=True, if_seg_emitter=True):
         '''
         images/demo_mitsuba_ret_seg_2D.png; 
         Update:
@@ -209,11 +209,13 @@ class mitsubaBase():
                     if_get_from_scratch = False
                     mi_seg_area = (mi_seg_area / 255.).astype(np.bool)
 
-            if if_get_from_scratch:
+            if if_get_from_scratch and if_seg_emitter:
                 mi_seg_area = np.array([[s is not None and s.emitter() is not None for s in ret.shape]]).reshape(self._H(frame_idx), self._W(frame_idx))
                 imageio.imwrite(str(mi_seg_area_file_path), (mi_seg_area*255.).astype(np.uint8))
                 print(green_text('[mi_get_segs] mi_seg_area -> %s'%str(mi_seg_area_file_path)))
-
+    
+            if not if_seg_emitter:
+                mi_seg_area = np.zeros_like(mi_seg_env, dtype=np.bool)
             self.mi_seg_dict_of_lists['area'].append(mi_seg_area) # lit-up lamps
 
             mi_seg_obj = np.logical_and(np.logical_not(mi_seg_area), np.logical_not(mi_seg_env))
@@ -221,7 +223,7 @@ class mitsubaBase():
 
         print(green_text('DONE. [mi_get_segs] for %d frames...'%len(self.mi_rays_ret_list)))
 
-    def sample_poses(self, sample_pose_num: int):
+    def sample_poses(self, sample_pose_num: int, extra_transform: np.ndarray=None):
         '''
         sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)
         '''
@@ -323,7 +325,7 @@ class mitsubaBase():
         camIndex = np.argsort(totalCosts)[::-1][:sample_pose_num]
 
         tmp_rendering_path = Path(self.scene_rendering_path) / 'tmp_sample_poses_rendering'
-        if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path))
+        if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path), ignore_errors=True)
         tmp_rendering_path.mkdir(parents=True, exist_ok=True)
         print(blue_text('Dumping tmp normal and depth by Mitsuba: %s')%str(tmp_rendering_path))
         for _, i in enumerate(camIndex):
@@ -341,7 +343,7 @@ class mitsubaBase():
 
         print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
 
-        dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=origin_lookat_up_list, cam_params_dict=self.cam_params_dict)
+        dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.cam_params_dict, extra_transform=extra_transform)
 
     def load_meta_json_pose(self, pose_file):
         assert Path(pose_file).exists(), 'Pose file not found at %s! Check if exist, or if the correct pose format was chosen in key \'pose_file\' of scene_obj.'%str(pose_file)
@@ -580,8 +582,48 @@ class mitsubaBase():
 
     def export_poses_cam_txt(self, export_folder: Path, cam_params_dict={}, frame_num_all=-1):
         print(white_blue('[%s] convert poses to OpenRooms format')%self.parent_class_name)
-        origin_lookat_up_mtx_list = [np.hstack((_[0], _[1]+_[0], _[2])).T for _ in self.origin_lookatvector_up_list]
-        dump_cam_params_OR(pose_file_root=export_folder, origin_lookat_up_mtx_list=origin_lookat_up_mtx_list, cam_params_dict=cam_params_dict, K_list=self.K_list, frame_num_all=frame_num_all)
+        T_list_ = [(None, '')]
+        if self.extra_transform is not None:
+            T_list_.append((self.extra_transform_inv, '_extra_transform'))
+            # R = R_.T
+            # t = -R_.T @ t_
+
+            # RR = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1]])
+            # tt = np.zeros((3, 1))
+            # from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up
+            # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(RR, tt)
+            # print((origin, lookatvector, up))
+
+        for T_, appendix in T_list_:
+            if T_ is not None:
+                origin_lookat_up_mtx_list = [np.hstack((T_@_[0], T_@_[1]+T_@_[0], T_@_[2])).T for _ in self.origin_lookatvector_up_list]
+            else:
+                origin_lookat_up_mtx_list = [np.hstack((_[0], _[1]+_[0], _[2])).T for _ in self.origin_lookatvector_up_list]
+            Rt_list = []
+            # T_opengl = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
+            for Rt in self.pose_list:
+                R, t = Rt[:3, :3], Rt[:3, 3:4]
+                if T_ is not None:
+                    # R = R @ T_
+                    R = T_ @ R
+                    t = T_ @ t
+                    # R = R @ T_opengl @ T_
+                    # t = T_ @ T_opengl @ t
+                    # R = R.T
+                    # t = -R @ t
+                    # print('+++++++++', R, t)
+
+                Rt_list.append((R, t))
+
+            if appendix != '':
+                # debug: two prints should agree
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(Rt_list[0][0], Rt_list[0][1])
+                print((origin.flatten(), lookatvector.flatten(), up.flatten()))
+                print((T_@self.origin_lookatvector_up_list[0][0]).flatten(), (T_@self.origin_lookatvector_up_list[0][1]).flatten(), (T_@self.origin_lookatvector_up_list[0][2]).flatten())
+            dump_cam_params_OR(
+                pose_file_root=export_folder, 
+                origin_lookat_up_mtx_list=origin_lookat_up_mtx_list, Rt_list=Rt_list, 
+                cam_params_dict=cam_params_dict, K_list=self.K_list, frame_num_all=frame_num_all, appendix=appendix)
 
     def dump_mi_meshes(self, mi_scene, mesh_dump_root: Path):
         '''
@@ -603,14 +645,16 @@ class mitsubaBase():
         if scene_export_path.exists():
             if_reexport = input(red("scene export path exists:%s . Re-export? [y/n]"%str(scene_export_path)))
             if if_reexport in ['y', 'Y']:
-                shutil.rmtree(str(scene_export_path))
+                if_delete = input(red("Delete? [y/n]"))
+                if if_delete in ['y', 'Y']:
+                    shutil.rmtree(str(scene_export_path), ignore_errors=True)
             else:
                 print(red('Aborted export.'))
                 return
         scene_export_path.mkdir(parents=True, exist_ok=True)
 
         for modality in modality_list:
-            assert modality in self.modality_list, 'modality %s not in %s'%(modality, self.modality_list)
+            # assert modality in self.modality_list, 'modality %s not in %s'%(modality, self.modality_list)
 
             if modality == 'poses':
                 self.export_poses_cam_txt(scene_export_path, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
@@ -653,28 +697,40 @@ class mitsubaBase():
             if modality == 'im_mask':
                 (scene_export_path / 'ImMask').mkdir(parents=True, exist_ok=True)
                 assert self.pts_from['mi']
-                assert len(self.im_mask_list) == len(self.mi_invalid_depth_mask_list)
+                if hasattr(self, 'im_mask_list'):
+                    assert len(self.im_mask_list) == len(self.mi_invalid_depth_mask_list)
                 for _, frame_id in enumerate(self.frame_id_list):
                     im_mask_export_path = scene_export_path / 'ImMask' / ('%03d_0001.png'%_)
-                    im_mask = self.im_mask_list[_]
                     mi_invalid_depth_mask = self.mi_invalid_depth_mask_list[_]
-                    assert mi_invalid_depth_mask.shape == im_mask.shape, 'invalid depth mask shape %s not equal to im_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask.shape)
-                    im_mask = np.logical_and(im_mask, ~mi_invalid_depth_mask)
+                    if hasattr(self, 'im_mask_list'):
+                        im_mask = self.im_mask_list[_]
+                        assert mi_invalid_depth_mask.shape == im_mask.shape, 'invalid depth mask shape %s not equal to im_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask.shape)
+                        im_mask = np.logical_and(im_mask, ~mi_invalid_depth_mask)
+                    else:
+                        im_mask = ~mi_invalid_depth_mask
                     cv2.imwrite(str(im_mask_export_path), (im_mask*255).astype(np.uint8))
                     print(blue_text('Mask image (for valid depths) %s exported to: %s'%(frame_id, str(im_mask_export_path))))
             
             if modality == 'shapes': 
                 assert self.if_loaded_shapes, 'shapes not loaded'
-                shape_export_path = scene_export_path / 'scene.obj'
-                shape_list = []
-                for vertices, faces in zip(self.vertices_list, self.faces_list):
-                    shape_list.append(trimesh.Trimesh(vertices, faces-1))
-                shape_tri_mesh = trimesh.util.concatenate(shape_list)
-                shape_tri_mesh.export(str(shape_export_path))
-                if not shape_tri_mesh.is_watertight:
-                    trimesh.repair.fill_holes(shape_tri_mesh)
-                    shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
-                    shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull.obj'%shape_export_path.stem)))
-                    shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
-                    shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed.obj'%shape_export_path.stem)))
-                    print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s.obj, %s_hull.obj, %s_fixed.obj'%(shape_export_path.name, shape_export_path.name, shape_export_path.name)))
+                T_list_ = [(None, '')]
+                if self.extra_transform is not None:
+                    T_list_.append((self.extra_transform_inv, '_extra_transform'))
+
+                for T_, appendix in T_list_:
+                    shape_list = []
+                    shape_export_path = scene_export_path / ('scene%s.obj'%appendix)
+                    for vertices, faces in zip(self.vertices_list, self.faces_list):
+                        if T_ is not None:
+                            shape_list.append(trimesh.Trimesh((T_ @ vertices.T).T, faces-1))
+                        else:
+                            shape_list.append(trimesh.Trimesh(vertices, faces-1))
+                    shape_tri_mesh = trimesh.util.concatenate(shape_list)
+                    shape_tri_mesh.export(str(shape_export_path))
+                    if not shape_tri_mesh.is_watertight:
+                        trimesh.repair.fill_holes(shape_tri_mesh)
+                        shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
+                        shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull%s.obj'%(shape_export_path.stem, appendix))))
+                        shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
+                        shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
+                        print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
