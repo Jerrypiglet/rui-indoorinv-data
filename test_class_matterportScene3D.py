@@ -78,14 +78,14 @@ assert base_root.exists()
 conference room with set of lamps and white chairs
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.17DRP5sb8fy_5
 '''
-scene_name = '17DRP5sb8fy'; region_id = 5; hdr_radiance_scale = 10; 
+scene_name = '17DRP5sb8fy'; region_id_list = [5]; hdr_radiance_scale = 10; 
 frame_ids = [21, 22, 46, 47]
 
 '''
 old bedroom
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.2t7WUuJeko7_5
 '''
-scene_name = '2t7WUuJeko7'; region_id = 5; hdr_radiance_scale = 10; 
+scene_name = '2t7WUuJeko7'; region_id_list = [4, 5]; hdr_radiance_scale = 10; 
 frame_ids = [18, 19, 20, 21, 22]
 
 scene_obj = matterportScene3D(
@@ -96,7 +96,7 @@ scene_obj = matterportScene3D(
         'scene_name': scene_name, 
         # 'frame_id_list': frame_ids, # comment out to use all frames
         'axis_up': 'z+', 
-        'region_id': region_id, 
+        'region_id_list': region_id_list, 
         'if_undist': False, # True to use undistorted images/poses
         # 'pose_file': ('bundle', 'bundle.out'), 
         # 'pose_file': ('OpenRooms', 'cam.txt'), # after dump to cam.txt

@@ -65,9 +65,10 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             if_debug_info=if_debug_info, 
             )
 
-        self.scene_name, self.region_id, self.frame_id_list = get_list_of_keys(scene_params_dict, ['scene_name', 'region_id', 'frame_id_list'], [str, int, list])
+        self.scene_name, self.region_id_list, self.frame_id_list = get_list_of_keys(scene_params_dict, ['scene_name', 'region_id', 'frame_id_list'], [str, int, list])
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
-
+        if isinstance(self.region_id_list, int): self.region_id_list = [self.region_id_list]
+        
         self.axis_up_native = 'z+'
         self.axis_up = scene_params_dict.get('axis_up', self.axis_up_native) # native: 'z+
         assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
@@ -87,7 +88,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         # assert self.pose_format in ['OpenRooms', 'bundle'], 'Unsupported pose file: '+pose_file
         # self.pose_file = self.scene_path / 'cameras' / pose_file
 
-        self.shape_file = self.scene_path / 'region_segmentations' / ('region%d.ply'%self.region_id)
+        self.shape_file_list = [self.scene_path / 'region_segmentations' / ('region%d.ply'%region_id) for region_id in self.region_id_list]
         self.shape_params_dict = shape_params_dict
         self.mi_params_dict = mi_params_dict
         variant = mi_params_dict.get('variant', '')
@@ -197,17 +198,21 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        shape_id_dict = {
-            'type': self.shape_file.suffix[1:],
-            'filename': str(self.shape_file), 
-            # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
-            }
-        # if self.if_scale_scene:
-        #     shape_id_dict['to_world'] = mi.ScalarTransform4f.scale([1./self.scene_scale]*3)
-        self.mi_scene = mi.load_dict({
+        scene_dict = {
             'type': 'scene',
-            'shape_id': shape_id_dict, 
-        })
+            # 'shape_id': shape_id_dict, 
+        }
+        for _, shape_file in enumerate(self.shape_file_list):
+            shape_id_dict = {
+                'type': shape_file.suffix[1:],
+                'filename': str(shape_file), 
+                # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
+                }
+            # if self.if_scale_scene:
+            #     shape_id_dict['to_world'] = mi.ScalarTransform4f.scale([1./self.scene_scale]*3)
+            scene_dict[str(_)] = shape_id_dict
+
+        self.mi_scene = mi.load_dict(scene_dict)
 
     def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True):
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
@@ -255,67 +260,10 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         '''
         house_line = scene_metadata[1].replace('  ', ' ').replace('  ', ' ').split(' '); assert house_line[0] == 'H'
         N_images, N_panoramas, N_vertices, N_surfaces, N_segments, N_objects, N_categories, self.N_regions = [int(_) for _ in house_line[3:11]]
-        assert self.region_id < self.N_regions
-        print('[%s] Loading region %s from %d regions of house %s (total %d frames for the house)...'%(self.__class__.__name__, self.region_id, self.N_regions, self.scene_name, N_images))
-
-        '''
-        the R line (region for self.region_id)...
-            R region_index level_index 0 0 label  px py pz  xlo ylo zlo xhi yhi zhi  height  0 0 0 0
-        '''
-        region_line = scene_metadata[3+self.region_id].replace('  ', ' ').replace('  ', ' ').split(' '); assert region_line[0] == 'R'
-        assert region_line[1] == str(self.region_id)
-        self.region_label = region_line[5]
-        self.region_description = self.region_description_dict[self.region_label]
-        self.region_height = float(region_line[15])
-        assert self.region_height > 0.
-
-        print('region %d: %s; height %.2f'%(self.region_id, self.region_description, self.region_height))
-
-        '''
-        load all panoramas and find the ones in the region
-            P  f4d03f729dfc49068db327584455e975  47 4  0  2.37165 4.31886 1.49283  0 0 0 0 0 
-            P name  panorama_index region_index 0  px py pz  0 0 0 0 0
-        '''
+        
         self.panorama_name_list = [] # list of str
         self.panorama_index_list = [] # list of int
-        panorama_line_list = [_.replace('  ', ' ').replace('  ', ' ').split(' ') for _ in scene_metadata if _.startswith('P')]
-        for panorama_line in panorama_line_list:
-            assert panorama_line[0] == 'P'
-            panorama_name = panorama_line[1]
-            panorama_index = int(panorama_line[2])
-            panorama_region_id = int(panorama_line[3])
-            if panorama_region_id == self.region_id:
-                self.panorama_name_list.append(panorama_name)
-                self.panorama_index_list.append(panorama_index)
-        assert self.panorama_name_list != [], 'no parameters for region %d'%self.region_id
-
-        '''
-        load all frames and find the ones in the region
-            I image_index panorama_index name camera_index yaw_index e00 e01 e02 e03 e10 e11 e12 e13 e20 e21 e22 e23 e30 e31 e32 e33  i00 i01 i02  i10 i11 i12 i20 i21 i22  width height  px py pz  0 0 0 0 0
-        '''
         self.frame_id_list = []
-        frame_line_list = [_.replace('  ', ' ').replace('  ', ' ').split(' ') for _ in scene_metadata if _.startswith('I')]
-        assert frame_line_list[0][1] == '0' # first frame is 0
-        assert frame_line_list[-1][1] == str(len(frame_line_list)-1)
-        for frame_line in frame_line_list:
-            assert frame_line[0] == 'I'
-            image_index = int(frame_line[1])
-            assert image_index < N_images
-            panorama_index = int(frame_line[2])
-            if panorama_index in self.panorama_index_list:
-                self.frame_id_list.append(image_index)
-        self.frame_num_all = len(self.frame_id_list)
-        
-        print('region %d: total'%self.region_id, white_blue(str(self.frame_num_all)), 'frames for the region (frame_id e.g. [%s]...)'%(', '.join([str(_) for _ in self.frame_id_list[:5]])))
-        if self.scene_params_dict['frame_id_list'] != []:
-            # self.frame_id_list = [self.frame_id_list[_] for _ in self.scene_params_dict['frame_id_list']]
-            assert all([_ in self.frame_id_list for _ in self.scene_params_dict['frame_id_list']])
-            self.frame_id_list = self.scene_params_dict['frame_id_list']
-            print('region %d: SELECTED %d frames ([%s]...)'%(self.region_id, len(self.frame_id_list), ', '.join([str(_) for _ in self.frame_id_list[:3]])))
-
-        assert len(self.frame_id_list) > 0
-        frame_line_valid_list = [frame_line_list[_] for _ in self.frame_id_list]
-
         self.frame_filename_list = []
         self.frame_info_list = []
         self.im_HW_load_list = []
@@ -326,40 +274,125 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         self.pose_list = [] # undistorted/distorted: the same
         self.origin_lookatvector_up_list = []
 
-        for frame_line in frame_line_valid_list:
-            assert frame_line[0] == 'I'
-            assert int(frame_line[1]) in self.frame_id_list
-            assert int(frame_line[2]) in self.panorama_index_list
-            frame_name = frame_line[3]
-            # a total of 18 images are captured for one location (3 cameras, 6 yaw angles; documentation has typo)
-            camera_index = int(frame_line[4]); assert camera_index in list(range(3))
-            yaw_index = int(frame_line[5]); assert yaw_index in list(range(6))
-            frame_filename = frame_name + '_' + '%s' + str(camera_index) + '_' + str(yaw_index) + '.%s' # '''08115b08da534f1aafff2fa81fc73512_%s0_0.%s'; %s: 'd' for *_depth_images, 'i' for *_color_images; %s: ext
-            self.frame_filename_list.append(frame_filename)
-            self.frame_info_list.append((frame_name, camera_index, yaw_index))
+        for region_id in self.region_id_list:
+            assert region_id < self.N_regions, 'region_id %d >= N_regions %d'%(region_id, self.N_regions)
+            print('[%s] Loading region %s from %d regions of house %s (total %d frames for the house)...'%(self.__class__.__name__, region_id, self.N_regions, self.scene_name, N_images))
 
-            # distorted camera parameters
-            extrinsics_mat = np.array([float(_) for _ in frame_line[6:22]]).reshape(4, 4)
-            self.extrinsics_mat_list.append(extrinsics_mat) # [world-to-camera] inverse of Rx+t
-            R_ = extrinsics_mat[:3, :3]; t_ = extrinsics_mat[:3, 3:4]
-            R = R_.T
-            t = -R_.T @ t_
-            R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
-            pose = np.concatenate([R, t], axis=1)
-            self.pose_list.append(pose) # [camera-to-world]
-            (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
-            self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+            '''
+            the R line (region for self.region_id)...
+                R region_index level_index 0 0 label  px py pz  xlo ylo zlo xhi yhi zhi  height  0 0 0 0
+            '''
+            region_line = scene_metadata[3+region_id].replace('  ', ' ').replace('  ', ' ').split(' '); assert region_line[0] == 'R'
+            assert region_line[1] == str(region_id)
+            region_label = region_line[5]
+            region_description = self.region_description_dict[region_label]
+            region_height = float(region_line[15])
+            assert region_height > 0.
 
-            width, height = int(frame_line[31]), int(frame_line[32])
-            self.im_HW_load_list.append((height, width))
+            print('region %d: %s; height %.2f'%(region_id, region_description, region_height))
 
-            # intrinsics
-            K = np.array([float(_) for _ in frame_line[22:31]]).reshape(3, 3) # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_intrinsics
-            self._K_orig_list.append(K.copy())
-            if width != self.W or height != self.H:
-                scale_factor = [t / s for t, s in zip((self.H, self.W), (height, width))]
-                K = resize_intrinsics(K, scale_factor)
-            self.K_list.append(K)
+            '''
+            load all panoramas and find the ones in the region
+                P  f4d03f729dfc49068db327584455e975  47 4  0  2.37165 4.31886 1.49283  0 0 0 0 0 
+                P name  panorama_index region_index 0  px py pz  0 0 0 0 0
+            '''
+            panorama_name_list = []
+            panorama_index_list = []
+            panorama_line_list = [_.replace('  ', ' ').replace('  ', ' ').split(' ') for _ in scene_metadata if _.startswith('P')]
+            for panorama_line in panorama_line_list:
+                assert panorama_line[0] == 'P'
+                panorama_name = panorama_line[1]
+                panorama_index = int(panorama_line[2])
+                panorama_region_id = int(panorama_line[3])
+                if panorama_region_id == region_id:
+                    panorama_name_list.append(panorama_name)
+                    panorama_index_list.append(panorama_index)
+            assert panorama_name_list != [], 'no parameters for region %d'%region_id
+            self.panorama_name_list += panorama_name_list
+            self.panorama_index_list += panorama_index_list
+
+            '''
+            load all frames and find the ones in the region
+                I image_index panorama_index name camera_index yaw_index e00 e01 e02 e03 e10 e11 e12 e13 e20 e21 e22 e23 e30 e31 e32 e33  i00 i01 i02  i10 i11 i12 i20 i21 i22  width height  px py pz  0 0 0 0 0
+            '''
+            frame_line_list = [_.replace('  ', ' ').replace('  ', ' ').split(' ') for _ in scene_metadata if _.startswith('I')]
+            frame_id_list = []
+            assert frame_line_list[0][1] == '0' # first frame is 0
+            assert frame_line_list[-1][1] == str(len(frame_line_list)-1)
+            for frame_line in frame_line_list:
+                assert frame_line[0] == 'I'
+                image_index = int(frame_line[1])
+                assert image_index < N_images
+                panorama_index = int(frame_line[2])
+                if panorama_index in panorama_index_list:
+                    frame_id_list.append(image_index)
+            frame_num_all = len(frame_id_list)
+            
+            print('region %d: total'%region_id, white_blue(str(frame_num_all)), 'frames for the region (frame_id e.g. [%s]...)'%(', '.join([str(_) for _ in self.frame_id_list[:5]])))
+            if self.scene_params_dict['frame_id_list'] != []:
+                # self.frame_id_list = [self.frame_id_list[_] for _ in self.scene_params_dict['frame_id_list']]
+                # assert all([_ in self.frame_id_list for _ in self.scene_params_dict['frame_id_list']])
+                # self.frame_id_list = self.scene_params_dict['frame_id_list']
+                frame_id_list = [_ in frame_id_list if _ in self.scene_params_dict['frame_id_list']]
+                print('region %d: SELECTED %d frames ([%s]...)'%(region_id, len(frame_id_list), ', '.join([str(_) for _ in frame_id_list[:3]])))
+
+            assert len(frame_id_list) > 0
+            frame_line_valid_list = [frame_line_list[_] for _ in frame_id_list]
+
+            frame_filename_list = []
+            frame_info_list = []
+            im_HW_load_list = []
+            K_list = [] # undistorted/distorted: the same
+            _K_orig_list = [] # only for validation purposes
+            extrinsics_mat_list = [] # loaded from distorted
+            pose_list = [] # undistorted/distorted: the same
+            origin_lookatvector_up_list = []
+
+            for frame_line in frame_line_valid_list:
+                assert frame_line[0] == 'I'
+                assert int(frame_line[1]) in frame_id_list
+                assert int(frame_line[2]) in panorama_index_list
+                frame_name = frame_line[3]
+                # a total of 18 images are captured for one location (3 cameras, 6 yaw angles; documentation has typo)
+                camera_index = int(frame_line[4]); assert camera_index in list(range(3))
+                yaw_index = int(frame_line[5]); assert yaw_index in list(range(6))
+                frame_filename = frame_name + '_' + '%s' + str(camera_index) + '_' + str(yaw_index) + '.%s' # '''08115b08da534f1aafff2fa81fc73512_%s0_0.%s'; %s: 'd' for *_depth_images, 'i' for *_color_images; %s: ext
+                frame_filename_list.append(frame_filename)
+                frame_info_list.append((frame_name, camera_index, yaw_index))
+
+                # distorted camera parameters
+                extrinsics_mat = np.array([float(_) for _ in frame_line[6:22]]).reshape(4, 4)
+                extrinsics_mat_list.append(extrinsics_mat) # [world-to-camera] inverse of Rx+t
+                R_ = extrinsics_mat[:3, :3]; t_ = extrinsics_mat[:3, 3:4]
+                R = R_.T
+                t = -R_.T @ t_
+                R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
+                pose = np.concatenate([R, t], axis=1)
+                pose_list.append(pose) # [camera-to-world]
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
+                origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+
+                width, height = int(frame_line[31]), int(frame_line[32])
+                im_HW_load_list.append((height, width))
+
+                # intrinsics
+                K = np.array([float(_) for _ in frame_line[22:31]]).reshape(3, 3) # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_intrinsics
+                _K_orig_list.append(K.copy())
+                if width != self.W or height != self.H:
+                    scale_factor = [t / s for t, s in zip((self.H, self.W), (height, width))]
+                    K = resize_intrinsics(K, scale_factor)
+                K_list.append(K)
+
+        self.frame_id_list += frame_id_list
+        self.frame_num_all = len(self.frame_id_list)
+        self.frame_filename_list += frame_filename_list
+        self.frame_info_list += frame_info_list
+        self.im_HW_load_list += im_HW_load_list
+        self.K_list += K_list
+        self._K_orig_list += _K_orig_list
+        self.extrinsics_mat_list += extrinsics_mat_list
+        self.pose_list += pose_list
+        self.origin_lookatvector_up_list += origin_lookatvector_up_list
 
         assert len(list(set(self.im_HW_load_list))) == 1, 'all loaded images should ideally have the same size'
         assert self.im_HW_load == self.im_HW_load_list[0], 'loaded image size should match the specified image size'

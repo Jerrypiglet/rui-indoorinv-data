@@ -26,6 +26,8 @@ parser.add_argument('--debug', action='store_true', help='not rendering; just sh
 parser.add_argument('--output_dir', type=str, default='/newfoundland3/ruizhu/Matterport3D/', help='output directory')
 parser.add_argument('--python_bin', type=str, default='python2', help='python binary')
 parser.add_argument('--download', action='store_true', help='')
+parser.add_argument('--unzip', action='store_true', help='')
+parser.add_argument('--scenes', nargs='+', help='list of scene names', required=False, default=[])
 # output_dir = '/newfoundland3/ruizhu/Matterport3D/'
 opt = parser.parse_args()
 
@@ -38,6 +40,9 @@ def exec(_):
         subprocess.call(cmd.split(' '))
 
 if __name__ == '__main__':
+    if opt.scenes != []:
+        assert [_ in house_scans_id for _ in opt.scenes]
+        house_scans_id = opt.scenes
 
     if opt.download:
         cmd = '%s download_mp.py -o %s --type %s --id %s'
