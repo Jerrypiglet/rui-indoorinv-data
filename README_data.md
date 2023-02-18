@@ -85,6 +85,10 @@ From Chang et al.'17, *Matterport3D: Learning from RGB-D Data in Indoor ...* [[P
 
 ![](images/demo_matterport_plt_2d.png)
 
+Fused im_sdr:
+
+![](images/images/demo_eval_scene_shapes-rgb_sdr-matterport.png)
+
 Download:
 
 ``` bash

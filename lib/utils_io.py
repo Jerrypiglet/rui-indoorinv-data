@@ -59,6 +59,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         mask = im <= 3000
         im[mask] = im[mask]*8e-8
         im[~mask] = 0.00024*1.0002**(im[~mask]-3000)
+        # im = 0.0000024 * im
 
     # cv2.imread returns None when it cannot read the file
     if im is None:

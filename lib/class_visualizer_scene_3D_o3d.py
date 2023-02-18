@@ -804,10 +804,13 @@ class visualizer_scene_3D_o3d(object):
                         (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
                         # print(_id, samples_v.shape[0], vertices.shape[0])
                         # assert mesh_color_type.split('-')[1] == samples_type, 'Make sure this two match (got [%s] VS [%s]): your_evalautor->sample_type, visualizer_3D_o3d->shapes_params->mesh_color_type'%(mesh_color_type.split('-')[1], samples_type)
-                        if samples_type == 'rad':
+                        if samples_type in ['rad', 'rgb_hdr', 'rgb_sdr']:
                             # vertices colored with: radiance in SDR space
                             assert samples_v.shape[0] == vertices.shape[0]
-                            samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
+                            if samples_type in ['rad', 'rgb_hdr']:
+                                samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
+                            else:
+                                samples_v_ = np.clip(samples_v, 0., 1.)
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
                         elif samples_type in ['emission_mask', 'emission_mask_bin', 'roughness', 'metallic']:
                             # vertices colored with: emission prob (non-emitter: blue; emitter: red)
@@ -827,6 +830,8 @@ class visualizer_scene_3D_o3d(object):
                             samples_v_ = (samples_v_vis_count / float(max_vis_count)).reshape(-1, 1)
                             samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
                             samples_v_[samples_v_vis_count==0] = np.array([[1., 1., 1.]]) # set not onserved area to white
+                            samples_v_[samples_v_vis_count==1] = np.array([[0., 1., 0.]]) # set not onserved area to green
+                            samples_v_[samples_v_vis_count==2] = np.array([[1., 1., 0.]]) # set not onserved area to yellow
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
                         elif samples_type == 't':
                             (samples_v_t, max_t) = samples_v

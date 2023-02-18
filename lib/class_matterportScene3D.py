@@ -327,15 +327,18 @@ class matterportScene3D(mitsubaBase, scene2DBase):
                     frame_id_list.append(image_index)
             frame_num_all = len(frame_id_list)
             
-            print('region %d: total'%region_id, white_blue(str(frame_num_all)), 'frames for the region (frame_id e.g. [%s]...)'%(', '.join([str(_) for _ in frame_id_list[:5]])))
+            print('region %d: total'%region_id, white_blue(str(frame_num_all)), 'frames for the region (frame_id e.g. [%s]...)'%(', '.join([str(_) for _ in frame_id_list])))
             if self.scene_params_dict['frame_id_list'] != []:
                 # self.frame_id_list = [self.frame_id_list[_] for _ in self.scene_params_dict['frame_id_list']]
                 # assert all([_ in self.frame_id_list for _ in self.scene_params_dict['frame_id_list']])
                 # self.frame_id_list = self.scene_params_dict['frame_id_list']
-                frame_id_list = [_ in frame_id_list for _ in self.scene_params_dict['frame_id_list']]
+                frame_id_list = [_ for _ in self.scene_params_dict['frame_id_list'] if _ in frame_id_list]
                 print('region %d: SELECTED %d frames ([%s]...)'%(region_id, len(frame_id_list), ', '.join([str(_) for _ in frame_id_list[:3]])))
 
-            assert len(frame_id_list) > 0
+            # assert len(frame_id_list) > 0
+            if len(frame_id_list) == 0:
+                print(red('region %d: no frames for the region; skipping...'%region_id))
+                continue
             frame_line_valid_list = [frame_line_list[_] for _ in frame_id_list]
 
             frame_filename_list = []
@@ -474,7 +477,6 @@ class matterportScene3D(mitsubaBase, scene2DBase):
     def get_cam_rays(self, cam_params_dict={}):
         if hasattr(self, 'cam_rays_list'):  return
         # self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
-        # import ipdb; ipdb.set_trace()
         self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, self.K_list, self.pose_list, convention='opencv')
 
     def load_shapes(self, shape_params_dict={}):

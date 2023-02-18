@@ -400,7 +400,6 @@ if opt.eval_scene:
 
     '''
     sample visivility to camera centers on vertices
-    [!!!] set 'mesh_color_type': 'eval-vis_count'
     '''
     _ = evaluator_scene.sample_shapes(
         sample_type='vis_count', # ['']

@@ -82,11 +82,12 @@ scene_name = '17DRP5sb8fy'; region_id_list = [5]; hdr_radiance_scale = 10;
 frame_ids = [21, 22, 46, 47]
 
 '''
-old bedroom
+old bedroom, with hallway
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.2t7WUuJeko7_5
 '''
 scene_name = '2t7WUuJeko7'; region_id_list = [4, 5]; hdr_radiance_scale = 10; 
-frame_ids = [18, 19, 20, 21, 22]
+# frame_ids = [20, 21, 22]
+frame_ids = [20]
 
 scene_obj = matterportScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -98,9 +99,6 @@ scene_obj = matterportScene3D(
         'axis_up': 'z+', 
         'region_id_list': region_id_list, 
         'if_undist': False, # True to use undistorted images/poses
-        # 'pose_file': ('bundle', 'bundle.out'), 
-        # 'pose_file': ('OpenRooms', 'cam.txt'), # after dump to cam.txt
-        # 'if_scale_scene': True, # whether to scale the scene to metric in meters, with given scale in scale.txt
         }, 
     mi_params_dict={
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
@@ -184,11 +182,13 @@ if opt.eval_scene:
 
     '''
     sample visivility to camera centers on vertices
-    [!!!] set 'mesh_color_type': 'eval-vis_count'
     '''
     _ = evaluator_scene.sample_shapes(
-        sample_type='vis_count', # ['']
+        # sample_type='rgb_hdr', # ['']
+        sample_type='rgb_sdr', # images/demo_eval_scene_shapes-rgb_sdr-matterport.png; VS artifacts as seen in images/demo_eval_scene_shapes-rgb_sdr-matterport-fromWEB.png
+        # sample_type='vis_count', # ['']
         # sample_type='t', # ['']
+        hdr_radiance_scale = hdr_radiance_scale, 
         shape_params={
         }
     )
@@ -251,7 +251,7 @@ if opt.vis_3d_o3d:
         shapes_params={
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
-            'if_voxel_volume': True, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
+            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
             'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
