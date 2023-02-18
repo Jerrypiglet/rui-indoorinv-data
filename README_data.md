@@ -52,10 +52,10 @@ For all datasets:
 To export all frames to mitsuabScene format, e.g.:
 
 ``` bash
-python test_class_freeviewpointScene3D.py --if_export True --eval_scene True
+python test_class_freeviewpointScene3D.py --export_scene True --eval_scene True
 ```
 
-- `--if_export True` to dump poses, K_list (intrinsics and image H W could vary between frames), im_hdr, im_sdr, im_mask (for valid area from provided mask, and area with valid depth from Mitsuba)
+- `--export_scene True` to dump poses, K_list (intrinsics and image H W could vary between frames), im_hdr, im_sdr, im_mask (for valid area from provided mask, and area with valid depth from Mitsuba)
 - `--eval_scene True` to count in how many frames each vertex is observed; will be visualized with open3d ([demo](images/)).
 - # 'frame_id_list': frame_ids, # comment out to use all frames
 - indicate modalities to export in: `scene_obj.export_scene(modality_list = [...`
@@ -96,7 +96,7 @@ Download:
 ```
 
 ``` bash
-python test_class_matterportScene3D.py --vis_2d_plt True --if_export True --eval_scene True
+python test_class_matterportScene3D.py --vis_2d_plt True --export_scene True --eval_scene True
 ```
 
 TODO:
@@ -115,9 +115,9 @@ python test_class_replicaScene3D.py --if_sample_poses True --eval_scene True
 # send to ReplicaSDK renderer and transfer the rendering back to -> {scene_path}/rendering
 ruizhu@mm3:~/Documents/data/replica_v1/rendering$ rm -rf *.png && rm -rf *.exr && /home/ruizhu/Documents/Projects/Replica-Dataset/build/ReplicaSDK/ReplicaRenderer ~/Documents/data/replica_v1/office_0/mesh.ply ~/Documents/data/replica_v1/office_0/textures/  ~/Documents/data/replica_v1/room_0/glass.sur /home/ruizhu/Documents/Projects/Replica-Dataset/cam_extra_transform.txt /home/ruizhu/Documents/Projects/Replica-Dataset/intrinsic_mitsubaScene.txt
 # dump sdr files; validate 2d plt vis
-python test_class_replicaScene3D.py --if_export False  --vis_3d_o3d True --vis_2d_plt True --eval_scene True
+python test_class_replicaScene3D.py --export_scene False  --vis_3d_o3d True --vis_2d_plt True --eval_scene True
 # export scene in mitsubaScene3D format
-python test_class_replicaScene3D.py --if_export True
+python test_class_replicaScene3D.py --export_scene True
 ```
 
 TODO: 

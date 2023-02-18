@@ -67,12 +67,11 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 # utils
 parser.add_argument('--if_convert_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
 parser.add_argument('--if_dump_shape', type=str2bool, nargs='?', const=True, default=False, help='if dump shape of entire scene')
-parser.add_argument('--if_export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--export_scene', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
 
 opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/Matterport3D'
-assert base_root.exists()
 
 '''
 conference room with set of lamps and white chairs
@@ -95,6 +94,14 @@ https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&mode
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&modelId=mp3d.mJXqzFtmKg4
 '''
 scene_name = 'mJXqzFtmKg4'; region_id_list = [0, 19, 16]; hdr_radiance_scale = 10; 
+
+
+'''
+dark bedroom with lamp (with next door hallway) ❌ the lotus lights on the fan is not in the geometry...
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&modelId=mp3d.qoiz87JEwZ2
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.qoiz87JEwZ2_15
+'''
+# scene_name = 'qoiz87JEwZ2'; region_id_list = [15, 16]; hdr_radiance_scale = 10; 
 
 scene_obj = matterportScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -162,7 +169,7 @@ scene_obj = matterportScene3D(
         },
 )
 
-if opt.if_export:
+if opt.export_scene:
     scene_obj.export_scene(
         modality_list = [
         'poses', 
@@ -173,6 +180,7 @@ if opt.if_export:
         'mi_normal', 
         'mi_depth', 
         ], 
+        if_filter_with_main_region = True, # True: to filter out frames that have too little coverage of the MAIN region
     )
 
 

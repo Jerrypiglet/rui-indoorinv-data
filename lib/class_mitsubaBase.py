@@ -57,7 +57,11 @@ class mitsubaBase():
             cam_rays_list.append((rays_o, rays_d, ray_d_center))
         return cam_rays_list
 
-    def mi_sample_rays_pts(self, cam_rays_list):
+    def mi_sample_rays_pts(
+        self, 
+        cam_rays_list, 
+        if_force: bool=False,
+        ):
         '''
         sample per-pixel rays in NeRF/DVGO setting
         -> populate: 
@@ -66,7 +70,8 @@ class mitsubaBase():
         [!] note:
             - in both self.mi_pts_list and self.mi_depth_list, np.inf values exist for pixels of infinite depth
         '''
-        if self.pts_from['mi']:
+        if self.pts_from['mi'] and not if_force:
+            print(green('[mi_sample_rays_pts] already populated. skip.'))
             return
 
         self.mi_rays_ret_list = []

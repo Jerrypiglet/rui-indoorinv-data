@@ -79,7 +79,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         self.host = host
         self.device = get_device(self.host, device_id)
 
-        self.scene_path = self.rendering_root / self.scene_name
+        self.scene_path = self.rendering_root / 'v1/scans' / self.scene_name
         self.scene_rendering_path = self.scene_path
         self.scene_name_full = self.scene_name # e.g.'asianRoom1'
 
@@ -193,15 +193,30 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         else:
             assert False, 'Unsupported modality: ' + modality
 
-    def load_mi_scene(self, mi_params_dict={}):
+    def load_mi_scene(
+        self, 
+        mi_params_dict={}, 
+        first_N_shapes=-1, 
+        if_force: bool=False,
+        ):
         '''
         load scene representation into Mitsuba 3
         '''
+        if hasattr(self, 'mi_scene') and not if_force:
+            print('Mitsuba scene already loaded. Skip loading. (if_force=%s)'%if_force)
+            return
+
         scene_dict = {
             'type': 'scene',
             # 'shape_id': shape_id_dict, 
         }
-        for _, shape_file in enumerate(self.shape_file_list):
+        if first_N_shapes != -1:
+            assert first_N_shapes <= len(self.shape_file_list)
+            shape_file_list = self.shape_file_list[:first_N_shapes]
+            print('Loading first %d shapes'%first_N_shapes)
+        else:
+            shape_file_list = self.shape_file_list
+        for _, shape_file in enumerate(shape_file_list):
             shape_id_dict = {
                 'type': shape_file.suffix[1:],
                 'filename': str(shape_file), 
@@ -258,7 +273,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             H name label #images #panoramas #vertices #surfaces #segments #objects #categories #regions #portals #levels  0 0 0 0 0  xlo ylo zlo xhi yhi zhi  0 0 0 0 0
         '''
         house_line = scene_metadata[1].replace('  ', ' ').replace('  ', ' ').split(' '); assert house_line[0] == 'H'
-        N_images, N_panoramas, N_vertices, N_surfaces, N_segments, N_objects, N_categories, self.N_regions = [int(_) for _ in house_line[3:11]]
+        N_images, N_panoramas, N_vertices, N_surfaces, N_segments, N_objects, N_categories, self.N_regions, _, N_levels = [int(_) for _ in house_line[3:13]]
         
         self.panorama_name_list = [] # list of str
         self.panorama_index_list = [] # list of int
@@ -273,16 +288,17 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         self.pose_list = [] # undistorted/distorted: the same
         self.origin_lookatvector_up_list = []
 
+        self.region_main = self.region_id_list[0] # MAIN region to load shape
         for region_id in self.region_id_list:
             assert region_id < self.N_regions, 'region_id %d >= N_regions %d'%(region_id, self.N_regions)
             print('[%s] Loading region %s from %d regions of house %s (total %d frames for the house)...'%(self.__class__.__name__, region_id, self.N_regions, self.scene_name, N_images))
 
-            '''
+            ''' 
             the R line (region for self.region_id)...
                 R region_index level_index 0 0 label  px py pz  xlo ylo zlo xhi yhi zhi  height  0 0 0 0
             '''
-            region_line = scene_metadata[3+region_id].replace('  ', ' ').replace('  ', ' ').split(' '); assert region_line[0] == 'R'
-            assert region_line[1] == str(region_id)
+            region_line = scene_metadata[N_levels+2+region_id].replace('  ', ' ').replace('  ', ' ').split(' '); assert region_line[0] == 'R'
+            assert region_line[1] == str(region_id), 'region_id %d != region_line[1] %s'%(region_id, region_line[1])
             region_label = region_line[5]
             region_description = self.region_description_dict[region_label]
             region_height = float(region_line[15])
@@ -445,7 +461,9 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             assert len(inv_extrinsics_undist) == 16
             inv_extrinsics_undist_mat = np.array(inv_extrinsics_undist).reshape(4, 4) # <camera-to-world-matrix>
             pose_opencv = np.hstack((self.pose_list[frame_id][:3, :3]@ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]), self.pose_list[frame_id][:3, 3:4]))
-            if not np.allclose(inv_extrinsics_undist_mat[:3], pose_opencv, atol=1e-5):
+            if not np.allclose(inv_extrinsics_undist_mat[:3], pose_opencv, atol=1e-5, rtol=1e-3):
+                print(inv_extrinsics_undist_mat[:3])
+                print(pose_opencv)
                 import ipdb; ipdb.set_trace()
             # assert np.allclose(inv_extrinsics_undist_mat[:3], self.pose_list[frame_id][:3])
 
@@ -504,9 +522,21 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         if shape_params_dict.get('if_dump_shape', False):
             dump_shape_dict_to_shape_file(shape_dict, self.shape_file)
 
-    def export_scene(self, modality_list=[]):
+    def export_scene(
+        self, 
+        modality_list=[], 
+        if_filter_with_main_region=False, # filter out frames with too many invalid rays (i.e. outside of MAIN region)
+        ):
         # find invalid frames (frames with no valid rays)
         print(white_blue('Exporting %d frames... but remove invalid frames first'%len(self.frame_id_list)))
+
+        if if_filter_with_main_region:
+            print(yellow('Filtering frames with coverage of MAIN region (room) ONLY...'))
+            print(yellow('Resetting mi scene to MAIN region only'))
+            self.load_mi_scene(first_N_shapes=1, if_force=True)
+            print(yellow('Resampling mi scene (MAIN region only)'))
+            self.mi_sample_rays_pts(self.cam_rays_list, if_force=True)
+
         valid_frame_idx_list = []
         for frame_idx, frame_id in enumerate(self.frame_id_list):
             valid_mask = ~self.mi_invalid_depth_mask_list[frame_idx]
@@ -518,6 +548,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
                 valid_frame_idx_list.append(frame_idx)
                 print(frame_idx, '->', len(valid_frame_idx_list)-1, 'num valid pixels:', np.sum(valid_mask), 'ratio: %.2f'%(valid_ratio))
 
+        _N_frames_total = len(self.frame_id_list)
         self.frame_id_list = [self.frame_id_list[_] for _ in valid_frame_idx_list]
         self.origin_lookatvector_up_list = [self.origin_lookatvector_up_list[_] for _ in valid_frame_idx_list]
         self.pose_list = [self.pose_list[_] for _ in valid_frame_idx_list]
@@ -534,7 +565,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         if hasattr(self, 'im_mask_list'):
             self.im_mask_list = [self.im_mask_list[_] for _ in valid_frame_idx_list]
 
-        print(white_blue('> Resulted in %d frames...'%len(self.frame_id_list)))
+        print(white_blue('> Resulted in %d -> %d frames...'%(_N_frames_total, len(self.frame_id_list))))
         
         mitsubaBase.export_scene(self, modality_list=modality_list)
 
