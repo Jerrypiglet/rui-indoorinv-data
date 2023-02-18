@@ -89,6 +89,13 @@ scene_name = '2t7WUuJeko7'; region_id_list = [4, 5]; hdr_radiance_scale = 10;
 # frame_ids = [20, 21, 22]
 frame_ids = [20]
 
+'''
+old bedroom (with hallway, and next room for complete geometry)
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.mJXqzFtmKg4_0
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&modelId=mp3d.mJXqzFtmKg4
+'''
+scene_name = 'mJXqzFtmKg4'; region_id_list = [0, 19, 16]; hdr_radiance_scale = 10; 
+
 scene_obj = matterportScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
