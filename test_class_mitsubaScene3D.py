@@ -3,8 +3,8 @@ work with Mitsuba/Blender scenes
 '''
 import sys
 
-host = 'mm1'
-# host = 'apple'
+# host = 'mm1'
+host = 'apple'
 
 from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
 PATH_HOME = PATH_HOME_dict[host]
@@ -70,6 +70,7 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 
 # utils
 parser.add_argument('--if_sample_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
+parser.add_argument('--export_scene', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
 
 opt = parser.parse_args()
 
@@ -77,23 +78,23 @@ base_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 # intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
-'''
-The kitchen scene: data/indoor_synthetic/kitchen/scene_v3.xml
-'''
 xml_filename = 'scene_v3.xml'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 
+frame_ids = []
 scene_name = 'kitchen'
+# split = 'train'; # frame_ids = list(range(202))
+split = 'val'; # frame_ids = list(range(10))
+
 # scene_name = 'bathroom'
 # scene_name = 'bedroom'
 # scene_name = 'living-room' # images/demo_eval_scene_shapes-vis_count-train-living-room_1.png
-scene_name = 'livingroom-test'
+# scene_name = 'livingroom-test'
 
 # split = 'train'; frame_ids = list(range(0, 202, 40))
 # split = 'train'; frame_ids = list(range(0, 4, 1))
 # split = 'train'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(197))
-split = 'val'; frame_ids = list(range(10))
 # split = 'val'; frame_ids = [0]
 # split = 'train'; frame_ids = list(range(189))
 
@@ -146,8 +147,8 @@ scene_obj = mitsubaScene3D(
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'poses', 
-        # 'im_hdr', 
-        # 'im_sdr', 
+        'im_hdr', 
+        'im_sdr', 
         # 'lighting_envmap', 
         # 'albedo', 'roughness', 
         # 'emission', 
@@ -399,6 +400,20 @@ if opt.eval_monosdf:
     # np.save('test_files/eval_return_dict.npy', eval_return_dict)
 
 # eval_return_dict = np.load('test_files/eval_return_dict.npy', allow_pickle=True).item(); opt.eval_monosdf = True
+
+if opt.export_scene:
+    scene_obj.export_scene(
+        modality_list = [
+        'poses', 
+        'im_hdr', 
+        'im_sdr', 
+        'im_mask', 
+        'shapes', 
+        'mi_normal', 
+        'mi_depth', 
+        ], 
+        split=split, 
+    )
 
 '''
 Evaluator for scene

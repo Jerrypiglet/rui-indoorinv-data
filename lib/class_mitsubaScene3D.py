@@ -142,6 +142,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         return len(self.frame_id_list)
 
     @property
+    def frame_num_all(self):
+        return len(self.frame_id_list)
+
+    @property
+    def K_list(self):
+        return [self.K] * self.frame_num
+
+    @property
     def valid_modalities(self):
         return [
             'im_hdr', 'im_sdr', 
@@ -324,7 +332,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         #     # if not hasattr(self, 'pose_list'):
         #         self.get_room_center_pose()
 
-        print(white_blue('[%s] load_poses from %s'%str(self.pose_file)))
+        print(white_blue('[%s] load_poses from %s'%(self.__class__.__name__, str(self.pose_file))))
          
         self.pose_list = []
         self.origin_lookatvector_up_list = []
@@ -413,7 +421,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             #     pose_list.append(np.hstack((R, t)))
             #     origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
-        print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
+        print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.__class__.__name__, len(self.pose_list))))
 
     def get_cam_rays(self, cam_params_dict={}):
         if hasattr(self, 'cam_rays_list'):  return
@@ -433,12 +441,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         return emission in HDR; (H, W, 3)
         '''
-        print(white_blue('[%s] load_emission for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
+        print(white_blue('[%s] load_emission for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
         self.emission_file_list = [self.scene_rendering_path / 'Emit' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
         self.emission_list = [load_img(_, expected_shape=self.im_HW_load+(3,), ext='exr', target_HW=self.im_HW_target) for _ in self.emission_file_list]
 
-        print(blue_text('[%s] DONE. load_emission'%self.parent_class_name))
+        print(blue_text('[%s] DONE. load_emission'%self.__class__.__name__))
 
     def load_albedo(self):
         '''
@@ -447,13 +455,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if hasattr(self, 'albedo_list'): return
 
-        print(white_blue('[%s] load_albedo for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
+        print(white_blue('[%s] load_albedo for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
         self.albedo_file_list = [self.scene_rendering_path / 'DiffCol' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.albedo_list = [load_img(albedo_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for albedo_file, __ in zip(self.albedo_file_list, expected_shape_list)]
         
-        print(blue_text('[%s] DONE. load_albedo'%self.parent_class_name))
+        print(blue_text('[%s] DONE. load_albedo'%self.__class__.__name__))
 
     def load_roughness(self):
         '''
@@ -462,13 +470,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if hasattr(self, 'roughness_list'): return
 
-        print(white_blue('[%s] load_roughness for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
+        print(white_blue('[%s] load_roughness for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
         self.roughness_file_list = [self.scene_rendering_path / 'Roughness' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.roughness_list = [load_img(roughness_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target)[:, :, 0:1].astype(np.float32) for roughness_file, __ in zip(self.roughness_file_list, expected_shape_list)]
 
-        print(blue_text('[%s] DONE. load_roughness'%self.parent_class_name))
+        print(blue_text('[%s] DONE. load_roughness'%self.__class__.__name__))
 
     def load_depth(self):
         '''
@@ -477,13 +485,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if hasattr(self, 'depth_list'): return
 
-        print(white_blue('[%s] load_depth for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
+        print(white_blue('[%s] load_depth for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
         self.depth_file_list = [self.scene_rendering_path / 'Depth' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.depth_list = [load_img(depth_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32)[:, :, 0] for depth_file, __ in zip(self.depth_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
 
-        print(blue_text('[%s] DONE. load_depth'%self.parent_class_name))
+        print(blue_text('[%s] DONE. load_depth'%self.__class__.__name__))
 
         self.pts_from['depth'] = True
 
@@ -494,14 +502,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if hasattr(self, 'normal_list'): return
 
-        print(white_blue('[%s] load_normal for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
+        print(white_blue('[%s] load_normal for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
         self.normal_file_list = [self.scene_rendering_path / 'Normal' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.normal_list = [load_img(normal_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for normal_file, __ in zip(self.normal_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
         self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
         
-        print(blue_text('[%s] DONE. load_normal'%self.parent_class_name))
+        print(blue_text('[%s] DONE. load_normal'%self.__class__.__name__))
 
     def load_lighting_envmap(self):
         '''
@@ -541,7 +549,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
 
-        print(blue_text('[%s] DONE. load_lighting_envmap'%self.parent_class_name))
+        print(blue_text('[%s] DONE. load_lighting_envmap'%self.__class__.__name__))
 
     def load_shapes(self, shape_params_dict={}):
         '''
@@ -673,7 +681,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.if_loaded_shapes = True
         
         print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
-            self.parent_class_name, 
+            self.__class__.__name__, 
             len(self.shape_list_valid), 
             len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
             len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 

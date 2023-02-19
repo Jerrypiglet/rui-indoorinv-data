@@ -412,7 +412,8 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             self.origin_lookatvector_up_list += origin_lookatvector_up_list
 
         self.frame_num_all = len(self.frame_id_list)
-
+        assert self.frame_num_all > 0, 'no frames found for the region'
+        
         assert len(list(set(self.im_HW_load_list))) == 1, 'all loaded images should ideally have the same size'
         assert self.im_HW_load == self.im_HW_load_list[0], 'loaded image size should match the specified image size'
 
@@ -526,6 +527,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         self, 
         modality_list=[], 
         if_filter_with_main_region=False, # filter out frames with too many invalid rays (i.e. outside of MAIN region)
+        if_force=False,
         ):
         # find invalid frames (frames with no valid rays)
         print(white_blue('Exporting %d frames... but remove invalid frames first'%len(self.frame_id_list)))
@@ -538,10 +540,13 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             self.mi_sample_rays_pts(self.cam_rays_list, if_force=True)
 
         valid_frame_idx_list = []
+
+        valid_ratio_thres = 0.2 if not if_filter_with_main_region else 0.5
+
         for frame_idx, frame_id in enumerate(self.frame_id_list):
             valid_mask = ~self.mi_invalid_depth_mask_list[frame_idx]
             valid_ratio = float(np.sum(valid_mask))/np.prod(valid_mask.shape[:2])
-            if valid_ratio < 0.2:
+            if valid_ratio < valid_ratio_thres:
                 print(yellow('frame %d has few valid rays (ratio %.2f), skip it.'%(frame_id, valid_ratio)))
                 # self.frame_id_list.remove(frame_id)
             else:
@@ -549,25 +554,32 @@ class matterportScene3D(mitsubaBase, scene2DBase):
                 print(frame_idx, '->', len(valid_frame_idx_list)-1, 'num valid pixels:', np.sum(valid_mask), 'ratio: %.2f'%(valid_ratio))
 
         _N_frames_total = len(self.frame_id_list)
-        self.frame_id_list = [self.frame_id_list[_] for _ in valid_frame_idx_list]
-        self.origin_lookatvector_up_list = [self.origin_lookatvector_up_list[_] for _ in valid_frame_idx_list]
-        self.pose_list = [self.pose_list[_] for _ in valid_frame_idx_list]
-        self.K_list = [self.K_list[_] for _ in valid_frame_idx_list]
-        self.cam_rays_list = [self.cam_rays_list[_] for _ in valid_frame_idx_list]
 
-        self.hdr_scale_list = [self.hdr_scale_list[_] for _ in valid_frame_idx_list]
-        self.im_hdr_list = [self.im_hdr_list[_] for _ in valid_frame_idx_list]
-        self.im_sdr_list = [self.im_sdr_list[_] for _ in valid_frame_idx_list]
-        self.mi_depth_list = [self.mi_depth_list[_] for _ in valid_frame_idx_list]
-        self.mi_normal_global_list = [self.mi_normal_global_list[_] for _ in valid_frame_idx_list]
+        valid_member_list = [
+            'frame_id_list', 
+            
+            'origin_lookatvector_up_list', 
+            'pose_list', 
+            'cam_rays_list', 
+            'K_list', 
 
-        self.mi_invalid_depth_mask_list = [self.mi_invalid_depth_mask_list[_] for _ in valid_frame_idx_list]
-        if hasattr(self, 'im_mask_list'):
-            self.im_mask_list = [self.im_mask_list[_] for _ in valid_frame_idx_list]
+            'hdr_scale_list', 
+            'im_hdr_list', 
+            'im_sdr_list', 
+            'im_mask_list', 
+            
+            'mi_depth_list', 
+            'mi_normal_global_list', 
+            'mi_invalid_depth_mask_list', 
+        ]
+        for valid_member in valid_member_list:
+            if hasattr(self, valid_member):
+                assert len(getattr(self, valid_member)) == _N_frames_total, 'len(%s)=%d != %d'%(valid_member, len(getattr(self, valid_member)), _N_frames_total)
+                setattr(self, valid_member, [getattr(self, valid_member)[_] for _ in valid_frame_idx_list])
 
         print(white_blue('> Resulted in %d -> %d frames...'%(_N_frames_total, len(self.frame_id_list))))
         
-        mitsubaBase.export_scene(self, modality_list=modality_list)
+        mitsubaBase.export_scene(self, modality_list=modality_list, appendix='_main' if if_filter_with_main_region else '', if_force=if_force)
 
     @property
     def region_description_dict(self):

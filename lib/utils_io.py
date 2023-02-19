@@ -101,6 +101,7 @@ def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if
     
     im_SDR = np.clip(im_hdr_scaled**(1.0/2.2), 0., 1.)
     im_SDR_uint8 = (255. * im_SDR).astype(np.uint8)
+    Path(png_image_path).parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(im_SDR_uint8).save(str(png_image_path))
 
 def tone_mapping_16bit(im_16bit, dest_dtype=np.float32):

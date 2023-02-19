@@ -334,7 +334,7 @@ class visualizer_scene_3D_o3d(object):
         subsample_cam_rate = cam_params.get('subsample_cam_rate', 1)
         near, far = self.os.near, self.os.far
 
-        pose_list = self.os.pose_list
+        # pose_list = self.os.pose_list
         # origin_lookatvector_up_list = self.os.origin_lookatvector_up_list
         cam_frustrm_list = []
         # cam_axes_list = []

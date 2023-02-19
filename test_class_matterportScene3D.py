@@ -68,33 +68,37 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 parser.add_argument('--if_convert_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
 parser.add_argument('--if_dump_shape', type=str2bool, nargs='?', const=True, default=False, help='if dump shape of entire scene')
 parser.add_argument('--export_scene', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
+parser.add_argument('--if_main_region', type=str2bool, nargs='?', const=True, default=False, help='')
 
 opt = parser.parse_args()
 
 base_root = Path(PATH_HOME) / 'data/Matterport3D'
+assert base_root.exists()
 
 '''
-conference room with set of lamps and white chairs
+conference room with set of lamps and white chairs; tones of glass
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.17DRP5sb8fy_5
 '''
 scene_name = '17DRP5sb8fy'; region_id_list = [5]; hdr_radiance_scale = 10; 
 frame_ids = [21, 22, 46, 47]
 
 '''
-old bedroom, with hallway
+old bedroom (boy in bed), with hallway
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.2t7WUuJeko7_5
 '''
-scene_name = '2t7WUuJeko7'; region_id_list = [4, 5]; hdr_radiance_scale = 10; 
+# scene_name = '2t7WUuJeko7'; region_id_list = [5, 4]; hdr_radiance_scale = 10; 
 # frame_ids = [20, 21, 22]
-frame_ids = [20]
+# frame_ids = [20]
 
 '''
-old bedroom (with hallway, and next room for complete geometry)
+movie room (with hallway, and next room for complete geometry)
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.mJXqzFtmKg4_0
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&modelId=mp3d.mJXqzFtmKg4
 '''
 scene_name = 'mJXqzFtmKg4'; region_id_list = [0, 19, 16]; hdr_radiance_scale = 10; 
-
+# frame_ids = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33]
+frame_ids = [19]
 
 '''
 dark bedroom with lamp (with next door hallway) ❌ the lotus lights on the fan is not in the geometry...
@@ -102,6 +106,7 @@ https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&model
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.qoiz87JEwZ2_15
 '''
 # scene_name = 'qoiz87JEwZ2'; region_id_list = [15, 16]; hdr_radiance_scale = 10; 
+# frame_ids = [486, 487, 488]
 
 scene_obj = matterportScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -131,6 +136,7 @@ scene_obj = matterportScene3D(
     modality_filename_dict = {
         'im_hdr': ('matterport_hdr_images', 'j', 'jxr'), 
         'im_sdr': ('matterport_color_images', 'i', 'jpg'), 
+        # 'im_sdr': ('undistorted_color_images', 'i', 'jpg'), 
         'depth': ('matterport_depth_images', 'd', 'png'), 
         'poses': ('matterport_camera_poses', 'pose_', 'txt'), # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_poses
         'im_sdr_undist': ('undistorted_color_images', 'i', 'jpg'), 
@@ -142,6 +148,7 @@ scene_obj = matterportScene3D(
     }, 
     im_params_dict={
         'im_H_load': 1024, 'im_W_load': 1280, 
+        # 'im_H_resize': 1024, 'im_W_resize': 1280, 
         'im_H_resize': 512, 'im_W_resize': 640, 
         'hdr_radiance_scale': hdr_radiance_scale, 
         }, 
@@ -180,7 +187,8 @@ if opt.export_scene:
         'mi_normal', 
         'mi_depth', 
         ], 
-        if_filter_with_main_region = True, # True: to filter out frames that have too little coverage of the MAIN region
+        if_filter_with_main_region = opt.if_main_region, # True: to filter out frames that have too little coverage of the MAIN region
+        if_force = opt.force, # True to force export
     )
 
 

@@ -646,20 +646,31 @@ class mitsubaBase():
             shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
         print(blue_text('Scene shapes dumped to: %s')%str(mesh_dump_root))
 
-    def export_scene(self, modality_list=[]):
+    def export_scene(self, modality_list=[], appendix='', split='', if_force=False):
         '''
-        export scene to mitsubaScene data structure
+        export scene to mitsubaScene data structure + monosdf inputs
         '''
-        scene_export_path = self.rendering_root / 'scene_export' / self.scene_name
+        scene_export_path = self.rendering_root / 'scene_export' / (self.scene_name + appendix)
+        if split != '':
+            scene_export_path = scene_export_path / split
         if scene_export_path.exists():
-            if_reexport = input(red("scene export path exists:%s . Re-export? [y/n]"%str(scene_export_path)))
+            if if_force:
+                if_reexport = 'Y'
+                print(red('scene export path exists:%s . FORCE overwritten.'%str(scene_export_path)))
+            else:
+                if_reexport = input(red("scene export path exists:%s . Re-export? [y/n]"%str(scene_export_path)))
+
             if if_reexport in ['y', 'Y']:
-                if_delete = input(red("Delete? [y/n]"))
+                if not if_force:
+                    if_delete = input(red("Delete? [y/n]"))
+                else:
+                    if_delete = 'Y'
                 if if_delete in ['y', 'Y']:
                     shutil.rmtree(str(scene_export_path), ignore_errors=True)
             else:
                 print(red('Aborted export.'))
                 return
+                
         scene_export_path.mkdir(parents=True, exist_ok=True)
 
         for modality in modality_list:
@@ -667,7 +678,55 @@ class mitsubaBase():
 
             if modality == 'poses':
                 self.export_poses_cam_txt(scene_export_path, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
+
+                '''
+                cameras for MonoSDF
+                '''
+                cameras = {}
+                scale_mat_path = self.rendering_root / 'scene_export' / (self.scene_name + appendix) / 'scale_mat.npy'
+                if split != 'val':
+                    poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.pose_list]
+                    poses = np.array(poses)
+                    assert poses.shape[1:] == (4, 4)
+                    min_vertices = poses[:, :3, 3].min(axis=0)
+                    max_vertices = poses[:, :3, 3].max(axis=0)
+                    center = (min_vertices + max_vertices) / 2.
+                    scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
+                    print('[pose normalization to unit cube] --center, scale--', center, scale)
+                    # we should normalized to unit cube
+                    scale_mat = np.eye(4).astype(np.float32)
+                    scale_mat[:3, 3] = -center
+                    scale_mat[:3 ] *= scale 
+                    scale_mat = np.linalg.inv(scale_mat)
+                    np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale})
+                else:
+                    assert scale_mat_path.exists()
+                    scale_mat_dict = np.load(str(scale_mat_path), allow_pickle=True).item()
+                    scale_mat = scale_mat_dict['scale_mat']
+                    center = scale_mat_dict['center']
+                    scale = scale_mat_dict['scale']
+
+                cameras['center'] = center
+                cameras['scale'] = scale
+                for _, pose in enumerate(self.pose_list):
+                    if hasattr(self, 'K'):
+                        K = self.K 
+                    else:
+                        assert hasattr(self, 'K_list')
+                        assert len(self.K_list) == len(self.pose_list)
+                        K = self.K_list[_] # (3, 3)
+                        assert K.shape == (3, 3)
+                    K = np.hstack((K, np.array([0., 0., 0.], dtype=np.float32).reshape((3, 1))))
+                    K = np.vstack((K, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
+                    pose = np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
+                    pose = K @ np.linalg.inv(pose)
+                    cameras['scale_mat_%d'%_] = scale_mat
+                    cameras['world_mat_%d'%_] = pose
+                    # cameras['split_%d'%_] = 'train' if _ < self.frame_num-10 else 'val' # 10 frames for val
+                    # cameras['frame_id_%d'%_] = idx if idx < len(mitsuba_scene_dict['train'].pose_list) else idx-len(mitsuba_scene_dict['train'].pose_list)
             
+                np.savez(str(scene_export_path / 'cameras.npz'), **cameras)
+
             if modality == 'im_hdr':
                 (scene_export_path / 'Image').mkdir(parents=True, exist_ok=True)
                 for _, frame_id in enumerate(self.frame_id_list):
@@ -682,6 +741,7 @@ class mitsubaBase():
                     im_sdr_export_path = scene_export_path / 'Image' / ('%03d_0001.png'%_)
                     cv2.imwrite(str(im_sdr_export_path), (np.clip(self.im_sdr_list[_][:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
                     print(blue_text('SDR image %s exported to: %s'%(frame_id, str(im_sdr_export_path))))
+                    print(self.modality_file_list_dict['im_sdr'][_])
             
             if modality == 'mi_normal':
                 (scene_export_path / 'MiNormalGlobal').mkdir(parents=True, exist_ok=True)
@@ -746,3 +806,5 @@ class mitsubaBase():
                         shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
                         shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
                         print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
+
+            

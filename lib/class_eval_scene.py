@@ -77,7 +77,7 @@ class evaluator_scene_scene():
                 vis_frustum_normals_list.append(normals)
                 vis_frustum_centers_list.append(rays_o[0, 0].reshape(1, 3))
 
-        for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
+        for shape_idx, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
             assert np.amin(faces) == 1
             if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr']:
                 assert self.os.if_has_poses
@@ -90,7 +90,7 @@ class evaluator_scene_scene():
                     rgb_sum = np.zeros((vertices.shape[0], 3), dtype=np.float32)
                     rgb_count = np.zeros((vertices.shape[0]), dtype=np.int64)
 
-                print('Evaluating %d frames...'%len(self.os.origin_lookatvector_up_list))
+                print('[Shape %d] Evaluating %d frames...'%(shape_idx, len(self.os.origin_lookatvector_up_list)))
                 for frame_idx, (origin, _, _) in tqdm(enumerate(self.os.origin_lookatvector_up_list)):
                     visibility_frustum = np.all(((vertices-vis_frustum_centers_list[frame_idx]) @ vis_frustum_normals_list[frame_idx]) > 0, axis=1)
                     # visibility = visibility_frustum
