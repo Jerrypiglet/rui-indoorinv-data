@@ -69,6 +69,7 @@ class visualizer_scene_2D(object):
             'emission', 
             'semseg', 'matseg', 
             'mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', 
+            'mi_normal_im_overlay', 
             'layout', 'shapes', 
             ]
 
@@ -178,7 +179,7 @@ class visualizer_scene_2D(object):
         if modality in ['depth', 'normal']: assert self.os.if_has_depth_normal
         if modality in ['albedo', 'roughness']: assert self.os.if_has_BRDF
         if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.os.if_has_seg
-        if modality in ['mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']: assert self.os.if_has_mitsuba_scene
+        if modality in ['mi_depth', 'mi_normal', 'mi_normal_im_overlay', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']: assert self.os.if_has_mitsuba_scene
 
         _list = self.os.get_modality(modality, source=source)
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
@@ -187,7 +188,7 @@ class visualizer_scene_2D(object):
 
             if modality == 'normal':
                 _im = (_im + 1.) / 2. 
-            if modality == 'mi_normal':
+            if modality in ['mi_normal', 'mi_normal_im_overlay']:
                 assert self.os.pts_from['mi']
                 R = self.os.pose_list[frame_idx][:3, :3]
                 mi_normal_global = _im
@@ -212,8 +213,13 @@ class visualizer_scene_2D(object):
                 elif mi_normal_vis_coords in ['world-blender']: # images/demo_normal_gt_mitsubaScene_world-blender.png
                     mi_normal_cam = (self.os.T_w_b2m.T @ mi_normal_global.reshape(-1, 3).T).T.reshape(H, W, 3)
 
-                _im = np.clip((mi_normal_cam+1.)/2., 0., 1.)
-                _im[mi_normal_global==np.inf] = 0.
+                mi_normal = np.clip((mi_normal_cam+1.)/2., 0., 1.)
+                mi_normal[mi_normal_global==np.inf] = 0.
+
+                if modality == 'mi_normal': 
+                    _im = mi_normal
+                elif modality == 'mi_normal_im_overlay':
+                    _im = np.clip(self.os.im_sdr_list[frame_idx] * 0.5 + mi_normal * 0.5, 0., 1.)
 
             if modality == 'depth':
                 plot = ax.imshow(_im, cmap='jet')

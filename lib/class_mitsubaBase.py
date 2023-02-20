@@ -39,6 +39,7 @@ class mitsubaBase():
         self.if_loaded_layout = False
 
         self.extra_transform = None
+        self.if_center_offset = True # pixel centers are 0.5, 1.5, ..., H-1+0.5
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
@@ -53,7 +54,7 @@ class mitsubaBase():
         if not isinstance(W_list, list): W_list = [W_list] * len(pose_list)
         assert len(K_list) == len(pose_list) == len(H_list) == len(W_list)
         for _, (H, W, pose, K) in enumerate(zip(H_list, W_list, pose_list, K_list)):
-            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=(convention=='opencv'))
+            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=(convention=='opencv'), if_center_offset=self.if_center_offset)
             cam_rays_list.append((rays_o, rays_d, ray_d_center))
         return cam_rays_list
 
@@ -670,7 +671,7 @@ class mitsubaBase():
             else:
                 print(red('Aborted export.'))
                 return
-                
+
         scene_export_path.mkdir(parents=True, exist_ok=True)
 
         for modality in modality_list:
@@ -769,18 +770,32 @@ class mitsubaBase():
                 assert self.pts_from['mi']
                 if hasattr(self, 'im_mask_list'):
                     assert len(self.im_mask_list) == len(self.mi_invalid_depth_mask_list)
+                if_undist_mask = False
+                if hasattr(self, 'if_undist'):
+                    if self.if_undist:
+                        assert hasattr(self, 'im_undist_mask_list')
+                        assert len(self.im_undist_mask_list) == len(self.mi_invalid_depth_mask_list)
+                        if_undist_mask = True
                 for _, frame_id in enumerate(self.frame_id_list):
                     im_mask_export_path = scene_export_path / 'ImMask' / ('%03d_0001.png'%_)
                     mi_invalid_depth_mask = self.mi_invalid_depth_mask_list[_]
+                    assert mi_invalid_depth_mask.dtype == bool
+                    im_mask_export = ~mi_invalid_depth_mask
+                    mask_source_list = ['mi']
                     if hasattr(self, 'im_mask_list'):
-                        im_mask = self.im_mask_list[_]
-                        assert mi_invalid_depth_mask.shape == im_mask.shape, 'invalid depth mask shape %s not equal to im_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask.shape)
-                        im_mask = np.logical_and(im_mask, ~mi_invalid_depth_mask)
-                        print('Exporting im_mask from invalid depth mask && loaded im_mask')
-                    else:
-                        im_mask = ~mi_invalid_depth_mask
-                        print('Exporting im_mask from invalid depth mask only')
-                    cv2.imwrite(str(im_mask_export_path), (im_mask*255).astype(np.uint8))
+                        im_mask_ = self.im_mask_list[_]
+                        assert im_mask_.dtype == bool
+                        assert im_mask_export.shape == im_mask_.shape, 'invalid depth mask shape %s not equal to im_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask_.shape)
+                        im_mask_export = np.logical_and(im_mask_export, im_mask_)
+                        mask_source_list.append('im_mask')
+                    if if_undist_mask:
+                        im_mask_ = self.im_undist_mask_list[_]
+                        assert im_mask_.dtype == bool
+                        assert im_mask_export.shape == im_mask_.shape, 'invalid depth mask shape %s not equal to im_undist_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask_.shape)
+                        im_mask_export = np.logical_and(im_mask_export, im_mask_)
+                        mask_source_list.append('im_undist_mask')
+                    print('Exporting im_mask from %s'%(' && '.join(mask_source_list)))
+                    cv2.imwrite(str(im_mask_export_path), (im_mask_export*255).astype(np.uint8))
                     print(blue_text('Mask image (for valid depths) %s exported to: %s'%(frame_id, str(im_mask_export_path))))
             
             if modality == 'shapes': 

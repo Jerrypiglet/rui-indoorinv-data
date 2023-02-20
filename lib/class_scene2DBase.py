@@ -79,7 +79,7 @@ class scene2DBase():
         self.modality_ext_dict = {}
         self.modality_folder_dict = {}
         for modality, filename in modality_filename_dict.items():
-            assert modality in self.valid_modalities, 'Invalid key [%s] in modality_filename_dict: NOT in self.valid_modalities!'%modality
+            # assert modality in self.valid_modalities, 'Invalid key [%s] in modality_filename_dict: NOT in self.valid_modalities!'%modality
             self.modality_ext_dict[modality] = filename.split('.')[-1] if isinstance(filename, str) else filename[-1]
             self.modality_folder_dict[modality] = filename.split('/')[0] if isinstance(filename, str) else filename[0]
         self.modality_file_list_dict = {}

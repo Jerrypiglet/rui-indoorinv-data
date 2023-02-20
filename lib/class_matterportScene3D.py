@@ -1,32 +1,22 @@
-import json
-from pathlib import Path, PosixPath
-import subprocess
-import imagecodecs
-import matplotlib.pyplot as plt
+from math import prod
+from pathlib import Path
 import numpy as np
-from pyvista import read_texture
 np.set_printoptions(suppress=True)
-
-from tqdm import tqdm
-import cv2
-from lib.global_vars import mi_variant_dict
+import torch
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up
-from lib.utils_io import load_img, resize_intrinsics
-# from collections import defaultdict
-# import trimesh
-# Import the library using the alias "mi"
+from tqdm import tqdm
 import mitsuba as mi
-
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
-
-# from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
 from .class_scene2DBase import scene2DBase
 
+from lib.global_vars import mi_variant_dict
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up
+from lib.utils_io import load_img, resize_intrinsics
+from lib.utils_misc import blue_text, magenta, yellow, get_list_of_keys, white_blue, red
 from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_dict_from_shape_file
 from lib.utils_misc import get_device
+from lib.utils_dvgo import get_meshgrid
 
 from .class_scene2DBase import scene2DBase
 
@@ -82,6 +72,9 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         self.scene_path = self.rendering_root / 'v1/scans' / self.scene_name
         self.scene_rendering_path = self.scene_path
         self.scene_name_full = self.scene_name # e.g.'asianRoom1'
+        
+        self.if_need_undist = self.im_params_dict.get('if_need_undist', False)
+        self.if_need_manual_undist_flags = {_: True for _ in self.modality_list}
 
         # self.pose_format, pose_file = scene_params_dict['pose_file']
         # assert self.pose_format in ['OpenRooms', 'bundle'], 'Unsupported pose file: '+pose_file
@@ -119,6 +112,84 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         if hasattr(self, 'pose_list'): 
             self.get_cam_rays(self.cam_params_dict)
         self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
+
+        '''
+        undist images if applicable
+        '''
+        for modality in self.modality_list:
+            if modality in ['im_sdr', 'im_hdr', 'depth', 'normal']:
+                if self.if_need_manual_undist_flags[modality]:
+
+                    assert hasattr(self, 'K_undist_params_list')
+                    assert len(self.frame_id_list) == len(self.K_list) == len(getattr(self, modality+'_list')) == len(self.K_undist_params_list)
+                    print(magenta('Undistorting %s...'%modality))
+                    has_mask_flag = hasattr(self, 'im_undist_mask_list')
+                    if not has_mask_flag:
+                        self.im_undist_mask_list = []
+                    modality_undist_list = []
+                    for frame_id, K, im, K_undist_params in tqdm(zip(self.frame_id_list, self.K_list, getattr(self, modality+'_list'), self.K_undist_params_list)):
+                        im_undist, im_undist_mask = self.undistort_single_image(im, K, K_undist_params, modality=modality)
+                        modality_undist_list.append(im_undist)
+                        if not has_mask_flag:
+                            self.im_undist_mask_list.append(im_undist_mask)
+                    setattr(self, modality+'_undist_list', modality_undist_list)
+
+    def undistort_single_image(self, im, K, K_undist_params, modality=''):
+        H, W = im.shape[:2]
+        undistorted_position_x, undistorted_position_y = get_meshgrid(H, W, self.if_center_offset) # True: pixel centers are 0.5, 1.5, ..., H-0.5; False: pixel centers are 0, 1, ..., H-1
+        [k1, k2, p1, p2, k3] = get_list_of_keys(K_undist_params, ['k1', 'k2', 'p1', 'p2', 'k3'], [float, float, float, float, float])
+        k4 = K_undist_params.get('k4', 0.) # [TODO] double check with Matterport folks, as it is not documented here... https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_intrinsics 
+        fx, fy = K[0][0], K[1][1]
+        cx, cy = K[0][2], K[1][2]
+        nx = (undistorted_position_x - cx) / fx
+        ny = (undistorted_position_y - cy) / fy
+        rr = nx*nx + ny*ny
+        rrrr = rr*rr
+        s = 1.0 + rr*k1 + rrrr*k2 + rrrr*rr*k3 + rrrr*rrrr*k4
+        nx = s*nx + p2*(rr + 2*nx*nx) + 2*p1*nx*ny
+        ny = s*ny + p1*(rr + 2*ny*ny) + 2*p2*nx*ny
+        distorted_position_x = nx*fx + cx
+        distorted_position_y = ny*fy + cy
+        
+        im_torch = torch.from_numpy(im).unsqueeze(0).permute(0, 3, 1, 2).float() # (1, C, H, W)
+        im_mask_torch = torch.ones(1, 1, im.shape[0], im.shape[1]).float() # (1, 1, H, W)
+
+        uv_dist_normalized_torch = torch.from_numpy(np.stack([distorted_position_x, distorted_position_y], axis=-1)).unsqueeze(0).float() # (1, H, W, 2)
+        if self.if_center_offset:
+            align_corners = False # (-1, 1) corresponds to the corner points of corner pixels (0, H or W)
+            # uv_undist_normalized_torch = torch.from_numpy(np.stack([undistorted_position_x, undistorted_position_y], axis=-1)).unsqueeze(0).unsqueeze(0).float() # (1, 1, H, W, 2)
+            uv_dist_normalized_torch = uv_dist_normalized_torch / torch.tensor([W, H]).reshape(1, 1, 1, 2).float() * 2 - 1 # (1, H, W, 2)
+        else:
+            align_corners = True # (-1, 1) corresponds to the CENTER points of corner pixels (0, H-1 or W-1)
+            uv_dist_normalized_torch = uv_dist_normalized_torch / torch.tensor([W-1, H-1]).reshape(1, 1, 1, 2).float() * 2 - 1 # (1, H, W, 2)
+
+        sampled_im_torch = torch.nn.functional.grid_sample(im_torch, uv_dist_normalized_torch, mode='bilinear', align_corners=align_corners) # (1, 3, H, W)
+        im_undist = sampled_im_torch.squeeze(0).permute(1, 2, 0).detach().numpy() # (H, W, C)
+
+        sampled_im_mask_torch = torch.nn.functional.grid_sample(im_mask_torch, uv_dist_normalized_torch, mode='nearest', align_corners=align_corners) # (1, 1, H, W)
+        im_undist_mask = sampled_im_mask_torch.squeeze().detach().numpy() # (H, W)
+        im_undist_mask = im_undist_mask == 1.
+
+        '''
+        uncomment to debug: images/debug_im_undist.png
+        '''
+        # import matplotlib.pyplot as plt
+        # plt.figure(figsize=(20, 10))
+        # plt.subplot(2, 2, 1)
+        # plt.imshow(np.clip(im**(1./2.2), 0., 1.))
+        # plt.grid()
+        # plt.subplot(2, 2, 2)
+        # plt.imshow(np.clip(im_undist**(1./2.2), 0., 1.))
+        # plt.grid()
+        # plt.subplot(2, 2, 3)
+        # plt.imshow(im_undist_mask.astype(np.float32))
+        # plt.colorbar()
+        # plt.grid()
+        # plt.show()
+
+        del uv_dist_normalized_torch, sampled_im_torch, im_torch, sampled_im_mask_torch, im_mask_torch
+
+        return im_undist, im_undist_mask
 
     @property
     def frame_num(self):
@@ -183,7 +254,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             assert self.pts_from['mi']
         if modality == 'mi_depth': 
             return self.mi_depth_list
-        elif modality == 'mi_normal': 
+        elif modality in ['mi_normal', 'mi_normal_im_overlay']: 
             return self.mi_normal_global_list
         elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
             seg_key = modality.split('_')[-1] 
@@ -345,9 +416,6 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             
             print('region %d: total'%region_id, white_blue(str(frame_num_all)), 'frames for the region (frame_id e.g. [%s]...)'%(', '.join([str(_) for _ in frame_id_list])))
             if self.scene_params_dict['frame_id_list'] != []:
-                # self.frame_id_list = [self.frame_id_list[_] for _ in self.scene_params_dict['frame_id_list']]
-                # assert all([_ in self.frame_id_list for _ in self.scene_params_dict['frame_id_list']])
-                # self.frame_id_list = self.scene_params_dict['frame_id_list']
                 frame_id_list = [_ for _ in self.scene_params_dict['frame_id_list'] if _ in frame_id_list]
                 print('region %d: SELECTED %d frames ([%s]...)'%(region_id, len(frame_id_list), ', '.join([str(_) for _ in frame_id_list[:3]])))
 
@@ -360,8 +428,8 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             frame_filename_list = []
             frame_info_list = []
             im_HW_load_list = []
-            K_list = [] # undistorted/distorted: the same
-            _K_orig_list = [] # only for validation purposes
+            # K_list = [] # undistorted/distorted: the same
+            # _K_orig_list = [] # only for validation purposes
             extrinsics_mat_list = [] # loaded from distorted
             pose_list = [] # undistorted/distorted: the same
             origin_lookatvector_up_list = []
@@ -393,20 +461,22 @@ class matterportScene3D(mitsubaBase, scene2DBase):
                 width, height = int(frame_line[31]), int(frame_line[32])
                 im_HW_load_list.append((height, width))
 
-                # intrinsics
-                K = np.array([float(_) for _ in frame_line[22:31]]).reshape(3, 3) # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_intrinsics
-                _K_orig_list.append(K.copy())
-                if width != self.W or height != self.H:
-                    scale_factor = [t / s for t, s in zip((self.H, self.W), (height, width))]
-                    K = resize_intrinsics(K, scale_factor)
-                K_list.append(K)
+                # intrinsics: not correct!!!
+                # K = np.array([float(_) for _ in frame_line[22:31]]).reshape(3, 3) # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_intrinsics
+                # _K_orig_list.append(K.copy())
+                # if width != self.W or height != self.H:
+                #     scale_factor = [t / s for t, s in zip((self.H, self.W), (height, width))]
+                #     K = resize_intrinsics(K, scale_factor)
+                #     print(yellow('Resized K from %s to %s'%((height, width), (self.H, self.W))))
+                # print(K)
+                # K_list.append(K)
 
             self.frame_id_list += frame_id_list
             self.frame_filename_list += frame_filename_list
             self.frame_info_list += frame_info_list
             self.im_HW_load_list += im_HW_load_list
-            self.K_list += K_list
-            self._K_orig_list += _K_orig_list
+            # self.K_list += K_list
+            # self._K_orig_list += _K_orig_list
             self.extrinsics_mat_list += extrinsics_mat_list
             self.pose_list += pose_list
             self.origin_lookatvector_up_list += origin_lookatvector_up_list
@@ -419,6 +489,12 @@ class matterportScene3D(mitsubaBase, scene2DBase):
 
         for modality, modality_filename in self.modality_filename_dict.items():
             modality_folder, modality_tag, modality_ext = modality_filename
+            if self.if_need_undist:
+                if modality in ['im_sdr', 'im_hdr', 'depth', 'normal']:
+                    if modality+'_undist' in self.modality_filename_dict:
+                        modality_folder_undist, modality_tag_undist, modality_ext_undist = self.modality_filename_dict[modality+'_undist']
+                        print(yellow('Using undistorted %s images from %s'%(modality, modality_folder_undist)))
+                        self.if_need_manual_undist_flags[modality] = False
             self.modality_file_list_dict[modality] = [self.scene_rendering_path / modality_folder / (frame_filename%(modality_tag, modality_ext)) for frame_filename in self.frame_filename_list]
         
         # import ipdb; ipdb.set_trace()
@@ -426,11 +502,19 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         # self.H_list = [_[0] for _ in self.im_HW_load_list]
         # self.W_list = [_[1] for _ in self.im_HW_load_list]
 
-        self.load_undist_cam_parameters() # load undistorted camera parameters; TO DOUBLE CHECK AGAINST LOADED DISTORTED CAMERA PARAMETERS
+        self.load_compare_undist_cam_parameters() # load undistorted camera parameters; TO DOUBLE CHECK AGAINST LOADED DISTORTED CAMERA PARAMETERS
+        self.load_compare_camera_files()
+        print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
 
-    def load_undist_cam_parameters(self):
+        if self.cam_params_dict.get('if_convert_poses', False):
+            self.export_poses_cam_txt(self.pose_file.parent, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
+
+    def load_compare_undist_cam_parameters(self):
         '''
-        load undistorted camera parameters from undistorted_camera_parameters/{scene_name}.json
+        undistorted_camera_parameters/{scene_name}.json
+
+        load undistorted camera parameters
+
         https://github.com/niessner/Matterport/blob/master/data_organization.md#undistorted_camera_parameters
 
         Mostly to double check against the loaded distorted camera parameters loaded in self.load_meta()
@@ -450,29 +534,65 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         undist_cam_data_per_cam = [undist_cam_data_all[_*7:(_+1)*7] for _ in range(len(undist_cam_data_all)//7)]
         undist_cam_data_per_cam_dict = {'_'.join(_[1].split(' ')[1].split('_')[:2]): _ for _ in undist_cam_data_per_cam} # key is camera id (e.g. ee59d6b5e5da4def9fe85a8ba94ecf25_d1), value is list: (intrinsics, cam info of 6 frames of 6 yaws)
 
+        assert len(self.frame_info_list) > 0
         for frame_id, (frame_name, camera_index, yaw_index) in enumerate(self.frame_info_list):
             undist_cam_data_per_cam = undist_cam_data_per_cam_dict['%s_d%d'%(frame_name, camera_index)]
-            assert undist_cam_data_per_cam[0].startswith('intrinsics_matrix')
-            intrinsics_undist = [float(_) for _ in undist_cam_data_per_cam[0].replace('  ', ' ').split(' ')[1:]] # <fx> 0 <cx>  0 <fy> <cy> 0 0 1
-            assert len(intrinsics_undist) == 9
-            fx, cx, fy, cy = intrinsics_undist[0], intrinsics_undist[2], intrinsics_undist[4], intrinsics_undist[5]
-            assert np.all(np.array([[fx, 0., cx], [0., fy, cy], [0., 0., 1.]]) == self._K_orig_list[frame_id]) # just double check to make sure: intrinsics distorted/undistorted are the same
+            
+            # not correct!!!
+            # assert undist_cam_data_per_cam[0].startswith('intrinsics_matrix')
+            # intrinsics_undist = [float(_) for _ in undist_cam_data_per_cam[0].replace('  ', ' ').split(' ')[1:]] # <fx> 0 <cx>  0 <fy> <cy> 0 0 1
+            # assert len(intrinsics_undist) == 9
+            # # fx, cx, fy, cy = intrinsics_undist[0], intrinsics_undist[2], intrinsics_undist[4], intrinsics_undist[5]
+            # # assert np.all(np.array([[fx, 0., cx], [0., fy, cy], [0., 0., 1.]]) == self._K_orig_list[frame_id]) # just double check to make sure: intrinsics distorted/undistorted are the same
+            # if not np.allclose(np.array(intrinsics_undist), self._K_orig_list[frame_id].flatten(), atol=1e-5, rtol=1e-5):
+            #     print(intrinsics_undist)
+            #     print(self._K_orig_list[frame_id].flatten())
+            #     import ipdb; ipdb.set_trace()
 
             inv_extrinsics_undist = [float(_) for _ in undist_cam_data_per_cam[1+yaw_index].replace('  ', ' ').split(' ')[3:]] # <camera-to-world-matrix>
             assert len(inv_extrinsics_undist) == 16
             inv_extrinsics_undist_mat = np.array(inv_extrinsics_undist).reshape(4, 4) # <camera-to-world-matrix>
             pose_opencv = np.hstack((self.pose_list[frame_id][:3, :3]@ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]), self.pose_list[frame_id][:3, 3:4]))
-            if not np.allclose(inv_extrinsics_undist_mat[:3], pose_opencv, atol=1e-5, rtol=1e-3):
+            if not np.allclose(inv_extrinsics_undist_mat[:3], pose_opencv, atol=1e-4, rtol=1e-4):
+                print('!!!')
                 print(inv_extrinsics_undist_mat[:3])
                 print(pose_opencv)
                 import ipdb; ipdb.set_trace()
             # assert np.allclose(inv_extrinsics_undist_mat[:3], self.pose_list[frame_id][:3])
 
-        print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
+    def load_compare_camera_files(self):
+        '''
+        further compare against:
+            - matterport_camera_intrinsics: this is the right one...
+            - matterport_camera_poses
+        '''
+        K_list_new = []
+        K_undist_params_list = []
+        for frame_id, (frame_name, camera_index, yaw_index) in enumerate(self.frame_info_list):
+            matterport_camera_intrinsics_file = self.scene_path / 'matterport_camera_intrinsics' / ('%s_intrinsics_%d.txt'%(frame_name, camera_index))
+            assert matterport_camera_intrinsics_file.exists(), 'matterport camera intrinsics file does not exist: %s'%matterport_camera_intrinsics_file
+            with open(str(matterport_camera_intrinsics_file), 'r') as camIn:
+                cam_data = camIn.read().splitlines()[0].split(' ')
+            width, height, fx, fy, cx, cy, k1, k2, p1, p2, k3 = [float(_) for _ in cam_data]
+            assert self.im_HW_load_list[frame_id] == (int(height), int(width))
+            K = np.array([[fx, 0., cx], [0., fy, cy], [0., 0., 1.]])
+            # if not np.allclose(K, self._K_orig_list[frame_id], atol=1e-5, rtol=1e-5):
+            #     print(red('!!! loaded intrinsics mismatch!'))
+            #     print(cam_data[2:])
+            #     print(self._K_orig_list[frame_id].flatten())
 
-        if self.cam_params_dict.get('if_convert_poses', False):
-            self.export_poses_cam_txt(self.pose_file.parent, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
-    
+            if width != self.W or height != self.H:
+                scale_factor = [t / s for t, s in zip((self.H, self.W), (height, width))]
+                K = resize_intrinsics(K, scale_factor)
+                print(yellow('Resized K from %s to %s'%((height, width), (self.H, self.W))))
+
+            # print(K)
+            K_list_new.append(K)
+            K_undist_params_list.append(dict(k1=k1, k2=k2, p1=p1, p2=p2, k3=k3))
+
+        self.K_list = K_list_new
+        self.K_undist_params_list = K_undist_params_list
+
     def load_im_mask(self):
         '''
         load im_mask (H, W), bool
@@ -571,6 +691,8 @@ class matterportScene3D(mitsubaBase, scene2DBase):
             'mi_depth_list', 
             'mi_normal_global_list', 
             'mi_invalid_depth_mask_list', 
+            
+            'im_undist_mask_list', 
         ]
         for valid_member in valid_member_list:
             if hasattr(self, valid_member):
@@ -578,8 +700,12 @@ class matterportScene3D(mitsubaBase, scene2DBase):
                 setattr(self, valid_member, [getattr(self, valid_member)[_] for _ in valid_frame_idx_list])
 
         print(white_blue('> Resulted in %d -> %d frames...'%(_N_frames_total, len(self.frame_id_list))))
-        
-        mitsubaBase.export_scene(self, modality_list=modality_list, appendix='_main' if if_filter_with_main_region else '', if_force=if_force)
+
+        appendix = ''
+        if if_filter_with_main_region: appendix += '_main'
+        if self.if_undist: appendix += '_undist'
+
+        mitsubaBase.export_scene(self, modality_list=modality_list, appendix=appendix, if_force=if_force)
 
     @property
     def region_description_dict(self):

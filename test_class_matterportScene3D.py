@@ -96,9 +96,10 @@ movie room (with hallway, and next room for complete geometry)
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.mJXqzFtmKg4_0
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&modelId=mp3d.mJXqzFtmKg4
 '''
-scene_name = 'mJXqzFtmKg4'; region_id_list = [0, 19, 16]; hdr_radiance_scale = 10; 
+# scene_name = 'mJXqzFtmKg4'; region_id_list = [0, 19, 16]; hdr_radiance_scale = 10; 
 # frame_ids = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33]
-frame_ids = [19]
+frame_ids = [18, 19, 21, 22, 24, 25]
+# frame_ids = [25]
 
 '''
 dark bedroom with lamp (with next door hallway) ❌ the lotus lights on the fan is not in the geometry...
@@ -117,7 +118,7 @@ scene_obj = matterportScene3D(
         # 'frame_id_list': frame_ids, # comment out to use all frames
         'axis_up': 'z+', 
         'region_id_list': region_id_list, 
-        'if_undist': False, # True to use undistorted images/poses
+        'if_undist': True, # True to use undistorted images/poses
         }, 
     mi_params_dict={
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
@@ -136,12 +137,10 @@ scene_obj = matterportScene3D(
     modality_filename_dict = {
         'im_hdr': ('matterport_hdr_images', 'j', 'jxr'), 
         'im_sdr': ('matterport_color_images', 'i', 'jpg'), 
-        # 'im_sdr': ('undistorted_color_images', 'i', 'jpg'), 
         'depth': ('matterport_depth_images', 'd', 'png'), 
         'poses': ('matterport_camera_poses', 'pose_', 'txt'), # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_poses
         'im_sdr_undist': ('undistorted_color_images', 'i', 'jpg'), 
-        'depth_undist': ('undistorted_depth_images', 'd', 'png'), 
-        # 'im_hdr_undist': ('undistorted_hdr_images', 'j', 'jxr'), 
+        # 'depth_undist': ('undistorted_depth_images', 'd', 'png'), 
         # 'normal_undist': ('undistorted_normal_images', 'd', 'png'), 
         # 'im_mask': 'images/%08d_mask.png', 
 
@@ -151,6 +150,7 @@ scene_obj = matterportScene3D(
         # 'im_H_resize': 1024, 'im_W_resize': 1280, 
         'im_H_resize': 512, 'im_W_resize': 640, 
         'hdr_radiance_scale': hdr_radiance_scale, 
+        'if_need_undist': True # True to use undistorted images or manually undistort (e.g. https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_intrinsics)
         }, 
     cam_params_dict={
         'if_convert': opt.if_convert_poses, # True to convert poses to cam.txt and K_list.txt
@@ -230,9 +230,10 @@ if opt.vis_2d_plt:
         modality_list_vis=[
             'im', 
             # 'im_mask', 
-            'mi_depth', 
-            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            # 'mi_depth', 
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            'mi_normal_im_overlay',
             ], 
         # frame_idx_list=[0], 
     )
