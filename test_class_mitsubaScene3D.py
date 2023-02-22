@@ -44,6 +44,8 @@ parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help=
 parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=True, default=False, help='if create color map for all points of Mitsuba; required: input_colors_tuple')
 # parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
 
+parser.add_argument('--split', type=str, default='train', help='')
+
 # differential renderer
 # parser.add_argument('--render_diff', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
 # parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
@@ -71,6 +73,7 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 # utils
 parser.add_argument('--if_sample_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
 parser.add_argument('--export_scene', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--export_single', type=str2bool, nargs='?', const=True, default=False, help='if export single image to Zhengqlis ECCV22 format')
 
 opt = parser.parse_args()
 
@@ -78,25 +81,32 @@ base_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 # intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
-xml_filename = 'scene_v3.xml'
+# xml_filename = 'scene_v3.xml'
+xml_filename = 'test.xml'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 
 frame_ids = []
-scene_name = 'kitchen'
-# split = 'train'; # frame_ids = list(range(202))
-split = 'val'; # frame_ids = list(range(10))
-
+# scene_name = 'kitchen'
 # scene_name = 'bathroom'
 # scene_name = 'bedroom'
-# scene_name = 'living-room' # images/demo_eval_scene_shapes-vis_count-train-living-room_1.png
+# scene_name = 'livingroom'
+
+scene_name = 'kitchen-resize'
+
+# scene_name = 'livingroom0'
 # scene_name = 'livingroom-test'
 
-# split = 'train'; frame_ids = list(range(0, 202, 40))
-# split = 'train'; frame_ids = list(range(0, 4, 1))
-# split = 'train'; frame_ids = [0]
-# split = 'train'; frame_ids = list(range(197))
-# split = 'val'; frame_ids = [0]
-# split = 'train'; frame_ids = list(range(189))
+# ZQ
+frame_ids = [21]
+# frame_ids = [64]
+
+# frame_ids = list(range(202))
+# frame_ids = list(range(10))
+# frame_ids = list(range(0, 202, 40))
+# frame_ids = list(range(0, 4, 1))
+# frame_ids = list(range(197))
+# frame_ids = [0]
+# frame_ids = list(range(189))
 
 '''
 default
@@ -127,7 +137,7 @@ scene_obj = mitsubaScene3D(
     scene_params_dict={
         'xml_filename': xml_filename, 
         'scene_name': scene_name, 
-        'split': split, 
+        'split': opt.split, 
         'frame_id_list': frame_ids, 
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
@@ -172,12 +182,10 @@ scene_obj = mitsubaScene3D(
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
     }, 
     im_params_dict={
-        # 'im_H_resize': 480, 'im_W_resize': 640, 
-        'im_H_load': 320, 'im_W_load': 640, 
-        # 'im_H_resize': 160, 'im_W_resize': 320, 
-        'im_H_resize': 320, 'im_W_resize': 640, 
-        # 'im_H_resize': 1, 'im_W_resize': 2, 
-        # 'im_H_resize': 32, 'im_W_resize': 64, 
+        # 'im_H_load': 320, 'im_W_load': 640, 
+        'im_H_load': 240, 'im_W_load': 320, 
+        # 'im_H_resize': 320, 'im_W_resize': 640, 
+        'im_H_resize': 240, 'im_W_resize': 320, 
         'spp': 4096, 
         # 'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
@@ -412,9 +420,20 @@ if opt.export_scene:
         'mi_normal', 
         'mi_depth', 
         ], 
-        split=split, 
+        split=opt.split, 
     )
 
+if opt.export_single:
+    scene_obj.export_single(
+        modality_list = [
+        'im_sdr', 
+        'mi_depth', 
+        'mi_seg_area', 
+        ], 
+        split='input', 
+        center_crop_HW=(240, 320), 
+    )
+    
 '''
 Evaluator for scene
 '''
@@ -462,8 +481,8 @@ if opt.vis_2d_plt:
             # 'seg_area', 'seg_env', 'seg_obj', 
             'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
-        # frame_idx_list=[0, 1, 2, 3, 4], 
-        frame_idx_list=[0], 
+        frame_idx_list=[0, 1, 2, 3, 4], 
+        # frame_idx_list=[0], 
     )
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:

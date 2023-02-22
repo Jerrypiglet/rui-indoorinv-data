@@ -329,3 +329,16 @@ def resize_intrinsics(K: np.ndarray, scale_factor: Tuple[float, float]) -> np.nd
     K[0] *= scale_factor[1]  # width
     K[1] *= scale_factor[0]  # height
     return K
+
+def center_crop(im, center_crop_HW):
+    '''
+    center crop
+    '''
+    if center_crop_HW is None:
+        return im
+    H, W = im.shape[:2]
+    H_crop, W_crop = center_crop_HW
+    assert H_crop <= H and W_crop <= W
+    h_start = (H-H_crop)//2
+    w_start = (W-W_crop)//2
+    return im[h_start:h_start+H_crop, w_start:w_start+W_crop, ...]

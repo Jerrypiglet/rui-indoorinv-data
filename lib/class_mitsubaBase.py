@@ -13,7 +13,7 @@ import trimesh
 import cv2
 # Import the library using the alias "mi"
 import mitsuba as mi
-from lib.utils_io import load_img, resize_intrinsics
+from lib.utils_io import load_img, resize_intrinsics, center_crop
 from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up, read_cam_params_OR, dump_cam_params_OR
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
@@ -646,7 +646,74 @@ class mitsubaBase():
             if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
             shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
         print(blue_text('Scene shapes dumped to: %s')%str(mesh_dump_root))
+        
+        
+    def export_single(self, modality_list=[], appendix='', split='', if_force=False, center_crop_HW=None):
+        '''
+        export single scene to Zhengqin's ECCV'22 format
+        '''
+        scene_export_path = self.rendering_root / 'single_export' / (self.scene_name + '_frame%d'%self.frame_id_list[0] + appendix)
+        if split != '':
+            scene_export_path = scene_export_path / split
+        if scene_export_path.exists():
+            if if_force:
+                if_reexport = 'Y'
+                print(red('scene export path exists:%s . FORCE overwritten.'%str(scene_export_path)))
+            else:
+                if_reexport = input(red("scene export path exists:%s . Re-export? [y/n]"%str(scene_export_path)))
 
+            if if_reexport in ['y', 'Y']:
+                if not if_force:
+                    if_delete = input(red("Delete? [y/n]"))
+                else:
+                    if_delete = 'Y'
+                if if_delete in ['y', 'Y']:
+                    shutil.rmtree(str(scene_export_path), ignore_errors=True)
+            else:
+                print(red('Aborted export.'))
+                return
+
+        scene_export_path.mkdir(parents=True, exist_ok=True)
+        
+        for modality in modality_list:
+            for _, frame_id in enumerate(self.frame_id_list):
+                if modality == 'im_sdr':
+                    im_sdr_export_path = scene_export_path / 'im.png'
+                    im_sdr = (np.clip(self.im_sdr_list[0][:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8)
+                    im_sdr = center_crop(im_sdr, center_crop_HW)
+                    cv2.imwrite(str(im_sdr_export_path), im_sdr)
+                    print(blue_text('SDR image exported to: %s'%(str(im_sdr_export_path))))
+                
+                if modality == 'mi_depth':
+                    assert self.pts_from['mi']
+                    mi_depth_vis_export_path = scene_export_path / 'depth_gt.png'
+                    mi_depth = self.mi_depth_list[0].squeeze()
+                    depth_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.mi_invalid_depth_mask_list[0])
+                    depth_normalized = center_crop(depth_normalized, center_crop_HW)
+                    cv2.imwrite(str(mi_depth_vis_export_path), depth_normalized)
+                    print(blue_text('Mitsuba depth (vis) exported to: %s'%(str(mi_depth_vis_export_path))))
+                    mi_depth_npy_export_path = scene_export_path / 'depth_gt.npy'
+                    mi_depth = center_crop(mi_depth, center_crop_HW)
+                    np.save(str(mi_depth_npy_export_path), mi_depth)
+                    print(blue_text('Mitsuba depth (npy) exported to: %s'%(str(mi_depth_npy_export_path))))
+                    
+                # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+                if modality == 'mi_seg_area':
+                    assert self.pts_from['mi']
+                    
+                    envMask_export_path = scene_export_path / 'envMask.png'
+                    # envMask = 255 - (self.mi_seg_dict_of_lists['area'][0].squeeze() * 255.).astype(np.uint8) # 0 for outdoor; 255 for indoor
+                    envMask = np.zeros_like(self.mi_seg_dict_of_lists['area'][0].squeeze(), dtype=np.uint8) + 255 # all white (indoor)
+                    envMask = center_crop(envMask, center_crop_HW)
+                    cv2.imwrite(str(envMask_export_path), envMask)
+                    print(blue_text('Mitsuba envMask exported to: %s'%(str(envMask_export_path))))
+
+                    areaMask = (self.mi_seg_dict_of_lists['area'][0].squeeze() * 255.).astype(np.uint8) # 0 for outdoor; 255 for indoor
+                    areaMask = center_crop(areaMask, center_crop_HW)
+                    winMask_export_path = scene_export_path / 'winMask.png' # 1 for window/lamp mask
+                    cv2.imwrite(str(winMask_export_path), areaMask)
+                    print(blue_text('Mitsuba winMask exported to: %s'%(str(winMask_export_path))))
+                
     def export_scene(self, modality_list=[], appendix='', split='', if_force=False):
         '''
         export scene to mitsubaScene data structure + monosdf inputs
@@ -701,7 +768,7 @@ class mitsubaBase():
                     scale_mat = np.linalg.inv(scale_mat)
                     np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale})
                 else:
-                    assert scale_mat_path.exists()
+                    assert scale_mat_path.exists(), 'scale_mat.npy not found in %s'%str(scale_mat_path)
                     scale_mat_dict = np.load(str(scale_mat_path), allow_pickle=True).item()
                     scale_mat = scale_mat_dict['scale_mat']
                     center = scale_mat_dict['center']
@@ -734,14 +801,14 @@ class mitsubaBase():
                     im_hdr_export_path = scene_export_path / 'Image' / ('%03d_0001.exr'%_)
                     hdr_scale = self.hdr_scale_list[_]
                     cv2.imwrite(str(im_hdr_export_path), hdr_scale * self.im_hdr_list[_][:, :, [2, 1, 0]])
-                    print(blue_text('HDR image %s exported to: %s'%(frame_id, str(im_hdr_export_path))))
+                    print(blue_text('HDR image %d exported to: %s'%(frame_id, str(im_hdr_export_path))))
             
             if modality == 'im_sdr':
                 (scene_export_path / 'Image').mkdir(parents=True, exist_ok=True)
                 for _, frame_id in enumerate(self.frame_id_list):
                     im_sdr_export_path = scene_export_path / 'Image' / ('%03d_0001.png'%_)
                     cv2.imwrite(str(im_sdr_export_path), (np.clip(self.im_sdr_list[_][:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
-                    print(blue_text('SDR image %s exported to: %s'%(frame_id, str(im_sdr_export_path))))
+                    print(blue_text('SDR image %d exported to: %s'%(frame_id, str(im_sdr_export_path))))
                     print(self.modality_file_list_dict['im_sdr'][_])
             
             if modality == 'mi_normal':
@@ -750,7 +817,7 @@ class mitsubaBase():
                 for _, frame_id in enumerate(self.frame_id_list):
                     mi_normal_export_path = scene_export_path / 'MiNormalGlobal' / ('%03d_0001.png'%_)
                     cv2.imwrite(str(mi_normal_export_path), (np.clip(self.mi_normal_global_list[_][:, :, [2, 1, 0]]/2.+0.5, 0., 1.)*255.).astype(np.uint8))
-                    print(blue_text('Mitsuba normal (global) %s exported to: %s'%(frame_id, str(mi_normal_export_path))))
+                    print(blue_text('Mitsuba normal (global) %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
             
             if modality == 'mi_depth':
                 (scene_export_path / 'MiDepth').mkdir(parents=True, exist_ok=True)
@@ -760,10 +827,10 @@ class mitsubaBase():
                     mi_depth = self.mi_depth_list[_].squeeze()
                     depth_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.mi_invalid_depth_mask_list[_])
                     cv2.imwrite(str(mi_depth_vis_export_path), depth_normalized)
-                    print(blue_text('Mitsuba depth (vis) %s exported to: %s'%(frame_id, str(mi_depth_vis_export_path))))
+                    print(blue_text('Mitsuba depth (vis) %d exported to: %s'%(frame_id, str(mi_depth_vis_export_path))))
                     mi_depth_npy_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.npy'%_)
                     np.save(str(mi_depth_npy_export_path), mi_depth)
-                    print(blue_text('Mitsuba depth (npy) %s exported to: %s'%(frame_id, str(mi_depth_npy_export_path))))
+                    print(blue_text('Mitsuba depth (npy) %d exported to: %s'%(frame_id, str(mi_depth_npy_export_path))))
 
             if modality == 'im_mask':
                 (scene_export_path / 'ImMask').mkdir(parents=True, exist_ok=True)

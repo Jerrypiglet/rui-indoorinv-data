@@ -387,7 +387,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 if not min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3:
                     print(self.K, f_xy)
                     import ipdb; ipdb.set_trace()
-                    assert False, red('computed f_xy is different than read from intrinsics!')
+                    assert False, red('computed f_xy is different than read from intrinsics! double check your loaded intrinsics!')
 
             # self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
             # self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)

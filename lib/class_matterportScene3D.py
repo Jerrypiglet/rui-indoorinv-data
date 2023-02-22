@@ -661,7 +661,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
 
         valid_frame_idx_list = []
 
-        valid_ratio_thres = 0.2 if not if_filter_with_main_region else 0.5
+        valid_ratio_thres = 0.5 if not if_filter_with_main_region else 0.5
 
         for frame_idx, frame_id in enumerate(self.frame_id_list):
             valid_mask = ~self.mi_invalid_depth_mask_list[frame_idx]

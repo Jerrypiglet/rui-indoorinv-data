@@ -78,16 +78,17 @@ assert base_root.exists()
 
 '''
 conference room with set of lamps and white chairs; tones of glass
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&modelId=mp3d.17DRP5sb8fy
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.17DRP5sb8fy_5
 '''
-scene_name = '17DRP5sb8fy'; region_id_list = [5]; hdr_radiance_scale = 10; 
+scene_name = '17DRP5sb8fy'; region_id_list = [5, 6, 7, 9]; hdr_radiance_scale = 10; 
 frame_ids = [21, 22, 46, 47]
 
 '''
 old bedroom (boy in bed), with hallway
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.2t7WUuJeko7_5
 '''
-# scene_name = '2t7WUuJeko7'; region_id_list = [5, 4]; hdr_radiance_scale = 10; 
+scene_name = '2t7WUuJeko7'; region_id_list = [5, 4]; hdr_radiance_scale = 10; 
 # frame_ids = [20, 21, 22]
 # frame_ids = [20]
 
@@ -108,6 +109,23 @@ https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&mode
 '''
 # scene_name = 'qoiz87JEwZ2'; region_id_list = [15, 16]; hdr_radiance_scale = 10; 
 # frame_ids = [486, 487, 488]
+
+'''
+banquet room
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.PuKPg4mmafe
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.PuKPg4mmafe_5
+'''
+scene_name = 'PuKPg4mmafe'; region_id_list = [5]; hdr_radiance_scale = 10; 
+
+'''
+bedroom ❌ nice room but too much glass
+'''
+scene_name = 'Vvot9Ly1tCj'; region_id_list = [19, 20]; hdr_radiance_scale = 5; 
+
+'''
+bathroom tiny
+'''
+scene_name = 'jh4fc5c5qoQ'; region_id_list = [1, 2]; hdr_radiance_scale = 20; 
 
 scene_obj = matterportScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -208,8 +226,8 @@ if opt.eval_scene:
     '''
     _ = evaluator_scene.sample_shapes(
         # sample_type='rgb_hdr', # ['']
-        sample_type='rgb_sdr', # images/demo_eval_scene_shapes-rgb_sdr-matterport.png; VS artifacts as seen in images/demo_eval_scene_shapes-rgb_sdr-matterport-fromWEB.png
-        # sample_type='vis_count', # ['']
+        # sample_type='rgb_sdr', # images/demo_eval_scene_shapes-rgb_sdr-matterport.png; VS artifacts as seen in images/demo_eval_scene_shapes-rgb_sdr-matterport-fromWEB.png
+        sample_type='vis_count', # ['']
         # sample_type='t', # ['']
         hdr_radiance_scale = hdr_radiance_scale, 
         shape_params={

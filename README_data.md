@@ -3,6 +3,8 @@
   - [Freeviewpoint](#freeviewpoint)
   - [Matterport3D](#matterport3d)
   - [Replica](#replica)
+  - [Other datasets](#other-datasets)
+    - [Mitsuba](#mitsuba)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 <!-- Added by: jerrypiglet, at: Mon Feb 13 02:05:56 PST 2023 -->
@@ -77,6 +79,7 @@ Holes in the scene are fixed by adding a convex hull mesh to the original mesh. 
 
 TODO:
 - [ ] add option to resize all frames to same dimension
+- [ ] pad to same size (even numbers in H, W)
 - [x] fix holes on the wall
   
 ## Matterport3D
@@ -130,3 +133,10 @@ TODO:
 - [ ] adapt sample pose to z+ up: get rid of self.extra_transform
 - [ ] add check for camera inside mesh (because no obj info available)
 - [ ] NaN in output exr images [issue](https://github.com/facebookresearch/Replica-Dataset/issues/19)
+
+## Other datasets
+
+### Mitsuba
+``` bash
+python test_class_mitsubaScene3D.py --vis_2d_plt False --export_scene --vis_3d_o3d False --split train # (or val; but train first)
+```
