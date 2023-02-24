@@ -72,8 +72,10 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 
 # utils
 parser.add_argument('--if_sample_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
-parser.add_argument('--export_scene', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
-parser.add_argument('--export_single', type=str2bool, nargs='?', const=True, default=False, help='if export single image to Zhengqlis ECCV22 format')
+# parser.add_argument('--export_scene', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--export_format', type=str, default='monosdf', help='')
+parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
 opt = parser.parse_args()
 
@@ -86,19 +88,25 @@ xml_filename = 'test.xml'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 
 frame_ids = []
+invalid_frame_id_list = []
+
 # scene_name = 'kitchen'
 # scene_name = 'bathroom'
 # scene_name = 'bedroom'
 # scene_name = 'livingroom'
 
-scene_name = 'kitchen-resize'
+# scene_name = 'kitchen-resize'
+scene_name = 'kitchen_new'; 
+# invalid_frame_id_list = [197]
+# scene_name = 'kitchen_new_400'
 
 # scene_name = 'livingroom0'
 # scene_name = 'livingroom-test'
 
 # ZQ
-frame_ids = [21]
+# frame_ids = [21]
 # frame_ids = [64]
+frame_ids = [197]
 
 # frame_ids = list(range(202))
 # frame_ids = list(range(10))
@@ -137,11 +145,12 @@ scene_obj = mitsubaScene3D(
     scene_params_dict={
         'xml_filename': xml_filename, 
         'scene_name': scene_name, 
-        'split': opt.split, 
-        'frame_id_list': frame_ids, 
+        'split': opt.split, # train, val, train+val
+        # 'frame_id_list': frame_ids, 
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
         'axis_up': 'y+', 
+        'invalid_frame_id_list': invalid_frame_id_list, 
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
         'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
@@ -182,10 +191,10 @@ scene_obj = mitsubaScene3D(
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
     }, 
     im_params_dict={
-        # 'im_H_load': 320, 'im_W_load': 640, 
-        'im_H_load': 240, 'im_W_load': 320, 
-        # 'im_H_resize': 320, 'im_W_resize': 640, 
-        'im_H_resize': 240, 'im_W_resize': 320, 
+        'im_H_load': 320, 'im_W_load': 640, 
+        'im_H_resize': 320, 'im_W_resize': 640, 
+        # 'im_H_load': 240, 'im_W_load': 320, 
+        # 'im_H_resize': 240, 'im_W_resize': 320, 
         'spp': 4096, 
         # 'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
@@ -193,34 +202,24 @@ scene_obj = mitsubaScene3D(
         }, 
     cam_params_dict={
         'near': 0.1, 'far': 10., 
-        # == params for sample camera poses
         'sampleNum': 3, 
+        
+        # == params for sample camera poses
         'heightMin' : 0.7, # camera height min
-        'heightMax' : 2., # camera height max
+        'heightMax' : 3, # camera height max
         'distMin': 0.2, # to wall distance min
-        'distMax': 2.5, # to wall distance max
+        'distMax': 3, # to wall distance max
         'thetaMin': -60, # theta min: pitch angle; up+ 
         'thetaMax' : 40, # theta max: pitch angle; up+
         'phiMin': -60, # yaw angle min
         'phiMax': 60, # yaw angle max
-        'distRaysMin': 0.3, # min dist of all camera rays to the scene; should be relatively relaxed; [!!!] set to -1 to disable checking
-        'distRaysMedianMin': 0.6, # median dist of all camera rays to the scene; should be relatively STRICT to avoid e.g. camera too close to walls; [!!!] set to -1 to disable checking
-
-        # 'heightMin' : 0.7, # camera height min
-        # 'heightMax' : 2., # camera height max
-        # 'distMin': 0.1, # to wall distance min
-        # 'distMax': 2.5, # to wall distance max
-        # 'thetaMin': -60, # theta min: pitch angle; up+ 
-        # 'thetaMax' : 40, # theta max: pitch angle; up+
-        # 'phiMin': -60, # yaw angle min
-        # 'phiMax': 60, # yaw angle max
-        # 'distRaysMin': -1, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
-        # 'distRaysMedianMin': 0.2, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'distRaysMin': 0.2, # min dist of all camera rays to the scene; [!!!] set to -1 to disable checking
+        'distRaysMedianMin': 0.6, # median dist of all camera rays to the scene; [!!!] set to -1 to disable checking
 
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        'sample_pose_num': 200, # Number of poses to sample; set to -1 if not sampling
-        'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
+        'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
+        'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     }, 
     lighting_params_dict={
         'SG_num': 12, 
@@ -409,30 +408,52 @@ if opt.eval_monosdf:
 
 # eval_return_dict = np.load('test_files/eval_return_dict.npy', allow_pickle=True).item(); opt.eval_monosdf = True
 
-if opt.export_scene:
-    scene_obj.export_scene(
+if opt.export:
+    from lib.class_exporter import exporter_scene
+    exporter = exporter_scene(
+        scene_object=scene_obj,
+        format=opt.export_format, 
         modality_list = [
-        'poses', 
-        'im_hdr', 
-        'im_sdr', 
-        'im_mask', 
-        'shapes', 
-        'mi_normal', 
-        'mi_depth', 
-        ], 
-        split=opt.split, 
+            'poses', 
+            'im_hdr', 
+            'im_sdr', 
+            'im_mask', 
+            'shapes', 
+            'mi_normal', 
+            'mi_depth', 
+            ], 
+        if_force=opt.force, 
     )
-
-if opt.export_single:
-    scene_obj.export_single(
-        modality_list = [
-        'im_sdr', 
-        'mi_depth', 
-        'mi_seg_area', 
-        ], 
-        split='input', 
-        center_crop_HW=(240, 320), 
-    )
+    if opt.export_format == 'monosdf':
+        exporter.export_monosdf_fvp(
+            split=opt.split, 
+            format='monosdf',
+            )
+    if opt.export_format == 'fvp':
+        exporter.export_monosdf_fvp(
+            format='fvp',
+            modality_list = [
+                'poses', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
+                'shapes', 
+                ], 
+        )
+    if opt.export_format == 'lieccv22':
+        exporter.export_lieccv22(
+            modality_list = [
+            'im_sdr', 
+            'mi_depth', 
+            'mi_seg', 
+            ], 
+            split=opt.split, 
+            assert_shape=(240, 320),
+            window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+            merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+            # center_crop_HW=(240, 320), 
+            if_no_gt_appendix=True, 
+        )
     
 '''
 Evaluator for scene
@@ -481,8 +502,8 @@ if opt.vis_2d_plt:
             # 'seg_area', 'seg_env', 'seg_obj', 
             'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
-        frame_idx_list=[0, 1, 2, 3, 4], 
-        # frame_idx_list=[0], 
+        # frame_idx_list=[0, 1, 2, 3, 4], 
+        frame_idx_list=[0], 
     )
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:
@@ -592,8 +613,10 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
-            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            # 'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            # 'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
         },
@@ -611,7 +634,7 @@ if opt.vis_3d_o3d:
             # 'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
             # 'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
-            'if_cam_rays': True, 
+            'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             

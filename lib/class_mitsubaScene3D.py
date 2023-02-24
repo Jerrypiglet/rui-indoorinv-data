@@ -71,10 +71,18 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         self.xml_filename, self.scene_name, self.mitsuba_version, self.intrinsics_path = get_list_of_keys(scene_params_dict, ['xml_filename', 'scene_name', 'mitsuba_version', 'intrinsics_path'], [str, str, str, PosixPath])
         self.split, self.frame_id_list = get_list_of_keys(scene_params_dict, ['split', 'frame_id_list'], [str, list])
+        self.splits = self.split.split('+')
+        assert all([_.split('_')[0] in ['train', 'val', 'train+val'] for _ in self.splits])
+        if len(self.splits) > 1:
+            print(yellow('Multiple splits: %s'%self.split))
+        
+        self.invalid_frame_id_list = scene_params_dict.get('invalid_frame_id_list', [])
+        self.frame_id_list = [_ for _ in self.frame_id_list if _ not in self.invalid_frame_id_list]
+        
         self.mitsuba_version, self.axis_up = get_list_of_keys(scene_params_dict, ['mitsuba_version', 'axis_up'], [str, str])
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
-        assert self.split in ['train', 'val']
+        
         assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
 
         self.extra_transform = None
@@ -90,11 +98,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.xml_file = self.xml_scene_root / self.scene_name / self.xml_filename
         self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})
         if '_shape_normalized' in self.monosdf_shape_dict:
-            assert self.monosdf_shape_dict['_shape_normalized'] in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%_shape_normalized
+            assert self.monosdf_shape_dict['_shape_normalized'] in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%self.monosdf_shape_dict['_shape_normalized']
 
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['OpenRooms', 'Blender', 'json'], 'Unsupported pose file: '+pose_file
-        self.pose_file = self.xml_scene_root / self.scene_name / self.split / pose_file
+        self.pose_file_list = [self.xml_scene_root / self.scene_name / split / pose_file for split in self.splits]
 
         # self.im_params_dict = im_params_dict
         # self.lighting_params_dict = lighting_params_dict
@@ -314,14 +322,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             # assert False, 'disabled; use '
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
-            if self.pose_file.exists():
+            if any([pose_file.exists() for pose_file in self.pose_file_list]):
                 # assert self.pose_format in ['json']
-                try:
-                    _num_poses = len(self.load_meta_json_pose(self.pose_file)[1])
-                except: 
-                    _num_poses = -1
+                _num_poses = sum([len(self.load_meta_json_pose(pose_file)[1]) for pose_file in self.pose_file_list])
                 # if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(self.load_meta_json_pose(self.pose_file)[1]))))
-                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), _num_poses)))
+                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(' + '.join([str(pose_file) for pose_file in self.pose_file_list]), _num_poses)))
             if not if_resample in ['N', 'n']:
                 self.sample_poses(cam_params_dict.get('sample_pose_num'))
                 return
@@ -331,75 +336,101 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         #     if not self.pose_file.exists():
         #     # if not hasattr(self, 'pose_list'):
         #         self.get_room_center_pose()
-
-        print(white_blue('[%s] load_poses from %s'%(self.__class__.__name__, str(self.pose_file))))
-         
         self.pose_list = []
         self.origin_lookatvector_up_list = []
-
-        if self.pose_format == 'OpenRooms':
-            '''
-            OpenRooms convention (matrices containing origin, lookat, up); The camera coordinates is in OpenCV convention (right-down-forward).
-            '''
-            cam_params = read_cam_params_OR(self.pose_file)
-            if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
-            assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
-
-            for idx in self.frame_id_list:
-                cam_param = cam_params[idx]
-                origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-                (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
-                self.pose_list.append(np.hstack((R, t)))
-                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
-
-        elif self.pose_format in ['Blender', 'json']:
-            '''
-            Blender: 
-                Liwen's Blender convention: (N, 2, 3), [t, euler angles]
-                Blender x y z == Mitsuba x z -y; Mitsuba x y z == Blender x z -y
-            Json:
-                Liwen's NeRF poses: [R, t]; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
-            '''
-            '''
-            [NOTE] scene.obj from Liwen is much smaller (s.t. scaling and translation here) compared to scene loaded from scene_v3.xml
-            '''
-            # self.scale_m2b = np.array([0.206, 0.206, 0.206], dtype=np.float32).reshape((3, 1))
-            # self.trans_m2b = np.array([-0.074684, 0.23965, -0.30727], dtype=np.float32).reshape((3, 1))
-            self.t_c2w_b_list, self.R_c2w_b_list = [], []
-
-            if self.pose_format == 'Blender':
-                cam_params = np.load(self.pose_file)
-                assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
-                if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
-                for idx in self.frame_id_list:
-                    R_ = scipy.spatial.transform.Rotation.from_euler('xyz', [cam_params[idx][1][0], cam_params[idx][1][1], cam_params[idx][1][2]])
-                    self.R_c2w_b_list.append(R_.as_matrix())
-                    assert np.allclose(R_.as_euler('xyz'), cam_params[idx][1])
-                    self.t_c2w_b_list.append(cam_params[idx][0].reshape((3, 1)).astype(np.float32))
+        frame_id_list_all = []
+        self.frame_split_list = []
+        self.frame_offset_list = []
+        self.t_c2w_b_list, self.R_c2w_b_list = [], []
+        self.scene_rendering_path_list = []
+        
+        for pose_file, split in zip(self.pose_file_list, self.splits):
+            print(white_blue('[%s] load_poses from %s'%(self.__class__.__name__, str(pose_file))))
             
-            elif self.pose_format == 'json':
-                self.meta, _Rt_c2w_b_list = self.load_meta_json_pose(self.pose_file)
-                if self.frame_id_list == []: self.frame_id_list = list(range(len(_Rt_c2w_b_list)))
-                self.R_c2w_b_list = [_Rt_c2w_b_list[_][0] for _ in self.frame_id_list]
-                self.t_c2w_b_list = [_Rt_c2w_b_list[_][1] for _ in self.frame_id_list]
+            pose_list = []
+            origin_lookatvector_up_list = []
 
-                f_xy = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length
-                if not min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3:
-                    print(self.K, f_xy)
-                    import ipdb; ipdb.set_trace()
-                    assert False, red('computed f_xy is different than read from intrinsics! double check your loaded intrinsics!')
+            if self.pose_format == 'OpenRooms':
+                '''
+                OpenRooms convention (matrices containing origin, lookat, up); The camera coordinates is in OpenCV convention (right-down-forward).
+                '''
+                cam_params = read_cam_params_OR(pose_file)
+                # if self.frame_id_list == []: 
+                frame_id_list = list(range(len(cam_params)))
+                frame_id_list = [_ for _ in frame_id_list if _ not in self.invalid_frame_id_list]
+                assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
 
-            # self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
-            # self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
-            T_ = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]], dtype=np.float32) # flip x, y: Liwen's new pose (left-up-forward) -> OpenCV (right-down-forward)
-            for R_c2w_b, t_c2w_b in zip(self.R_c2w_b_list, self.t_c2w_b_list):
-                R = R_c2w_b @ T_
-                t = t_c2w_b
+                for idx in frame_id_list:
+                    cam_param = cam_params[idx]
+                    origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+                    (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
+                    pose_list.append(np.hstack((R, t)))
+                    origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
-                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
+            elif self.pose_format in ['Blender', 'json']:
+                '''
+                Blender: 
+                    Liwen's Blender convention: (N, 2, 3), [t, euler angles]
+                    Blender x y z == Mitsuba x z -y; Mitsuba x y z == Blender x z -y
+                Json:
+                    Liwen's NeRF poses: [R, t]; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+                '''
+                '''
+                [NOTE] scene.obj from Liwen is much smaller (s.t. scaling and translation here) compared to scene loaded from scene_v3.xml
+                '''
+                # self.scale_m2b = np.array([0.206, 0.206, 0.206], dtype=np.float32).reshape((3, 1))
+                # self.trans_m2b = np.array([-0.074684, 0.23965, -0.30727], dtype=np.float32).reshape((3, 1))
+                t_c2w_b_list, R_c2w_b_list = [], []
 
-                self.pose_list.append(np.hstack((R, t)))
-                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+                if self.pose_format == 'Blender':
+                    cam_params = np.load(pose_file)
+                    assert all([cam_param.shape == (2, 3) for cam_param in cam_params])
+                    # if self.frame_id_list == []: 
+                    frame_id_list = list(range(len(cam_params)))
+                    frame_id_list = [_ for _ in frame_id_list if _ not in self.invalid_frame_id_list]
+                    for idx in frame_id_list:
+                        R_ = scipy.spatial.transform.Rotation.from_euler('xyz', [cam_params[idx][1][0], cam_params[idx][1][1], cam_params[idx][1][2]])
+                        R_c2w_b_list.append(R_.as_matrix())
+                        assert np.allclose(R_.as_euler('xyz'), cam_params[idx][1])
+                        t_c2w_b_list.append(cam_params[idx][0].reshape((3, 1)).astype(np.float32))
+                
+                elif self.pose_format == 'json':
+                    self.meta, _Rt_c2w_b_list = self.load_meta_json_pose(pose_file)
+                    # if self.frame_id_list == []: 
+                    frame_id_list = list(range(len(_Rt_c2w_b_list)))
+                    frame_id_list = [_ for _ in frame_id_list if _ not in self.invalid_frame_id_list]
+                    assert max(frame_id_list) < len(_Rt_c2w_b_list)
+                    R_c2w_b_list = [_Rt_c2w_b_list[_][0] for _ in frame_id_list]
+                    t_c2w_b_list = [_Rt_c2w_b_list[_][1] for _ in frame_id_list]
+
+                    f_xy = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length
+                    if not min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3:
+                        print(self.K, f_xy)
+                        import ipdb; ipdb.set_trace()
+                        assert False, red('computed f_xy is different than read from intrinsics! double check your loaded intrinsics!')
+
+                # self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
+                # self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
+                T_ = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]], dtype=np.float32) # flip x, y: Liwen's new pose (left-up-forward) -> OpenCV (right-down-forward)
+                for R_c2w_b, t_c2w_b in zip(R_c2w_b_list, t_c2w_b_list):
+                    R = R_c2w_b @ T_
+                    t = t_c2w_b
+
+                    (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
+
+                    pose_list.append(np.hstack((R, t)))
+                    origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+                    
+            self.pose_list += pose_list
+            self.origin_lookatvector_up_list += origin_lookatvector_up_list
+            self.frame_offset_list += [len(frame_id_list_all)] * len(frame_id_list)
+            frame_id_list_all += [len(frame_id_list_all) + frame_id for frame_id in frame_id_list]
+            self.t_c2w_b_list += t_c2w_b_list
+            self.R_c2w_b_list += R_c2w_b_list
+            self.frame_split_list += [split] * len(frame_id_list)
+            self.scene_rendering_path_list += [self.scene_rendering_path.parent / split] * len(frame_id_list)
+            
+            print(yellow(split), blue_text('Loaded {} poses from {}'.format(len(frame_id_list), pose_file)))
 
             '''
             Obselete code, when Liwen was using Blender poses...
@@ -420,6 +451,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
             #     pose_list.append(np.hstack((R, t)))
             #     origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+
+        if self.frame_id_list == []: 
+            self.frame_id_list = frame_id_list_all
+            assert len(self.frame_id_list) == len(self.frame_offset_list)
+            assert len(self.frame_id_list) == len(self.frame_split_list)
+        self.frame_id_list = [frame_id-offset for (frame_id, offset) in zip(self.frame_id_list, self.frame_offset_list)]
 
         print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.__class__.__name__, len(self.pose_list))))
 
@@ -443,7 +480,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         print(white_blue('[%s] load_emission for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
-        self.emission_file_list = [self.scene_rendering_path / 'Emit' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
+        self.emission_file_list = [self.scene_rendering_path_list[frame_idx] / 'Emit' / ('%03d_0001.%s'%(frame_id, 'exr')) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         self.emission_list = [load_img(_, expected_shape=self.im_HW_load+(3,), ext='exr', target_HW=self.im_HW_target) for _ in self.emission_file_list]
 
         print(blue_text('[%s] DONE. load_emission'%self.__class__.__name__))
@@ -457,7 +494,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         print(white_blue('[%s] load_albedo for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
-        self.albedo_file_list = [self.scene_rendering_path / 'DiffCol' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
+        self.albedo_file_list = [self.scene_rendering_path_list[frame_idx] / 'DiffCol' / ('%03d_0001.%s'%(frame_id, 'exr')) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.albedo_list = [load_img(albedo_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for albedo_file, __ in zip(self.albedo_file_list, expected_shape_list)]
         
@@ -472,7 +509,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         print(white_blue('[%s] load_roughness for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
-        self.roughness_file_list = [self.scene_rendering_path / 'Roughness' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
+        self.roughness_file_list = [self.scene_rendering_path_list[frame_idx] / 'Roughness' / ('%03d_0001.%s'%(frame_id, 'exr')) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.roughness_list = [load_img(roughness_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target)[:, :, 0:1].astype(np.float32) for roughness_file, __ in zip(self.roughness_file_list, expected_shape_list)]
 
@@ -487,7 +524,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         print(white_blue('[%s] load_depth for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
-        self.depth_file_list = [self.scene_rendering_path / 'Depth' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
+        self.depth_file_list = [self.scene_rendering_path_list[frame_idx] / 'Depth' / ('%03d_0001.%s'%(frame_id, 'exr')) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.depth_list = [load_img(depth_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32)[:, :, 0] for depth_file, __ in zip(self.depth_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
 
@@ -504,7 +541,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         print(white_blue('[%s] load_normal for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
-        self.normal_file_list = [self.scene_rendering_path / 'Normal' / ('%03d_0001.%s'%(i, 'exr')) for i in self.frame_id_list]
+        self.normal_file_list = [self.scene_rendering_path_list[frame_idx] / 'Normal' / ('%03d_0001.%s'%(frame_id, 'exr')) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.normal_list = [load_img(normal_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for normal_file, __ in zip(self.normal_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
         self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
@@ -521,6 +558,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         rendered with Blender: lib/class_renderer_blender_mitsubaScene_3D->renderer_blender_mitsubaScene_3D(); 
         '''
+        assert False, 'no longer supported for now'
         print(white_blue('[%s] load_lighting_envmap'))
 
         self.lighting_envmap_list = []
@@ -535,11 +573,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             envmap = np.zeros((env_row, env_col, 3, env_height, env_width), dtype=np.float32)
             envmap_position = np.zeros((env_row, env_col, 3, env_height, env_width), dtype=np.float32)
             for env_idx in tqdm(range(env_row*env_col)):
-                lighting_envmap_file_path = lighting_envmap_folder_path / ('%03d_%03d.%s'%(i, env_idx, 'exr'))
+                lighting_envmap_file_path = lighting_envmap_folder_path / ('%03d_%03d.%s'%(frame_id, env_idx, 'exr'))
                 lighting_envmap = load_img(lighting_envmap_file_path, ext='exr', target_HW=(env_height, env_width))
                 envmap[env_idx//env_col, env_idx-env_col*(env_idx//env_col)] = lighting_envmap.transpose((2, 0, 1))
 
-                lighting_envmap_position_m_file_path = lighting_envmap_folder_path / ('%03d_position_0001_%03d.%s'%(i, env_idx, 'exr'))
+                lighting_envmap_position_m_file_path = lighting_envmap_folder_path / ('%03d_position_0001_%03d.%s'%(frame_id, env_idx, 'exr'))
                 lighting_envmap_position_m = load_img(lighting_envmap_position_m_file_path, ext='exr', target_HW=(env_height, env_width)) # (H, W, 3), in Blender coords
                 lighting_envmap_position = (lighting_envmap_position_m.reshape(-1, 3) @ (self.T_w_b2m.T)).reshape(env_height, env_width, 3)
                 envmap_position[env_idx//env_col, env_idx-env_col*(env_idx//env_col)] = lighting_envmap_position.transpose((2, 0, 1))
@@ -605,7 +643,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         assert rgb.get('name') == 'radiance'
                         radiance = np.array(rgb.get('value').split(', ')).astype(np.float32).reshape(3,)
                         if_emitter = True; if_area_light = True
-                        _id = 'emitter-' + _id
+                        # _id = 'emitter-' + _id
+                        _id = 'emitter-' + emitter.get('id') if emitter.get('id') is not None else _id
                         emitter_prop = {'intensity': radiance, 'obj_type': 'obj', 'if_lit_up': np.amax(radiance) > 1e-3}
                 else:
                     if not len(shape.findall('string')) > 0: continue
@@ -664,12 +703,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 if shape_dict['is_wall']: 
                     print('++++ is_wall:', _id, shape_dict['filename'])
                 if if_emitter:
-                    print('**** if_emitter:', _id, shape_dict['filename'])
                     shape_dict.update({'emitter_prop': emitter_prop})
+                    print('**** if_emitter:', _id, shape_dict['filename'], shape_dict['emitter_prop']['intensity'])
                 if if_area_light:
                     # self.lamp_list.append((shape_dict, vertices, faces))
                     self.lamp_list.append(
-                        {'emitter_prop': shape_dict['emitter_prop'], 'vertices': vertices, 'faces': faces}
+                        {'emitter_prop': shape_dict['emitter_prop'], 'vertices': vertices, 'faces': faces, 'id': _id, 'random_id': random_id}
                     )
 
                 self.shape_list_valid.append(shape_dict)

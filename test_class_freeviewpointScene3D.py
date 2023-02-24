@@ -67,7 +67,9 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 # utils
 parser.add_argument('--if_convert_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
 parser.add_argument('--if_dump_shape', type=str2bool, nargs='?', const=True, default=False, help='if dump shape of entire scene')
-parser.add_argument('--export_scene', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+
+parser.add_argument('--export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--export_format', type=str, default='monosdf', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
 opt = parser.parse_args()
@@ -79,9 +81,9 @@ hdr_radiance_scale = 1.
 
 # scene_name = 'asianRoom1'
 # scene_name = 'asianRoom2'
-# scene_name = 'Hall'
+scene_name = 'Hall'
 # scene_name = 'Kitchen'
-scene_name = 'Salon2'; hdr_radiance_scale = 2;  # Living room
+# scene_name = 'Salon2'; hdr_radiance_scale = 2;  # Living room
 # scene_name = 'sofa91'
 
 frame_ids = [0]
@@ -129,26 +131,58 @@ scene_obj = freeviewpointScene3D(
     }, 
     shape_params_dict={
         'if_dump_shape': opt.if_dump_shape, # True to dump fixed shape to obj file
-        'if_fix_watertight': not opt.export_scene, 
+        'if_fix_watertight': not opt.export, 
         },
     emitter_params_dict={
         },
 )
 
-if opt.export_scene:
-    scene_obj.export_scene(
+if opt.export:
+    from lib.class_exporter import exporter_scene
+    exporter = exporter_scene(
+        scene_object=scene_obj,
+        format=opt.export_format, 
         modality_list = [
-        'poses', 
-        'im_hdr', 
-        'im_sdr', 
-        'im_mask', 
-        'shapes', 
-        'mi_normal', 
-        'mi_depth', 
-        ], 
-        if_force = opt.force, # True to force export
+            'poses', 
+            'im_hdr', 
+            'im_sdr', 
+            'im_mask', 
+            'shapes', 
+            'mi_normal', 
+            'mi_depth', 
+            ], 
+        if_force=opt.force, 
     )
-
+    if opt.export_format == 'monosdf':
+        exporter.export_monosdf_fvp(
+            split=opt.split, 
+            format='monosdf',
+            )
+    if opt.export_format == 'fvp':
+        exporter.export_monosdf_fvp(
+            format='fvp',
+            modality_list = [
+                'poses', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
+                'shapes', 
+                ], 
+        )
+    if opt.export_format == 'lieccv22':
+        exporter.export_lieccv22(
+            modality_list = [
+            'im_sdr', 
+            'mi_depth', 
+            'mi_seg', 
+            ], 
+            split=opt.split, 
+            assert_shape=(240, 320),
+            window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+            merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+            # center_crop_HW=(240, 320), 
+            if_no_gt_appendix=True, 
+        )
 eval_return_dict = {}
 
 '''

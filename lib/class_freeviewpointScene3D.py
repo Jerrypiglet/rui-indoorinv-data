@@ -150,6 +150,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
             self.frame_id_list = frame_id_all_list
             # if if_missing_frame:
             #     frame_info_all_list = [_ for _ in frame_info_all_list if int(_.split(' ')[0].split('.')[0]) in self.frame_id_list]
+        self.scene_rendering_path_list = [self.scene_rendering_path] * len(self.frame_id_list)
 
         frame_info_all_dict = {int(_.split(' ')[0].split('.')[0]): _ for _ in frame_info_all_list}
         

@@ -203,7 +203,7 @@ class mitsubaBase():
             
             # [class mitsuba.ShapePtr] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html#mitsuba.ShapePtr
             # slow...
-            mi_seg_area_file_folder = self.scene_rendering_path / 'mi_seg_emitter'
+            mi_seg_area_file_folder = self.scene_rendering_path_list[frame_idx] / 'mi_seg_emitter'
             mi_seg_area_file_folder.mkdir(parents=True, exist_ok=True)
             mi_seg_area_file_path = mi_seg_area_file_folder / ('mi_seg_emitter_%d.png'%(self.frame_id_list[frame_idx]))
             if_get_from_scratch = True
@@ -237,6 +237,7 @@ class mitsubaBase():
         
         invalid_normal_threshold: if pixels of invalid normals exceed this thres, discard pose
         '''
+        
         from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
         assert self.axis_up == 'y+', 'not supporting other axes for now'
         if not self.if_loaded_layout: self.load_layout()
@@ -356,7 +357,9 @@ class mitsubaBase():
         dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.cam_params_dict, extra_transform=extra_transform)
 
     def load_meta_json_pose(self, pose_file):
-        assert Path(pose_file).exists(), 'Pose file not found at %s! Check if exist, or if the correct pose format was chosen in key \'pose_file\' of scene_obj.'%str(pose_file)
+        # assert Path(pose_file).exists(), str(pose_file)
+        if not Path(pose_file).exists():
+            return None, []
         with open(pose_file, 'r') as f:
             meta = json.load(f)
         Rt_c2w_b_list = []
@@ -645,248 +648,4 @@ class mitsubaBase():
         for shape_idx, shape, in enumerate(mi_scene.shapes()):
             if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
             shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
-        print(blue_text('Scene shapes dumped to: %s')%str(mesh_dump_root))
-        
-        
-    def export_single(self, modality_list=[], appendix='', split='', if_force=False, center_crop_HW=None):
-        '''
-        export single scene to Zhengqin's ECCV'22 format
-        '''
-        scene_export_path = self.rendering_root / 'single_export' / (self.scene_name + '_frame%d'%self.frame_id_list[0] + appendix)
-        if split != '':
-            scene_export_path = scene_export_path / split
-        if scene_export_path.exists():
-            if if_force:
-                if_reexport = 'Y'
-                print(red('scene export path exists:%s . FORCE overwritten.'%str(scene_export_path)))
-            else:
-                if_reexport = input(red("scene export path exists:%s . Re-export? [y/n]"%str(scene_export_path)))
-
-            if if_reexport in ['y', 'Y']:
-                if not if_force:
-                    if_delete = input(red("Delete? [y/n]"))
-                else:
-                    if_delete = 'Y'
-                if if_delete in ['y', 'Y']:
-                    shutil.rmtree(str(scene_export_path), ignore_errors=True)
-            else:
-                print(red('Aborted export.'))
-                return
-
-        scene_export_path.mkdir(parents=True, exist_ok=True)
-        
-        for modality in modality_list:
-            for _, frame_id in enumerate(self.frame_id_list):
-                if modality == 'im_sdr':
-                    im_sdr_export_path = scene_export_path / 'im.png'
-                    im_sdr = (np.clip(self.im_sdr_list[0][:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8)
-                    im_sdr = center_crop(im_sdr, center_crop_HW)
-                    cv2.imwrite(str(im_sdr_export_path), im_sdr)
-                    print(blue_text('SDR image exported to: %s'%(str(im_sdr_export_path))))
-                
-                if modality == 'mi_depth':
-                    assert self.pts_from['mi']
-                    mi_depth_vis_export_path = scene_export_path / 'depth_gt.png'
-                    mi_depth = self.mi_depth_list[0].squeeze()
-                    depth_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.mi_invalid_depth_mask_list[0])
-                    depth_normalized = center_crop(depth_normalized, center_crop_HW)
-                    cv2.imwrite(str(mi_depth_vis_export_path), depth_normalized)
-                    print(blue_text('Mitsuba depth (vis) exported to: %s'%(str(mi_depth_vis_export_path))))
-                    mi_depth_npy_export_path = scene_export_path / 'depth_gt.npy'
-                    mi_depth = center_crop(mi_depth, center_crop_HW)
-                    np.save(str(mi_depth_npy_export_path), mi_depth)
-                    print(blue_text('Mitsuba depth (npy) exported to: %s'%(str(mi_depth_npy_export_path))))
-                    
-                # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
-                if modality == 'mi_seg_area':
-                    assert self.pts_from['mi']
-                    
-                    envMask_export_path = scene_export_path / 'envMask.png'
-                    # envMask = 255 - (self.mi_seg_dict_of_lists['area'][0].squeeze() * 255.).astype(np.uint8) # 0 for outdoor; 255 for indoor
-                    envMask = np.zeros_like(self.mi_seg_dict_of_lists['area'][0].squeeze(), dtype=np.uint8) + 255 # all white (indoor)
-                    envMask = center_crop(envMask, center_crop_HW)
-                    cv2.imwrite(str(envMask_export_path), envMask)
-                    print(blue_text('Mitsuba envMask exported to: %s'%(str(envMask_export_path))))
-
-                    areaMask = (self.mi_seg_dict_of_lists['area'][0].squeeze() * 255.).astype(np.uint8) # 0 for outdoor; 255 for indoor
-                    areaMask = center_crop(areaMask, center_crop_HW)
-                    winMask_export_path = scene_export_path / 'winMask.png' # 1 for window/lamp mask
-                    cv2.imwrite(str(winMask_export_path), areaMask)
-                    print(blue_text('Mitsuba winMask exported to: %s'%(str(winMask_export_path))))
-                
-    def export_scene(self, modality_list=[], appendix='', split='', if_force=False):
-        '''
-        export scene to mitsubaScene data structure + monosdf inputs
-        '''
-        scene_export_path = self.rendering_root / 'scene_export' / (self.scene_name + appendix)
-        if split != '':
-            scene_export_path = scene_export_path / split
-        if scene_export_path.exists():
-            if if_force:
-                if_reexport = 'Y'
-                print(red('scene export path exists:%s . FORCE overwritten.'%str(scene_export_path)))
-            else:
-                if_reexport = input(red("scene export path exists:%s . Re-export? [y/n]"%str(scene_export_path)))
-
-            if if_reexport in ['y', 'Y']:
-                if not if_force:
-                    if_delete = input(red("Delete? [y/n]"))
-                else:
-                    if_delete = 'Y'
-                if if_delete in ['y', 'Y']:
-                    shutil.rmtree(str(scene_export_path), ignore_errors=True)
-            else:
-                print(red('Aborted export.'))
-                return
-
-        scene_export_path.mkdir(parents=True, exist_ok=True)
-
-        for modality in modality_list:
-            # assert modality in self.modality_list, 'modality %s not in %s'%(modality, self.modality_list)
-
-            if modality == 'poses':
-                self.export_poses_cam_txt(scene_export_path, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
-
-                '''
-                cameras for MonoSDF
-                '''
-                cameras = {}
-                scale_mat_path = self.rendering_root / 'scene_export' / (self.scene_name + appendix) / 'scale_mat.npy'
-                if split != 'val':
-                    poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.pose_list]
-                    poses = np.array(poses)
-                    assert poses.shape[1:] == (4, 4)
-                    min_vertices = poses[:, :3, 3].min(axis=0)
-                    max_vertices = poses[:, :3, 3].max(axis=0)
-                    center = (min_vertices + max_vertices) / 2.
-                    scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
-                    print('[pose normalization to unit cube] --center, scale--', center, scale)
-                    # we should normalized to unit cube
-                    scale_mat = np.eye(4).astype(np.float32)
-                    scale_mat[:3, 3] = -center
-                    scale_mat[:3 ] *= scale 
-                    scale_mat = np.linalg.inv(scale_mat)
-                    np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale})
-                else:
-                    assert scale_mat_path.exists(), 'scale_mat.npy not found in %s'%str(scale_mat_path)
-                    scale_mat_dict = np.load(str(scale_mat_path), allow_pickle=True).item()
-                    scale_mat = scale_mat_dict['scale_mat']
-                    center = scale_mat_dict['center']
-                    scale = scale_mat_dict['scale']
-
-                cameras['center'] = center
-                cameras['scale'] = scale
-                for _, pose in enumerate(self.pose_list):
-                    if hasattr(self, 'K'):
-                        K = self.K 
-                    else:
-                        assert hasattr(self, 'K_list')
-                        assert len(self.K_list) == len(self.pose_list)
-                        K = self.K_list[_] # (3, 3)
-                        assert K.shape == (3, 3)
-                    K = np.hstack((K, np.array([0., 0., 0.], dtype=np.float32).reshape((3, 1))))
-                    K = np.vstack((K, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
-                    pose = np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
-                    pose = K @ np.linalg.inv(pose)
-                    cameras['scale_mat_%d'%_] = scale_mat
-                    cameras['world_mat_%d'%_] = pose
-                    # cameras['split_%d'%_] = 'train' if _ < self.frame_num-10 else 'val' # 10 frames for val
-                    # cameras['frame_id_%d'%_] = idx if idx < len(mitsuba_scene_dict['train'].pose_list) else idx-len(mitsuba_scene_dict['train'].pose_list)
-            
-                np.savez(str(scene_export_path / 'cameras.npz'), **cameras)
-
-            if modality == 'im_hdr':
-                (scene_export_path / 'Image').mkdir(parents=True, exist_ok=True)
-                for _, frame_id in enumerate(self.frame_id_list):
-                    im_hdr_export_path = scene_export_path / 'Image' / ('%03d_0001.exr'%_)
-                    hdr_scale = self.hdr_scale_list[_]
-                    cv2.imwrite(str(im_hdr_export_path), hdr_scale * self.im_hdr_list[_][:, :, [2, 1, 0]])
-                    print(blue_text('HDR image %d exported to: %s'%(frame_id, str(im_hdr_export_path))))
-            
-            if modality == 'im_sdr':
-                (scene_export_path / 'Image').mkdir(parents=True, exist_ok=True)
-                for _, frame_id in enumerate(self.frame_id_list):
-                    im_sdr_export_path = scene_export_path / 'Image' / ('%03d_0001.png'%_)
-                    cv2.imwrite(str(im_sdr_export_path), (np.clip(self.im_sdr_list[_][:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
-                    print(blue_text('SDR image %d exported to: %s'%(frame_id, str(im_sdr_export_path))))
-                    print(self.modality_file_list_dict['im_sdr'][_])
-            
-            if modality == 'mi_normal':
-                (scene_export_path / 'MiNormalGlobal').mkdir(parents=True, exist_ok=True)
-                assert self.pts_from['mi']
-                for _, frame_id in enumerate(self.frame_id_list):
-                    mi_normal_export_path = scene_export_path / 'MiNormalGlobal' / ('%03d_0001.png'%_)
-                    cv2.imwrite(str(mi_normal_export_path), (np.clip(self.mi_normal_global_list[_][:, :, [2, 1, 0]]/2.+0.5, 0., 1.)*255.).astype(np.uint8))
-                    print(blue_text('Mitsuba normal (global) %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
-            
-            if modality == 'mi_depth':
-                (scene_export_path / 'MiDepth').mkdir(parents=True, exist_ok=True)
-                assert self.pts_from['mi']
-                for _, frame_id in enumerate(self.frame_id_list):
-                    mi_depth_vis_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.png'%_)
-                    mi_depth = self.mi_depth_list[_].squeeze()
-                    depth_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.mi_invalid_depth_mask_list[_])
-                    cv2.imwrite(str(mi_depth_vis_export_path), depth_normalized)
-                    print(blue_text('Mitsuba depth (vis) %d exported to: %s'%(frame_id, str(mi_depth_vis_export_path))))
-                    mi_depth_npy_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.npy'%_)
-                    np.save(str(mi_depth_npy_export_path), mi_depth)
-                    print(blue_text('Mitsuba depth (npy) %d exported to: %s'%(frame_id, str(mi_depth_npy_export_path))))
-
-            if modality == 'im_mask':
-                (scene_export_path / 'ImMask').mkdir(parents=True, exist_ok=True)
-                assert self.pts_from['mi']
-                if hasattr(self, 'im_mask_list'):
-                    assert len(self.im_mask_list) == len(self.mi_invalid_depth_mask_list)
-                if_undist_mask = False
-                if hasattr(self, 'if_undist'):
-                    if self.if_undist:
-                        assert hasattr(self, 'im_undist_mask_list')
-                        assert len(self.im_undist_mask_list) == len(self.mi_invalid_depth_mask_list)
-                        if_undist_mask = True
-                for _, frame_id in enumerate(self.frame_id_list):
-                    im_mask_export_path = scene_export_path / 'ImMask' / ('%03d_0001.png'%_)
-                    mi_invalid_depth_mask = self.mi_invalid_depth_mask_list[_]
-                    assert mi_invalid_depth_mask.dtype == bool
-                    im_mask_export = ~mi_invalid_depth_mask
-                    mask_source_list = ['mi']
-                    if hasattr(self, 'im_mask_list'):
-                        im_mask_ = self.im_mask_list[_]
-                        assert im_mask_.dtype == bool
-                        assert im_mask_export.shape == im_mask_.shape, 'invalid depth mask shape %s not equal to im_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask_.shape)
-                        im_mask_export = np.logical_and(im_mask_export, im_mask_)
-                        mask_source_list.append('im_mask')
-                    if if_undist_mask:
-                        im_mask_ = self.im_undist_mask_list[_]
-                        assert im_mask_.dtype == bool
-                        assert im_mask_export.shape == im_mask_.shape, 'invalid depth mask shape %s not equal to im_undist_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask_.shape)
-                        im_mask_export = np.logical_and(im_mask_export, im_mask_)
-                        mask_source_list.append('im_undist_mask')
-                    print('Exporting im_mask from %s'%(' && '.join(mask_source_list)))
-                    cv2.imwrite(str(im_mask_export_path), (im_mask_export*255).astype(np.uint8))
-                    print(blue_text('Mask image (for valid depths) %s exported to: %s'%(frame_id, str(im_mask_export_path))))
-            
-            if modality == 'shapes': 
-                assert self.if_loaded_shapes, 'shapes not loaded'
-                T_list_ = [(None, '')]
-                if self.extra_transform is not None:
-                    T_list_.append((self.extra_transform_inv, '_extra_transform'))
-
-                for T_, appendix in T_list_:
-                    shape_list = []
-                    shape_export_path = scene_export_path / ('scene%s.obj'%appendix)
-                    for vertices, faces in zip(self.vertices_list, self.faces_list):
-                        if T_ is not None:
-                            shape_list.append(trimesh.Trimesh((T_ @ vertices.T).T, faces-1))
-                        else:
-                            shape_list.append(trimesh.Trimesh(vertices, faces-1))
-                    shape_tri_mesh = trimesh.util.concatenate(shape_list)
-                    shape_tri_mesh.export(str(shape_export_path))
-                    if not shape_tri_mesh.is_watertight:
-                        trimesh.repair.fill_holes(shape_tri_mesh)
-                        shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
-                        shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull%s.obj'%(shape_export_path.stem, appendix))))
-                        shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
-                        shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
-                        print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
-
-            
+        print(blue_text('Scene shapes dumped to: %s')%str(mesh_dump_root))      

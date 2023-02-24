@@ -208,7 +208,7 @@ class scene2DBase():
         if_allow_crop = self.im_params_dict.get('if_allow_crop', False)
         if not 'im_sdr' in self.modality_file_list_dict:
             filename = self.modality_filename_dict['im_sdr']
-            self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
+            self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path_list[frame_idx] / (filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
 
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_sdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_sdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop)/255. for _, __ in zip(self.modality_file_list_dict['im_sdr'], expected_shape_list)]
@@ -226,7 +226,7 @@ class scene2DBase():
         if_allow_crop = self.im_params_dict.get('if_allow_crop', False)
         if not 'im_hdr' in self.modality_file_list_dict:
             filename = self.modality_filename_dict['im_hdr']
-            self.modality_file_list_dict['im_hdr'] = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
+            self.modality_file_list_dict['im_hdr'] = [self.scene_rendering_path_list[frame_idx] / (filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
 
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_hdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_hdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop) for _, __ in zip(self.modality_file_list_dict['im_hdr'], expected_shape_list)]
@@ -249,7 +249,7 @@ class scene2DBase():
         '''
         if not 'im_sdr' in self.modality_file_list_dict:
             filename = self.modality_filename_dict['im_sdr']
-            self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path / (filename%frame_id) for frame_id in self.frame_id_list]
+            self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path_list[frame_idx] / (filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         for frame_idx, (frame_id, im_hdr_file) in enumerate(zip(self.frame_id_list, self.modality_file_list_dict['im_hdr'])):
 
             # im_sdr_file = Path(str(im_hdr_file).replace(self.modality_ext_dict['im_hdr'], self.modality_ext_dict['im_sdr']))

@@ -543,8 +543,10 @@ Datasets include:
 - Check you have the data 
 
 # Todolist
-- [] load windows for Mitsuba scene
-- [] eval-inv:
+- [ ] load windows for Mitsuba scene
+- [ ] fix one camera in kitchen sceen (197)
+- [ ] fix invalid_frame_id_list even when not loading poses
+- [ ] eval-inv:
   - [] GT emission, albedo, roughness, metallic
 - [x] vis envmap in 2D plt
 - [ ] 1./rad* -> * rad_mul

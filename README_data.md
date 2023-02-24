@@ -1,7 +1,7 @@
 <!--ts-->
 - [More datasets](#more-datasets)
-  - [Freeviewpoint](#freeviewpoint)
-  - [Matterport3D](#matterport3d)
+  - [Free-viewpoint (fvp)](#free-viewpoint-fvp)
+  - [Matterport3D (mp)](#matterport3d-mp)
   - [Replica](#replica)
   - [Other datasets](#other-datasets)
     - [Mitsuba](#mitsuba)
@@ -62,7 +62,7 @@ python test_class_freeviewpointScene3D.py --export_scene True --eval_scene True
 - # 'frame_id_list': frame_ids, # comment out to use all frames
 - indicate modalities to export in: `scene_obj.export_scene(modality_list = [...`
 
-## Freeviewpoint
+## Free-viewpoint (fvp)
 
 From Philip et al.'21, *Free-viewpoint Indoor Neural Relighting from Multi-view Stereo*. [[Project]](https://repo-sam.inria.fr/fungraph/deep-indoor-relight/#code [[Code]](https://gitlab.inria.fr/sibr/projects/indoor_relighting)
 
@@ -77,12 +77,18 @@ python test_class_freeviewpointScene3D.py --vis_2d_plt True
 
 Holes in the scene are fixed by adding a convex hull mesh to the original mesh. See demo [here](images/demo_freeviewpoint_salon_viewcount.png).
 
+You can export the scene back to fvp format by (as a sanity check for exporter in fvp format):
+
+``` bash
+python test_class_freeviewpointScene3D.py --export True --export_format fvp --vis_3d_o3d False --force
+```
+
 TODO:
 - [ ] add option to resize all frames to same dimension
 - [ ] pad to same size (even numbers in H, W)
 - [x] fix holes on the wall
   
-## Matterport3D
+## Matterport3D (mp)
 
 From Chang et al.'17, *Matterport3D: Learning from RGB-D Data in Indoor ...* [[Project]](https://niessner.github.io/Matterport/) [[Code]](https://github.com/niessner/Matterport) [[Browse]](https://aspis.cmpt.sfu.ca/scene-toolkit/scans/matterport3d/houses) [[Data organization]](https://github.com/niessner/Matterport/blob/master/data_organization.md)
 
@@ -140,3 +146,15 @@ TODO:
 ``` bash
 python test_class_mitsubaScene3D.py --vis_2d_plt False --export_scene --vis_3d_o3d False --split train # (or val; but train first)
 ```
+
+Export to LiECCV22 format:
+
+``` bash
+python test_class_mitsubaScene3D.py --vis_3d_o3d False --export True --export_format lieccv22 --split val --force True
+```
+
+Export to fvp (free-viewpoint) format (e.g. train + val splits):
+
+``` bash
+python test_class_mitsubaScene3D.py --split train+val --export True --export_format fvp --vis_3d_o3d False
+``

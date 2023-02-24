@@ -98,7 +98,13 @@ def func_mitsubaScene_sample_poses(
     totalLen_list = []
     cam_colors = [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.], [0.5, 0.5, 0.5]]
 
-    print('Sampling poses...')
+    import random
+    from datetime import datetime
+    seed = int(datetime.now().timestamp())
+    print('Sampling poses... random seed: %d' % seed)
+    random.seed(seed)
+    np.random.seed(seed)
+
 
     # visualize additional camera location constraining bbox
     if cam_loc_bbox != [] and sample_pose_if_vis_plt:

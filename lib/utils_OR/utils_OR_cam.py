@@ -10,7 +10,7 @@ from utils_OR.utils_OR_geo import isect_line_plane_v3
 from lib.utils_io import normalize_v
 
 def read_cam_params_OR(camFile):
-    assert osp.isfile(str(camFile))
+    assert osp.isfile(str(camFile)), str(camFile)
     with open(str(camFile), 'r') as camIn:
     #     camNum = int(camIn.readline().strip() )
         cam_data = camIn.read().splitlines()
