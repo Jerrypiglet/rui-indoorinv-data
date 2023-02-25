@@ -217,7 +217,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         for _ in self.modality_list:
             result_ = scene2DBase.load_modality_(self, _)
             if not (result_ == False): continue
-            if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
+            if _ == 'shapes': self.load_single_shape(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'im_mask': self.load_im_mask()
 
     def get_modality(self, modality, source: str='GT'):
@@ -375,30 +375,3 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
     def get_cam_rays(self, cam_params_dict={}):
         if hasattr(self, 'cam_rays_list'):  return
         self.cam_rays_list = self.get_cam_rays_list(self.H_list, self.W_list, self.K_list, self.pose_list, convention='opencv')
-
-    def load_shapes(self, shape_params_dict={}):
-        '''
-        load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
-        '''
-        if self.if_loaded_shapes: return
-        
-        print(white_blue('[%s] load_shapes for scene...'%self.parent_class_name))
-
-        mitsubaBase._prepare_shapes(self)
-
-        scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)
-        shape_dict = load_shape_dict_from_shape_file(self.shape_file, shape_params_dict=shape_params_dict, scale_offset=scale_offset)
-        # , scale_offset=(9.1, 0.)) # read scale.txt and resize room to metric scale in meters
-        self.append_shape(shape_dict)
-
-        self.if_loaded_shapes = True
-        
-        print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
-            self.parent_class_name, 
-            len(self.shape_list_valid), 
-            len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
-            len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
-            )))
-
-        if shape_params_dict.get('if_dump_shape', False):
-            dump_shape_dict_to_shape_file(shape_dict, self.shape_file)

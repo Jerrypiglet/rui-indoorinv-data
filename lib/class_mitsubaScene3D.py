@@ -1,6 +1,7 @@
 from pathlib import Path, PosixPath
 import matplotlib.pyplot as plt
 import numpy as np
+import trimesh
 np.set_printoptions(suppress=True)
 
 from tqdm import tqdm
@@ -253,6 +254,17 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_scene()
+        elif self.scene_params_dict.get('shape_file', '') != '':
+            print(yellow('Loading MI scene from shape file: ' + str(self.scene_params_dict['shape_file'])))
+            shape_file = Path(self.scene_params_dict['shape_file'])
+            shape_id_dict = {
+                'type': shape_file.suffix[1:],
+                'filename': str(shape_file), 
+                }
+            self.mi_scene = mi.load_dict({
+                'type': 'scene',
+                'shape_id': shape_id_dict, 
+            })
         else:
             self.mi_scene = mi.load_file(str(self.xml_file))
             # if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
@@ -270,9 +282,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             '''
             test_rendering_path = self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'
             print(blue_text('Rendering... test frame by Mitsuba: %s')%str(test_rendering_path))
-            image = mi.render(self.mi_scene, spp=16)
-            mi.util.write_bitmap(str(test_rendering_path), image)
-            print(blue_text('DONE.'))
+            if self.mi_scene.integrator() is None:
+                print(yellow('No integrator found in the scene. Skipped: debug_render_test_image'))
+            else:
+                image = mi.render(self.mi_scene, spp=16)
+                mi.util.write_bitmap(str(test_rendering_path), image)
+                print(blue_text('DONE.'))
 
         debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
         if debug_dump_mesh:
@@ -599,6 +614,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_shape(shape_params_dict=shape_params_dict)
+        elif self.scene_params_dict.get('shape_file', '') != '':
+            self.shape_file = self.scene_params_dict['shape_file']
+            self.load_single_shape(shape_params_dict)
         else:
             if_sample_pts_on_mesh = shape_params_dict.get('if_sample_pts_on_mesh', False)
             sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
@@ -654,7 +672,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
                     obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
                     # if if_load_obj_mesh:
-                    vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py; faces is 1-based!
+                    # vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py; faces is 1-based!
+                    shape_trimesh = trimesh.load_mesh(str(obj_path), process=False, maintain_order=True)
+                    vertices, faces = np.array(shape_trimesh.vertices), np.array(shape_trimesh.faces)+1
+
                     assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
                     
                 bverts, bfaces = computeBox(vertices)

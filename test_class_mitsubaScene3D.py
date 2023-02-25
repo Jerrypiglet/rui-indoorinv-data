@@ -72,7 +72,6 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 
 # utils
 parser.add_argument('--if_sample_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
-# parser.add_argument('--export_scene', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
 parser.add_argument('--export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
 parser.add_argument('--export_format', type=str, default='monosdf', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
@@ -86,17 +85,21 @@ xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 # xml_filename = 'scene_v3.xml'
 xml_filename = 'test.xml'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
+shape_file = ''
 
 frame_ids = []
 invalid_frame_id_list = []
 
-# scene_name = 'kitchen'
+scene_name = 'kitchen_new'; 
 # scene_name = 'bathroom'
 # scene_name = 'bedroom'
 # scene_name = 'livingroom'
 
+# shape_file = 'data/indoor_synthetic/EXPORT_fvp/livingroom/train+val/meshes/recon.ply'
+shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
+
 # scene_name = 'kitchen-resize'
-scene_name = 'kitchen_new'; 
+# scene_name = 'kitchen'
 # invalid_frame_id_list = [197]
 # scene_name = 'kitchen_new_400'
 
@@ -154,6 +157,7 @@ scene_obj = mitsubaScene3D(
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
         'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+        'shape_file': shape_file, 
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
@@ -192,9 +196,9 @@ scene_obj = mitsubaScene3D(
     }, 
     im_params_dict={
         'im_H_load': 320, 'im_W_load': 640, 
-        'im_H_resize': 320, 'im_W_resize': 640, 
+        # 'im_H_resize': 320, 'im_W_resize': 640, 
         # 'im_H_load': 240, 'im_W_load': 320, 
-        # 'im_H_resize': 240, 'im_W_resize': 320, 
+        'im_H_resize': 160, 'im_W_resize': 320, 
         'spp': 4096, 
         # 'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
@@ -246,6 +250,9 @@ scene_obj = mitsubaScene3D(
         'simplify_mesh_max': 1000, 
         'if_remesh': True, # False: images/demo_shapes_3D_kitchen_NO_remesh.png; True: images/demo_shapes_3D_kitchen_YES_remesh.png
         'remesh_max_edge': 0.15,  
+        
+        'if_dump_shape': False, # True to dump fixed shape to obj file
+        'if_fix_watertight': False, 
         },
     emitter_params_dict={
         },
@@ -431,6 +438,7 @@ if opt.export:
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp(
+            split=opt.split, 
             format='fvp',
             modality_list = [
                 'poses', 
@@ -439,6 +447,7 @@ if opt.export:
                 'im_mask', 
                 'shapes', 
                 ], 
+            appendix='_small', 
         )
     if opt.export_format == 'lieccv22':
         exporter.export_lieccv22(
@@ -469,8 +478,9 @@ if opt.eval_scene:
     [!!!] set 'mesh_color_type': 'eval-vis_count'
     '''
     _ = evaluator_scene.sample_shapes(
-        sample_type='vis_count', # ['']
+        # sample_type='vis_count', # ['']
         # sample_type='t', # ['']
+        sample_type='face_normal', # ['']
         shape_params={
         }
     )
@@ -495,15 +505,16 @@ if opt.vis_2d_plt:
             # 'emission', 
             # 'depth', 
             # 'normal', 
-            'mi_depth', 
+            # 'mi_depth', 
             'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
             # 'seg_area', 'seg_env', 'seg_obj', 
-            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         # frame_idx_list=[0, 1, 2, 3, 4], 
-        frame_idx_list=[0], 
+        # frame_idx_list=[0], 
+        frame_idx_list=[6, 10, 12], 
     )
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:
@@ -549,7 +560,7 @@ if opt.vis_3d_o3d:
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             'layout', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES)
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
             ], 
@@ -613,10 +624,10 @@ if opt.vis_3d_o3d:
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
-            'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            # 'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            # 'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            # 'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            # 'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
         },

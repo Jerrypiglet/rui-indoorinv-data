@@ -15,7 +15,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.global_vars import mi_variant_dict
 
 from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
-from lib.utils_misc import get_list_of_keys, white_blue, blue_text
+from lib.utils_misc import get_list_of_keys, white_blue, blue_text, red
 from lib.utils_OR.utils_OR_lighting import get_lighting_envmap_dirs_global
 from lib.utils_mitsuba import get_rad_meter_sensor
 
@@ -54,7 +54,7 @@ class evaluator_scene_scene():
         - shape_params
         '''
         assert self.os.if_loaded_shapes
-        assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr']
+        assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal']
 
         return_dict = {}
         samples_v_dict = {}
@@ -110,7 +110,7 @@ class evaluator_scene_scene():
                     ts = ret.t.numpy()
                     visibility = np.logical_not(ts < (np.linalg.norm(ds_, axis=1, keepdims=False)))
                     visibility = np.logical_and(visibility, visibility_frustum) # (N_vertices,)
-
+                    
                     if sample_type == 'vis_count':
                         vis_count += visibility
                     if sample_type in ['rgb_hdr', 'rgb_sdr']:
@@ -153,6 +153,34 @@ class evaluator_scene_scene():
                     rgb_sdr[rgb_count==0] = np.array([[1., 1., 0.]], dtype=np.float32) # yellow for unordered vertices
                     samples_v_dict[_id] = ('rgb_sdr', rgb_sdr)
 
+            elif sample_type in ['face_normal']:
+                assert self.os.if_has_poses
+                assert self.os.if_has_mitsuba_scene # scene_obj->modality_list=['mi'
+
+                if sample_type == 'face_normal':
+                    vertex_vis_count = np.zeros((vertices.shape[0]), dtype=np.int64)
+                    vertex_normals = np.zeros((vertices.shape[0], 3), dtype=np.float32)
+                    
+                print('[Shape %d] Evaluating %d frames...'%(shape_idx, len(self.os.frame_id_list)))
+                for frame_idx, ret in tqdm(enumerate(self.os.mi_rays_ret_list)):
+                    if sample_type == 'face_normal':
+                        assert len(self.os.vertices_list) == 1, 'only works for single shape scene, so that faces in Mitsuba is the same as shapes loaded from .obj'
+                        assert faces.shape[0] == self.os.mi_scene.shapes()[0].face_count(), 'should load MI scene from single shape'
+                        face_ids = np.array(ret.prim_index) # (HW,), 0-based
+                        assert np.amax(face_ids) < faces.shape[0]
+                        face_normals = np.array(ret.n) # (HW, 3)
+                        
+                        rays_o, rays_d, _ = self.os.cam_rays_list[frame_idx]
+                        
+                        vertex_ids = np.array(faces[face_ids])-1 # (N, 3), 0-based
+                        vertex_normals[vertex_ids] += np.repeat(np.expand_dims(face_normals, 1), 3, axis=1)
+                        # vertex_normals[vertex_ids] += np.repeat(np.expand_dims(face_normals, -1), 3, axis=2)
+                        vertex_vis_count[vertex_ids.reshape(-1)] += 1
+                        
+                vertex_normals = vertex_normals / (vertex_vis_count.reshape((-1, 1))+1e-6)
+
+                samples_v_dict[_id] = ('vertex_normal', vertex_normals)
+                
             elif sample_type == 't':
                 assert self.os.if_has_poses
                 assert self.os.if_has_mitsuba_scene
@@ -173,6 +201,9 @@ class evaluator_scene_scene():
                 t = ret.t.numpy()
 
                 samples_v_dict[_id] = ('t', (t, np.amax(t)))
+            else:
+                print(red('sample_type %s not implemented'%sample_type))
+                raise NotImplementedError
         
         if sample_type == 'vis_count':
             assert max_vis_count > 0

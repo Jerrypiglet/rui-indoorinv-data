@@ -1,4 +1,5 @@
 import numpy as np
+import trimesh
 
 from lib.class_replicaScene3D import replicaScene3D
 np.random.seed(0)
@@ -766,10 +767,6 @@ class visualizer_scene_3D_o3d(object):
                     # print(yellow(str(obj_color)), shape_dict['random_id'])
 
 
-            # trimesh.repair.fill_holes(shape_mesh)
-            # trimesh.repair.fix_winding(shape_mesh)
-            # trimesh.repair.fix_inversion(shape_mesh)
-            # trimesh.repair.fix_normals(shape_mesh)
             shape_bbox = o3d.geometry.LineSet()
             shape_bbox.points = o3d.utility.Vector3dVector(bverts)
             shape_bbox.colors = o3d.utility.Vector3dVector([obj_color if not if_emitter else [0., 0., 0.] for i in range(12)]) # black for emitters
@@ -822,6 +819,10 @@ class visualizer_scene_3D_o3d(object):
                             # vertices colored with albedo (SDR)
                             assert samples_v.shape[0] == vertices.shape[0]
                             samples_v_ = np.clip(samples_v, 0., 1.)
+                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+                        elif samples_type == 'vertex_normal':
+                            assert samples_v.shape[0] == vertices.shape[0]
+                            samples_v_ = np.clip(samples_v/2.+0.5, 0., 1.)
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
                         elif samples_type == 'vis_count':
                             (samples_v_vis_count, max_vis_count) = samples_v

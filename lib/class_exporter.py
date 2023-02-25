@@ -268,23 +268,32 @@ class exporter_scene():
                         else:
                             shape_list.append(trimesh.Trimesh(vertices, faces-1))
                     shape_tri_mesh = trimesh.util.concatenate(shape_list)
+                    
+                    # trimesh.repair.fill_holes(shape_tri_mesh)
+                    # trimesh.repair.fix_winding(shape_tri_mesh)
+                    # trimesh.repair.fix_inversion(shape_tri_mesh)
+                    # trimesh.repair.fix_normals(shape_tri_mesh)
+                    
                     shape_tri_mesh.export(str(shape_export_path))
                     if not shape_tri_mesh.is_watertight:
-                        trimesh.repair.fill_holes(shape_tri_mesh)
                         shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
                         shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull%s.obj'%(shape_export_path.stem, appendix))))
                         shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
+                        if_fixed_water_tight = False
                         if format == 'monosdf':
                             shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
-                        elif format == 'fvp': # overwrite the original mesh
-                            shape_tri_mesh_fixed.export(str(shape_export_path))
+                            if_fixed_water_tight = True
+                        elif format == 'fvp': 
                             # scale.txt
                             scene_scale = self.os.scene_scale if hasattr(self.os, 'scene_scale') else 1.
                             with open(str(scene_export_path / 'scale.txt'), 'w') as camOut:
-                                camOut.write('%.4f\n'%scene_scale)
+                                camOut.write('%.4f'%scene_scale)
+                            # overwrite the original mesh
+                            # shape_tri_mesh_fixed.export(str(shape_export_path))
                         else:
                             raise NotImplementedError
-                        print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
+                        if if_fixed_water_tight:
+                            print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
 
     def export_lieccv22(self, modality_list=[], appendix='', split='', center_crop_HW=None, assert_shape=None, window_area_emitter_id_list: list=[], merge_lamp_id_list: list=[], if_no_gt_appendix: bool=False):
         '''

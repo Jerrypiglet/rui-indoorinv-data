@@ -22,8 +22,14 @@ def load_shape_dict_from_shape_file(shape_file_list: list, shape_params_dict={},
         sample_pts_list = []
     
     if not isinstance(shape_file_list, list): shape_file_list = [shape_file_list]
-    shape_tri_mesh_list = [trimesh.load_mesh(str(shape_file)) for shape_file in shape_file_list]
+    shape_file_list = [Path(shape_file) for shape_file in shape_file_list]
+    shape_tri_mesh_list = [trimesh.load_mesh(str(shape_file), process=False, maintain_order=True) for shape_file in shape_file_list]
     shape_tri_mesh = trimesh.util.concatenate(shape_tri_mesh_list)
+    
+    # trimesh.repair.fill_holes(shape_tri_mesh)
+    # trimesh.repair.fix_winding(shape_tri_mesh)
+    # trimesh.repair.fix_inversion(shape_tri_mesh)
+    # trimesh.repair.fix_normals(shape_tri_mesh)
 
     suffix = shape_file_list[0].suffix
     shape_file_join = shape_file_list[0].parent / ('%s.%s'%('-'.join(shape_file.stem for shape_file in shape_file_list), suffix))

@@ -16,11 +16,11 @@ import mitsuba as mi
 from lib.utils_io import load_img, resize_intrinsics, center_crop
 from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up, read_cam_params_OR, dump_cam_params_OR
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
+from lib.utils_misc import get_list_of_keys, green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 
-from lib.utils_monosdf_scene import load_shape_dict_from_shape_file, load_monosdf_scale_offset
+from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_dict_from_shape_file, load_monosdf_scale_offset
 
 class mitsubaBase():
     '''
@@ -40,6 +40,8 @@ class mitsubaBase():
 
         self.extra_transform = None
         self.if_center_offset = True # pixel centers are 0.5, 1.5, ..., H-1+0.5
+
+        self.if_scale_scene = False
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
@@ -592,6 +594,34 @@ class mitsubaBase():
         self.lamp_list = []
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
+    
+    def load_single_shape(self, shape_params_dict={}):
+        '''
+        load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
+        '''
+        if self.if_loaded_shapes: return
+        
+        print(white_blue('[%s] load_single_shape for scene...'%self.parent_class_name), yellow('single'))
+
+        mitsubaBase._prepare_shapes(self)
+
+        scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)
+        shape_dict = load_shape_dict_from_shape_file(self.shape_file, shape_params_dict=shape_params_dict, scale_offset=scale_offset)
+        # , scale_offset=(9.1, 0.)) # read scale.txt and resize room to metric scale in meters
+        self.append_shape(shape_dict)
+
+        self.if_loaded_shapes = True
+        
+        print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
+            self.parent_class_name, 
+            len(self.shape_list_valid), 
+            len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
+            len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
+            )))
+
+        if shape_params_dict.get('if_dump_shape', False):
+            dump_shape_dict_to_shape_file(shape_dict, self.shape_file)
+
 
     def export_poses_cam_txt(self, export_folder: Path, cam_params_dict={}, frame_num_all=-1):
         print(white_blue('[%s] convert poses to OpenRooms format')%self.parent_class_name)

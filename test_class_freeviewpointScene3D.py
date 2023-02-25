@@ -160,6 +160,7 @@ if opt.export:
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp(
+            split=opt.split, 
             format='fvp',
             modality_list = [
                 'poses', 
