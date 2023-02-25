@@ -14,7 +14,7 @@ import cv2
 # Import the library using the alias "mi"
 import mitsuba as mi
 from lib.utils_io import load_img, resize_intrinsics, center_crop
-from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up, read_cam_params_OR, dump_cam_params_OR
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP, read_cam_params_OR, dump_cam_params_OR
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import get_list_of_keys, green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
@@ -115,7 +115,9 @@ class mitsubaBase():
             mi_normal_global = ret.n.numpy().reshape(self._H(frame_idx), self._W(frame_idx), 3)
             # FLIP inverted normals!
             normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normal_global, axis=-1) > 0, np.any(mi_normal_global != np.inf, axis=-1))
-            mi_normal_global[normals_flip_mask] = -mi_normal_global[normals_flip_mask]
+            if np.sum(normals_flip_mask) > 0:
+                mi_normal_global[normals_flip_mask] = -mi_normal_global[normals_flip_mask]
+                print(yellow('[mi_sample_rays_pts] %d normals flipped!'%np.sum(normals_flip_mask)))
             mi_normal_global[invalid_depth_mask, :] = 0.
             self.mi_normal_global_list.append(mi_normal_global)
 
@@ -595,7 +597,7 @@ class mitsubaBase():
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
     
-    def load_single_shape(self, shape_params_dict={}):
+    def load_single_shape(self, shape_params_dict={}, extra_transform=None):
         '''
         load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
         '''
@@ -606,7 +608,7 @@ class mitsubaBase():
         mitsubaBase._prepare_shapes(self)
 
         scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)
-        shape_dict = load_shape_dict_from_shape_file(self.shape_file, shape_params_dict=shape_params_dict, scale_offset=scale_offset)
+        shape_dict = load_shape_dict_from_shape_file(self.shape_file, shape_params_dict=shape_params_dict, scale_offset=scale_offset, extra_transform=extra_transform)
         # , scale_offset=(9.1, 0.)) # read scale.txt and resize room to metric scale in meters
         self.append_shape(shape_dict)
 
@@ -633,8 +635,8 @@ class mitsubaBase():
 
             # RR = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1]])
             # tt = np.zeros((3, 1))
-            # from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up
-            # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(RR, tt)
+            # from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP
+            # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(RR, tt)
             # print((origin, lookatvector, up))
 
         for T_, appendix in T_list_:
@@ -660,7 +662,7 @@ class mitsubaBase():
 
             if appendix != '':
                 # debug: two prints should agree
-                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(Rt_list[0][0], Rt_list[0][1])
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(Rt_list[0][0], Rt_list[0][1])
                 print((origin.flatten(), lookatvector.flatten(), up.flatten()))
                 print((T_@self.origin_lookatvector_up_list[0][0]).flatten(), (T_@self.origin_lookatvector_up_list[0][1]).flatten(), (T_@self.origin_lookatvector_up_list[0][2]).flatten())
             dump_cam_params_OR(

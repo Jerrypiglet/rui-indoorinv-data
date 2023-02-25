@@ -181,7 +181,10 @@ def origin_lookat_up_to_R_t(origin, lookat, up):
 
     return (R, t), lookatvector
     
-def R_t_to_origin_lookatvector_up(R, t):
+def R_t_to_origin_lookatvector_up_yUP(R, t):
+    '''
+    only works for y+ [!!!]
+    '''
     _, __, lookatvector = np.split(R, 3, axis=-1)
     lookatvector = normalize_v(lookatvector)
     up = normalize_v(-__) # (3, 1)

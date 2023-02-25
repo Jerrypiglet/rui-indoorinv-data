@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up
+from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up_yUP
 from lib.utils_io import load_img, load_matrix
 # from collections import defaultdict
 # import trimesh

@@ -26,9 +26,9 @@ def load_shape_dict_from_shape_file(shape_file_list: list, shape_params_dict={},
     shape_tri_mesh_list = [trimesh.load_mesh(str(shape_file), process=False, maintain_order=True) for shape_file in shape_file_list]
     shape_tri_mesh = trimesh.util.concatenate(shape_tri_mesh_list)
     
+    # print(yellow('Fixing a few issues with the single mesh...'))
     # trimesh.repair.fill_holes(shape_tri_mesh)
     # trimesh.repair.fix_winding(shape_tri_mesh)
-    # trimesh.repair.fix_inversion(shape_tri_mesh)
     # trimesh.repair.fix_normals(shape_tri_mesh)
 
     suffix = shape_file_list[0].suffix

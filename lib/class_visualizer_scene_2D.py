@@ -39,8 +39,10 @@ class visualizer_scene_2D(object):
             assert isinstance(frame_idx_list, list)
             self.frame_idx_list = frame_idx_list
         # import ipdb; ipdb.set_trace()
+        # assert len(self.frame_idx_list) <= self.os.frame_num
+        
+        self.frame_idx_list = self.frame_idx_list[:min(6, self.os.frame_num)]
         assert len(self.frame_idx_list) <= self.os.frame_num
-        self.frame_idx_list = self.frame_idx_list[:6]
 
         self.N_frames = min(len(self.frame_idx_list), len(self.os.frame_id_list))
         assert self.N_frames >= 1

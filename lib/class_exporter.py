@@ -159,6 +159,9 @@ class exporter_scene():
                             
                             # [!!!] assert if_scale_scene = 1.0
                             R, t = self.os.pose_list[frame_idx][:3, :3], self.os.pose_list[frame_idx][:3, 3]
+                            # if self.extra_transform is not None:
+                            #     R = R @ (self.extra_transform.T)
+                            #     t = self.extra_transform @ t
                             if hasattr(self.os, 'scene_scale'):
                                 t = t * self.os.scene_scale
                             R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenCV -> OpenGL
@@ -251,49 +254,61 @@ class exporter_scene():
             
             if modality == 'shapes': 
                 assert self.os.if_loaded_shapes, 'shapes not loaded'
-                T_list_ = [(None, '')]
-                if self.os.extra_transform is not None:
-                    T_list_.append((self.extra_transform_inv, '_extra_transform'))
+                # T_list_ = [(None, '')]
+                # if self.extra_transform is not None: # [TODO] clean this up with below
+                #     T_list_ = [(self.extra_transform, '')]
+                # if self.os.extra_transform is not None:
+                #     print(red('extra_transform is not None'))
+                #     T_list_.append((self.os.extra_transform_inv, '_extra_transform'))
 
-                for T_, appendix in T_list_:
-                    shape_list = []
-                    # shape_export_path = scene_export_path / ('scene%s.obj'%appendix)
-                    file_str = {'monosdf': 'scene%s.obj'%appendix, 'fvp': 'meshes/recon.ply'}[format]
-                    (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
-                    shape_export_path = scene_export_path / file_str
+                # for T_, appendix in T_list_:
+                shape_list = []
+                # shape_export_path = scene_export_path / ('scene%s.obj'%appendix)
+                file_str = {'monosdf': 'scene%s.obj'%appendix, 'fvp': 'meshes/recon.ply'}[format]
+                (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
+                shape_export_path = scene_export_path / file_str
+                
+                for vertices, faces in zip(self.os.vertices_list, self.os.faces_list):
+                    # if T_ is not None:
+                    #     shape_list.append(trimesh.Trimesh((T_ @ vertices.T).T, faces-1, process=False, maintain_order=True))
+                    # else:
+                    shape_list.append(trimesh.Trimesh(vertices, faces-1, process=True, maintain_order=True))
+                shape_tri_mesh = trimesh.util.concatenate(shape_list)
+                
+                # trimesh.repair.fill_holes(shape_tri_mesh)
+                # trimesh.repair.fix_winding(shape_tri_mesh)
+                # trimesh.repair.fix_inversion(shape_tri_mesh)
+                # trimesh.repair.fix_normals(shape_tri_mesh)
+                
+                shape_tri_mesh.export(str(shape_export_path))
+                print('-->', shape_tri_mesh.faces[19531])
+                print(white_blue('Shape exported to: %s'%str(shape_export_path)))
+                if not shape_tri_mesh.is_watertight:
+                    shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
+                    # slightly expand the convex hull to avoid overlap faces -> flickering in Meshlab
+                    _v = shape_tri_mesh_convex.vertices
+                    _v_mean = np.mean(_v, axis=0, keepdims=True)
+                    shape_tri_mesh_convex = trimesh.Trimesh(vertices=(_v - _v_mean) * 1.001 + _v_mean, faces=shape_tri_mesh_convex.faces)
                     
-                    for vertices, faces in zip(self.os.vertices_list, self.os.faces_list):
-                        if T_ is not None:
-                            shape_list.append(trimesh.Trimesh((T_ @ vertices.T).T, faces-1))
-                        else:
-                            shape_list.append(trimesh.Trimesh(vertices, faces-1))
-                    shape_tri_mesh = trimesh.util.concatenate(shape_list)
+                    shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull%s.obj'%(shape_export_path.stem, appendix))))
                     
-                    # trimesh.repair.fill_holes(shape_tri_mesh)
-                    # trimesh.repair.fix_winding(shape_tri_mesh)
-                    # trimesh.repair.fix_inversion(shape_tri_mesh)
-                    # trimesh.repair.fix_normals(shape_tri_mesh)
-                    
-                    shape_tri_mesh.export(str(shape_export_path))
-                    if not shape_tri_mesh.is_watertight:
-                        shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
-                        shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull%s.obj'%(shape_export_path.stem, appendix))))
-                        shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
-                        if_fixed_water_tight = False
-                        if format == 'monosdf':
-                            shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
-                            if_fixed_water_tight = True
-                        elif format == 'fvp': 
-                            # scale.txt
-                            scene_scale = self.os.scene_scale if hasattr(self.os, 'scene_scale') else 1.
-                            with open(str(scene_export_path / 'scale.txt'), 'w') as camOut:
-                                camOut.write('%.4f'%scene_scale)
-                            # overwrite the original mesh
-                            # shape_tri_mesh_fixed.export(str(shape_export_path))
-                        else:
-                            raise NotImplementedError
-                        if if_fixed_water_tight:
-                            print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
+                    shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
+                    if_fixed_water_tight = False
+                    if format == 'monosdf':
+                        shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
+                        if_fixed_water_tight = True
+                    elif format == 'fvp': 
+                        # scale.txt
+                        scene_scale = self.os.scene_scale if hasattr(self.os, 'scene_scale') else 1.
+                        with open(str(scene_export_path / 'scale.txt'), 'w') as camOut:
+                            camOut.write('%.4f'%scene_scale)
+                        # overwrite the original mesh
+                        # print(red('Overwriting with mehs + hull: %s'%str(shape_export_path)))
+                        shape_tri_mesh_fixed.export(str(shape_export_path))
+                    else:
+                        raise NotImplementedError
+                    if if_fixed_water_tight:
+                        print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
 
     def export_lieccv22(self, modality_list=[], appendix='', split='', center_crop_HW=None, assert_shape=None, window_area_emitter_id_list: list=[], merge_lamp_id_list: list=[], if_no_gt_appendix: bool=False):
         '''

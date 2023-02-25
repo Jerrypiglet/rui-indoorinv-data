@@ -11,7 +11,7 @@ from .class_mitsubaBase import mitsubaBase
 from .class_scene2DBase import scene2DBase
 
 from lib.global_vars import mi_variant_dict
-from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP
 from lib.utils_io import load_img, resize_intrinsics
 from lib.utils_misc import blue_text, magenta, yellow, get_list_of_keys, white_blue, red
 from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_dict_from_shape_file

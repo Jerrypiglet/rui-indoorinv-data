@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up
+from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up_yUP
 from lib.utils_io import load_img, load_matrix
 # from collections import defaultdict
 # import trimesh
@@ -340,7 +340,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
                 R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
                 self.pose_list.append(np.hstack((R, t)))
 
-                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
                 K = np.array([[float(f), 0, self._W(frame_idx)/2.], [0, float(f), self._H(frame_idx)/2.], [0, 0, 1]], dtype=np.float32)

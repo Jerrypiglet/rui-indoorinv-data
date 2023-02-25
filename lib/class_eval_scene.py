@@ -3,6 +3,7 @@ from pathlib import Path
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+import trimesh
 np.set_printoptions(precision=4)
 np.set_printoptions(suppress=True)
 
@@ -15,7 +16,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.global_vars import mi_variant_dict
 
 from lib.utils_OR.utils_OR_emitter import sample_mesh_emitter
-from lib.utils_misc import get_list_of_keys, white_blue, blue_text, red
+from lib.utils_misc import get_list_of_keys, white_blue, blue_text, red, yellow
 from lib.utils_OR.utils_OR_lighting import get_lighting_envmap_dirs_global
 from lib.utils_mitsuba import get_rad_meter_sensor
 
@@ -154,32 +155,58 @@ class evaluator_scene_scene():
                     samples_v_dict[_id] = ('rgb_sdr', rgb_sdr)
 
             elif sample_type in ['face_normal']:
+                '''
+                Compute face normals of all visible faces, and flip inwards normals opposite to cameras
+                
+                images/demo_eval_scene_shapes-face_normal.png
+                '''
                 assert self.os.if_has_poses
                 assert self.os.if_has_mitsuba_scene # scene_obj->modality_list=['mi'
 
                 if sample_type == 'face_normal':
                     vertex_vis_count = np.zeros((vertices.shape[0]), dtype=np.int64)
                     vertex_normals = np.zeros((vertices.shape[0], 3), dtype=np.float32)
+                    face_normals_mask = np.ones((faces.shape[0]), dtype=np.uint8).astype(bool)
+                    normal_rays_dict = {'v': [], 'd': [], 'l': []}
                     
                 print('[Shape %d] Evaluating %d frames...'%(shape_idx, len(self.os.frame_id_list)))
+                face_normals = trimesh.Trimesh(faces=faces-1, vertices=vertices, process=False, maintain_order=True).face_normals # (N_faces, 3)
                 for frame_idx, ret in tqdm(enumerate(self.os.mi_rays_ret_list)):
                     if sample_type == 'face_normal':
-                        assert len(self.os.vertices_list) == 1, 'only works for single shape scene, so that faces in Mitsuba is the same as shapes loaded from .obj'
-                        assert faces.shape[0] == self.os.mi_scene.shapes()[0].face_count(), 'should load MI scene from single shape'
-                        face_ids = np.array(ret.prim_index) # (HW,), 0-based
+                        assert len(self.os.faces_list) == 1, 'only works for single shape scene, so that faces in Mitsuba is the same as shapes loaded from .obj'
+                        assert faces.shape[0] == self.os.mi_scene.shapes()[0].face_count(), 'should load MI scene from single shape; double check if you [1] load entire scene as a shape [2] preserve the shape when loading with trimesh.load_mesh'
+                        face_ids = ret.prim_index.numpy() # (HW,), 0-based
                         assert np.amax(face_ids) < faces.shape[0]
-                        face_normals = np.array(ret.n) # (HW, 3)
+                        # _face_normals = ret.n.numpy() # (HW, 3) # [???] Mitsuba auto flip normals for single sides shapes?
+                        _face_normals = face_normals[face_ids] # (HW, 3)
                         
-                        rays_o, rays_d, _ = self.os.cam_rays_list[frame_idx]
+                        _, rays_d, _ = self.os.cam_rays_list[frame_idx]
+                        rays_d = -rays_d.reshape((-1, 3))
+                        
+                        _face_normals_mask = np.sum(_face_normals * rays_d, axis=1) > 0
+                        face_normals_mask[face_ids] = np.logical_and(_face_normals_mask, face_normals_mask[face_ids])
+                        # [DEBUG] output face normals: blue; inwards: red
+                        # face_normals[_face_normals_mask] = np.array([[0., 0., 1.]])
+                        # face_normals[~_face_normals_mask] = np.array([[1., 0., 0.]])
                         
                         vertex_ids = np.array(faces[face_ids])-1 # (N, 3), 0-based
-                        vertex_normals[vertex_ids] += np.repeat(np.expand_dims(face_normals, 1), 3, axis=1)
+                        _face_centers = vertices[vertex_ids].mean(axis=1) # (N, 3)
+                        vertex_normals[vertex_ids] += np.repeat(np.expand_dims(_face_normals, 1), 3, axis=1)
                         # vertex_normals[vertex_ids] += np.repeat(np.expand_dims(face_normals, -1), 3, axis=2)
                         vertex_vis_count[vertex_ids.reshape(-1)] += 1
+
+                        normal_rays_dict['v'].append(np.array(_face_centers))
+                        normal_rays_dict['d'].append(np.array(_face_normals))
+                        normal_rays_dict['l'].append(np.ones(_face_normals.shape[0], dtype=np.float32)*0.2)
                         
                 vertex_normals = vertex_normals / (vertex_vis_count.reshape((-1, 1))+1e-6)
 
                 samples_v_dict[_id] = ('vertex_normal', vertex_normals)
+                return_dict['face_normals_flipped_mask'] = ~face_normals_mask
+                return_dict['normal_rays_list'] = {'v': np.concatenate(normal_rays_dict['v'], axis=0), 'd': np.concatenate(normal_rays_dict['d'], axis=0), 'l': np.concatenate(normal_rays_dict['l'], axis=0)}
+                
+                # DEBUG:
+                # samples_v_dict[_id] = ('vis_count', (vertex_vis_count, np.amax(vertex_vis_count)))
                 
             elif sample_type == 't':
                 assert self.os.if_has_poses

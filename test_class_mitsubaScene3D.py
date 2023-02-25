@@ -16,7 +16,7 @@ MONOSDF_ROOT = MONOSDF_ROOT_dict[host]
 from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
-from lib.utils_misc import str2bool
+from lib.utils_misc import str2bool, white_magenta
 import argparse
 
 from lib.class_mitsubaScene3D import mitsubaScene3D
@@ -91,12 +91,15 @@ frame_ids = []
 invalid_frame_id_list = []
 
 scene_name = 'kitchen_new'; 
-# scene_name = 'bathroom'
+shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
+
 # scene_name = 'bedroom'
+# shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
+
+# scene_name = 'bathroom'
 # scene_name = 'livingroom'
 
-# shape_file = 'data/indoor_synthetic/EXPORT_fvp/livingroom/train+val/meshes/recon.ply'
-shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
+# shape_file = 'data/indoor_synthetic/EXPORT_fvp/kitchen_new_small/val/meshes/recon.obj'
 
 # scene_name = 'kitchen-resize'
 # scene_name = 'kitchen'
@@ -109,14 +112,14 @@ shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
 # ZQ
 # frame_ids = [21]
 # frame_ids = [64]
-frame_ids = [197]
+# frame_ids = [197]
 
 # frame_ids = list(range(202))
 # frame_ids = list(range(10))
 # frame_ids = list(range(0, 202, 40))
 # frame_ids = list(range(0, 4, 1))
 # frame_ids = list(range(197))
-# frame_ids = [0]
+frame_ids = [0]
 # frame_ids = list(range(189))
 
 '''
@@ -153,6 +156,7 @@ scene_obj = mitsubaScene3D(
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
         'axis_up': 'y+', 
+        'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
@@ -196,9 +200,9 @@ scene_obj = mitsubaScene3D(
     }, 
     im_params_dict={
         'im_H_load': 320, 'im_W_load': 640, 
-        # 'im_H_resize': 320, 'im_W_resize': 640, 
+        'im_H_resize': 320, 'im_W_resize': 640, 
         # 'im_H_load': 240, 'im_W_load': 320, 
-        'im_H_resize': 160, 'im_W_resize': 320, 
+        # 'im_H_resize': 160, 'im_W_resize': 320, 
         'spp': 4096, 
         # 'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
@@ -415,55 +419,6 @@ if opt.eval_monosdf:
 
 # eval_return_dict = np.load('test_files/eval_return_dict.npy', allow_pickle=True).item(); opt.eval_monosdf = True
 
-if opt.export:
-    from lib.class_exporter import exporter_scene
-    exporter = exporter_scene(
-        scene_object=scene_obj,
-        format=opt.export_format, 
-        modality_list = [
-            'poses', 
-            'im_hdr', 
-            'im_sdr', 
-            'im_mask', 
-            'shapes', 
-            'mi_normal', 
-            'mi_depth', 
-            ], 
-        if_force=opt.force, 
-    )
-    if opt.export_format == 'monosdf':
-        exporter.export_monosdf_fvp(
-            split=opt.split, 
-            format='monosdf',
-            )
-    if opt.export_format == 'fvp':
-        exporter.export_monosdf_fvp(
-            split=opt.split, 
-            format='fvp',
-            modality_list = [
-                'poses', 
-                'im_hdr', 
-                'im_sdr', 
-                'im_mask', 
-                'shapes', 
-                ], 
-            appendix='_small', 
-        )
-    if opt.export_format == 'lieccv22':
-        exporter.export_lieccv22(
-            modality_list = [
-            'im_sdr', 
-            'mi_depth', 
-            'mi_seg', 
-            ], 
-            split=opt.split, 
-            assert_shape=(240, 320),
-            window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-            merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
-            # center_crop_HW=(240, 320), 
-            if_no_gt_appendix=True, 
-        )
-    
 '''
 Evaluator for scene
 '''
@@ -489,7 +444,70 @@ if opt.eval_scene:
             eval_return_dict[k].update(_[k])
         else:
             eval_return_dict[k] = _[k]
+            
+    if 'face_normals_flipped_mask' in eval_return_dict and opt.export:
+        face_normals_flipped_mask = eval_return_dict['face_normals_flipped_mask']
+        assert face_normals_flipped_mask.shape[0] == scene_obj.faces_list[0].shape[0]
+        if np.sum(face_normals_flipped_mask) > 0:
+            validate_idx = np.where(face_normals_flipped_mask)[0][0]
+            print(validate_idx, scene_obj.faces_list[0][validate_idx])
+            scene_obj.faces_list[0][face_normals_flipped_mask] = scene_obj.faces_list[0][face_normals_flipped_mask][:, [0, 2, 1]]
+            print(white_magenta('[FLIPPED] %d/%d inward face normals'%(np.sum(face_normals_flipped_mask), scene_obj.faces_list[0].shape[0])))
+            print(validate_idx, '->', scene_obj.faces_list[0][validate_idx])
 
+if opt.export:
+    from lib.class_exporter import exporter_scene
+    exporter = exporter_scene(
+        scene_object=scene_obj,
+        format=opt.export_format, 
+        modality_list = [
+            'poses', 
+            'im_hdr', 
+            'im_sdr', 
+            'im_mask', 
+            'shapes', 
+            'mi_normal', 
+            'mi_depth', 
+            ], 
+        if_force=opt.force, 
+        # convert from y+ (native to indoor synthetic) to z+
+        # extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32),  # y=z, z=x, x=y
+        # extra_transform = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32),  # z=y, y=x, x=z
+        
+    )
+    if opt.export_format == 'monosdf':
+        exporter.export_monosdf_fvp(
+            split=opt.split, 
+            format='monosdf',
+            )
+    if opt.export_format == 'fvp':
+        exporter.export_monosdf_fvp(
+            split=opt.split, 
+            format='fvp',
+            modality_list = [
+                'poses', 
+                # 'im_hdr', 
+                # 'im_sdr', 
+                # 'im_mask', 
+                'shapes', 
+                ], 
+            # appendix='_small', 
+        )
+    if opt.export_format == 'lieccv22':
+        exporter.export_lieccv22(
+            modality_list = [
+            'im_sdr', 
+            'mi_depth', 
+            'mi_seg', 
+            ], 
+            split=opt.split, 
+            assert_shape=(240, 320),
+            window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+            merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+            # center_crop_HW=(240, 320), 
+            if_no_gt_appendix=True, 
+        )
+    
 '''
 Matploblib 2D viewer
 '''
@@ -513,8 +531,8 @@ if opt.vis_2d_plt:
             # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         # frame_idx_list=[0, 1, 2, 3, 4], 
-        # frame_idx_list=[0], 
-        frame_idx_list=[6, 10, 12], 
+        frame_idx_list=[0], 
+        # frame_idx_list=[6, 10, 12], 
     )
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:
@@ -586,10 +604,10 @@ if opt.vis_3d_o3d:
         }
 
     if opt.if_add_rays_from_eval:
-        if 'emitter_rays_list' in eval_return_dict:
-            assert opt.eval_rad
-            for _ in eval_return_dict['emitter_rays_list']:
-                lpts, lpts_end = _['v'], _['v']+_['d']*_['l']
+        for key in eval_return_dict.keys():
+            if 'rays_list' in key:
+            # assert opt.eval_rad
+                lpts, lpts_end = eval_return_dict[key]['v'], eval_return_dict[key]['v']+eval_return_dict[key]['d']*eval_return_dict[key]['l'].reshape(-1, 1)
                 visualizer_3D_o3d.add_extra_geometry([
                     ('rays', {
                         'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 0., 1.]]*lpts.shape[0]), # BLUE for EST
@@ -616,7 +634,7 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
-            'if_cam_axis_only': True, 
+            'if_cam_axis_only': False, 
             }, 
         lighting_params=lighting_params_vis, 
         shapes_params={
@@ -645,7 +663,7 @@ if opt.vis_3d_o3d:
             # 'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
             # 'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
-            'if_cam_rays': False, 
+            'if_cam_rays': True, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             
