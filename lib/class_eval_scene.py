@@ -174,8 +174,13 @@ class evaluator_scene_scene():
                 for frame_idx, ret in tqdm(enumerate(self.os.mi_rays_ret_list)):
                     if sample_type == 'face_normal':
                         assert len(self.os.faces_list) == 1, 'only works for single shape scene, so that faces in Mitsuba is the same as shapes loaded from .obj'
+                        assert len(self.os.mi_scene.shapes()) == 1, 'only works for single shape scene, so that faces in Mitsuba is the same as shapes loaded from .obj'
                         assert faces.shape[0] == self.os.mi_scene.shapes()[0].face_count(), 'should load MI scene from single shape; double check if you [1] load entire scene as a shape [2] preserve the shape when loading with trimesh.load_mesh'
                         face_ids = ret.prim_index.numpy() # (HW,), 0-based
+                        if np.amax(face_ids) >= faces.shape[0]:
+                            print(frame_idx, np.amax(face_ids), faces.shape[0])
+                            print(red('[ERROR] somehow every large face id in ray-mi intersection; skipped frame %d'%frame_idx))
+                            continue
                         assert np.amax(face_ids) < faces.shape[0]
                         # _face_normals = ret.n.numpy() # (HW, 3) # [???] Mitsuba auto flip normals for single sides shapes?
                         _face_normals = face_normals[face_ids] # (HW, 3)

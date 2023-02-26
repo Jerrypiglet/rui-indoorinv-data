@@ -74,6 +74,7 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 parser.add_argument('--if_sample_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
 parser.add_argument('--export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
 parser.add_argument('--export_format', type=str, default='monosdf', help='')
+parser.add_argument('--export_appendix', type=str, default='', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
 opt = parser.parse_args()
@@ -90,11 +91,16 @@ shape_file = ''
 frame_ids = []
 invalid_frame_id_list = []
 
-scene_name = 'kitchen_new'; 
-shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
+# scene_name = 'kitchen_new'; 
+# shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
+# shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-140240-mm3-EVAL-20230224-013408kitchen_NEW_HDR_grids_trainval.ply'
 
 # scene_name = 'bedroom'
 # shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
+# shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135215-mm1-EVAL-20230219-211718-bedroom_HDR_grids_trainval.ply'
+
+scene_name = 'bathroom'
+shape_file = 'data/indoor_synthetic/bathroom/scene.obj'
 
 # scene_name = 'bathroom'
 # scene_name = 'livingroom'
@@ -491,7 +497,7 @@ if opt.export:
                 # 'im_mask', 
                 'shapes', 
                 ], 
-            # appendix='_small', 
+            appendix=opt.export_appendix, 
         )
     if opt.export_format == 'lieccv22':
         exporter.export_lieccv22(
