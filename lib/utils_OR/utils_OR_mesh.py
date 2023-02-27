@@ -262,7 +262,7 @@ def flip_ceiling_normal(faces, vertices):
 
     return faces
 
-def get_rectangle_mesh(R: np.ndarray, t: np.ndarray):
+def get_rectangle_mesh(R: np.ndarray, t: np.ndarray, extra_transform=None):
     assert R.shape==(3, 3) and t.shape==(3, 1)
     vertices = (R @ np.array([
         [-1, -1, 0.], 
@@ -270,6 +270,9 @@ def get_rectangle_mesh(R: np.ndarray, t: np.ndarray):
         [1, 1, 0.], 
         [1, -1, 0.], 
     ], dtype=np.float32).T + t).T
+    if extra_transform is not None:
+        assert extra_transform.shape == (3, 3)
+        vertices = (extra_transform @ vertices.T).T
     faces = np.array([
         [2, 4, 3], 
         [1, 4, 2], 

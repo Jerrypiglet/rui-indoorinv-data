@@ -22,6 +22,7 @@ import mitsuba as mi
 
 from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
 from lib.utils_io import load_matrix, resize_intrinsics
+from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
 
 # from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
@@ -688,8 +689,18 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         images/demo_mitsubaScene_rectangle_windows_1.png
                         images/demo_mitsubaScene_rectangle_windows_2.png
                     '''
-                    transform_m = np.array(shape.findall('transform')[0].findall('matrix')[0].get('value').split(' ')).reshape(4, 4).astype(np.float32) # [[R,t], [0,0,0,1]]
-                    (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4])
+                    transform_item = shape.findall('transform')[0]
+                    transform_m = np.eye(4, dtype=np.float32)
+                    if len(transform_item.findall('rotate')) > 0:
+                        rotate_item = transform_item.findall('rotate')[0]
+                        _r_h = xml_rotation_to_matrix_homo(rotate_item)
+                        transform_m = _r_h @ transform_m
+                        
+                    if len(transform_item.findall('matrix')) > 0:
+                        _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
+                        transform_m = np.array(_transform).reshape(4, 4).astype(np.float32) @ transform_m # [[R,t], [0,0,0,1]]
+                        
+                    (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4], extra_transform=self.extra_transform)
                     _id = 'rectangle_'+random_id
                     emitters = shape.findall('emitter')
                     if len(emitters) > 0:
@@ -743,6 +754,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     vertices, faces, (N_triangles, target_number_of_triangles) = simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh=if_remesh, remesh_max_edge=remesh_max_edge, _id=_id)
                     if N_triangles != faces.shape[0]:
                         print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
+                
+                if self.extra_transform is not None:
+                    vertices = (self.extra_transform @ vertices.T).T
+                    bverts = (self.extra_transform @ bverts.T).T
 
                 self.vertices_list.append(vertices)
                 self.faces_list.append(faces)

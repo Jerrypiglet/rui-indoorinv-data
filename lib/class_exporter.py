@@ -1,12 +1,17 @@
+import copy
 import shutil
 from pathlib import Path
 import numpy as np
 import trimesh
 import cv2
 from tqdm import tqdm
+from lib.class_realScene3D import realScene3D
 from lib.class_replicaScene3D import replicaScene3D
+from lib.utils_OR.utils_OR_mesh import get_rectangle_mesh
+from lib.utils_OR.utils_OR_xml import get_XML_root, transformToXml
 from lib.utils_io import center_crop
 from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
+from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
@@ -30,7 +35,7 @@ class exporter_scene():
         if_debug_info: bool=False, 
     ):
         
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
@@ -46,7 +51,7 @@ class exporter_scene():
 
     @property
     def valid_modalities(self):
-        return ['im_hdr', 'im_sdr', 'poses', 'im_mask', 'shapes', 'mi_normal', 'mi_depth']
+        return ['im_hdr', 'im_sdr', 'poses', 'im_mask', 'shapes', 'mi_normal', 'mi_depth', 'lighting']
     
     def prepare_check_export(self, scene_export_path: Path):
         if scene_export_path.exists():
@@ -98,7 +103,8 @@ class exporter_scene():
                     cameras for MonoSDF
                     '''
                     cameras = {}
-                    scale_mat_path = self.os.rendering_root / 'scene_export' / (self.os.scene_name + appendix) / 'scale_mat.npy'
+                    scale_mat_path = self.os.rendering_root / 'EXPORT_monosdf' / (self.os.scene_name + appendix) / 'scale_mat.npy'
+                    scale_mat_path.parent.mkdir(parents=True, exist_ok=True)
                     if split != 'val':
                         poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.os.pose_list]
                         poses = np.array(poses)
@@ -113,7 +119,11 @@ class exporter_scene():
                         scale_mat[:3, 3] = -center
                         scale_mat[:3 ] *= scale 
                         scale_mat = np.linalg.inv(scale_mat)
-                        np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale})
+                        if scale_mat_path.exists() and not self.if_force:
+                            if_overwrite = input(red('scale_mat.npy exists. Overwrite? [y/n]'))
+                            if if_overwrite in ['y', 'Y']:
+                                scale_mat_path.unlink()
+                        np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale}, allow_pickle=True)
                     else:
                         assert scale_mat_path.exists(), 'scale_mat.npy not found in %s'%str(scale_mat_path)
                         scale_mat_dict = np.load(str(scale_mat_path), allow_pickle=True).item()
@@ -121,8 +131,8 @@ class exporter_scene():
                         center = scale_mat_dict['center']
                         scale = scale_mat_dict['scale']
 
-                    cameras['center'] = center
-                    cameras['scale'] = scale
+                    # cameras['center'] = center
+                    # cameras['scale'] = scale
                     for frame_idx, pose in enumerate(self.os.pose_list):
                         if hasattr(self.os, 'K'):
                             K = self.os.K
@@ -140,6 +150,7 @@ class exporter_scene():
                         # cameras['split_%d'%frame_idx] = 'train' if _ < self.frame_num-10 else 'val' # 10 frames for val
                         # cameras['frame_id_%d'%frame_idx] = idx if idx < len(mitsuba_scene_dict['train'].pose_list) else idx-len(mitsuba_scene_dict['train'].pose_list)
                     np.savez(str(scene_export_path / 'cameras.npz'), **cameras)
+                    
                 elif format == 'fvp':
                     '''
                     cameras for fvp; reverse of class_freeviewpointScene3D -> load_poses; dump tp bundle.out
@@ -252,6 +263,76 @@ class exporter_scene():
                     cv2.imwrite(str(im_mask_export_path), (im_mask_export*255).astype(np.uint8))
                     print(blue_text('Mask image (for valid depths) %s exported to: %s'%(frame_id, str(im_mask_export_path))))
             
+            if modality == 'lighting': 
+                outLight_file_list = [_ for _ in self.os.scene_path.iterdir() if _.stem.startswith('outLight')]
+                if len(outLight_file_list) > 0:
+                    print(white_blue('Found %d outLight files at'%len(outLight_file_list)), str(self.os.scene_path))
+                    (scene_export_path / 'lightings').mkdir(parents=True, exist_ok=True)
+                    for outLight_file in outLight_file_list:
+                        root = get_XML_root(str(outLight_file))
+                        root = copy.deepcopy(root)
+                        shapes = root.findall('shape')
+                        assert len(shapes) > 0, 'No shapes found in %s; double check you XML file (e.g. did you miss headings)?'%str(outLight_file)
+                        
+                        for shape in tqdm(shapes):
+                            emitters = shape.findall('emitter')
+                            assert len(emitters) == 1
+                            if shape.get('type') != 'obj':
+                                assert shape.get('type') == 'rectangle'
+                                
+                                transform_item = shape.findall('transform')[0]
+                                transform_accu = np.eye(4, dtype=np.float32)
+                                
+                                if len(transform_item.findall('rotate')) > 0:
+                                    rotate_item = transform_item.findall('rotate')[0]
+                                    _r_h = xml_rotation_to_matrix_homo(rotate_item)
+                                    transform_accu = _r_h @ transform_accu
+                                    
+                                if len(transform_item.findall('matrix')) > 0:
+                                    _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
+                                    transform_matrix = np.array(_transform).reshape(4, 4).astype(np.float32)
+                                    transform_accu = transform_matrix @ transform_accu # [[R,t], [0,0,0,1]]
+                        
+                                (_vertices, _faces) = get_rectangle_mesh(transform_accu[:3, :3], transform_accu[:3, 3:4])
+                                light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_faces-1)
+                                light_mesh_path = scene_export_path / 'lightings' / (outLight_file.stem + '_mesh.obj')
+                                light_trimesh.export(str(light_mesh_path))
+                                
+                                # print(transform_m)
+                                if self.os.extra_transform is not None:
+                                    transform_matrix = self.os.extra_transform_homo @ transform_matrix
+                                _transform_matrix_new = ' '.join(['%f'%_ for _ in transform_matrix.reshape(-1)])
+                                shape.findall('transform')[0].findall('matrix')[0].set('value', _transform_matrix_new)
+                                
+                                # write another *_scale.txt, and set emitter max radiance to 1.
+                                assert len(shape.findall('emitter')) == 1
+                                assert shape.findall('emitter')[0].get('type') == 'area'
+                                _rad_item = shape.findall('emitter')[0].findall('rgb')[0]
+                                assert _rad_item.get('name') == 'radiance'
+                                _rad = [float(_) for _ in _rad_item.get('value').split(', ')]
+                                assert len(_rad) == 3
+                                _rad_max = max(_rad)
+                                _rad_item.set('value', ' '.join(['%.2f'%(_/(_rad_max+1e-6)) for _ in _rad]))
+                                
+                                xmlString = transformToXml(root)
+                                xml_filepath = scene_export_path / 'lightings' / outLight_file.name
+                                (scene_export_path / xml_filepath).parent.mkdir(parents=True, exist_ok=True)
+                                with open(str(xml_filepath), 'w') as xmlOut:
+                                    xmlOut.write(xmlString)
+                                
+                                txt_filepath = scene_export_path / 'lightings' / (outLight_file.stem + '_scale.txt')
+                                with open(str(txt_filepath), 'w') as txtOut:
+                                    txtOut.write('%.2f'%(_rad_max))
+                                
+                                print(blue_text('lighting exported to: %s'%str(xml_filepath)))
+                            else:
+                                assert False, 'todo: deal with obj emitter'
+                                if not len(shape.findall('string')) > 0: continue
+                                filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
+                                obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
+                                shape_trimesh = trimesh.load_mesh(str(obj_path), process=False, maintain_order=True)
+                                vertices, faces = np.array(shape_trimesh.vertices), np.array(shape_trimesh.faces)+1
+
             if modality == 'shapes': 
                 assert self.os.if_loaded_shapes, 'shapes not loaded'
                 # T_list_ = [(None, '')]
@@ -284,11 +365,11 @@ class exporter_scene():
                 print('-->', shape_tri_mesh.faces[19531])
                 print(white_blue('Shape exported to: %s'%str(shape_export_path)))
                 if not shape_tri_mesh.is_watertight:
-                    shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
-                    # slightly expand the convex hull to avoid overlap faces -> flickering in Meshlab
-                    _v = shape_tri_mesh_convex.vertices
+                    # slightly expand the shape to get bigger convex hull to avoid overlap faces -> flickering in Meshlab
+                    _v = shape_tri_mesh.vertices
                     _v_mean = np.mean(_v, axis=0, keepdims=True)
-                    shape_tri_mesh_convex = trimesh.Trimesh(vertices=(_v - _v_mean) * 1.001 + _v_mean, faces=shape_tri_mesh_convex.faces)
+                    shape_tri_mesh_tmp = trimesh.Trimesh(vertices=(_v - _v_mean) * 1.1 + _v_mean, faces=shape_tri_mesh.faces)
+                    shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh_tmp)
                     
                     shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull%s.obj'%(shape_export_path.stem, appendix))))
                     
@@ -303,7 +384,7 @@ class exporter_scene():
                         with open(str(scene_export_path / 'scale.txt'), 'w') as camOut:
                             camOut.write('%.4f'%scene_scale)
                         # overwrite the original mesh
-                        # print(red('Overwriting with mehs + hull: %s'%str(shape_export_path)))
+                        print(red('Overwriting with mehs + hull: %s'%str(shape_export_path)))
                         shape_tri_mesh_fixed.export(str(shape_export_path))
                     else:
                         raise NotImplementedError

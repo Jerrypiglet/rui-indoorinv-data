@@ -85,6 +85,7 @@ python test_class_freeviewpointScene3D.py --export True --export_format fvp --vi
 
 TODO:
 - [ ] add option to resize all frames to same dimension
+- [ ] check why kitchen -> scene_subdiv.obj breaks when looking for lights in fvp code
 - [ ] pad to same size (even numbers in H, W)
 - [x] fix holes on the wall
   
@@ -157,9 +158,9 @@ Export to fvp (free-viewpoint) format (e.g. train + val splits):
 
 ``` bash
 python test_class_mitsubaScene3D.py --export True --export_format fvp --vis_3d_o3d False --force --vis_2d_plt False --split val --eval_scene
-``
+```
 
-# Need to transform to z+ up:
-# ``` bash
-# mitsubaScene3D(scene_params_dict={'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32),  # z=y, y=x, x=z
+Need to transform to z+ up:
+``` bash
+mitsubaScene3D(scene_params_dict={'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32),  # z=y, y=x, x=z
 ```

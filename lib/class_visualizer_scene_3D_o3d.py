@@ -26,6 +26,7 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_monosdfScene3D import monosdfScene3D
 from lib.class_freeviewpointScene3D import freeviewpointScene3D
 from lib.class_matterportScene3D import matterportScene3D
+from lib.class_realScene3D import realScene3D
 
 from lib.utils_misc import get_list_of_keys, gen_random_str, yellow, yellow, white_red
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
@@ -52,7 +53,7 @@ class visualizer_scene_3D_o3d(object):
         modality_list_vis: list, 
         if_debug_info: bool=False, 
     ):
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
@@ -327,6 +328,10 @@ class visualizer_scene_3D_o3d(object):
         return pcd_color
         
     def collect_cameras(self, cam_params: dict={}):
+        '''
+        highlight first cam frustrm with blue!
+        highlight last cam frustrm with red!
+        '''
         if not self.os.if_has_poses: 
             print(yellow('[%s] No poses found in scene_object! Did you include \'poses\' in modality_list of scene_obj?'%str(self.__class__.__name__))); return []
 
@@ -382,9 +387,9 @@ class visualizer_scene_3D_o3d(object):
             # cam_color = [0.5, 0.5, 0.5]
             cam_color = [0., 0., 0.] # default: black
             if cam_idx == 0:
-                cam_color = [0., 0., 1.] # highlight first cam frustrm with blue
+                cam_color = [0., 0., 1.] # highlight first cam frustrm with blue!
             elif cam_idx == len(cam_list)-1:
-                cam_color = [1., 0., 0.] # highlight last cam frustrm with red
+                cam_color = [1., 0., 0.] # highlight last cam frustrm with red!
 
             cam_frustrm = o3d.geometry.LineSet()
             cam_frustrm.points = o3d.utility.Vector3dVector(cam)
@@ -679,6 +684,15 @@ class visualizer_scene_3D_o3d(object):
 
         return return_list + [layout_bbox_pcd]
 
+    def collect_pcd(self, shape_params: dict={}):
+        assert self.os.if_has_pcd
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(self.os.pcd)
+        pcd.colors = o3d.utility.Vector3dVector([[0.5,0.5,0.5]] * self.os.pcd.shape[0])
+
+        return [pcd]
+        
     def collect_shapes(self, shapes_params: dict={}):
         '''
         collect shapes and bboxes for objs + emitters (shapes)
@@ -690,6 +704,9 @@ class visualizer_scene_3D_o3d(object):
 
         images/demo_shapes_emitter_o3d.png
         '''
+        if (not self.os.if_has_shapes) and self.os.if_has_pcd:
+            return self.collect_pcd(shape_params=shapes_params)
+        
         assert self.os.if_has_shapes
 
         if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_obj_mesh', True)
@@ -1006,6 +1023,8 @@ class visualizer_scene_3D_o3d(object):
 
         if if_cam_rays: 
             for frame_idx, (rays_o, rays_d, _) in enumerate(self.os.cam_rays_list[:2]): # show only first frame
+                assert rays_o.shape[0] == rays_d.shape[0]
+                assert len(rays_o.shape) == 3, 'should be rays in 2D, not 1D'
                 rays_of_a_view = o3d.geometry.LineSet()
 
                 if cam_rays_if_pts:
@@ -1013,7 +1032,7 @@ class visualizer_scene_3D_o3d(object):
                     rays_t_flatten = ret.t.numpy()[::cam_rays_subsample][:, np.newaxis]
                     rays_t_flatten[rays_t_flatten==np.inf] = 0.
                 else:
-                    rays_t_flatten = np.ones((rays_o.shape[0], 1), dtype=np.float32)
+                    rays_t_flatten = np.ones((prod(rays_o.shape[:2]), 1), dtype=np.float32)[::cam_rays_subsample] * 3.
 
                 rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3)[::cam_rays_subsample], rays_d.reshape(-1, 3)[::cam_rays_subsample]
 

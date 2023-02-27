@@ -16,7 +16,7 @@ MONOSDF_ROOT = MONOSDF_ROOT_dict[host]
 from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
-from lib.utils_misc import str2bool, white_magenta
+from lib.utils_misc import red, str2bool, white_magenta
 import argparse
 
 from lib.class_mitsubaScene3D import mitsubaScene3D
@@ -84,31 +84,32 @@ xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 # intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
 # xml_filename = 'scene_v3.xml'
-xml_filename = 'test.xml'
+# xml_filename = 'test.xml'
+xml_filename = 'test-relight.xml'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 shape_file = ''
 
 frame_ids = []
 invalid_frame_id_list = []
 
-scene_name = 'kitchen_new'; 
+# scene_name = 'kitchen_new'; 
+# shape_file = 'data/indoor_synthetic/kitchen_new/scene_subdiv.obj'
 # shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
-# shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230226-021300-mm3-EVAL-20230225-135237kitchen_NEW_HDR_grids_trainval'
-# frame_ids = [204, 205, 206, 207, 208]
-# frame_ids = [210, 211, 212, 213, 214]
-# frame_ids = [215, 216, 217, 218, 209]
+# shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230226-021300-mm3-EVAL-20230225-135237kitchen_NEW_HDR_grids_trainval.ply'
 
 # scene_name = 'bedroom'
+# shape_file = 'data/indoor_synthetic/bedroom/scene_subdiv.obj'
 # shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135215-mm1-EVAL-20230219-211718-bedroom_HDR_grids_trainval.ply'
 
 # scene_name = 'bathroom'
 # shape_file = 'data/indoor_synthetic/bathroom/scene.obj'
+# shape_file = 'data/indoor_synthetic/bathroom/scene_subdiv.obj'
 
-# scene_name = 'bathroom'
-# scene_name = 'livingroom'
-
-# shape_file = 'data/indoor_synthetic/EXPORT_fvp/kitchen_new_small/val/meshes/recon.obj'
+scene_name = 'livingroom'
+# shape_file = 'data/indoor_synthetic/livingroom/scene.obj'
+# shape_file = 'data/indoor_synthetic/livingroom/scene_subdiv.obj'
+shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135959-mm1-EVAL-20230219-211728-livingroom_HDR_grids_trainval.ply'
 
 # scene_name = 'kitchen-resize'
 # scene_name = 'kitchen'
@@ -128,7 +129,7 @@ scene_name = 'kitchen_new';
 # frame_ids = list(range(0, 202, 40))
 # frame_ids = list(range(0, 4, 1))
 # frame_ids = list(range(197))
-# frame_ids = [0]
+frame_ids = [0]
 # frame_ids = list(range(189))
 
 '''
@@ -161,11 +162,11 @@ scene_obj = mitsubaScene3D(
         'xml_filename': xml_filename, 
         'scene_name': scene_name, 
         'split': opt.split, # train, val, train+val
-        'frame_id_list': frame_ids, 
+        # 'frame_id_list': frame_ids, 
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
         'axis_up': 'y+', 
-        # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
+        'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
@@ -432,37 +433,40 @@ if opt.eval_monosdf:
 Evaluator for scene
 '''
 if opt.eval_scene:
-    evaluator_scene = evaluator_scene_scene(
-        host=host, 
-        scene_object=scene_obj, 
-    )
+    if 'scene' not in shape_file:
+        print(red('Skipped fkipping for est geometry'))
+    else:
+        evaluator_scene = evaluator_scene_scene(
+            host=host, 
+            scene_object=scene_obj, 
+        )
 
-    '''
-    sample visivility to camera centers on vertices
-    [!!!] set 'mesh_color_type': 'eval-vis_count'
-    '''
-    _ = evaluator_scene.sample_shapes(
-        sample_type='vis_count', # ['']
-        # sample_type='t', # ['']
-        # sample_type='face_normal', # ['']
-        shape_params={
-        }
-    )
-    for k, v in _.items():
-        if k in eval_return_dict:
-            eval_return_dict[k].update(_[k])
-        else:
-            eval_return_dict[k] = _[k]
-            
-    if 'face_normals_flipped_mask' in eval_return_dict and opt.export:
-        face_normals_flipped_mask = eval_return_dict['face_normals_flipped_mask']
-        assert face_normals_flipped_mask.shape[0] == scene_obj.faces_list[0].shape[0]
-        if np.sum(face_normals_flipped_mask) > 0:
-            validate_idx = np.where(face_normals_flipped_mask)[0][0]
-            print(validate_idx, scene_obj.faces_list[0][validate_idx])
-            scene_obj.faces_list[0][face_normals_flipped_mask] = scene_obj.faces_list[0][face_normals_flipped_mask][:, [0, 2, 1]]
-            print(white_magenta('[FLIPPED] %d/%d inward face normals'%(np.sum(face_normals_flipped_mask), scene_obj.faces_list[0].shape[0])))
-            print(validate_idx, '->', scene_obj.faces_list[0][validate_idx])
+        '''
+        sample visivility to camera centers on vertices
+        [!!!] set 'mesh_color_type': 'eval-vis_count'
+        '''
+        _ = evaluator_scene.sample_shapes(
+            # sample_type='vis_count', # ['']
+            # sample_type='t', # ['']
+            sample_type='face_normal', # ['']
+            shape_params={
+            }
+        )
+        for k, v in _.items():
+            if k in eval_return_dict:
+                eval_return_dict[k].update(_[k])
+            else:
+                eval_return_dict[k] = _[k]
+                
+        if 'face_normals_flipped_mask' in eval_return_dict and opt.export:
+            face_normals_flipped_mask = eval_return_dict['face_normals_flipped_mask']
+            assert face_normals_flipped_mask.shape[0] == scene_obj.faces_list[0].shape[0]
+            if np.sum(face_normals_flipped_mask) > 0:
+                validate_idx = np.where(face_normals_flipped_mask)[0][0]
+                print(validate_idx, scene_obj.faces_list[0][validate_idx])
+                scene_obj.faces_list[0][face_normals_flipped_mask] = scene_obj.faces_list[0][face_normals_flipped_mask][:, [0, 2, 1]]
+                print(white_magenta('[FLIPPED] %d/%d inward face normals'%(np.sum(face_normals_flipped_mask), scene_obj.faces_list[0].shape[0])))
+                print(validate_idx, '->', scene_obj.faces_list[0][validate_idx])
 
 if opt.export:
     from lib.class_exporter import exporter_scene
@@ -495,10 +499,11 @@ if opt.export:
             format='fvp',
             modality_list = [
                 'poses', 
-                # 'im_hdr', 
-                # 'im_sdr', 
-                # 'im_mask', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
                 'shapes', 
+                'lighting', # new lights
                 ], 
             appendix=opt.export_appendix, 
         )
@@ -539,8 +544,8 @@ if opt.vis_2d_plt:
             # 'seg_area', 'seg_env', 'seg_obj', 
             # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
-        frame_idx_list=[0, 1, 2, 3, 4], 
-        # frame_idx_list=[0], 
+        # frame_idx_list=[0, 1, 2, 3, 4], 
+        frame_idx_list=[0], 
         # frame_idx_list=[6, 10, 12], 
     )
     if opt.if_add_est_from_eval:
@@ -672,7 +677,7 @@ if opt.vis_3d_o3d:
             # 'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
             # 'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
-            'if_cam_rays': False, 
+            'if_cam_rays': True, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             

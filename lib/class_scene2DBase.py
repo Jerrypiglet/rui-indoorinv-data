@@ -210,7 +210,11 @@ class scene2DBase():
             filename = self.modality_filename_dict['im_sdr']
             self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path_list[frame_idx] / (filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
 
-        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
+        if 'im_H_load_sdr' in self.im_params_dict:
+            # separate H, W for loading SDR images
+            expected_shape_list = [(self.im_params_dict['im_H_load_sdr'], self.im_params_dict['im_W_load_sdr'], 3,)]*self.frame_num
+        else:
+            expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_sdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_sdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop)/255. for _, __ in zip(self.modality_file_list_dict['im_sdr'], expected_shape_list)]
 
         # print(self.modality_file_list_dict['im_sdr'])
@@ -228,7 +232,11 @@ class scene2DBase():
             filename = self.modality_filename_dict['im_hdr']
             self.modality_file_list_dict['im_hdr'] = [self.scene_rendering_path_list[frame_idx] / (filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
 
-        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
+        if 'im_H_load_hdr' in self.im_params_dict:
+            # separate H, W for loading HDR images
+            expected_shape_list = [(self.im_params_dict['im_H_load_hdr'], self.im_params_dict['im_W_load_hdr'], 3,)]*self.frame_num
+        else:
+            expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_hdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_hdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop) for _, __ in zip(self.modality_file_list_dict['im_hdr'], expected_shape_list)]
         hdr_radiance_scale = self.im_params_dict.get('hdr_radiance_scale', 1.)
         self.hdr_scale_list = [hdr_radiance_scale] * len(self.im_hdr_list)

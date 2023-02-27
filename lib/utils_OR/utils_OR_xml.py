@@ -10,10 +10,21 @@ from xml.dom import minidom
 
 import xml.etree.ElementTree as et
 from xml.dom import minidom
+from scipy.spatial.transform import Rotation
 
 from .utils_OR_mesh import loadMesh, computeBox, computeTransform, writeMesh
 from .utils_OR_transform import transform_with_transforms_xml_list
 
+def xml_rotation_to_matrix_homo(rotate_item):
+    _angle = float(rotate_item.get('angle'))
+    _axis_key = [_ for _ in rotate_item.keys() if _ in ['x', 'y', 'z']]
+    assert len(_axis_key) == 1, 'support only one rotation axis for now'
+    _axis = {'x': np.array([1., 0., 0.]), 'y': np.array([0., 1., 0.]), 'z': np.array([0., 0., 1.])}[_axis_key[0]]
+    _r = Rotation.from_rotvec(_angle * _axis, degrees=True).as_matrix()
+    _r_h = np.eye(4, dtype=np.float32)
+    _r_h[:3, :3] = _r
+    
+    return _r_h
 
 def get_XML_root(main_xml_file):
     # L202 of sampleCameraPoseFromScanNet.py
@@ -295,16 +306,6 @@ def parse_XML_for_shapes_global(root, root_uv_mapped, root_layoutMesh, scene_xml
         return shapes_list, emitters_list
     else:
         return shapes_list
-
-def transformToXml(root):
-    rstring = et.tostring(root, 'utf-8')
-    pstring = minidom.parseString(rstring)
-    xmlString = pstring.toprettyxml(indent="    ")
-    xmlString = xmlString.split('\n')
-    xmlString = [x for x in xmlString if len(x.strip()) != 0]
-    xmlString = '\n'.join(xmlString)
-    return xmlString
-
 
 # sys.path.insert(0, '/home/ruizhu/Documents/Projects/Total3DUnderstanding')
 # root_uv_mapped = Path('/newfoundland2/ruizhu/siggraphasia20dataset/uv_mapped')
