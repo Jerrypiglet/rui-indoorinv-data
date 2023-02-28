@@ -148,13 +148,13 @@ TODO:
 python test_class_mitsubaScene3D.py --vis_2d_plt False --export_scene --vis_3d_o3d False --split train # (or val; but train first)
 ```
 
-Export to LiECCV22 format:
+[1] Export to LiECCV22 format:
 
 ``` bash
 python test_class_mitsubaScene3D.py --vis_3d_o3d False --export True --export_format lieccv22 --split val --force True
 ```
 
-Export to fvp (free-viewpoint) format (e.g. train + val splits):
+[2] Export to fvp (free-viewpoint) format (e.g. train + val splits):
 
 ``` bash
 python test_class_mitsubaScene3D.py --export True --export_format fvp --vis_3d_o3d False --force --vis_2d_plt False --split val --eval_scene
@@ -165,7 +165,7 @@ Need to transform to z+ up:
 mitsubaScene3D(scene_params_dict={'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32),  # z=y, y=x, x=z
 ```
 
-Export GT subdiv mesh with flipped normals:
+[3] Export GT subdiv mesh with flipped normals:
 
 ``` bash
 python _export_test_class_mitsubaScene3D_fixmesh.py --export True --export_format fvp --vis_3d_o3d True --vis_2d_plt False --split train --eval_scene --export_appendix _resample --if_sample_poses True
@@ -173,3 +173,4 @@ python _export_test_class_mitsubaScene3D_fixmesh.py --export True --export_forma
 
 TODO:
 - [ ] auto generate new light xml files (e..g outLight0.xml)
+- [ ] merge stuff in exporter between lieccv22 and fvp

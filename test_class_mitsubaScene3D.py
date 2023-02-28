@@ -88,7 +88,7 @@ xml_filename = 'test.xml'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 shape_file = ''
 
-frame_ids = []
+frame_ids = [8]
 invalid_frame_id_list = []
 
 # scene_name = 'kitchen_new'; 
@@ -515,11 +515,13 @@ if opt.export:
             'im_sdr', 
             'mi_seg', 
             'mi_depth', 
+            'lighting', 
             ], 
             split=opt.split, 
             assert_shape=(240, 320),
             window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
             merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+            BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000', # transfer this back once get BRDF results
             # center_crop_HW=(240, 320), 
             if_no_gt_appendix=True, # do not append '_gt' to the end of the file name
         )

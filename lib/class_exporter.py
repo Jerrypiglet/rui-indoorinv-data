@@ -315,7 +315,6 @@ class exporter_scene():
                             
                             # [TODO] dump mesh obj file as well so that fvp can access it. And change to abs path in outLight XML.
                             
-                            # print(transform_m)
                             if self.os.extra_transform is not None:
                                 transform_matrix = self.os.extra_transform_homo @ transform_matrix
                             _transform_matrix_new = ' '.join(['%f'%_ for _ in transform_matrix.reshape(-1)])
@@ -408,7 +407,18 @@ class exporter_scene():
                     if if_fixed_water_tight:
                         print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
 
-    def export_lieccv22(self, modality_list=[], appendix='', split='', center_crop_HW=None, assert_shape=None, window_area_emitter_id_list: list=[], merge_lamp_id_list: list=[], if_no_gt_appendix: bool=False):
+    def export_lieccv22(
+        self, 
+        modality_list=[], 
+        appendix='', 
+        split='', 
+        center_crop_HW=None, 
+        assert_shape=None, 
+        window_area_emitter_id_list: list=[], 
+        merge_lamp_id_list: list=[], 
+        if_no_gt_appendix: bool=False, 
+        BRDF_results_folder: str=None,
+        ):
         '''
         export lieccv22 scene to Zhengqin's ECCV'22 format
         
@@ -467,24 +477,31 @@ class exporter_scene():
                     mi_depth_vis_export_path = frame_export_path / ('depth_gt.png' if not if_no_gt_appendix else 'depth.png')
                     mi_depth = self.os.mi_depth_list[frame_idx].squeeze()
                     
-                    valid_depth_mask = ~self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()
                     # normalize, following Zhengqin
-                    mi_depth_min = np.amin(mi_depth[valid_depth_mask])
-                    mi_depth_max = np.amax(mi_depth[valid_depth_mask])
-                    mi_depth_normalized = (mi_depth - mi_depth_min) / (mi_depth_max - mi_depth_min)
-                    mi_depth_normalized = np.clip(mi_depth_normalized, 0, 1)
-                    
+                    # _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
+                    _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
+                    prediction = 1./(mi_depth.copy()+1e-6)
+                    prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
+                    predictionMin = (prediction + _mask * 1e6).min()
+                    predictionMax = (prediction - _mask * 1e6).max()
+
+                    prediction = (prediction - predictionMin ) \
+                        / (predictionMax - predictionMin )
+                    prediction = np.clip(prediction, 0, 1)
+
                     offset = 0.189
                     scale = 0.515
-                    mi_depth_normalized_out = 1 / (scale * mi_depth_normalized + offset)
-                    mi_depth_normalized_out = mi_depth_normalized_out * (1 - valid_depth_mask.astype(np.float32)) + valid_depth_mask.astype(np.float32) * (1.420 + 3.869)
+                    prediction = 1 / (scale * prediction + offset)
+                    prediction = prediction * (1 - _mask ) + _mask * (1.420 + 3.869 )
+                    print(np.amax(prediction), np.amin(prediction))
 
-                    mi_depth_normalized_out_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
-                    mi_depth_normalized_out = center_crop(mi_depth_normalized_out, center_crop_HW)
-                    np.save(str(mi_depth_normalized_out_npy_export_path), mi_depth_normalized_out)
-                    print(blue_text('depth (npy) exported to: %s'%(str(mi_depth_normalized_out_npy_export_path))))
+                    prediction_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
+                    prediction = center_crop(prediction, center_crop_HW)
+                    np.save(str(prediction_npy_export_path), prediction)
+                    print(blue_text('depth (npy) exported to: %s'%(str(prediction_npy_export_path))))
                     
-                    depth_vis_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth_normalized, normalize=False, valid_mask=valid_depth_mask)
+                    # export vis of normalized depth
+                    depth_vis_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=False, valid_mask=~self.os.mi_invalid_depth_mask_list[frame_idx].squeeze())
                     depth_vis_normalized = center_crop(depth_vis_normalized, center_crop_HW)
                     cv2.imwrite(str(mi_depth_vis_export_path), depth_vis_normalized)
                     print(blue_text('depth (vis) exported to: %s'%(str(mi_depth_vis_export_path))))
@@ -541,6 +558,126 @@ class exporter_scene():
                     envMask_export_path = frame_export_path / 'envMask.png'
                     cv2.imwrite(str(envMask_export_path), envMask)
                     print(blue_text('envMask exported to: %s'%(str(envMask_export_path))))
+                    
+                if modality == 'lighting':
+                    outLight_file_list = [_ for _ in self.os.scene_path.iterdir() if _.stem.startswith('outLight')]
+                    assert len(outLight_file_list) > 0, 'No outLight files found at %s'%str(self.os.scene_path)
+                    print(white_blue('Found %d outLight files at'%len(outLight_file_list)), str(self.os.scene_path))
+                    
+                    BRDF_results_path = frame_export_path.parent / BRDF_results_folder
+                    if not BRDF_results_path.exists():
+                        print(red('BRDF_results_path does not exist: %s, skipping lighting export'%str(BRDF_results_path)))
+                        continue
+                    
+                    for outLight_file_idx, outLight_file in tqdm(enumerate(outLight_file_list)):
+                        root = get_XML_root(str(outLight_file))
+                        root = copy.deepcopy(root)
+                        shapes = root.findall('shape')
+                        # assert len(shapes) > 0, 'No shapes found in %s; double check you XML file (e.g. did you miss headings)?'%str(outLight_file)
+                        assert len(shapes) == 1 # one new lamp each XML file for now
+                        
+                        for shape in tqdm(shapes):
+                            emitters = shape.findall('emitter')
+                            assert len(emitters) == 1
+                            # if shape.get('type') != 'obj':
+                            assert shape.get('type') in ['obj', 'rectangle']
+                            #     assert shape.get('type') == 'rectangle'
+                                
+                            transform_item = shape.findall('transform')[0]
+                            transform_accu = np.eye(4, dtype=np.float32)
+                            
+                            if len(transform_item.findall('rotate')) > 0:
+                                rotate_item = transform_item.findall('rotate')[0]
+                                _r_h = xml_rotation_to_matrix_homo(rotate_item)
+                                transform_accu = _r_h @ transform_accu
+                                
+                            if len(transform_item.findall('matrix')) > 0:
+                                _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
+                                transform_matrix = np.array(_transform).reshape(4, 4).astype(np.float32)
+                                transform_accu = transform_matrix @ transform_accu # [[R,t], [0,0,0,1]]
+
+                            assert self.os.extra_transform is None
+                            # transform_accu = self.os.extra_transform_homo @ transform_accu
+                                
+                            if shape.get('type') == 'rectangle':
+                                (_vertices, _faces) = get_rectangle_mesh(transform_accu[:3, :3], transform_accu[:3, 3:4])
+                                _faces -= 1
+                                # light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_faces-1)
+                            elif shape.get('type') == 'obj':
+                                light_mesh_path = self.os.scene_path / shape.findall('string')[0].get('value')
+                                assert light_mesh_path.exists()
+                                light_mesh = trimesh.load_mesh(str(light_mesh_path))
+                                _vertices, _faces = light_mesh.vertices, light_mesh.faces
+                                _vertices = (transform_accu[:3, :3] @ _vertices.T + transform_accu[:3, 3:4]).T
+                                # light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_faces)
+                            
+                            pose = self.os.pose_list[frame_idx]
+                            _R, _t = pose[:3, :3], pose[:3, 3:4]
+                            _vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_vertices.T  - _t)).T
+                            offset = 0.189
+                            scale = 0.515
+                            # _vertices_cam_center_depth = -np.mean(_vertices_cam, axis=0)[-1]
+                            # assert np.amin(_vertices_cam_center_depth) > 0.
+                            # _vertices_cam_center_depth_inv = 1. / _vertices_cam_center_depth
+                            _vertices_cam_depth = -_vertices_cam[:, -1]
+                            assert np.amin(_vertices_cam_depth) > 0.
+                            _vertices_cam_depth_inv = 1. / _vertices_cam_depth
+
+                            _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
+                            prediction = 1./(mi_depth.copy()+1e-6)
+                            prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
+                            predictionMin = (prediction + _mask * 1e6).min()
+                            predictionMax = (prediction - _mask * 1e6).max()
+                            # _vertices_cam_center_depth_inv = (_vertices_cam_center_depth_inv - predictionMin ) / (predictionMax - predictionMin )
+                            _vertices_cam_depth_inv = (_vertices_cam_depth_inv - predictionMin ) / (predictionMax - predictionMin )
+                            
+                            # _vertices_cam_center_depth_new = 1./(scale * _vertices_cam_center_depth_inv + offset)
+                            # _vertices_cam_center = np.mean(_vertices_cam, axis=0, keepdims=True).reshape(3, 1)
+                            # _vertices_cam_center_dir = _vertices_cam_center / _vertices_cam_center[-1, 0]
+                            # _vertices_cam_center_new = - _vertices_cam_center_dir * _vertices_cam_center_depth_new
+                            # _vertices_cam_new = _vertices_cam - np.mean(_vertices_cam, axis=0, keepdims=True) + _vertices_cam_center_new.reshape((1, 3))
+
+                            _vertices_cam_depth_new = 1./(scale * _vertices_cam_depth_inv + offset)
+                            _vertices_cam_dir = _vertices_cam / _vertices_cam[:, 2:3]
+                            _vertices_cam_new = - _vertices_cam_dir * _vertices_cam_depth_new.reshape(-1, 1)
+
+                            light_trimesh = trimesh.Trimesh(vertices=_vertices_cam_new, faces=_faces)
+                            light_mesh_path = frame_export_path / ('visLamp_%d.obj'%outLight_file_idx)
+                            light_trimesh.export(str(light_mesh_path))
+                            
+                            print(blue_text('NEW light mesh exported to: %s'%str(light_mesh_path)))
+                            
+                            continue
+                            
+                            # [TODO] dump original mesh obj file as well so that fvp can access it in outLight*.xml. And change to abs path in outLight XML.
+                            
+                            if self.os.extra_transform is not None:
+                                transform_matrix = self.os.extra_transform_homo @ transform_matrix
+                            _transform_matrix_new = ' '.join(['%f'%_ for _ in transform_matrix.reshape(-1)])
+                            shape.findall('transform')[0].findall('matrix')[0].set('value', _transform_matrix_new)
+                            
+                            # write another *_scale.txt, and set emitter max radiance to 1.
+                            assert len(shape.findall('emitter')) == 1
+                            assert shape.findall('emitter')[0].get('type') == 'area'
+                            _rad_item = shape.findall('emitter')[0].findall('rgb')[0]
+                            assert _rad_item.get('name') == 'radiance'
+                            _rad = [float(_) for _ in _rad_item.get('value').split(',')]
+                            assert len(_rad) == 3
+                            _rad_max = max(_rad)
+                            _rad_item.set('value', ' '.join(['%.2f'%(_/(_rad_max+1e-6)) for _ in _rad]))
+                            
+                            xmlString = transformToXml(root)
+                            xml_filepath = scene_export_path / 'lightings' / outLight_file.name
+                            (scene_export_path / xml_filepath).parent.mkdir(parents=True, exist_ok=True)
+                            with open(str(xml_filepath), 'w') as xmlOut:
+                                xmlOut.write(xmlString)
+                            
+                            txt_filepath = scene_export_path / 'lightings' / (outLight_file.stem + '_scale.txt')
+                            with open(str(txt_filepath), 'w') as txtOut:
+                                txtOut.write('%.2f'%(_rad_max))
+                            
+                            print(blue_text('lighting exported to: %s'%str(xml_filepath)))
+
                         
         frame_list_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / 'testList.txt'
         with open(str(frame_list_export_path), 'w') as camOut:
