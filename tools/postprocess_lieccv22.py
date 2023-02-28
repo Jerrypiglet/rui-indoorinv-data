@@ -7,8 +7,8 @@ sys.path.insert(0, str(ROOT_PATH))
 
 from lib.utils_io import center_crop
 
-# test_list_path = ROOT_PATH / 'data/indoor_synthetic/lieccv22_export/val/testList.txt'
-test_list_path = ROOT_PATH / 'data/indoor_synthetic/lieccv22_export/train_gtDepth/testList.txt'
+# test_list_path = ROOT_PATH / 'data/indoor_synthetic/EXPORT_lieccv22/val/testList.txt'
+test_list_path = ROOT_PATH / 'data/indoor_synthetic/EXPORT_lieccv22/train_gtDepth/testList.txt'
 scene_name = 'kitchen'
 assert Path(test_list_path).exists(), str(test_list_path)
 split = test_list_path.parent.stem

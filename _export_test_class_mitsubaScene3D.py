@@ -97,8 +97,9 @@ invalid_frame_id_list = []
 # shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230226-021300-mm3-EVAL-20230225-135237kitchen_NEW_HDR_grids_trainval.ply'
 
-# scene_name = 'bedroom'
-# shape_file = 'data/indoor_synthetic/bedroom/scene_subdiv.obj'
+scene_name = 'bedroom'
+# shape_file = 'data/indoor_synthetic/bedroom/scene_subdiv_large.obj'
+shape_file = 'data/indoor_synthetic/bedroom/scene_subdiv_large.obj'
 # shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135215-mm1-EVAL-20230219-211718-bedroom_HDR_grids_trainval.ply'
 
@@ -106,10 +107,10 @@ invalid_frame_id_list = []
 # shape_file = 'data/indoor_synthetic/bathroom/scene.obj'
 # shape_file = 'data/indoor_synthetic/bathroom/scene_subdiv.obj'
 
-scene_name = 'livingroom'
+# scene_name = 'livingroom'
 # shape_file = 'data/indoor_synthetic/livingroom/scene.obj'
 # shape_file = 'data/indoor_synthetic/livingroom/scene_subdiv.obj'
-shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135959-mm1-EVAL-20230219-211728-livingroom_HDR_grids_trainval.ply'
+# shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135959-mm1-EVAL-20230219-211728-livingroom_HDR_grids_trainval.ply'
 
 # scene_name = 'kitchen-resize'
 # scene_name = 'kitchen'
@@ -236,7 +237,7 @@ scene_obj = mitsubaScene3D(
 
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
+        'sample_pose_num': 00 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
         'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     }, 
     lighting_params_dict={
@@ -261,9 +262,9 @@ scene_obj = mitsubaScene3D(
         'if_simplify_mesh': False,  # default True: simply triangles
         'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
         'simplify_mesh_min': 100, 
-        'simplify_mesh_max': 1000, 
+        'simplify_mesh_max': 100000, 
         'if_remesh': True, # False: images/demo_shapes_3D_kitchen_NO_remesh.png; True: images/demo_shapes_3D_kitchen_YES_remesh.png
-        'remesh_max_edge': 0.15,  
+        'remesh_max_edge': 0.05,  
         
         'if_dump_shape': False, # True to dump fixed shape to obj file
         'if_fix_watertight': False, 

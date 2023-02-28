@@ -91,7 +91,7 @@ shape_file = ''
 frame_ids = []
 invalid_frame_id_list = []
 
-scene_name = 'kitchen_new'; 
+# scene_name = 'kitchen_new'; 
 # shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230226-021300-mm3-EVAL-20230225-135237kitchen_NEW_HDR_grids_trainval'
 # frame_ids = [204, 205, 206, 207, 208]
@@ -110,7 +110,11 @@ scene_name = 'kitchen_new';
 
 # shape_file = 'data/indoor_synthetic/EXPORT_fvp/kitchen_new_small/val/meshes/recon.obj'
 
-# scene_name = 'kitchen-resize'
+'''
+for export to lieccv22
+'''
+scene_name = 'kitchen-resize'
+
 # scene_name = 'kitchen'
 # invalid_frame_id_list = [197]
 # scene_name = 'kitchen_new_400'
@@ -208,12 +212,15 @@ scene_obj = mitsubaScene3D(
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
     }, 
     im_params_dict={
-        'im_H_load': 320, 'im_W_load': 640, 
-        'im_H_resize': 320, 'im_W_resize': 640, 
-        # 'im_H_load': 240, 'im_W_load': 320, 
+        # 'im_H_load': 320, 'im_W_load': 640, 
+        # 'im_H_resize': 320, 'im_W_resize': 640, 
+        
+        'im_H_load': 240, 'im_W_load': 320, 
+        'im_H_resize': 240, 'im_W_resize': 320, 
+        
         # 'im_H_resize': 160, 'im_W_resize': 320, 
+        
         'spp': 4096, 
-        # 'spp': 16, 
         # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
         # 'im_hdr_ext': 'exr', 
         }, 
@@ -506,15 +513,15 @@ if opt.export:
         exporter.export_lieccv22(
             modality_list = [
             'im_sdr', 
-            'mi_depth', 
             'mi_seg', 
+            'mi_depth', 
             ], 
             split=opt.split, 
             assert_shape=(240, 320),
             window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
             merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
             # center_crop_HW=(240, 320), 
-            if_no_gt_appendix=True, 
+            if_no_gt_appendix=True, # do not append '_gt' to the end of the file name
         )
     
 '''

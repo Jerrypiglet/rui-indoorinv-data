@@ -44,6 +44,7 @@ class evaluator_scene_scene():
         sample_type: str='vis_count', 
         hdr_radiance_scale: float=1., 
         shape_params={}, 
+        if_show: bool=True,
         ):
         '''
         sample shape surface for sample_type:
@@ -91,7 +92,7 @@ class evaluator_scene_scene():
                     rgb_sum = np.zeros((vertices.shape[0], 3), dtype=np.float32)
                     rgb_count = np.zeros((vertices.shape[0]), dtype=np.int64)
 
-                print('[Shape %d] Evaluating %d frames...'%(shape_idx, len(self.os.origin_lookatvector_up_list)))
+                print('[Shape %d] Evaluating %d frames...'%(shape_idx, self.os.frame_num))
                 for frame_idx, (origin, _, _) in tqdm(enumerate(self.os.origin_lookatvector_up_list)):
                     visibility_frustum = np.all(((vertices-vis_frustum_centers_list[frame_idx]) @ vis_frustum_normals_list[frame_idx]) > 0, axis=1)
                     # visibility = visibility_frustum

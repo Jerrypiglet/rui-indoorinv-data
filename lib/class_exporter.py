@@ -425,7 +425,7 @@ class exporter_scene():
         if assert_shape is not None:
             assert assert_shape == (self.os.H, self.os.W), 'assert_shape %s not equal to (H, W) %s'%(assert_shape, (self.os.H, self.os.W))
             
-        lamp_dict = {_['id'].replace('emitter-', ''): _ for _ in self.os.lamp_list}
+        lamp_dict = {_['id'].replace('emitter-', ''): _ for _ in self.os.lamp_list if _['emitter_prop']['if_lit_up']} # only lit up lamps
         window_dict = {_['id'].replace('emitter-', ''): _ for _ in self.os.window_list}
         if window_area_emitter_id_list != []:
             for window_area_emitter_id in window_area_emitter_id_list:
@@ -444,7 +444,7 @@ class exporter_scene():
         
         frame_export_path_list = []
         for frame_idx, frame_id in enumerate(self.os.frame_id_list):
-            frame_export_path = self.os.rendering_root / 'lieccv22_export' / split / (self.os.scene_name + '_frame%d'%frame_id + appendix) / 'input'
+            frame_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / (self.os.scene_name + '_frame%d'%frame_id + appendix) / 'input'
             frame_export_path.mkdir(parents=True, exist_ok=True)
             frame_export_path_list.append(frame_export_path)
             
@@ -466,14 +466,28 @@ class exporter_scene():
                     assert self.os.pts_from['mi']
                     mi_depth_vis_export_path = frame_export_path / ('depth_gt.png' if not if_no_gt_appendix else 'depth.png')
                     mi_depth = self.os.mi_depth_list[frame_idx].squeeze()
-                    depth_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.os.mi_invalid_depth_mask_list[0])
-                    depth_normalized = center_crop(depth_normalized, center_crop_HW)
-                    cv2.imwrite(str(mi_depth_vis_export_path), depth_normalized)
+                    
+                    valid_depth_mask = ~self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()
+                    # normalize, following Zhengqin
+                    mi_depth_min = np.amin(mi_depth[valid_depth_mask])
+                    mi_depth_max = np.amax(mi_depth[valid_depth_mask])
+                    mi_depth_normalized = (mi_depth - mi_depth_min) / (mi_depth_max - mi_depth_min)
+                    mi_depth_normalized = np.clip(mi_depth_normalized, 0, 1)
+                    
+                    offset = 0.189
+                    scale = 0.515
+                    mi_depth_normalized_out = 1 / (scale * mi_depth_normalized + offset)
+                    mi_depth_normalized_out = mi_depth_normalized_out * (1 - valid_depth_mask.astype(np.float32)) + valid_depth_mask.astype(np.float32) * (1.420 + 3.869)
+
+                    mi_depth_normalized_out_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
+                    mi_depth_normalized_out = center_crop(mi_depth_normalized_out, center_crop_HW)
+                    np.save(str(mi_depth_normalized_out_npy_export_path), mi_depth_normalized_out)
+                    print(blue_text('depth (npy) exported to: %s'%(str(mi_depth_normalized_out_npy_export_path))))
+                    
+                    depth_vis_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth_normalized, normalize=False, valid_mask=valid_depth_mask)
+                    depth_vis_normalized = center_crop(depth_vis_normalized, center_crop_HW)
+                    cv2.imwrite(str(mi_depth_vis_export_path), depth_vis_normalized)
                     print(blue_text('depth (vis) exported to: %s'%(str(mi_depth_vis_export_path))))
-                    mi_depth_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
-                    mi_depth = center_crop(mi_depth, center_crop_HW)
-                    np.save(str(mi_depth_npy_export_path), mi_depth)
-                    print(blue_text('depth (npy) exported to: %s'%(str(mi_depth_npy_export_path))))
                     
                 if modality == 'mi_seg':
                     assert self.os.pts_from['mi']
@@ -486,9 +500,9 @@ class exporter_scene():
                     '''
                     lampMask_%d.png / windowMask_%d.png
                     '''
-                    # for emitter_dict in [lamp_dict, window_dict]:
+                    for emitter_dict in [lamp_dict, window_dict]:
                     # for emitter_dict in [window_dict]:
-                    for emitter_dict in [lamp_dict]:
+                    # for emitter_dict in [lamp_dict]:
                         for _, (emitter_id, emitter) in enumerate(emitter_dict.items()):
                             emitter_name = 'lamp' if emitter_id in lamp_dict else 'win'
                             emitter_count = 0
@@ -528,9 +542,9 @@ class exporter_scene():
                     cv2.imwrite(str(envMask_export_path), envMask)
                     print(blue_text('envMask exported to: %s'%(str(envMask_export_path))))
                         
-        frame_list_export_path = self.os.rendering_root / 'lieccv22_export' / split / 'testList.txt'
+        frame_list_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / 'testList.txt'
         with open(str(frame_list_export_path), 'w') as camOut:
             for frame_export_path in frame_export_path_list:
-                frame_export_path = (Path('data/kitchen') / frame_export_path.relative_to(self.os.rendering_root / 'lieccv22_export')).parent
+                frame_export_path = (Path('data/kitchen') / frame_export_path.relative_to(self.os.rendering_root / 'EXPORT_lieccv22')).parent
                 camOut.write('%s\n'%(frame_export_path))
         print(white_blue('Exported test list file to: %s'%(str(frame_list_export_path))))

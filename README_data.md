@@ -165,5 +165,11 @@ Need to transform to z+ up:
 mitsubaScene3D(scene_params_dict={'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32),  # z=y, y=x, x=z
 ```
 
+Export GT subdiv mesh with flipped normals:
+
+``` bash
+python _export_test_class_mitsubaScene3D_fixmesh.py --export True --export_format fvp --vis_3d_o3d True --vis_2d_plt False --split train --eval_scene --export_appendix _resample --if_sample_poses True
+```
+
 TODO:
 - [ ] auto generate new light xml files (e..g outLight0.xml)

@@ -39,6 +39,8 @@ class mitsubaBase():
         self.if_loaded_layout = False
 
         self.extra_transform = None
+        self.extra_transform_inv = None
+        self.extra_transform_homo = None
         self.if_center_offset = True # pixel centers are 0.5, 1.5, ..., H-1+0.5
 
         self.if_scale_scene = False
@@ -235,7 +237,7 @@ class mitsubaBase():
 
         print(green_text('DONE. [mi_get_segs] for %d frames...'%len(self.mi_rays_ret_list)))
 
-    def sample_poses(self, sample_pose_num: int, extra_transform: np.ndarray=None, invalid_normal_thres=-1):
+    def sample_poses(self, sample_pose_num: int, extra_transform: np.ndarray=None, invalid_normal_thres=-1, if_dump=True):
         '''
         sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)
         
@@ -259,7 +261,7 @@ class mitsubaBase():
             tmp_folder = self.scene_rendering_path / _tmp_folder
             if tmp_folder.exists():
                 shutil.rmtree(str(tmp_folder))
-        
+                
         origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
             mitsubaScene=self, 
             scene_dict={
@@ -358,7 +360,8 @@ class mitsubaBase():
 
         print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
 
-        dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.cam_params_dict, extra_transform=extra_transform)
+        if if_dump:
+            dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.cam_params_dict, extra_transform=extra_transform)
 
     def load_meta_json_pose(self, pose_file):
         # assert Path(pose_file).exists(), str(pose_file)
@@ -597,11 +600,11 @@ class mitsubaBase():
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
     
-    def load_single_shape(self, shape_params_dict={}, extra_transform=None):
+    def load_single_shape(self, shape_params_dict={}, extra_transform=None, force=False):
         '''
         load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
         '''
-        if self.if_loaded_shapes: return
+        if self.if_loaded_shapes and not force: return
         
         print(white_blue('[%s] load_single_shape for scene...'%self.parent_class_name), yellow('single'))
 

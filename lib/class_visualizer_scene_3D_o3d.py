@@ -339,7 +339,9 @@ class visualizer_scene_3D_o3d(object):
         if_cam_traj = cam_params.get('if_cam_traj', False)
         subsample_cam_rate = cam_params.get('subsample_cam_rate', 1)
         cam_vis_scale = cam_params.get('cam_vis_scale', 1)
-        near, far = self.os.near * cam_vis_scale * 5, self.os.far * cam_vis_scale * 5
+        # near, far = self.os.near * cam_vis_scale * 5, self.os.far * cam_vis_scale * 5
+        near, far = self.os.near, self.os.far
+        
 
         # pose_list = self.os.pose_list
         # origin_lookatvector_up_list = self.os.origin_lookatvector_up_list

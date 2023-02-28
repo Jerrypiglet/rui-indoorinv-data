@@ -151,7 +151,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         if hasattr(self, 'pose_list'): 
             self.get_cam_rays(self.cam_params_dict)
-        self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
+        if self.mi_params_dict.get('process_mi_scene', True):
+            self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
 
     @property
     def frame_num(self):
@@ -284,7 +285,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             #     print(blue_text('XML (lit_up_area_lights_only) for Mitsuba dumped to: %s')%str(xml_file_lit_up_area_lights_only))
             #     self.mi_scene_lit_up_area_lights_only = mi.load_file(str(xml_file_lit_up_area_lights_only))
 
-    def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True):
+    def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True, force=False):
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
             '''
@@ -310,7 +311,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if if_postprocess_mi_frames:
             if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
             if if_sample_rays_pts:
-                self.mi_sample_rays_pts(self.cam_rays_list)
+                self.mi_sample_rays_pts(self.cam_rays_list, if_force=force)
                 self.pts_from['mi'] = True
             
             if_get_segs = mi_params_dict.get('if_get_segs', True)
@@ -353,7 +354,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 # if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(self.load_meta_json_pose(self.pose_file)[1]))))
                 if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(' + '.join([str(pose_file) for pose_file in self.pose_file_list]), _num_poses)))
             if not if_resample in ['N', 'n']:
-                self.sample_poses(cam_params_dict.get('sample_pose_num'), self.extra_transform_inv)
+                self.sample_poses(cam_params_dict.get('sample_pose_num'), self.extra_transform_inv, if_dump=cam_params_dict.get('sample_pose_if_dump', False))
                 return
             # else:
             #     print(yellow('ABORTED resample pose.'))
@@ -643,11 +644,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         print(blue_text('[%s] DONE. load_lighting_envmap'%self.__class__.__name__))
 
-    def load_shapes(self, shape_params_dict={}):
+    def load_shapes(self, shape_params_dict={}, force=False):
         '''
         load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
         '''
-        if self.if_loaded_shapes: return
+        if self.if_loaded_shapes and not force: return
         
         mitsubaBase._prepare_shapes(self)
         
@@ -656,7 +657,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             assert self.extra_transform is None, 'not suported yet'
         elif self.scene_params_dict.get('shape_file', '') != '':
             self.shape_file = self.scene_params_dict['shape_file']
-            self.load_single_shape(shape_params_dict, extra_transform=self.extra_transform)
+            self.load_single_shape(shape_params_dict, extra_transform=self.extra_transform, force=force)
         else:
             if_sample_pts_on_mesh = shape_params_dict.get('if_sample_pts_on_mesh', False)
             sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
@@ -709,7 +710,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         assert emitter.get('type') == 'area'
                         rgb = emitter.findall('rgb')[0]
                         assert rgb.get('name') == 'radiance'
-                        radiance = np.array(rgb.get('value').split(', ')).astype(np.float32).reshape(3,)
+                        radiance = np.array(rgb.get('value').split(',')).astype(np.float32).reshape(3,)
                         if_emitter = True; if_area_light = True
                         # _id = 'emitter-' + _id
                         _id = 'emitter-' + emitter.get('id') if emitter.get('id') is not None else _id
