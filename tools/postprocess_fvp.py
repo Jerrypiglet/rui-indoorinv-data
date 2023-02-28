@@ -13,11 +13,12 @@ sys.path.insert(0, str(ROOT_PATH))
 from lib.utils_io import center_crop
 
 # scene_name = 'indoor_synthetic/bedroom'; appendix = '_est_fullres'
-scene_name = 'indoor_synthetic/bedroom'; appendix = '_gt_fullres'
-split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(208, 208+14)}
+# scene_name = 'indoor_synthetic/bedroom'; appendix = '_gt_fullres'
+# split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(208, 208+14)}
 
 # scene_name = 'indoor_synthetic/kitchen_new'; appendix = '_est_fullres'
-# split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(212, 212+15)}
+scene_name = 'indoor_synthetic/kitchen_new'; appendix = '_gt_fullres'
+split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(212, 212+15)}
 
 # scene_name = 'indoor_synthetic/livingroom'; appendix = '_est_fullres'
 # split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(213, 213+14)}
