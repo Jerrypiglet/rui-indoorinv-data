@@ -16,8 +16,11 @@ from lib.utils_io import center_crop
 # scene_name = 'indoor_synthetic/bedroom'; appendix = '_gt_fullres'
 # split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(208, 208+14)}
 
-scene_name = 'indoor_synthetic/kitchen_new'; appendix = '_est_fullres'
-split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(212, 212+15)}
+# scene_name = 'indoor_synthetic/kitchen_new'; appendix = '_est_fullres'
+# split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(212, 212+15)}
+
+scene_name = 'indoor_synthetic/livingroom'; appendix = '_est_fullres'
+split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(213, 213+14)}
 
 test_root_path = ROOT_PATH / 'data' / scene_name.split('/')[0] / 'RESULTS_fvp' / (scene_name.split('/')[1]+appendix) / split_fvp
 assert Path(test_root_path).exists(), str(test_root_path)

@@ -338,7 +338,8 @@ class visualizer_scene_3D_o3d(object):
         if_cam_axis_only = cam_params.get('if_cam_axis_only', False)
         if_cam_traj = cam_params.get('if_cam_traj', False)
         subsample_cam_rate = cam_params.get('subsample_cam_rate', 1)
-        near, far = self.os.near, self.os.far
+        cam_vis_scale = cam_params.get('cam_vis_scale', 1)
+        near, far = self.os.near * cam_vis_scale * 5, self.os.far * cam_vis_scale * 5
 
         # pose_list = self.os.pose_list
         # origin_lookatvector_up_list = self.os.origin_lookatvector_up_list
@@ -373,10 +374,10 @@ class visualizer_scene_3D_o3d(object):
             cam_d = rays_d[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
             cam_list.append(np.array([cam_o, *(cam_o+cam_d*max(near, far*0.05))]))
 
-            cam_axis = cam_d.mean(0)
+            cam_axis = cam_d.mean(0) * cam_vis_scale
             cam_axis_list.append(np.array([cam_o, cam_o+cam_axis]))
 
-            cam_up = self.os.origin_lookatvector_up_list[cam_idx][2].reshape(-1)
+            cam_up = self.os.origin_lookatvector_up_list[cam_idx][2].reshape(-1) * cam_vis_scale
             cam_up_list.append(np.array([cam_o, cam_o+cam_up]))
         
         # c2w_list = pose_list
@@ -418,7 +419,7 @@ class visualizer_scene_3D_o3d(object):
                     font='/System/Library/Fonts/Helvetica.ttc' if self.os.host=='apple' else '/usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf', 
                     direction=(0., 0., 1.), 
                     degree=270., 
-                    font_size=50, density=3, text_color=tuple([0, 128, 128]))
+                    font_size=int(50*cam_vis_scale), density=3, text_color=tuple([0, 128, 128]))
                 cam_center_list.append(pcd_10)
 
             cam_axis = cam_axis_list[cam_idx]
@@ -1032,7 +1033,7 @@ class visualizer_scene_3D_o3d(object):
                     rays_t_flatten = ret.t.numpy()[::cam_rays_subsample][:, np.newaxis]
                     rays_t_flatten[rays_t_flatten==np.inf] = 0.
                 else:
-                    rays_t_flatten = np.ones((prod(rays_o.shape[:2]), 1), dtype=np.float32)[::cam_rays_subsample] * 3.
+                    rays_t_flatten = np.ones((prod(rays_o.shape[:2]), 1), dtype=np.float32)[::cam_rays_subsample]
 
                 rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3)[::cam_rays_subsample], rays_d.reshape(-1, 3)[::cam_rays_subsample]
 

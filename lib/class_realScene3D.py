@@ -76,9 +76,11 @@ class realScene3D(mitsubaBase, scene2DBase):
             device = self.device, 
         )
 
-        self.scene_name, self.frame_id_list = get_list_of_keys(scene_params_dict, ['scene_name', 'frame_id_list'], [str, list])
+        self.if_rc = scene_params_dict.get('if_rc', False) # True: get results from Reality Capture; False: from Colmap and converted by Mustafa
+        
+        self.scene_name, self.frame_id_list_input = get_list_of_keys(scene_params_dict, ['scene_name', 'frame_id_list'], [str, list])
         self.invalid_frame_id_list = scene_params_dict.get('invalid_frame_id_list', [])
-        self.frame_id_list = [_ for _ in self.frame_id_list if _ not in self.invalid_frame_id_list]
+        self.frame_id_list_input = [_ for _ in self.frame_id_list_input if _ not in self.invalid_frame_id_list]
         
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
         
@@ -93,8 +95,9 @@ class realScene3D(mitsubaBase, scene2DBase):
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
         self.scene_name_full = self.scene_name # e.g. 'main_xml_scene0008_00_more'
 
-        self.pose_format, self.pose_file = scene_params_dict['pose_file']
-        assert self.pose_format in ['json'], 'Unsupported pose file: '+self.pose_file
+        self.pose_format, pose_file = scene_params_dict['pose_file']
+        assert self.pose_format in ['json', 'bundle'], 'Unsupported pose file: '+self.pose_file
+        self.pose_file = self.scene_path / pose_file
 
         self.shape_params_dict = shape_params_dict
         self.mi_params_dict = mi_params_dict
@@ -106,7 +109,7 @@ class realScene3D(mitsubaBase, scene2DBase):
         self.near = cam_params_dict.get('near', 0.1)
         self.far = cam_params_dict.get('far', 10.)
 
-        self.load_meta()
+        self.load_poses()
         self.scene_rendering_path_list = [self.scene_rendering_path] * len(self.frame_id_list
                                                                            )
         ''''
@@ -126,6 +129,28 @@ class realScene3D(mitsubaBase, scene2DBase):
             self.get_cam_rays(self.cam_params_dict)
         self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
 
+        '''
+        normalize poses and pcs
+        '''   
+        if_autoscale_scene = self.scene_params_dict['if_autoscale_scene']     
+        if if_autoscale_scene:
+            print(yellow('Autoscaling scene...'))
+            poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.pose_list]
+            poses = np.array(poses)
+            min_vertices = poses[:, :3, 3].min(axis=0)
+            max_vertices = poses[:, :3, 3].max(axis=0)
+            center = (min_vertices + max_vertices) / 2.
+            scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
+            for pose in self.pose_list: # modify in place
+                pose[:3, 3] = (pose[:3, 3]- center) * scale
+            for (origin, lookatvector, up) in self.origin_lookatvector_up_list:
+                origin = (origin - center.reshape((3, 1))) * scale
+            
+            if self.scene_params_dict.get('pcd_file', '') != '':
+                self.pcd = (self.pcd - center.reshape((1, 3))) * scale
+                self.xyz_max = (self.xyz_max - center.reshape((3,))) * scale
+                self.xyz_min = (self.xyz_min - center.reshape((3,))) * scale
+
     @property
     def frame_num(self):
         return len(self.frame_id_list)
@@ -133,10 +158,6 @@ class realScene3D(mitsubaBase, scene2DBase):
     @property
     def frame_num_all(self):
         return len(self.frame_id_list)
-
-    @property
-    def K_list(self):
-        return [self.K] * self.frame_num
 
     @property
     def valid_modalities(self):
@@ -262,76 +283,129 @@ class realScene3D(mitsubaBase, scene2DBase):
                 assert if_sample_rays_pts
                 self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
                 self.seg_from['mi'] = True
-    
-    def load_meta(self):
-        self.meta_file_path = self.scene_path / 'transforms.json'
-        assert self.meta_file_path.exists(), 'No meta file found: ' + str(self.meta_file_path)
-        
-        with open(str(self.meta_file_path), 'r') as f:
-            meta = json.load(f)
-        
-        # dict_keys(['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model', 'frames'])
-        fl_x, fl_y, cx, cy, w, h, camera_model = get_list_of_keys(meta, ['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model'], [float, float, float, float, int, int, str])
-        assert camera_model == 'OPENCV'
-        assert int(h) == self.im_params_dict['im_H_load']
-        assert int(w) == self.im_params_dict['im_W_load']
-        self.K = np.array([[fl_x, 0, cx], [0, fl_y, cy], [0, 0, 1]], dtype=np.float32)
-        if self.im_W_load != self.W or self.im_H_load != self.H:
-            scale_factor = [t / s for t, s in zip((self.H, self.W), self.im_HW_load)]
-            self.K = resize_intrinsics(self.K, scale_factor)
-            
-        frame_id_list = []
-        pose_list = []
-        origin_lookatvector_up_list = []
-        for idx in range(len(meta['frames'])):
-            file_path = meta['frames'][idx]['file_path']
-            frame_id = int(file_path.split('/')[-1].split('.')[0].replace('img_', ''))
-            frame_id_list.append(frame_id)
-            
-            c2w = np.array(meta['frames'][idx]['transform_matrix']).astype(np.float32)
-            c2w = np.linalg.inv(c2w)
-            c2w[2, :] *= -1
-            c2w = c2w[np.array([1, 0, 2, 3]), :]
-            c2w[0:3, 1:3] *= -1
+                
+    def load_poses(self):
+        print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file))))
 
-            R_, t_ = np.split(c2w[:3], (3,), axis=1)
-            # R = R / np.linalg.norm(R, axis=1, keepdims=True) # somehow R was mistakenly scaled by scale_m2b; need to recover to det(R)=1
-            R = R_; t = t_
-            # R = R_.T
-            # t = -R_.T @ t_
-            # t = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) @ t # OpenGL -> OpenCV
-            # R = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) @ R # OpenGL -> OpenCV
-            # R = np.concatenate([R[:, 1:2], -R[:, 0:1], R[:, 2:]], 1) # [Rui!!] llff specific; done in llff dataloader
-            # R = R @ np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]]) # [Rui] opengl (llff) -> opencv convention
-            pose_list.append(np.hstack((R, t)))
-            assert np.isclose(np.linalg.det(R), 1.0), 'R is not a rotation matrix'
-            
-            origin = t
-            lookatvector = R @ np.array([[0.], [0.], [1.]], dtype=np.float32)
-            up = R @ np.array([[0.], [-1.], [0.]], dtype=np.float32)
-            origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
-            
-            # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
-            # origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
-            
-        assert len(set(frame_id_list)) == len(frame_id_list), 'frame_id_list is not unique'
+        self.pose_list = []
+        self.K_list = []
+        self.origin_lookatvector_up_list = []
         
-        if self.frame_id_list == []:
-            self.frame_id_list = frame_id_list
-            self.pose_list = pose_list
-            self.origin_lookatvector_up_list = origin_lookatvector_up_list
-        else:
-            assert all([frame_id in frame_id_list for frame_id in self.frame_id_list])
-            self.pose_list = [pose_list[frame_id_list.index(frame_id)] for frame_id in self.frame_id_list]
-            self.origin_lookatvector_up_list = [origin_lookatvector_up_list[frame_id_list.index(frame_id)] for frame_id in self.frame_id_list]
-        print(self.frame_id_list)
-        print(self.pose_list)
+        if self.pose_format == 'json':
+            meta_file_path = self.scene_path / 'transforms.json'
+            assert meta_file_path.exists(), 'No meta file found: ' + str(meta_file_path)
+            with open(str(meta_file_path), 'r') as f:
+                meta = json.load(f)
+                
+            self.frame_id_list = []
+            for idx in range(len(meta['frames'])):
+                file_path = meta['frames'][idx]['file_path']
+                frame_id = int(file_path.split('/')[-1].split('.')[0].replace('img_', ''))
+                self.frame_id_list.append(frame_id)
+                
+            # dict_keys(['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model', 'frames'])
+            fl_x, fl_y, cx, cy, w, h, camera_model = get_list_of_keys(meta, ['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model'], [float, float, float, float, int, int, str])
+            assert camera_model == 'OPENCV'
+            assert int(h) == self.im_params_dict['im_H_load']
+            assert int(w) == self.im_params_dict['im_W_load']
+            K = np.array([[fl_x, 0, cx], [0, fl_y, cy], [0, 0, 1]], dtype=np.float32)
+            if self.im_W_load != self.W or self.im_H_load != self.H:
+                scale_factor = [t / s for t, s in zip((self.H, self.W), self.im_HW_load)]
+                K = resize_intrinsics(K, scale_factor)
+            self.K_list.append(K)
+                
+            for frame_idx in range(len(meta['frames'])):
+                c2w = np.array(meta['frames'][frame_idx]['transform_matrix']).astype(np.float32)
+                c2w = np.linalg.inv(c2w)
+                c2w[2, :] *= -1
+                c2w = c2w[np.array([1, 0, 2, 3]), :]
+                c2w[0:3, 1:3] *= -1
+
+                R_, t_ = np.split(c2w[:3], (3,), axis=1)
+                # R = R / np.linalg.norm(R, axis=1, keepdims=True) # somehow R was mistakenly scaled by scale_m2b; need to recover to det(R)=1
+                R = R_; t = t_
+                # R = R_.T
+                # t = -R_.T @ t_
+                # t = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) @ t # OpenGL -> OpenCV
+                # R = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) @ R # OpenGL -> OpenCV
+                # R = np.concatenate([R[:, 1:2], -R[:, 0:1], R[:, 2:]], 1) # [Rui!!] llff specific; done in llff dataloader
+                # R = R @ np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]]) # [Rui] opengl (llff) -> opencv convention
+                self.pose_list.append(np.hstack((R, t)))
+                assert np.isclose(np.linalg.det(R), 1.0), 'R is not a rotation matrix'
+                
+                origin = t
+                lookatvector = R @ np.array([[0.], [0.], [1.]], dtype=np.float32)
+                up = R @ np.array([[0.], [-1.], [0.]], dtype=np.float32)
+                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+                
+                # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
+                # origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+
+        elif self.pose_format in ['bundle']:
+            with open(str(self.pose_file), 'r') as camIn:
+                cam_data = camIn.read().splitlines()
+            
+            with open(str(self.pose_file).replace('_bundle.out', '.csv'), 'r') as csvIn:
+                csv_data = csvIn.read().splitlines()
+            self.frame_id_list = [int(line.split(',')[0].replace('img_', '').replace('.png', '')) for line in csv_data[1:]]
+            assert len(self.frame_id_list) == int(cam_data[1].split(' ')[0])
+            
+            # just double check with lst file
+            with open(str(self.pose_file).replace('_bundle.out', '.lst'), 'r') as lstIn:
+                lst_data = lstIn.read().splitlines()
+            frame_id_list_lst = [int(line.split('\\')[-1].replace('img_', '').replace('.png', '')) for line in lst_data if line != '']
+            assert self.frame_id_list == frame_id_list_lst
+
+            for frame_idx in tqdm(range(len(self.frame_id_list))):
+                cam_lines = cam_data[(2+frame_idx*5):(2+frame_idx*5+5)]
+                f = cam_lines[0].split(' ')[0]
+                if cam_lines[0].split(' ')[1:] != ['0', '0']: # no distortion
+                    import ipdb; ipdb.set_trace()
+                '''
+                laoded R, t are: [1] world-to-camera, [2] OpenGL convention: https://www.cs.cornell.edu/~snavely/bundler/bundler-v0.3-manual.html#S6
+                '''
+                R_lines = [[float(_) for _ in R_line.split(' ')] for R_line in cam_lines[1:4]]
+                R_ = np.array(R_lines).reshape(3, 3)
+                t_line = [float(_) for _ in cam_lines[4].split(' ')]
+                t_ = np.array(t_line).reshape(3, 1)
+                assert np.isclose(np.linalg.det(R_), 1.)
+                R = R_.T
+                t = -R_.T @ t_
+                if self.if_scale_scene:
+                    t = t / self.scene_scale
+                R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
+                self.pose_list.append(np.hstack((R, t)))
+
+                # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
+                # self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+                origin = t
+                lookatvector = R @ np.array([[0.], [0.], [1.]], dtype=np.float32)
+                up = R @ np.array([[0.], [-1.], [0.]], dtype=np.float32)
+                self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+
+                K = np.array([[float(f), 0, self._W(frame_idx)/2.], [0, float(f), self._H(frame_idx)/2.], [0, 0, 1]], dtype=np.float32)
+                self.K_list.append(K)
+                
+        assert len(set(self.frame_id_list)) == len(self.frame_id_list), 'frame_id_list is not unique'
+        
+        if self.frame_id_list_input != []:
+            '''
+            select a subset of poses
+            '''
+            assert all([frame_id in self.frame_id_list for frame_id in self.frame_id_list_input])
+            self.pose_list = [self.pose_list[self.frame_id_list.index(frame_id)] for frame_id in self.frame_id_list_input]
+            self.origin_lookatvector_up_list = [self.origin_lookatvector_up_list[self.frame_id_list.index(frame_id)] for frame_id in self.frame_id_list_input]
+            self.K_list = [self.K_list[self.frame_id_list.index(frame_id)] for frame_id in self.frame_id_list_input]
+            self.frame_id_list = self.frame_id_list_input
+            
+        print('frame_id_list:', self.frame_id_list)
+        # print(self.pose_list)
 
         print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.__class__.__name__, len(self.pose_list))))
             
     def get_cam_rays(self, cam_params_dict={}):
         if hasattr(self, 'cam_rays_list'):  return
-        self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
+        self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, self.K_list, self.pose_list, convention='opencv')
 
     def load_shapes(self, shape_params_dict={}):
         '''

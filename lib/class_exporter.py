@@ -188,6 +188,7 @@ class exporter_scene():
                     raise NotImplementedError
 
             if modality == 'im_hdr':
+                assert self.os.if_has_im_hdr
                 file_str = {'monosdf': 'Image/%03d_0001.exr', 'fvp': 'images/%05d.exr'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
@@ -197,6 +198,7 @@ class exporter_scene():
                     print(blue_text('HDR image %d exported to: %s'%(frame_id, str(im_hdr_export_path))))
             
             if modality == 'im_sdr':
+                assert self.os.if_has_im_sdr
                 file_str = {'monosdf': 'Image/%03d_0001.png', 'fvp': 'images/%05d.jpg'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
@@ -277,61 +279,76 @@ class exporter_scene():
                         for shape in tqdm(shapes):
                             emitters = shape.findall('emitter')
                             assert len(emitters) == 1
-                            if shape.get('type') != 'obj':
-                                assert shape.get('type') == 'rectangle'
+                            # if shape.get('type') != 'obj':
+                            assert shape.get('type') in ['obj', 'rectangle']
+                            #     assert shape.get('type') == 'rectangle'
                                 
-                                transform_item = shape.findall('transform')[0]
-                                transform_accu = np.eye(4, dtype=np.float32)
+                            transform_item = shape.findall('transform')[0]
+                            transform_accu = np.eye(4, dtype=np.float32)
+                            
+                            if len(transform_item.findall('rotate')) > 0:
+                                rotate_item = transform_item.findall('rotate')[0]
+                                _r_h = xml_rotation_to_matrix_homo(rotate_item)
+                                transform_accu = _r_h @ transform_accu
                                 
-                                if len(transform_item.findall('rotate')) > 0:
-                                    rotate_item = transform_item.findall('rotate')[0]
-                                    _r_h = xml_rotation_to_matrix_homo(rotate_item)
-                                    transform_accu = _r_h @ transform_accu
-                                    
-                                if len(transform_item.findall('matrix')) > 0:
-                                    _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
-                                    transform_matrix = np.array(_transform).reshape(4, 4).astype(np.float32)
-                                    transform_accu = transform_matrix @ transform_accu # [[R,t], [0,0,0,1]]
-                        
+                            if len(transform_item.findall('matrix')) > 0:
+                                _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
+                                transform_matrix = np.array(_transform).reshape(4, 4).astype(np.float32)
+                                transform_accu = transform_matrix @ transform_accu # [[R,t], [0,0,0,1]]
+
+                            if self.os.extra_transform is not None:
+                                transform_accu = self.os.extra_transform_homo @ transform_accu
+                                
+                            if shape.get('type') == 'rectangle':
                                 (_vertices, _faces) = get_rectangle_mesh(transform_accu[:3, :3], transform_accu[:3, 3:4])
                                 light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_faces-1)
-                                light_mesh_path = scene_export_path / 'lightings' / (outLight_file.stem + '_mesh.obj')
-                                light_trimesh.export(str(light_mesh_path))
+                            elif shape.get('type') == 'obj':
+                                light_mesh_path = self.os.scene_path / shape.findall('string')[0].get('value')
+                                assert light_mesh_path.exists()
+                                light_mesh = trimesh.load_mesh(str(light_mesh_path))
+                                _vertices, _faces = light_mesh.vertices, light_mesh.faces
+                                _vertices = (transform_accu[:3, :3] @ _vertices.T + transform_accu[:3, 3:4]).T
+                                light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_faces)
                                 
-                                # print(transform_m)
-                                if self.os.extra_transform is not None:
-                                    transform_matrix = self.os.extra_transform_homo @ transform_matrix
-                                _transform_matrix_new = ' '.join(['%f'%_ for _ in transform_matrix.reshape(-1)])
-                                shape.findall('transform')[0].findall('matrix')[0].set('value', _transform_matrix_new)
-                                
-                                # write another *_scale.txt, and set emitter max radiance to 1.
-                                assert len(shape.findall('emitter')) == 1
-                                assert shape.findall('emitter')[0].get('type') == 'area'
-                                _rad_item = shape.findall('emitter')[0].findall('rgb')[0]
-                                assert _rad_item.get('name') == 'radiance'
-                                _rad = [float(_) for _ in _rad_item.get('value').split(', ')]
-                                assert len(_rad) == 3
-                                _rad_max = max(_rad)
-                                _rad_item.set('value', ' '.join(['%.2f'%(_/(_rad_max+1e-6)) for _ in _rad]))
-                                
-                                xmlString = transformToXml(root)
-                                xml_filepath = scene_export_path / 'lightings' / outLight_file.name
-                                (scene_export_path / xml_filepath).parent.mkdir(parents=True, exist_ok=True)
-                                with open(str(xml_filepath), 'w') as xmlOut:
-                                    xmlOut.write(xmlString)
-                                
-                                txt_filepath = scene_export_path / 'lightings' / (outLight_file.stem + '_scale.txt')
-                                with open(str(txt_filepath), 'w') as txtOut:
-                                    txtOut.write('%.2f'%(_rad_max))
-                                
-                                print(blue_text('lighting exported to: %s'%str(xml_filepath)))
-                            else:
-                                assert False, 'todo: deal with obj emitter'
-                                if not len(shape.findall('string')) > 0: continue
-                                filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
-                                obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
-                                shape_trimesh = trimesh.load_mesh(str(obj_path), process=False, maintain_order=True)
-                                vertices, faces = np.array(shape_trimesh.vertices), np.array(shape_trimesh.faces)+1
+                            light_mesh_path = scene_export_path / 'lightings' / (outLight_file.stem + '_mesh.obj')
+                            light_trimesh.export(str(light_mesh_path))
+                            
+                            # [TODO] dump mesh obj file as well so that fvp can access it. And change to abs path in outLight XML.
+                            
+                            # print(transform_m)
+                            if self.os.extra_transform is not None:
+                                transform_matrix = self.os.extra_transform_homo @ transform_matrix
+                            _transform_matrix_new = ' '.join(['%f'%_ for _ in transform_matrix.reshape(-1)])
+                            shape.findall('transform')[0].findall('matrix')[0].set('value', _transform_matrix_new)
+                            
+                            # write another *_scale.txt, and set emitter max radiance to 1.
+                            assert len(shape.findall('emitter')) == 1
+                            assert shape.findall('emitter')[0].get('type') == 'area'
+                            _rad_item = shape.findall('emitter')[0].findall('rgb')[0]
+                            assert _rad_item.get('name') == 'radiance'
+                            _rad = [float(_) for _ in _rad_item.get('value').split(',')]
+                            assert len(_rad) == 3
+                            _rad_max = max(_rad)
+                            _rad_item.set('value', ' '.join(['%.2f'%(_/(_rad_max+1e-6)) for _ in _rad]))
+                            
+                            xmlString = transformToXml(root)
+                            xml_filepath = scene_export_path / 'lightings' / outLight_file.name
+                            (scene_export_path / xml_filepath).parent.mkdir(parents=True, exist_ok=True)
+                            with open(str(xml_filepath), 'w') as xmlOut:
+                                xmlOut.write(xmlString)
+                            
+                            txt_filepath = scene_export_path / 'lightings' / (outLight_file.stem + '_scale.txt')
+                            with open(str(txt_filepath), 'w') as txtOut:
+                                txtOut.write('%.2f'%(_rad_max))
+                            
+                            print(blue_text('lighting exported to: %s'%str(xml_filepath)))
+                            # else:
+                            #     assert False, 'todo: deal with obj emitter'
+                                # if not len(shape.findall('string')) > 0: continue
+                                # filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
+                                # obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
+                                # shape_trimesh = trimesh.load_mesh(str(obj_path), process=False, maintain_order=True)
+                                # vertices, faces = np.array(shape_trimesh.vertices), np.array(shape_trimesh.faces)+1
 
             if modality == 'shapes': 
                 assert self.os.if_loaded_shapes, 'shapes not loaded'

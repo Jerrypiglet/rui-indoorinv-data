@@ -88,7 +88,9 @@ frame_ids = []
 invalid_frame_id_list = []
 hdr_radiance_scale = 1.
 
-scene_name = 'IndoorKitchen_v1'; pcd_file = 'reconstuction_auto/dense/2/fused.ply'; hdr_radiance_scale = 10.; 
+scene_name = 'IndoorKitchen_v1'; hdr_radiance_scale = 10.
+# if_rc = False; pcd_file = 'reconstuction_auto/dense/2/fused.ply'; pose_file = ('json', 'transforms.json')
+if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
 # frame_ids = [5, 6, 7]
 
 scene_obj = realScene3D(
@@ -103,12 +105,11 @@ scene_obj = realScene3D(
         # 'axis_up': 'y+', 
         # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
-        # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
-        # 'pose_file': ('OpenRooms', 'cam.txt'), 
-        'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+        'pose_file': pose_file, 
         'pcd_file': pcd_file, 
         'shape_file': shape_file, 
-        # 'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
+        'if_rc': if_rc, 
+        'if_autoscale_scene': not opt.export, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
         }, 
     mi_params_dict={
         # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
@@ -139,7 +140,8 @@ scene_obj = realScene3D(
         'im_H_resize': 512, 'im_W_resize': 768, 
         }, 
     cam_params_dict={
-        'near': 0.1, 'far': 10., 
+        'near': 0.1, 'far': 1., # [in a unit box]
+        # 'near': 0.5, 'far': 20., # [in a unit box]
         # ==> if sample poses and render images 
         'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
         # 'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
@@ -344,6 +346,7 @@ if opt.vis_3d_o3d:
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
             'if_cam_axis_only': False, 
+            'cam_vis_scale': 0.2, 
             }, 
         lighting_params=lighting_params_vis, 
         shapes_params={

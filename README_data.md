@@ -164,3 +164,6 @@ Need to transform to z+ up:
 ``` bash
 mitsubaScene3D(scene_params_dict={'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32),  # z=y, y=x, x=z
 ```
+
+TODO:
+- [ ] auto generate new light xml files (e..g outLight0.xml)
