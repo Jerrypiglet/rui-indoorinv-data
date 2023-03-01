@@ -52,7 +52,6 @@ class exporter_scene():
         # self.lieccv22_depth_offset = 0.189
         # self.lieccv22_depth_scale = 0.515
 
-
         self.modality_list_export = list(set(modality_list))
         for _ in self.modality_list_export:
             if _ == '': continue
@@ -81,7 +80,7 @@ class exporter_scene():
                 print(red('Aborted export.'))
                 return False
         
-        scene_export_path.mkdir(parents=True, exist_ok=True)
+        # scene_export_path.mkdir(parents=True, exist_ok=True)
         
         return True
         
@@ -420,6 +419,7 @@ class exporter_scene():
         self, 
         modality_list=[], 
         appendix='', 
+        dataset_name='', 
         split='', 
         center_crop_HW=None, 
         assert_shape=None, 
@@ -449,7 +449,7 @@ class exporter_scene():
         window_dict = {_['id'].replace('emitter-', ''): _ for _ in self.os.window_list}
         if window_area_emitter_id_list != []:
             for window_area_emitter_id in window_area_emitter_id_list:
-                assert window_area_emitter_id in lamp_dict
+                assert window_area_emitter_id in lamp_dict, 'window_area_emitter_id %s not in lamp_dict (keys: %s); did you assign IDs to emitters in XML?'%(window_area_emitter_id, '-'.join(lamp_dict.keys()))
                 window_dict.update({window_area_emitter_id: lamp_dict[window_area_emitter_id]})
                 lamp_dict.pop(window_area_emitter_id)
         if merge_lamp_id_list != []:
@@ -462,11 +462,15 @@ class exporter_scene():
             
         print(yellow('🛋️ Found %d lamps and %d windows'%(len(lamp_dict), len(window_dict))))
         
+        
         frame_export_path_list = []
         for frame_idx, frame_id in enumerate(self.os.frame_id_list):
             frame_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / (self.os.scene_name + '_frame%d'%frame_id + appendix) / 'input'
             frame_export_path.mkdir(parents=True, exist_ok=True)
             frame_export_path_list.append(frame_export_path)
+            
+            fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
+            np.save(frame_export_path / 'fov_x.npy', np.array([fov_x]))
             
             for modality in modality_list_export:
                 '''
@@ -505,7 +509,7 @@ class exporter_scene():
                     prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
 
                     print(np.amax(prediction), np.amin(prediction))
-
+ 
                     prediction_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                     prediction = center_crop(prediction, center_crop_HW)
                     np.save(str(prediction_npy_export_path), prediction)
@@ -531,9 +535,9 @@ class exporter_scene():
                     for emitter_dict in [lamp_dict, window_dict]:
                     # for emitter_dict in [window_dict]:
                     # for emitter_dict in [lamp_dict]:
+                        emitter_count = 0
                         for _, (emitter_id, emitter) in enumerate(emitter_dict.items()):
                             emitter_name = 'lamp' if emitter_id in lamp_dict else 'win'
-                            emitter_count = 0
                             if '+' in emitter_id:
                                 emitter_id_list = emitter_id.split('+')
                             else:
@@ -577,7 +581,9 @@ class exporter_scene():
                     
                     BRDF_results_path = frame_export_path.parent / BRDF_results_folder
                     Edited_BRDF_results_path = frame_export_path.parent / (BRDF_results_folder.replace('BRDFLight', 'EditedBRDFLight'))
-                    assert BRDF_results_path.exists(), red('BRDF_results_path does not exist: %s, skipping lighting export'%str(BRDF_results_path))
+                    if not BRDF_results_path.exists():
+                        print(red('[WARNING] BRDF_results_path does not exist: %s, skipping lighting export'%str(BRDF_results_path)))
+                        continue
                     if Edited_BRDF_results_path.exists():
                         shutil.rmtree(Edited_BRDF_results_path, ignore_errors=True)
                     shutil.copytree(str(BRDF_results_path), str(Edited_BRDF_results_path))
@@ -652,7 +658,7 @@ class exporter_scene():
                             _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
                             transform_matrix = np.array(_transform).reshape(4, 4).astype(np.float32)
                             transform_accu = transform_matrix @ transform_accu # [[R,t], [0,0,0,1]]
-
+                            
                         assert self.os.extra_transform is None
                         # transform_accu = self.os.extra_transform_homo @ transform_accu
                             
@@ -664,13 +670,27 @@ class exporter_scene():
                                 _axes, _axes_center = get_rectangle_thin_box(transform_accu[:3, :3], transform_accu[:3, 3:4]) # (3, 3), each row is a axis
                             # light_trimesh = trimesh.Trimesh(vertices=_light_vertices, faces=_light_faces-1)
                         elif shape.get('type') == 'obj':
-                            assert False, 'double check '
                             light_mesh_path = self.os.scene_path / shape.findall('string')[0].get('value')
                             assert light_mesh_path.exists()
                             light_mesh = trimesh.load_mesh(str(light_mesh_path))
                             _light_vertices, _light_faces = light_mesh.vertices, light_mesh.faces
-                            _light_vertices = (transform_accu[:3, :3] @ _light_vertices.T + transform_accu[:3, 3:4]).T
-                            # light_trimesh = trimesh.Trimesh(vertices=_light_vertices, faces=_light_faces)
+                            if IF_light_visible:
+                                _light_vertices = (transform_accu[:3, :3] @ _light_vertices.T + transform_accu[:3, 3:4]).T
+                                # light_trimesh = trimesh.Trimesh(vertices=_light_vertices, faces=_light_faces)
+                            else:
+                                # from lib.utils_OR.utils_OR_mesh import computeBox
+                                # [TODO] assuming right now it's axis aligned; need to fix this
+                                _axes = transform_accu[:3, :3] @ np.array([
+                                    [1., 0., 0.],
+                                    [0., 1., 0.],
+                                    [0., 0., 1.],
+                                ]) *  np.array([
+                                    max(np.amax(_light_vertices[:, 0]) - np.amin(_light_vertices[:, 0]), 0.01) / 2., 
+                                    max(np.amax(_light_vertices[:, 1]) - np.amin(_light_vertices[:, 1]), 0.01) / 2., 
+                                    max(np.amax(_light_vertices[:, 2]) - np.amin(_light_vertices[:, 2]), 0.01) / 2., 
+                                ]).reshape((1, 3))
+                                _light_vertices = (transform_accu[:3, :3] @ _light_vertices.T + transform_accu[:3, 3:4]).T
+                                _axes_center = np.mean(_light_vertices, axis=0).reshape((1, 3))
                             
                         '''
                         dump new light - mesh, .dat; NOT a linear transformation because normalization was done on inverse depth
@@ -693,8 +713,8 @@ class exporter_scene():
                         
                         if IF_light_visible:
                             _light_vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_light_vertices.T  - _t)).T # convert to oopengl camera coords
-                            _light_vertices_cam_depth = -_light_vertices_cam[:, -1]
-                            assert np.amin(_light_vertices_cam_depth) > 0.
+                            # _light_vertices_cam_depth = -_light_vertices_cam[:, -1]
+                            # assert np.amin(_light_vertices_cam_depth) > 0.
                             
                             # _light_vertices_cam_depth_inv = 1. / _light_vertices_cam_depth
 
@@ -712,9 +732,7 @@ class exporter_scene():
                             # _light_vertices_cam_dir = _light_vertices_cam / _light_vertices_cam[:, 2:3]
                             # _light_vertices_cam_new = - _light_vertices_cam_dir * _light_vertices_cam_depth_new.reshape(-1, 1)
 
-                            _light_vertices_cam_new = _light_vertices_cam
-                            
-                            light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam_new, faces=_light_faces)
+                            light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam, faces=_light_faces)
                             light_mesh_path = Edited_input_path / ('visLamp_%d.obj'%outLight_file_idx)
                             light_trimesh.export(str(light_mesh_path))
 
@@ -725,7 +743,7 @@ class exporter_scene():
                             
                             # dump new light - .dat
                             light_dat_path = Edited_BRDF_results_path / ('visLampSrc_%d.dat'%outLight_file_idx)
-                            light_dat_dict = {'center': np.mean(_light_vertices_cam_new, axis=0).reshape((1, 3)), 'src': np.array(_rad).reshape((1, 3))}
+                            light_dat_dict = {'center': np.mean(_light_vertices_cam, axis=0).reshape((1, 3)), 'src': np.array(_rad).reshape((1, 3))}
                             with open(light_dat_path, 'wb') as fOut:
                                 pickle.dump(light_dat_dict, fOut)
                         else:
@@ -920,9 +938,9 @@ class exporter_scene():
                             print(blue_text('lighting FILES exported to: %s'%str(Edited_BRDF_results_path)))
 
                         
-        frame_list_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / 'testList.txt'
+        frame_list_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / ('testList_%s.txt'%self.os.scene_name)
         with open(str(frame_list_export_path), 'w') as camOut:
             for frame_export_path in frame_export_path_list:
-                frame_export_path = (Path('data/kitchen') / frame_export_path.relative_to(self.os.rendering_root / 'EXPORT_lieccv22')).parent
+                frame_export_path = (Path('data') / dataset_name / frame_export_path.relative_to(self.os.rendering_root / 'EXPORT_lieccv22')).parent
                 camOut.write('%s\n'%(frame_export_path))
         print(white_blue('Exported test list file to: %s'%(str(frame_list_export_path))))

@@ -28,7 +28,7 @@ from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
 from .class_mitsubaBase import mitsubaBase
 from .class_scene2DBase import scene2DBase
 
-from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, sample_mesh, simplify_mesh
+from lib.utils_OR.utils_OR_mesh import sample_mesh, simplify_mesh
 from lib.utils_OR.utils_OR_xml import get_XML_root
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, get_rectangle_mesh
 from lib.utils_misc import get_device

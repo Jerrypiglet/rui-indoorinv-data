@@ -88,10 +88,16 @@ frame_ids = []
 invalid_frame_id_list = []
 hdr_radiance_scale = 1.
 
-scene_name = 'IndoorKitchen_v1'; hdr_radiance_scale = 10.
-# if_rc = False; pcd_file = 'reconstuction_auto/dense/2/fused.ply'; pose_file = ('json', 'transforms.json')
-if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
+# scene_name = 'IndoorKitchen_v1'; hdr_radiance_scale = 10.
+# # if_rc = False; pcd_file = 'reconstuction_auto/dense/2/fused.ply'; pose_file = ('json', 'transforms.json')
+# if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
 # frame_ids = [5, 6, 7]
+
+scene_name = 'IndoorKitchen_v2'; hdr_radiance_scale = 1.
+if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
+# frame_ids = [0, 1, 2, 3, 4, 5, 6]
+
 
 scene_obj = realScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -124,19 +130,24 @@ scene_obj = realScene3D(
         'im_sdr', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
     modality_filename_dict = {
         # 'poses', 
         'im_hdr': 'merged_images/img_%04d.exr', 
-        'im_sdr': 'pose_images/img_%04d.png', 
+        'im_sdr': 'png_images/img_%04d.png', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
     }, 
     im_params_dict={
         'hdr_radiance_scale': hdr_radiance_scale, 
-        'im_H_load_hdr': 503, 'im_W_load_hdr': 753, 
-        'im_H_load_sdr': 2012, 'im_W_load_sdr': 3012, 
-        'im_H_load': 503, 'im_W_load': 753, 
+        # 'im_H_load_hdr': 503, 'im_W_load_hdr': 753, 
+        # 'im_H_load_sdr': 2012, 'im_W_load_sdr': 3012, 
+        # 'im_H_load': 503, 'im_W_load': 753, 
+        # 'im_H_resize': 512, 'im_W_resize': 768, 
+        'im_H_load_hdr': 1006, 'im_W_load_hdr': 1506, 
+        'im_H_load_sdr': 1006, 'im_W_load_sdr': 1506, 
+        'im_H_load': 1006, 'im_W_load': 1506, 
+        # 'im_H_resize': 503, 'im_W_resize': 753, # (py38) ruizhu@mm3:~/Documents/Projects/monosdf/preprocess$ python batch_extract.py --pad_H 9 --pad_W 15
         'im_H_resize': 512, 'im_W_resize': 768, 
         }, 
     cam_params_dict={
@@ -316,9 +327,9 @@ if opt.vis_3d_o3d:
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
-            'mi', # mitsuba sampled rays, pts
+            # 'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -347,6 +358,7 @@ if opt.vis_3d_o3d:
         cam_params={
             'if_cam_axis_only': False, 
             'cam_vis_scale': 0.2, 
+            'if_cam_traj': False, 
             }, 
         lighting_params=lighting_params_vis, 
         shapes_params={

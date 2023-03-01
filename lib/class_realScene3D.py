@@ -312,11 +312,11 @@ class realScene3D(mitsubaBase, scene2DBase):
             if self.im_W_load != self.W or self.im_H_load != self.H:
                 scale_factor = [t / s for t, s in zip((self.H, self.W), self.im_HW_load)]
                 K = resize_intrinsics(K, scale_factor)
-            self.K_list.append(K)
-                
+
+            self.K_list = [K] * len(self.frame_id_list)
+            
             for frame_idx in range(len(meta['frames'])):
                 c2w = np.array(meta['frames'][frame_idx]['transform_matrix']).astype(np.float32)
-                c2w = np.linalg.inv(c2w)
                 c2w[2, :] *= -1
                 c2w = c2w[np.array([1, 0, 2, 3]), :]
                 c2w[0:3, 1:3] *= -1

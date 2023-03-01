@@ -11,15 +11,15 @@ sys.path.insert(0, str(ROOT_PATH))
 
 from lib.utils_io import center_crop
 
-test_list_path = ROOT_PATH / 'data/indoor_synthetic/EXPORT_lieccv22/val/testList.txt'
-scene_name = 'indoor_synthetic/kitchen'
+test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22/val/testList_livingroom.txt'
+scene_name = 'indoor_synthetic/livingroom'
+
 scene_name_write = scene_name.split('/')[1] if '/' in scene_name else scene_name
 assert Path(test_list_path).exists(), str(test_list_path)
 split = test_list_path.parent.stem
 assert split.split('_')[0] in ['train', 'val'], str(split)
 
-TARGET_PATH = ROOT_PATH / 'data/indoor_synthetic/results/$TASK/lieccv22' / scene_name_write / split
-TARGET_PATH.mkdir(parents=True, exist_ok=True)
+TARGET_PATH = ROOT_PATH / 'data/indoor_synthetic/RESULTS/$TASK/lieccv22' / scene_name_write / split
 
 # BRDF_result_folder = 'BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize'
 BRDF_result_folder = 'BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000'
@@ -47,6 +47,8 @@ for test in tests:
    BRDF_result_path = test.parent / BRDF_result_folder
    assert BRDF_result_path.exists(), str(BRDF_result_path)
    
+   Path(str(TARGET_PATH).replace('$TASK', 'brdf')).mkdir(parents=True, exist_ok=True)
+   
    albedo_vis_path = BRDF_result_path / 'albedo.png'
    assert albedo_vis_path.exists(), str(albedo_vis_path)
    albedo = cv2.imread(str(albedo_vis_path), cv2.IMREAD_UNCHANGED)
@@ -59,6 +61,7 @@ for test in tests:
    rough = center_crop(rough, expected_shape)
    rough = cv2.resize(rough, (expected_shape[1]*2, expected_shape[0]*2))
    cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_roughness.png'%frame_id)), rough)
+   print('=== BRDF results saved to %s ==='%str(Path(str(TARGET_PATH).replace('$TASK', 'brdf'))))
     
    '''
    relight

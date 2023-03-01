@@ -262,6 +262,7 @@ class scene2DBase():
 
             # im_sdr_file = Path(str(im_hdr_file).replace(self.modality_ext_dict['im_hdr'], self.modality_ext_dict['im_sdr']))
             im_sdr_file = self.modality_file_list_dict['im_sdr'][frame_idx]
+
             if not im_sdr_file.exists():
                 print(yellow('[%s] load_im_hdr: converting HDR to SDR and write to disk'%frame_idx))
                 print('-> %s'%str(im_sdr_file))

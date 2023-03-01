@@ -92,8 +92,8 @@ shape_file = ''
 frame_ids = []
 invalid_frame_id_list = []
 
-scene_name = 'kitchen_new'; 
-shape_file = 'data/indoor_synthetic/kitchen_new/scene_subdiv.obj'
+# scene_name = 'kitchen_new'; 
+# shape_file = 'data/indoor_synthetic/kitchen_new/scene_subdiv.obj'
 # shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230226-021300-mm3-EVAL-20230225-135237kitchen_NEW_HDR_grids_trainval.ply'
 
@@ -103,9 +103,9 @@ shape_file = 'data/indoor_synthetic/kitchen_new/scene_subdiv.obj'
 # shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135215-mm1-EVAL-20230219-211718-bedroom_HDR_grids_trainval.ply'
 
-# scene_name = 'bathroom'
+scene_name = 'bathroom'
 # shape_file = 'data/indoor_synthetic/bathroom/scene.obj'
-# shape_file = 'data/indoor_synthetic/bathroom/scene_subdiv.obj'
+shape_file = 'data/indoor_synthetic/bathroom/scene_subdiv.obj'
 
 # scene_name = 'livingroom'
 # shape_file = 'data/indoor_synthetic/livingroom/scene.obj'

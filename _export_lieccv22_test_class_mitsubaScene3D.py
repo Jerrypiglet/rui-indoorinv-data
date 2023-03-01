@@ -76,11 +76,12 @@ parser.add_argument('--export', type=str2bool, nargs='?', const=True, default=Fa
 parser.add_argument('--export_format', type=str, default='monosdf', help='')
 parser.add_argument('--export_appendix', type=str, default='', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
+parser.add_argument('--export_dataset_name', type=str, default='indoor_synthetic_resize', help='')
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/indoor_synthetic'
-xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
+base_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
+xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 # intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
 # xml_filename = 'scene_v3.xml'
@@ -105,47 +106,34 @@ invalid_frame_id_list = []
 # scene_name = 'bathroom'
 # shape_file = 'data/indoor_synthetic/bathroom/scene.obj'
 
-scene_name = 'bathroom'
+# scene_name = 'bathroom'
 # scene_name = 'livingroom'
-frame_ids = [0]
 
 # shape_file = 'data/indoor_synthetic/EXPORT_fvp/kitchen_new_small/val/meshes/recon.obj'
 
-# '''`
-# for export to lieccv22
-# '''
-# base_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
-# xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
+'''
+for export to lieccv22
+'''
+base_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
+xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 
-# scene_name = 'kitchen'
-# window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-# merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
+scene_name = 'kitchen'
+window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
 
 # scene_name = 'bedroom'
+# window_area_emitter_id_list=['window_area_emitter_1', 'window_area_emitter_2'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+# merge_lamp_id_list=[]  # need to manually specify in XML
+
+# scene_name = 'bathroom'
 # window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-# merge_lamp_id_list=['lamp`_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
+# merge_lamp_id_list=[]  # need to manually specify in XML
 
-# frame_ids = [3]
+# scene_name = 'livingroom'
+# window_area_emitter_id_list=['window_area_emitter_middle', 'window_area_emitter_left', 'window_area_emitter_right'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+# merge_lamp_id_list=[]  # need to manually specify in XML
 
-# scene_name = 'kitchen'
-# invalid_frame_id_list = [197]
-# scene_name = 'kitchen_new_400'
-
-# scene_name = 'livingroom0'
-# scene_name = 'livingroom-test'
-
-# ZQ
-# frame_ids = [21]
-# frame_ids = [64]
-# frame_ids = [197]
-
-# frame_ids = list(range(202))
-# frame_ids = list(range(10))
-# frame_ids = list(range(0, 202, 40))
-# frame_ids = list(range(0, 4, 1))
-# frame_ids = list(range(197))
 # frame_ids = [0]
-# frame_ids = list(range(189))
 
 '''
 default
@@ -224,11 +212,11 @@ scene_obj = mitsubaScene3D(
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
     }, 
     im_params_dict={
-        'im_H_load': 320, 'im_W_load': 640, 
-        'im_H_resize': 320, 'im_W_resize': 640, 
+        # 'im_H_load': 320, 'im_W_load': 640, 
+        # 'im_H_resize': 320, 'im_W_resize': 640, 
         
-        # 'im_H_load': 240, 'im_W_load': 320, 
-        # 'im_H_resize': 240, 'im_W_resize': 320, 
+        'im_H_load': 240, 'im_W_load': 320, 
+        'im_H_resize': 240, 'im_W_resize': 320, 
         
         # 'im_H_resize': 160, 'im_W_resize': 320, 
         
@@ -523,6 +511,7 @@ if opt.export:
         )
     if opt.export_format == 'lieccv22':
         exporter.export_lieccv22(
+            dataset_name=opt.export_dataset_name,
             modality_list = [
             'im_sdr', 
             'mi_seg', 
@@ -553,7 +542,7 @@ if opt.vis_2d_plt:
             # 'emission', 
             # 'depth', 
             # 'normal', 
-            # 'mi_depth', 
+            'mi_depth', 
             'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png

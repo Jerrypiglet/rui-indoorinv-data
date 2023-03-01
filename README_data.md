@@ -151,7 +151,8 @@ python test_class_mitsubaScene3D.py --vis_2d_plt False --export_scene --vis_3d_o
 [1] Export to LiECCV22 format:
 
 ``` bash
-python test_class_mitsubaScene3D.py --vis_3d_o3d False --export True --export_format lieccv22 --split val --force True
+# python test_class_mitsubaScene3D.py --vis_3d_o3d False --export True --export_format lieccv22 --split val --force True
+python _export_zq_test_class_mitsubaScene3D.py --vis_3d_o3d False --export True --export_format lieccv22 --split val --force True
 ```
 
 Please note that, if using GT depth, the depth is expected to be in metric unit (e.g. 1 depth = 1 meter). If not, please rescale your scene to roughly the scale.
