@@ -154,6 +154,8 @@ python test_class_mitsubaScene3D.py --vis_2d_plt False --export_scene --vis_3d_o
 python test_class_mitsubaScene3D.py --vis_3d_o3d False --export True --export_format lieccv22 --split val --force True
 ```
 
+Please note that, if using GT depth, the depth is expected to be in metric unit (e.g. 1 depth = 1 meter). If not, please rescale your scene to roughly the scale.
+
 [2] Export to fvp (free-viewpoint) format (e.g. train + val splits):
 
 ``` bash
@@ -174,3 +176,4 @@ python _export_test_class_mitsubaScene3D_fixmesh.py --export True --export_forma
 TODO:
 - [ ] auto generate new light xml files (e..g outLight0.xml)
 - [ ] merge stuff in exporter between lieccv22 and fvp
+- [ ] test again generated emitters in ZQ's scene

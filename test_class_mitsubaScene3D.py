@@ -88,10 +88,10 @@ xml_filename = 'test.xml'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 shape_file = ''
 
-frame_ids = [8]
+frame_ids = []
 invalid_frame_id_list = []
 
-# scene_name = 'kitchen_new'; 
+scene_name = 'kitchen_new'; 
 # shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230226-021300-mm3-EVAL-20230225-135237kitchen_NEW_HDR_grids_trainval'
 # frame_ids = [204, 205, 206, 207, 208]
@@ -113,7 +113,10 @@ invalid_frame_id_list = []
 '''
 for export to lieccv22
 '''
-scene_name = 'kitchen-resize'
+# scene_name = 'kitchen-resize'
+# window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+# merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+# frame_ids = [3]
 
 # scene_name = 'kitchen'
 # invalid_frame_id_list = [197]
@@ -172,8 +175,8 @@ scene_obj = mitsubaScene3D(
         # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
-        # 'pose_file': ('OpenRooms', 'cam.txt'), 
-        'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+        'pose_file': ('OpenRooms', 'cam.txt'), 
+        # 'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         'shape_file': shape_file, 
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
@@ -212,11 +215,11 @@ scene_obj = mitsubaScene3D(
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
     }, 
     im_params_dict={
-        # 'im_H_load': 320, 'im_W_load': 640, 
-        # 'im_H_resize': 320, 'im_W_resize': 640, 
+        'im_H_load': 320, 'im_W_load': 640, 
+        'im_H_resize': 320, 'im_W_resize': 640, 
         
-        'im_H_load': 240, 'im_W_load': 320, 
-        'im_H_resize': 240, 'im_W_resize': 320, 
+        # 'im_H_load': 240, 'im_W_load': 320, 
+        # 'im_H_resize': 240, 'im_W_resize': 320, 
         
         # 'im_H_resize': 160, 'im_W_resize': 320, 
         
@@ -229,8 +232,8 @@ scene_obj = mitsubaScene3D(
         'sampleNum': 3, 
         
         # == params for sample camera poses
-        'heightMin' : 0.7, # camera height min
-        'heightMax' : 3, # camera height max
+        'heightMin' : 0.5, # camera height min
+        'heightMax' : 2.5, # camera height max
         'distMin': 0.2, # to wall distance min
         'distMax': 3, # to wall distance max
         'thetaMin': -60, # theta min: pitch angle; up+ 
@@ -243,7 +246,7 @@ scene_obj = mitsubaScene3D(
         # ==> if sample poses and render images 
         'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
         'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
-        'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
+        'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     }, 
     lighting_params_dict={
         'SG_num': 12, 
@@ -515,12 +518,12 @@ if opt.export:
             'im_sdr', 
             'mi_seg', 
             'mi_depth', 
-            'lighting', 
+            'lighting', # ONLY available after getting BRDFLight result from testRealBRDFLight.py
             ], 
             split=opt.split, 
             assert_shape=(240, 320),
-            window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-            merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+            window_area_emitter_id_list=window_area_emitter_id_list, # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+            merge_lamp_id_list=merge_lamp_id_list,  # need to manually specify in XML
             BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000', # transfer this back once get BRDF results
             # center_crop_HW=(240, 320), 
             if_no_gt_appendix=True, # do not append '_gt' to the end of the file name
@@ -662,8 +665,8 @@ if opt.vis_3d_o3d:
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
             # 'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             # 'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
         },

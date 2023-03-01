@@ -129,7 +129,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
         assert self.im_lighting_HW_ratios[0] > 0 and self.im_lighting_HW_ratios[1] > 0
 
-
         # self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
         self.pcd_color = None
 
@@ -161,7 +160,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
     @property
     def frame_num_all(self):
         return len(self.frame_id_list)
-
+    
     @property
     def K_list(self):
         return [self.K] * self.frame_num
@@ -342,10 +341,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
         if not hasattr(self, 'mi_scene'): self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=False)
 
-        if_resample = 'n'
         if cam_params_dict.get('if_sample_poses', False):
             if_resample = 'y'
-            # assert False, 'disabled; use '
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
             if any([pose_file.exists() for pose_file in self.pose_file_list]):
@@ -354,7 +351,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 # if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(self.load_meta_json_pose(self.pose_file)[1]))))
                 if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(' + '.join([str(pose_file) for pose_file in self.pose_file_list]), _num_poses)))
             if not if_resample in ['N', 'n']:
-                self.sample_poses(cam_params_dict.get('sample_pose_num'), self.extra_transform_inv, if_dump=cam_params_dict.get('sample_pose_if_dump', False))
+                self.sample_poses(cam_params_dict.get('sample_pose_num'), self.extra_transform_inv, if_dump=cam_params_dict.get('sample_pose_if_dump', True))
+                self.scene_rendering_path_list = [self.scene_rendering_path.parent / self.split] * len(self.frame_id_list)
                 return
             # else:
             #     print(yellow('ABORTED resample pose.'))
@@ -367,7 +365,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         frame_id_list_all = []
         self.frame_split_list = []
         self.frame_offset_list = []
-        self.t_c2w_b_list, self.R_c2w_b_list = [], []
+        if self.pose_format == 'json':
+            self.t_c2w_b_list, self.R_c2w_b_list = [], []
         self.scene_rendering_path_list = []
         
         for pose_file, split in zip(self.pose_file_list, self.splits):
@@ -470,8 +469,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             self.origin_lookatvector_up_list += origin_lookatvector_up_list
             self.frame_offset_list += [len(frame_id_list_all)] * len(frame_id_list)
             frame_id_list_all += [len(frame_id_list_all) + frame_id for frame_id in frame_id_list]
-            self.t_c2w_b_list += t_c2w_b_list
-            self.R_c2w_b_list += R_c2w_b_list
+            if self.pose_format == 'json':
+                self.t_c2w_b_list += t_c2w_b_list
+                self.R_c2w_b_list += R_c2w_b_list
             self.frame_split_list += [split] * len(frame_id_list)
             self.scene_rendering_path_list += [self.scene_rendering_path.parent / split] * len(frame_id_list)
             

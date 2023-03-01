@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from lib.class_realScene3D import realScene3D
 from lib.class_replicaScene3D import replicaScene3D
-from lib.utils_OR.utils_OR_mesh import get_rectangle_mesh
+from lib.utils_OR.utils_OR_mesh import get_rectangle_mesh, get_rectangle_thin_box
 from lib.utils_OR.utils_OR_xml import get_XML_root, transformToXml
 from lib.utils_io import center_crop
 from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
@@ -48,6 +48,10 @@ class exporter_scene():
         self.format = format
         assert self.format in ['monosdf', 'lieccv22', 'fvp'], '[%s] format: %s is not supported!'%(self.__class__.__name__, self.format)
         self.if_debug_info = if_debug_info
+        
+        # self.lieccv22_depth_offset = 0.189
+        # self.lieccv22_depth_scale = 0.515
+
 
         self.modality_list_export = list(set(modality_list))
         for _ in self.modality_list_export:
@@ -305,15 +309,15 @@ class exporter_scene():
                                 transform_accu = self.os.extra_transform_homo @ transform_accu
                                 
                             if shape.get('type') == 'rectangle':
-                                (_vertices, _faces) = get_rectangle_mesh(transform_accu[:3, :3], transform_accu[:3, 3:4])
-                                light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_faces-1)
+                                (_vertices, _light_faces) = get_rectangle_mesh(transform_accu[:3, :3], transform_accu[:3, 3:4])
+                                light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_light_faces-1)
                             elif shape.get('type') == 'obj':
                                 light_mesh_path = self.os.scene_path / shape.findall('string')[0].get('value')
                                 assert light_mesh_path.exists()
                                 light_mesh = trimesh.load_mesh(str(light_mesh_path))
-                                _vertices, _faces = light_mesh.vertices, light_mesh.faces
+                                _vertices, _light_faces = light_mesh.vertices, light_mesh.faces
                                 _vertices = (transform_accu[:3, :3] @ _vertices.T + transform_accu[:3, 3:4]).T
-                                light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_faces)
+                                light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_light_faces)
                                 
                             light_mesh_path = scene_export_path / 'lightings' / (outLight_file.stem + '_mesh.obj')
                             light_trimesh.export(str(light_mesh_path))
@@ -485,20 +489,21 @@ class exporter_scene():
                     
                     # normalize, following Zhengqin
                     # _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
-                    _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
-                    prediction = 1./(mi_depth.copy()+1e-6)
+                    # prediction = 1./(mi_depth.copy()+1e-6)
+                    # prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
+                    # predictionMin = (prediction + _mask * 1e6).min()
+                    # predictionMax = (prediction - _mask * 1e6).max()
+
+                    # prediction = (prediction - predictionMin ) \
+                    #     / (predictionMax - predictionMin )
+                    # prediction = np.clip(prediction, 0, 1)
+
+                    # prediction = 1 / (self.lieccv22_depth_scale * prediction + self.lieccv22_depth_offset)
+                    # prediction = prediction * (1 - _mask) + _mask * (1.420 + 3.869)
+                    
+                    prediction = mi_depth.copy()
                     prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
-                    predictionMin = (prediction + _mask * 1e6).min()
-                    predictionMax = (prediction - _mask * 1e6).max()
 
-                    prediction = (prediction - predictionMin ) \
-                        / (predictionMax - predictionMin )
-                    prediction = np.clip(prediction, 0, 1)
-
-                    offset = 0.189
-                    scale = 0.515
-                    prediction = 1 / (scale * prediction + offset)
-                    prediction = prediction * (1 - _mask ) + _mask * (1.420 + 3.869 )
                     print(np.amax(prediction), np.amin(prediction))
 
                     prediction_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
@@ -571,20 +576,61 @@ class exporter_scene():
                     print(white_blue('Found %d outLight files at'%len(outLight_file_list)), str(self.os.scene_path))
                     
                     BRDF_results_path = frame_export_path.parent / BRDF_results_folder
-                    if not BRDF_results_path.exists():
-                        print(red('BRDF_results_path does not exist: %s, skipping lighting export'%str(BRDF_results_path)))
-                        continue
-                    if not Path(str(BRDF_results_path)+'_pred').exists():
-                        shutil.copytree(str(BRDF_results_path), str(BRDF_results_path)+'_pred')
+                    Edited_BRDF_results_path = frame_export_path.parent / (BRDF_results_folder.replace('BRDFLight', 'EditedBRDFLight'))
+                    assert BRDF_results_path.exists(), red('BRDF_results_path does not exist: %s, skipping lighting export'%str(BRDF_results_path))
+                    if Edited_BRDF_results_path.exists():
+                        shutil.rmtree(Edited_BRDF_results_path, ignore_errors=True)
+                    shutil.copytree(str(BRDF_results_path), str(Edited_BRDF_results_path))
+                    
+                    Edited_input_path = Path(str(frame_export_path).replace('input', 'EditedInput'))
+                    if Edited_input_path.exists():
+                        shutil.rmtree(Edited_input_path, ignore_errors=True)
+                    shutil.copytree(str(frame_export_path), str(Edited_input_path))
+                    for _ in Edited_input_path.iterdir():
+                        if _.stem.startswith('DEBUG_'): _.unlink()
+                    
+                    assert len(outLight_file_list) == 1
+                    IF_light_visible = False
                     
                     for outLight_file_idx, outLight_file in tqdm(enumerate(outLight_file_list)):
+                        '''
+                        dump new light - mask
+                        '''
+                        mi_light_scene = mi.load_file(str(outLight_file))
+                        rays_o, rays_d, ray_d_center = self.os.cam_rays_list[frame_idx]
+                        rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
+                        xs_mi = mi.Point3f(self.os.to_d(rays_o_flatten))
+                        ds_mi = mi.Vector3f(self.os.to_d(rays_d_flatten))
+                        rays_mi = mi.Ray3f(xs_mi, ds_mi)
+                        ret = mi_light_scene.ray_intersect(rays_mi) # [mitsuba.Scene.ray_intersect] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+                        rays_t = ret.t.numpy()
+                        rays_v_flatten = rays_t[:, np.newaxis] * rays_d_flatten
+                        mi_light_depth = np.sum(rays_v_flatten.reshape(self.os._H(frame_idx), self.os._W(frame_idx), 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
+                        invalid_light_depth_mask = np.logical_or(np.isnan(mi_light_depth), np.isinf(mi_light_depth))
+                        
+                        if np.sum(~invalid_light_depth_mask) > 0:
+                            IF_light_visible = True
+                        
+                        if IF_light_visible:
+                            # clean all existing lamps files in EditedInput
+                            for _ in Edited_input_path.iterdir():
+                                if 'lampMask' in str(_.stem):
+                                    _.unlink(missing_ok=True); print('-Unlinked %s'%str(_))
+                            # dump new vis lamp mask
+                            light_mask_path = Edited_input_path / ('lampMask_%d.png'%outLight_file_idx)
+                            light_mask = (~invalid_light_depth_mask).astype(np.uint8) * 255
+                            if len(light_mask.shape) == 3: light_mask = light_mask[:, :, 0]
+                            cv2.imwrite(str(light_mask_path), light_mask)
+
+                        '''
+                        shape or dat
+                        '''
+                        
                         root = get_XML_root(str(outLight_file))
                         root = copy.deepcopy(root)
                         shapes = root.findall('shape')
                         # assert len(shapes) > 0, 'No shapes found in %s; double check you XML file (e.g. did you miss headings)?'%str(outLight_file)
                         assert len(shapes) == 1 # one new lamp each XML file for now
-                        
-                        mi_light_scene = mi.load_file(str(outLight_file))
                         
                         # for shape in tqdm(shapes):
                         shape = shapes[0]
@@ -611,56 +657,28 @@ class exporter_scene():
                         # transform_accu = self.os.extra_transform_homo @ transform_accu
                             
                         if shape.get('type') == 'rectangle':
-                            (_vertices, _faces) = get_rectangle_mesh(transform_accu[:3, :3], transform_accu[:3, 3:4])
-                            _faces -= 1
-                            # light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_faces-1)
+                            if IF_light_visible:
+                                (_light_vertices, _light_faces) = get_rectangle_mesh(transform_accu[:3, :3], transform_accu[:3, 3:4])
+                                _light_faces -= 1
+                            else:
+                                _axes, _axes_center = get_rectangle_thin_box(transform_accu[:3, :3], transform_accu[:3, 3:4]) # (3, 3), each row is a axis
+                            # light_trimesh = trimesh.Trimesh(vertices=_light_vertices, faces=_light_faces-1)
                         elif shape.get('type') == 'obj':
+                            assert False, 'double check '
                             light_mesh_path = self.os.scene_path / shape.findall('string')[0].get('value')
                             assert light_mesh_path.exists()
                             light_mesh = trimesh.load_mesh(str(light_mesh_path))
-                            _vertices, _faces = light_mesh.vertices, light_mesh.faces
-                            _vertices = (transform_accu[:3, :3] @ _vertices.T + transform_accu[:3, 3:4]).T
-                            # light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_faces)
+                            _light_vertices, _light_faces = light_mesh.vertices, light_mesh.faces
+                            _light_vertices = (transform_accu[:3, :3] @ _light_vertices.T + transform_accu[:3, 3:4]).T
+                            # light_trimesh = trimesh.Trimesh(vertices=_light_vertices, faces=_light_faces)
+                            
+                        '''
+                        dump new light - mesh, .dat; NOT a linear transformation because normalization was done on inverse depth
+                        '''
                         
-                        '''
-                        dump new light - mesh, .dat
-                        '''
                         pose = self.os.pose_list[frame_idx]
                         _R, _t = pose[:3, :3], pose[:3, 3:4]
-                        _vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_vertices.T  - _t)).T
-                        offset = 0.189
-                        scale = 0.515
-                        # _vertices_cam_center_depth = -np.mean(_vertices_cam, axis=0)[-1]
-                        # assert np.amin(_vertices_cam_center_depth) > 0.
-                        # _vertices_cam_center_depth_inv = 1. / _vertices_cam_center_depth
-                        _vertices_cam_depth = -_vertices_cam[:, -1]
-                        assert np.amin(_vertices_cam_depth) > 0.
-                        _vertices_cam_depth_inv = 1. / _vertices_cam_depth
 
-                        _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
-                        prediction = 1./(mi_depth.copy()+1e-6)
-                        prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
-                        predictionMin = (prediction + _mask * 1e6).min()
-                        predictionMax = (prediction - _mask * 1e6).max()
-                        # _vertices_cam_center_depth_inv = (_vertices_cam_center_depth_inv - predictionMin ) / (predictionMax - predictionMin )
-                        _vertices_cam_depth_inv = (_vertices_cam_depth_inv - predictionMin ) / (predictionMax - predictionMin )
-                        
-                        # _vertices_cam_center_depth_new = 1./(scale * _vertices_cam_center_depth_inv + offset)
-                        # _vertices_cam_center = np.mean(_vertices_cam, axis=0, keepdims=True).reshape(3, 1)
-                        # _vertices_cam_center_dir = _vertices_cam_center / _vertices_cam_center[-1, 0]
-                        # _vertices_cam_center_new = - _vertices_cam_center_dir * _vertices_cam_center_depth_new
-                        # _vertices_cam_new = _vertices_cam - np.mean(_vertices_cam, axis=0, keepdims=True) + _vertices_cam_center_new.reshape((1, 3))
-
-                        _vertices_cam_depth_new = 1./(scale * _vertices_cam_depth_inv + offset)
-                        _vertices_cam_dir = _vertices_cam / _vertices_cam[:, 2:3]
-                        _vertices_cam_new = - _vertices_cam_dir * _vertices_cam_depth_new.reshape(-1, 1)
-
-                        light_trimesh = trimesh.Trimesh(vertices=_vertices_cam_new, faces=_faces)
-                        light_mesh_path = frame_export_path / ('visLamp_%d.obj'%outLight_file_idx)
-                        light_trimesh.export(str(light_mesh_path))
-                        
-                        print(blue_text('NEW light mesh exported to:'), str(light_mesh_path))) # input/visLamp_%d.obj
-                        
                         assert len(shape.findall('emitter')) == 1
                         assert shape.findall('emitter')[0].get('type') == 'area'
                         _rad_item = shape.findall('emitter')[0].findall('rgb')[0]
@@ -671,143 +689,235 @@ class exporter_scene():
                         _rad_new = np.array([_rad[0]/_rad_max, _rad[1]/_rad_max, _rad[2]/_rad_max])
                         _rad_new_BGR = (_rad_new * 255.).astype(np.uint8)[::-1]
                         
-                        light_dat_path = BRDF_results_path / ('visLampSrc_%d.dat'%outLight_file_idx)
-                        light_dat_dict = {'center': np.mean(_vertices_cam_new, axis=0).reshape((1, 3)), 'src': np.array(_rad).reshape((1, 3))}
-                        with open(light_dat_path, 'wb') as fOut:
-                            pickle.dump(light_dat_dict, fOut)
+                        light_edit_txt_path = Edited_input_path / ('light_%d_params.txt'%outLight_file_idx)
+                        
+                        if IF_light_visible:
+                            _light_vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_light_vertices.T  - _t)).T # convert to oopengl camera coords
+                            _light_vertices_cam_depth = -_light_vertices_cam[:, -1]
+                            assert np.amin(_light_vertices_cam_depth) > 0.
+                            
+                            # _light_vertices_cam_depth_inv = 1. / _light_vertices_cam_depth
 
+                            # _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
+                            # prediction = 1./(mi_depth.copy()+1e-6)
+                            # prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
+                            # predictionMin = (prediction + _mask * 1e6).min()
+                            # predictionMax = (prediction - _mask * 1e6).max()
+                            # _light_vertices_cam_depth_inv = (_light_vertices_cam_depth_inv - predictionMin ) / (predictionMax - predictionMin )
+                            
+                            # _light_vertices_cam_depth_new = 1./(self.lieccv22_depth_scale * _light_vertices_cam_depth_inv + self.lieccv22_depth_offset)
+                            
+                            # _light_vertices_cam_depth_new = _light_vertices_cam_depth
+                            
+                            # _light_vertices_cam_dir = _light_vertices_cam / _light_vertices_cam[:, 2:3]
+                            # _light_vertices_cam_new = - _light_vertices_cam_dir * _light_vertices_cam_depth_new.reshape(-1, 1)
+
+                            _light_vertices_cam_new = _light_vertices_cam
+                            
+                            light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam_new, faces=_light_faces)
+                            light_mesh_path = Edited_input_path / ('visLamp_%d.obj'%outLight_file_idx)
+                            light_trimesh.export(str(light_mesh_path))
+
+                            # clean all existing light - .dat files in EditedInput
+                            for _ in Edited_BRDF_results_path.iterdir():
+                                if 'visLampSrc_' in str(_):
+                                    _.unlink(); print('--Unlinked %s'%str(_))
+                            
+                            # dump new light - .dat
+                            light_dat_path = Edited_BRDF_results_path / ('visLampSrc_%d.dat'%outLight_file_idx)
+                            light_dat_dict = {'center': np.mean(_light_vertices_cam_new, axis=0).reshape((1, 3)), 'src': np.array(_rad).reshape((1, 3))}
+                            with open(light_dat_path, 'wb') as fOut:
+                                pickle.dump(light_dat_dict, fOut)
+                        else:
+                            '''
+                            given lieccv22 uses linear transformation on inverse depth, hence non-linear on metric depth, thus the scene is no longer orthographic
+                            Then the best thing we can do about invisible lamps is to maintain the geometry as a box in the new scene, and offset it to the correct location
+                            '''
+                            _axes_center_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_axes_center.T  - _t)).T # convert to oopengl camera coords
+                            # if_behind_camera = _axes_center_cam[:, -1] < 0
+                            # if if_behind_camera: # flip all exes to be in front of camera, and flip back
+                            #     _axes_center_cam[:, -1] = - _axes_center_cam[:, -1]
+                            #     _axes[:, -1] = - _axes[:, -1]
+                            # _axes_center_cam_depth = _axes_center_cam[:, -1]
+                            # assert np.amin(_axes_center_cam_depth) > 0.
+                            
+                            # _axes_center_cam_depth_inv = 1. / _axes_center_cam_depth
+
+                            # _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
+                            # prediction = 1./(mi_depth.copy()+1e-6)
+                            # prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
+                            # predictionMin = (prediction + _mask * 1e6).min()
+                            # predictionMax = (prediction - _mask * 1e6).max()
+                            # _axes_center_cam_depth_inv = (_axes_center_cam_depth_inv - predictionMin ) / (predictionMax - predictionMin )
+                            
+                            # _axes_center_cam_depth_new = 1./(self.lieccv22_depth_scale * _axes_center_cam_depth_inv + self.lieccv22_depth_offset)
+                            
+                            # _axes_center_cam_depth_new = _ax`es_center_cam_depth
+                            
+                            # _axes_center_cam_dir = _axes_center_cam / _axes_center_cam[:, 2:3]
+                            # _axes_center_cam_new = _axes_center_cam_dir * _axes_center_cam_depth_new.reshape(-1, 1)
+                            # if _axes_center_cam[:, -1] < 0:
+                            #     _axes_center_cam_new = - _axes_center_cam_new
+                            
+                            _axes_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_axes.T)).T # does not shift or sheer
+                            
+                            # validation to make sure the axes are orthogonal (after scaling back)
+                            _axes_cam_normalized = _axes_cam / np.linalg.norm(_axes_cam, axis=1, keepdims=True)
+                            assert np.allclose(_axes_cam_normalized @ _axes_cam_normalized.T, np.eye(3, dtype=np.float32), atol=1e-3)
+                            
+                            # if if_behind_camera:
+                            #     _axes_cam[:, -1] = - _axes_cam[:, -1]
+                            #     _axes_center_cam_new[:, -1] = - _axes_center_cam_new[:, -1]
+                            
+                            _axes_center_cam_new = _axes_center_cam
+                            
+                            from lib.utils_lieccv22 import generateBox
+                            _light_vertices_cam_new, _light_faces = generateBox(
+                                _axes_cam,
+                                _axes_center_cam_new.reshape(3,), 
+                                0)
+
+                            light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam_new, faces=_light_faces)
+                            light_mesh_path = Edited_input_path / ('DEBUG_invLamp_%d.obj'%outLight_file_idx)
+                            light_trimesh.export(str(light_mesh_path))
+                            # clean all existing invlamps files in Edited_BRDF_results_path
+                            for _ in Edited_BRDF_results_path.iterdir():
+                                if 'invLamp' in str(_.stem):
+                                    _.unlink(missing_ok=True); print('Unlinked %s'%str(_))
+                            light_mesh_path = Edited_BRDF_results_path / ('invLampPred_0_%d.obj'%outLight_file_idx)
+                            light_trimesh.export(str(light_mesh_path))
+                            
+                            assert outLight_file_idx == 0, 'only one light is supported for now'
+                            light_dat_path = Edited_BRDF_results_path / 'invLampSrc.dat'
+                            light_dat_dict = {
+                                'center': np.mean(_light_vertices_cam_new, axis=0).reshape((1, 3)).astype(np.float32), 
+                                'src': np.array(_rad).reshape((1, 3)).astype(np.float32), 
+                                'axes': _axes_cam[np.newaxis].astype(np.float32), 
+                                }
+                            with open(light_dat_path, 'wb') as fOut:
+                                pickle.dump(light_dat_dict, fOut)
+
+                        print(blue_text('NEW light mesh exported to:'), str(light_mesh_path)) # input/visLamp_%d.obj
                         print(blue_text('NEW light .dat exported to:'), str(light_dat_path), light_dat_dict) # {BRDF}/visLampSrc_%d.dat
                         
-                        '''
-                        dump new light - mask
-                        '''
-                        rays_o, rays_d, ray_d_center = self.os.cam_rays_list[frame_idx]
-                        rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
-                        xs_mi = mi.Point3f(self.os.to_d(rays_o_flatten))
-                        ds_mi = mi.Vector3f(self.os.to_d(rays_d_flatten))
-                        rays_mi = mi.Ray3f(xs_mi, ds_mi)
-                        ret = mi_light_scene.ray_intersect(rays_mi) # [mitsuba.Scene.ray_intersect] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
-                        rays_t = ret.t.numpy()
-                        rays_v_flatten = rays_t[:, np.newaxis] * rays_d_flatten
-                        mi_light_depth = np.sum(rays_v_flatten.reshape(self.os._H(frame_idx), self.os._W(frame_idx), 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
-                        invalid_light_depth_mask = np.logical_or(np.isnan(mi_light_depth), np.isinf(mi_light_depth))
-                        
-                        light_mask_path = frame_export_path / ('lampMask_%d.png'%outLight_file_idx)
-                        light_mask = (~invalid_light_depth_mask).astype(np.uint8) * 255
-                        if len(light_mask.shape) == 3: light_mask = light_mask[:, :, 0]
-                        cv2.imwrite(str(light_mask_path), light_mask)
+                        with open(light_edit_txt_path, 'w') as fOut:
+                            fOut.write('--ifInvisWin False\n--ifVisWin False\n')
+                            if IF_light_visible:
+                                fOut.write('--ifInvisLamp False\n--ifVisLamp True\n--isVisLampMesh\n')
+                            else:
+                                fOut.write('--ifInvisLamp True\n--ifVisLamp False\n')
                         
                         '''
                         dump new light - albedo, im
                         '''
-                        
-                        albedo_path = BRDF_results_path / 'albedo.npy'
-                        albedo = np.load(str(albedo_path)) # (1, 3, H, W)
-                        albedo[:, :, light_mask==255] = 0
-                        np.save(str(albedo_path).replace('.npy', '___.npy'), albedo)
-                        albedo_im = cv2.imread(str(albedo_path).replace('.npy', '.png'))
-                        albedo_im[light_mask==255] = _rad_new_BGR
-                        cv2.imwrite(str(albedo_path).replace('.npy', '___.png'), albedo_im)
-                        _H, _W = albedo_im.shape[:2]
-                        albedoDS_im = cv2.resize(albedo_im, (_W//2, _H//2), interpolation=cv2.INTER_AREA)
-                        cv2.imwrite(str(albedo_path).replace('.npy', 'DS___.png'), albedoDS_im)
-                        np.save(str(albedo_path).replace('.npy', 'DS___.npy'), albedoDS_im.transpose(2, 0, 1)[np.newaxis])
+                        if IF_light_visible:
+                            albedo_path = Edited_BRDF_results_path / 'albedo.npy'
+                            albedo = np.load(str(albedo_path)) # (1, 3, H, W)
+                            albedo[:, :, light_mask==255] = 0
+                            np.save(str(albedo_path), albedo)
+                            albedo_im = cv2.imread(str(albedo_path).replace('.npy', '.png'))
+                            albedo_im[light_mask==255] = _rad_new_BGR
+                            cv2.imwrite(str(albedo_path).replace('.npy', '.png'), albedo_im)
+                            _H, _W = albedo_im.shape[:2]
+                            albedoDS_im = cv2.resize(albedo_im, (_W//2, _H//2), interpolation=cv2.INTER_AREA)
+                            cv2.imwrite(str(albedo_path).replace('.npy', 'DS.png'), albedoDS_im)
+                            np.save(str(albedo_path).replace('.npy', 'DS.npy'), albedoDS_im.transpose(2, 0, 1)[np.newaxis])
 
-                        im_path = BRDF_results_path / 'im.png'
-                        im = cv2.imread(str(im_path))
-                        im[light_mask==255] = 255
-                        cv2.imwrite(str(im_path).replace('.png', '___.png'), im)
-                        im_npy = np.load(str(im_path).replace('.png', '.npy'))
-                        im_npy[:, :, light_mask==255] = 0
-                        np.save(str(im_path).replace('.png', '___.npy'), im_npy)
-                        # plt.figure()
-                        # plt.subplot(121)
-                        # plt.imshow(im[:, :, ::-1])
-                        # plt.subplot(122)
-                        # plt.imshow(im_npy.squeeze().transpose(1, 2, 0)) # somehow darker...
-                        # plt.show()
-                        
-                        # imSmall_path = '/Volumes/RuiT7/ICCV23/indoor_synthetic/EXPORT_lieccv22/Example1_addLamp_turnOffPredLamps/BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize/imSmall.png'
-                        imSmall_path = BRDF_results_path / 'imSmall.png'
-                        imSmall_im = cv2.imread(str(imSmall_path)) # uint8, 0 - 255, (H//2, W//2, 3)
-                        imSmall_npy = np.load(str(imSmall_path).replace('.png', '.npy')) # float, 0.-1., (1, 3, H//2, W//2)
-                        # plt.figure()
-                        # plt.subplot(121)
-                        # plt.imshow(imSmall_im)
-                        # plt.subplot(122)
-                        # plt.imshow(imSmall_npy.squeeze().transpose(1, 2, 0)) # somehow darker...
-                        # plt.show()
-                        _H, _W = im.shape[:2]
-                        __ = np.repeat(cv2.resize(light_mask, (_W//2, _H//2), interpolation=cv2.INTER_NEAREST)[:, :, np.newaxis], 3, -1)
-                        light_mask_small = cv2.resize(light_mask, (_W//2, _H//2), interpolation=cv2.INTER_NEAREST)
-                        imSmall_im[light_mask_small==255] = __[light_mask_small==255]
-                        cv2.imwrite(str(imSmall_path).replace('.png', '___.png'), imSmall_im)
-                        imSmall_npy[:, :, light_mask_small==255] = __.transpose(2, 0, 1)[np.newaxis][:, :, light_mask_small==255]
-                        np.save(str(imSmall_path).replace('.png', '___.npy'), imSmall_npy)
-                        
-                        onMask_path = BRDF_results_path / 'onMask.png'
-                        onMask_im = cv2.imread(str(onMask_path)) # uint8, 0 - 255, (H//2, W//2, 3)
-                        onMask_npy = np.load(str(onMask_path).replace('.png', '.npy')) # float, 0.-1., (1, 1, H//2, W//2)
-                        cv2.imwrite(str(onMask_path).replace('.png', '___.png'), onMask_im)
-                        cv2.imwrite(str(onMask_path).replace('.png', 'Small___.png'), cv2.resize(onMask_im, (_W//2, _H//2), interpolation=cv2.INTER_NEAREST))
-                        __ = light_mask[np.newaxis, np.newaxis, :, :].astype(np.float32) / 255.
-                        assert np.amax(__) <= 1.
-                        np.save(str(onMask_path).replace('.png', '___.npy'), __)
-                        __ = cv2.resize(light_mask, (_W//2, _H//2), interpolation=cv2.INTER_NEAREST)[np.newaxis, np.newaxis, :, :].astype(np.float32) / 255.
-                        np.save(str(onMask_path).replace('.png', 'Small___.npy'), __)
-                        
-                        '''
-                        dump new light - depth
-                        '''
-                        prediction_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
-                        depth = np.load(str(prediction_npy_export_path))
-                        
-                        mi_light_depth = 1./(mi_light_depth+1e-6)
-                        mi_light_depth = (mi_light_depth - predictionMin ) / (predictionMax - predictionMin )
-                        mi_light_depth = np.clip(mi_light_depth, 0, 1)
-                        mi_light_depth = 1 / (scale * mi_light_depth + offset)
-                        
-                        depth[light_mask==255] == mi_light_depth
-                        depth_export_path = BRDF_results_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
-                        np.save(str(depth_export_path).replace('.npy', '___.npy'), depth)
-                        np.save(str(depth_export_path).replace('.npy', 'DS___.npy'), depth[::2, ::2])
-                        depth_vis_normalized, depth_min_and_scale = vis_disp_colormap(depth, normalize=True, valid_mask=np.logical_or(~self.os.mi_invalid_depth_mask_list[frame_idx].squeeze(), light_mask==255))
-                        depth_vis_normalized = center_crop(depth_vis_normalized, center_crop_HW)
-                        cv2.imwrite(str(depth_export_path).replace('.npy', '___.png'), depth_vis_normalized)
-                        cv2.imwrite(str(depth_export_path).replace('.npy', 'DS___.png'), cv2.resize(depth_vis_normalized, (_W//2, _H//2), interpolation=cv2.INTER_AREA))
-                        
-                        '''
-                        dump new light - normal, rough
-                        '''
-                        mi_light_normal_global = ret.n.numpy().reshape(self.os._H(frame_idx), self.os._W(frame_idx), 3)
-                        # FLIP inverted normals!
-                        normals_flip_mask = np.logical_and(np.sum(rays_d * mi_light_normal_global, axis=-1) > 0, np.any(mi_light_normal_global != np.inf, axis=-1))
-                        if np.sum(normals_flip_mask) > 0:
-                            mi_light_normal_global[normals_flip_mask] = -mi_light_normal_global[normals_flip_mask]
-                            print(yellow('[mi_sample_rays_pts] %d normals flipped!'%np.sum(normals_flip_mask)))
-                        mi_light_normal_global[invalid_light_depth_mask, :] = 0.
-                        mi_light_normal_cam_opencv = mi_light_normal_global @ self.os.pose_list[frame_idx][:3, :3]
-                        mi_light_normal_cam_opengl = np.stack([mi_light_normal_cam_opencv[:, :, 0], -mi_light_normal_cam_opencv[:, :, 1], -mi_light_normal_cam_opencv[:, :, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
-                        
-                        normal_path = BRDF_results_path / 'normal.npy'
-                        normal = np.load(str(normal_path))
-                        normal[:, :, light_mask==255] = mi_light_normal_cam_opengl.transpose(2, 0, 1)[np.newaxis][:, :, light_mask==255]
-                        normal_vis = np.clip(normal.squeeze().transpose(1, 2, 0)/2.+0.5, 0., 1.)
-                        np.save(str(normal_path).replace('.npy', '___.npy'), normal)
-                        np.save(str(normal_path).replace('.npy', 'DS___.npy'), normal[:, :, ::2, ::2])
-                        cv2.imwrite(str(normal_path).replace('.npy', '___.png'), (normal_vis*255).astype(np.uint8))
-                        cv2.imwrite(str(normal_path).replace('.npy', 'DS___.png'), cv2.resize((normal_vis*255).astype(np.uint8), (_W//2, _H//2), interpolation=cv2.INTER_AREA))
-                        
-                        rough_path = BRDF_results_path / 'rough.npy'
-                        rough = np.load(str(rough_path)) # (1, 1, H, W), 0.-1.
-                        rough[:, :, light_mask==255] = 0.
-                        np.save(str(rough_path).replace('.npy', '___.npy'), rough)
-                        np.save(str(rough_path).replace('.npy', 'DS___.npy'), rough[:, :, ::2, ::2])
-                        rough_vis = (rough.squeeze()[:, :, np.newaxis].repeat(3, axis=2)*255).astype(np.uint8)
-                        cv2.imwrite(str(rough_path).replace('.npy', '___.png'), rough_vis)
-                        cv2.imwrite(str(rough_path).replace('.npy', 'DS___.png'), cv2.resize(rough_vis, (_W//2, _H//2), interpolation=cv2.INTER_AREA))
-                        
-                        print(blue_text('lighting FILES exported to: %s'%str(BRDF_results_path)))
+                            im_path = Edited_BRDF_results_path / 'im.png'
+                            im = cv2.imread(str(im_path))
+                            im[light_mask==255] = 255
+                            cv2.imwrite(str(im_path).replace('.png', '.png'), im)
+                            im_npy = np.load(str(im_path).replace('.png', '.npy'))
+                            im_npy[:, :, light_mask==255] = 0
+                            np.save(str(im_path).replace('.png', '.npy'), im_npy)
+                            # plt.figure()
+                            # plt.subplot(121)
+                            # plt.imshow(im[:, :, ::-1])
+                            # plt.subplot(122)
+                            # plt.imshow(im_npy.squeeze().transpose(1, 2, 0)) # somehow darker...
+                            # plt.show()
+                            
+                            # imSmall_path = '/Volumes/RuiT7/ICCV23/indoor_synthetic/EXPORT_lieccv22/Example1_addLamp_turnOffPredLamps/BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize/imSmall.png'
+                            imSmall_path = Edited_BRDF_results_path / 'imSmall.png'
+                            imSmall_im = cv2.imread(str(imSmall_path)) # uint8, 0 - 255, (H//2, W//2, 3)
+                            imSmall_npy = np.load(str(imSmall_path).replace('.png', '.npy')) # float, 0.-1., (1, 3, H//2, W//2)
+                            # plt.figure()
+                            # plt.subplot(121)
+                            # plt.imshow(imSmall_im)
+                            # plt.subplot(122)
+                            # plt.imshow(imSmall_npy.squeeze().transpose(1, 2, 0)) # somehow darker...
+                            # plt.show()
+                            _H, _W = im.shape[:2]
+                            __ = np.repeat(cv2.resize(light_mask, (_W//2, _H//2), interpolation=cv2.INTER_NEAREST)[:, :, np.newaxis], 3, -1)
+                            light_mask_small = cv2.resize(light_mask, (_W//2, _H//2), interpolation=cv2.INTER_NEAREST)
+                            imSmall_im[light_mask_small==255] = __[light_mask_small==255]
+                            cv2.imwrite(str(imSmall_path).replace('.png', '.png'), imSmall_im)
+                            imSmall_npy[:, :, light_mask_small==255] = __.transpose(2, 0, 1)[np.newaxis][:, :, light_mask_small==255]
+                            np.save(str(imSmall_path).replace('.png', '.npy'), imSmall_npy)
+                            
+                            onMask_path = Edited_BRDF_results_path / 'onMask.png'
+                            onMask_im = cv2.imread(str(onMask_path)) # uint8, 0 - 255, (H//2, W//2, 3)
+                            onMask_npy = np.load(str(onMask_path).replace('.png', '.npy')) # float, 0.-1., (1, 1, H//2, W//2)
+                            cv2.imwrite(str(onMask_path).replace('.png', '.png'), onMask_im)
+                            cv2.imwrite(str(onMask_path).replace('.png', 'Small.png'), cv2.resize(onMask_im, (_W//2, _H//2), interpolation=cv2.INTER_NEAREST))
+                            __ = light_mask[np.newaxis, np.newaxis, :, :].astype(np.float32) / 255.
+                            assert np.amax(__) <= 1.
+                            np.save(str(onMask_path).replace('.png', '.npy'), __)
+                            __ = cv2.resize(light_mask, (_W//2, _H//2), interpolation=cv2.INTER_NEAREST)[np.newaxis, np.newaxis, :, :].astype(np.float32) / 255.
+                            np.save(str(onMask_path).replace('.png', 'Small.npy'), __)
+                            
+                            '''
+                            dump new light - depth
+                            '''
+                            prediction_npy_export_path = Edited_input_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
+                            depth = np.load(str(prediction_npy_export_path))
+                            
+                            # mi_light_depth = 1./(mi_light_depth+1e-6)
+                            # mi_light_depth = (mi_light_depth - predictionMin ) / (predictionMax - predictionMin )
+                            # mi_light_depth = np.clip(mi_light_depth, 0, 1)
+                            # mi_light_depth = 1 / (self.lieccv22_depth_scale * mi_light_depth + self.lieccv22_depth_offset)
+                            
+                            depth[light_mask==255] == mi_light_depth
+                            depth_export_path = Edited_BRDF_results_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
+                            np.save(str(depth_export_path), depth)
+                            np.save(str(depth_export_path).replace('.npy', 'DS.npy'), depth[::2, ::2][np.newaxis, np.newaxis].astype(np.float32))
+                            depth_vis_normalized, depth_min_and_scale = vis_disp_colormap(depth, normalize=True, valid_mask=np.logical_or(~self.os.mi_invalid_depth_mask_list[frame_idx].squeeze(), light_mask==255))
+                            depth_vis_normalized = center_crop(depth_vis_normalized, center_crop_HW)
+                            cv2.imwrite(str(depth_export_path).replace('.npy', '.png'), depth_vis_normalized)
+                            cv2.imwrite(str(depth_export_path).replace('.npy', 'DS.png'), cv2.resize(depth_vis_normalized, (_W//2, _H//2), interpolation=cv2.INTER_AREA))
+                            
+                            '''
+                            dump new light - normal, rough
+                            '''
+                            mi_light_normal_global = ret.n.numpy().reshape(self.os._H(frame_idx), self.os._W(frame_idx), 3)
+                            # FLIP inverted normals!
+                            normals_flip_mask = np.logical_and(np.sum(rays_d * mi_light_normal_global, axis=-1) > 0, np.any(mi_light_normal_global != np.inf, axis=-1))
+                            if np.sum(normals_flip_mask) > 0:
+                                mi_light_normal_global[normals_flip_mask] = -mi_light_normal_global[normals_flip_mask]
+                                print(yellow('[mi_sample_rays_pts] %d normals flipped!'%np.sum(normals_flip_mask)))
+                            mi_light_normal_global[invalid_light_depth_mask, :] = 0.
+                            mi_light_normal_cam_opencv = mi_light_normal_global @ self.os.pose_list[frame_idx][:3, :3]
+                            mi_light_normal_cam_opengl = np.stack([mi_light_normal_cam_opencv[:, :, 0], -mi_light_normal_cam_opencv[:, :, 1], -mi_light_normal_cam_opencv[:, :, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
+                            
+                            normal_path = Edited_BRDF_results_path / 'normal.npy'
+                            normal = np.load(str(normal_path))
+                            normal[:, :, light_mask==255] = mi_light_normal_cam_opengl.transpose(2, 0, 1)[np.newaxis][:, :, light_mask==255]
+                            normal_vis = np.clip(normal.squeeze().transpose(1, 2, 0)/2.+0.5, 0., 1.)
+                            np.save(str(normal_path), normal)
+                            np.save(str(normal_path).replace('.npy', 'DS.npy'), normal[:, :, ::2, ::2])
+                            cv2.imwrite(str(normal_path).replace('.npy', '.png'), (normal_vis*255).astype(np.uint8))
+                            cv2.imwrite(str(normal_path).replace('.npy', 'DS.png'), cv2.resize((normal_vis*255).astype(np.uint8), (_W//2, _H//2), interpolation=cv2.INTER_AREA))
+                            
+                            rough_path = Edited_BRDF_results_path / 'rough.npy'
+                            rough = np.load(str(rough_path)) # (1, 1, H, W), 0.-1.
+                            rough[:, :, light_mask==255] = 0.
+                            np.save(str(rough_path), rough)
+                            np.save(str(rough_path).replace('.npy', 'DS.npy'), rough[:, :, ::2, ::2])
+                            rough_vis = (rough.squeeze()[:, :, np.newaxis].repeat(3, axis=2)*255).astype(np.uint8)
+                            cv2.imwrite(str(rough_path).replace('.npy', '.png'), rough_vis)
+                            cv2.imwrite(str(rough_path).replace('.npy', 'DS.png'), cv2.resize(rough_vis, (_W//2, _H//2), interpolation=cv2.INTER_AREA))
+                            
+                            print(blue_text('lighting FILES exported to: %s'%str(Edited_BRDF_results_path)))
 
                         
         frame_list_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / 'testList.txt'

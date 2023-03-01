@@ -361,7 +361,9 @@ class mitsubaBase():
         print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
 
         if if_dump:
-            dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.cam_params_dict, extra_transform=extra_transform)
+            pose_file_root=self.pose_file.parent if hasattr(self, 'pose_file') else self.pose_file_list[0].parent
+            dump_cam_params_OR(pose_file_root=pose_file_root, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.cam_params_dict, extra_transform=extra_transform)
+            print(white_blue('Dumped sampled poses to %s'%str(pose_file_root)))
 
     def load_meta_json_pose(self, pose_file):
         # assert Path(pose_file).exists(), str(pose_file)

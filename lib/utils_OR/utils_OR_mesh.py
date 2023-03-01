@@ -282,6 +282,21 @@ def get_rectangle_mesh(R: np.ndarray, t: np.ndarray, extra_transform=None):
 
     return (vertices, faces)
 
+def get_rectangle_thin_box(R: np.ndarray, t: np.ndarray, extra_transform=None):
+    assert R.shape==(3, 3) and t.shape==(3, 1)
+    axes = np.array([
+        [1., 0., 0.], 
+        [0., 1., 0.], 
+        [0., 0., 0.01], 
+    ])
+    axes = (R @ axes.T).T
+    axes_center = t.reshape(1, 3)
+    if extra_transform is not None:
+        assert extra_transform.shape == (3, 3)
+        axes = (extra_transform @ axes.T).T
+        axes_center = (extra_transform @ axes_center.T).T
+
+    return axes, axes_center
 
 def mesh_to_contour(mesh, if_input_is_v_e=False, if_input_is_Trimesh=False, vertical_dim=-1):
     if if_input_is_v_e:
