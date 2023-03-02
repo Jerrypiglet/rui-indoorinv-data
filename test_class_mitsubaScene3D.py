@@ -504,12 +504,12 @@ if opt.export:
         
     )
     if opt.export_format == 'monosdf':
-        exporter.export_monosdf_fvp(
+        exporter.export_monosdf_fvp_mitsuba(
             split=opt.split, 
             format='monosdf',
             )
     if opt.export_format == 'fvp':
-        exporter.export_monosdf_fvp(
+        exporter.export_monosdf_fvp_mitsuba(
             split=opt.split, 
             format='fvp',
             modality_list = [

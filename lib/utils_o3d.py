@@ -23,7 +23,7 @@ def text_3d(text, pos, direction=None, degree=0.0, density=10, font='/usr/share/
     if direction is None:
         direction = (0., 0., 1.)
 
-    assert Path(font).exists()
+    assert Path(font).exists(), f'Font {font} does not exist in your system!'
 
     font_obj = ImageFont.truetype(font, font_size * density)
     # font_obj = ImageFont.load_default()

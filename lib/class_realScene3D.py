@@ -117,12 +117,33 @@ class realScene3D(mitsubaBase, scene2DBase):
         '''
         self.pts_from = {'mi': False, 'depth': False}
         self.seg_from = {'mi': False, 'seg': False}
+        
+        '''
+        normalize poses
+        [TODO] stremaline this into loader functions
+        '''   
+        self.if_autoscale_scene = self.scene_params_dict['if_autoscale_scene']     
+        monosdf_scale_tuple = ()
+        if self.if_autoscale_scene:
+            print(yellow('Autoscaling scene (following MonoSDF)...'))
+            poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.pose_list]
+            poses = np.array(poses)
+            min_vertices = poses[:, :3, 3].min(axis=0)
+            max_vertices = poses[:, :3, 3].max(axis=0)
+            center = (min_vertices + max_vertices) / 2.
+            scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
+            monosdf_scale_tuple = (center, scale)
+            
+            for pose in self.pose_list: # modify in place
+                pose[:3, 3] = (pose[:3, 3]- center) * scale
+            for (origin, lookatvector, up) in self.origin_lookatvector_up_list:
+                origin = (origin - center.reshape((3, 1))) * scale
 
         '''
         load everything
         '''
 
-        self.load_mi_scene(self.mi_params_dict)
+        self.load_mi_scene(self.mi_params_dict, monosdf_scale_tuple=monosdf_scale_tuple)
         self.load_modalities()
 
         if hasattr(self, 'pose_list'): 
@@ -130,23 +151,18 @@ class realScene3D(mitsubaBase, scene2DBase):
         self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
 
         '''
-        normalize poses and pcs
+        normalize shapes pcs
+        [TODO] stremaline this into loader functions
         '''   
-        if_autoscale_scene = self.scene_params_dict['if_autoscale_scene']     
-        if if_autoscale_scene:
-            print(yellow('Autoscaling scene...'))
-            poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.pose_list]
-            poses = np.array(poses)
-            min_vertices = poses[:, :3, 3].min(axis=0)
-            max_vertices = poses[:, :3, 3].max(axis=0)
-            center = (min_vertices + max_vertices) / 2.
-            scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
-            for pose in self.pose_list: # modify in place
-                pose[:3, 3] = (pose[:3, 3]- center) * scale
-            for (origin, lookatvector, up) in self.origin_lookatvector_up_list:
-                origin = (origin - center.reshape((3, 1))) * scale
-            
-            if self.scene_params_dict.get('pcd_file', '') != '':
+        if self.if_autoscale_scene:
+            if self.scene_params_dict.get('shape_file', '') != '':
+                print('Scaling shapes...')
+                self.vertices_list = [(vertices - center.reshape((1, 3))) * scale for vertices in self.vertices_list]
+                self.bverts_list = [(bverts - center.reshape((1, 3))) * scale for bverts in self.bverts_list]
+                self.xyz_max = (self.xyz_max - center.reshape((3,))) * scale
+                self.xyz_min = (self.xyz_min - center.reshape((3,))) * scale
+            elif self.scene_params_dict.get('pcd_file', '') != '':
+                print('Scaling pcd...')
                 self.pcd = (self.pcd - center.reshape((1, 3))) * scale
                 self.xyz_max = (self.xyz_max - center.reshape((3,))) * scale
                 self.xyz_min = (self.xyz_min - center.reshape((3,))) * scale
@@ -229,7 +245,7 @@ class realScene3D(mitsubaBase, scene2DBase):
         else:
             assert False, 'Unsupported modality: ' + modality
 
-    def load_mi_scene(self, mi_params_dict={}):
+    def load_mi_scene(self, mi_params_dict={}, monosdf_scale_tuple=()):
         '''
         load scene representation into Mitsuba 3
         '''
@@ -244,6 +260,12 @@ class realScene3D(mitsubaBase, scene2DBase):
             }
         if self.extra_transform is not None:
             shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
+        if monosdf_scale_tuple != ():
+            center, scale = monosdf_scale_tuple
+            scale_mat = np.eye(4).astype(np.float32)
+            scale_mat[:3, 3] = -center
+            scale_mat[:3 ] *= scale 
+            shape_id_dict['to_world'] = mi.ScalarTransform4f(scale_mat)
         self.mi_scene = mi.load_dict({
             'type': 'scene',
             'shape_id': shape_id_dict, 
@@ -415,10 +437,13 @@ class realScene3D(mitsubaBase, scene2DBase):
         print(white_blue('[%s] load_shapes for scene...')%self.__class__.__name__)
         
         if self.scene_params_dict.get('shape_file', '') != '':
-            if self.if_loaded_shapes: return
+            if self.if_loaded_shapes: 
+                print('already loaded shapes. skip.')
+                return
             mitsubaBase._prepare_shapes(self)
             self.shape_file = self.scene_params_dict['shape_file']
             self.load_single_shape(shape_params_dict, extra_transform=self.extra_transform)
+                
             self.if_loaded_shapes = True
             print(blue_text('[%s] DONE. load_shapes'%(self.__class__.__name__)))
 

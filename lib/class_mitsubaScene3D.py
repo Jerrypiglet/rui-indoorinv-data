@@ -432,10 +432,17 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     assert max(frame_id_list) < len(_Rt_c2w_b_list)
                     R_c2w_b_list = [_Rt_c2w_b_list[_][0] for _ in frame_id_list]
                     t_c2w_b_list = [_Rt_c2w_b_list[_][1] for _ in frame_id_list]
-
-                    f_xy = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length
-                    if not min(abs(self.K[0][0]-f_xy), abs(self.K[1][1]-f_xy)) < 1e-3:
-                        print(self.K, f_xy)
+                    
+                    assert 'camera_angle_x' in self.meta
+                    f_x = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length - x
+                    if 'camera_angle_y' in self.meta:
+                        # different focal length in x and y
+                        f_y = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_y']) # original focal length - y
+                    else:
+                        # [TODO] @Liwen always write camera_angle_x and camera_angle_y in json
+                        f_y = f_x
+                    if not min(abs(self.K[0][0]-f_x), abs(self.K[1][1]-f_y)) < 1e-3:
+                        print(self.K, f_x, f_y)
                         import ipdb; ipdb.set_trace()
                         assert False, red('computed f_xy is different than read from intrinsics! double check your loaded intrinsics!')
 

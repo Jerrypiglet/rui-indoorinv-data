@@ -46,7 +46,7 @@ class exporter_scene():
         self.os = scene_object
         self.if_force = if_force
         self.format = format
-        assert self.format in ['monosdf', 'lieccv22', 'fvp'], '[%s] format: %s is not supported!'%(self.__class__.__name__, self.format)
+        assert self.format in ['monosdf', 'lieccv22', 'fvp', 'mitsuba'], '[%s] format: %s is not supported!'%(self.__class__.__name__, self.format)
         self.if_debug_info = if_debug_info
         
         # self.lieccv22_depth_offset = 0.189
@@ -84,13 +84,13 @@ class exporter_scene():
         
         return True
         
-    def export_monosdf_fvp(self, modality_list={}, appendix='', split='', format='monosdf'):
+    def export_monosdf_fvp_mitsuba(self, modality_list={}, appendix='', split='', format='monosdf'):
         '''
         export scene to mitsubaScene data structure + monosdf inputs
         and fvp: free viewpoint dataset https://gitlab.inria.fr/sibr/projects/indoor_relighting
         '''
         
-        assert format in ['monosdf', 'fvp'], 'format %s not supported'%format
+        assert format in ['monosdf', 'fvp', 'mitsuba'], 'format %s not supported'%format
         
         scene_export_path = self.os.rendering_root / ('EXPORT_%s'%format) / (self.os.scene_name + appendix)
         if split != '':
@@ -105,59 +105,61 @@ class exporter_scene():
             # assert modality in self.modality_list, 'modality %s not in %s'%(modality, self.modality_list)
 
             if modality == 'poses':
-                if format == 'monosdf': 
+                if format in ['monosdf', 'mitsuba']: 
                     self.os.export_poses_cam_txt(scene_export_path, cam_params_dict=self.os.cam_params_dict, frame_num_all=self.os.frame_num_all)
                     '''
                     cameras for MonoSDF
                     '''
-                    cameras = {}
-                    scale_mat_path = self.os.rendering_root / 'EXPORT_monosdf' / (self.os.scene_name + appendix) / 'scale_mat.npy'
-                    scale_mat_path.parent.mkdir(parents=True, exist_ok=True)
-                    if split != 'val':
-                        poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.os.pose_list]
-                        poses = np.array(poses)
-                        assert poses.shape[1:] == (4, 4)
-                        min_vertices = poses[:, :3, 3].min(axis=0)
-                        max_vertices = poses[:, :3, 3].max(axis=0)
-                        center = (min_vertices + max_vertices) / 2.
-                        scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
-                        print('[pose normalization to unit cube] --center, scale--', center, scale)
-                        # we should normalized to unit cube
-                        scale_mat = np.eye(4).astype(np.float32)
-                        scale_mat[:3, 3] = -center
-                        scale_mat[:3 ] *= scale 
-                        scale_mat = np.linalg.inv(scale_mat)
-                        if scale_mat_path.exists() and not self.if_force:
-                            if_overwrite = input(red('scale_mat.npy exists. Overwrite? [y/n]'))
-                            if if_overwrite in ['y', 'Y']:
-                                scale_mat_path.unlink()
-                        np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale}, allow_pickle=True)
-                    else:
-                        assert scale_mat_path.exists(), 'scale_mat.npy not found in %s'%str(scale_mat_path)
-                        scale_mat_dict = np.load(str(scale_mat_path), allow_pickle=True).item()
-                        scale_mat = scale_mat_dict['scale_mat']
-                        center = scale_mat_dict['center']
-                        scale = scale_mat_dict['scale']
-
-                    # cameras['center'] = center
-                    # cameras['scale'] = scale
-                    for frame_idx, pose in enumerate(self.os.pose_list):
-                        if hasattr(self.os, 'K'):
-                            K = self.os.K
+                    if format in ['monosdf']: 
+                        cameras = {}
+                        scale_mat_path = self.os.rendering_root / 'EXPORT_monosdf' / (self.os.scene_name + appendix) / 'scale_mat.npy'
+                        scale_mat_path.parent.mkdir(parents=True, exist_ok=True)
+                        if split != 'val':
+                            scale_mat = np.eye(4).astype(np.float32)
+                            if self.os.if_autoscale_scene:
+                                print(yellow('Skipped autoscale (following Monosdf) because dataset is already auto scaled.'))
+                            else:
+                                poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.os.pose_list]
+                                poses = np.array(poses)
+                                assert poses.shape[1:] == (4, 4)
+                                min_vertices = poses[:, :3, 3].min(axis=0)
+                                max_vertices = poses[:, :3, 3].max(axis=0)
+                                center = (min_vertices + max_vertices) / 2.
+                                scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
+                                print('[pose normalization to unit cube] --center, scale--', center, scale)
+                                # we should normalized to unit cube
+                                scale_mat[:3, 3] = -center
+                                scale_mat[:3 ] *= scale 
+                                scale_mat = np.linalg.inv(scale_mat)
+                            if scale_mat_path.exists() and not self.if_force:
+                                if_overwrite = input(red('scale_mat.npy exists. Overwrite? [y/n]'))
+                                if if_overwrite in ['y', 'Y']:
+                                    scale_mat_path.unlink()
+                            np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale}, allow_pickle=True)
                         else:
-                            assert hasattr(self.os, 'K_list')
-                            assert len(self.os.K_list) == len(self.os.pose_list)
-                            K = self.os.K_list[frame_idx] # (3, 3)
-                            assert K.shape == (3, 3)
-                        K = np.hstack((K, np.array([0., 0., 0.], dtype=np.float32).reshape((3, 1))))
-                        K = np.vstack((K, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
-                        pose = np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
-                        pose = K @ np.linalg.inv(pose)
-                        cameras['scale_mat_%d'%frame_idx] = scale_mat
-                        cameras['world_mat_%d'%frame_idx] = pose
-                        # cameras['split_%d'%frame_idx] = 'train' if _ < self.frame_num-10 else 'val' # 10 frames for val
-                        # cameras['frame_id_%d'%frame_idx] = idx if idx < len(mitsuba_scene_dict['train'].pose_list) else idx-len(mitsuba_scene_dict['train'].pose_list)
-                    np.savez(str(scene_export_path / 'cameras.npz'), **cameras)
+                            assert scale_mat_path.exists(), 'scale_mat.npy not found in %s'%str(scale_mat_path)
+                            scale_mat_dict = np.load(str(scale_mat_path), allow_pickle=True).item()
+                            scale_mat = scale_mat_dict['scale_mat']
+                            center = scale_mat_dict['center']
+                            scale = scale_mat_dict['scale']
+
+                        for frame_idx, pose in enumerate(self.os.pose_list):
+                            if hasattr(self.os, 'K'):
+                                K = self.os.K
+                            else:
+                                assert hasattr(self.os, 'K_list')
+                                assert len(self.os.K_list) == len(self.os.pose_list)
+                                K = self.os.K_list[frame_idx] # (3, 3)
+                                assert K.shape == (3, 3)
+                            K = np.hstack((K, np.array([0., 0., 0.], dtype=np.float32).reshape((3, 1))))
+                            K = np.vstack((K, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
+                            pose = np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4))))
+                            pose = K @ np.linalg.inv(pose)
+                            cameras['scale_mat_%d'%frame_idx] = scale_mat
+                            cameras['world_mat_%d'%frame_idx] = pose
+                            # cameras['split_%d'%frame_idx] = 'train' if _ < self.frame_num-10 else 'val' # 10 frames for val
+                            # cameras['frame_id_%d'%frame_idx] = idx if idx < len(mitsuba_scene_dict['train'].pose_list) else idx-len(mitsuba_scene_dict['train'].pose_list)
+                        np.savez(str(scene_export_path / 'cameras.npz'), **cameras)
                     
                 elif format == 'fvp':
                     '''
@@ -172,12 +174,12 @@ class exporter_scene():
                         for frame_idx, frame_id in tqdm(enumerate(self.os.frame_id_list)):
                             K = self.os._K(frame_idx)
                             f = K[0][0]
-                            assert K[0][0] == K[1][1]
+                            # assert K[0][0] == K[1][1], 'focal length of x and y not equal: %f, %f'%(K[0][0], K[1][1])
                             assert K[0][1] == 0. and K[1][0] == 0. # no redial distortion
                             camOut.write('%.6f %d %d\n'%(f, 0, 0)) # <f> <k1> <k2>   [the focal length, followed by two radial distortion coeffs]
                             
                             # [!!!] assert if_scale_scene = 1.0
-                            R, t = self.os.pose_list[frame_idx][:3, :3], self.os.pose_list[frame_idx][:3, 3]
+                            R, t = self.os.pose_list[frame_idx][:3, :3].copy(), self.os.pose_list[frame_idx][:3, 3].copy()
                             # if self.extra_transform is not None:
                             #     R = R @ (self.extra_transform.T)
                             #     t = self.extra_transform @ t
@@ -197,7 +199,7 @@ class exporter_scene():
 
             if modality == 'im_hdr':
                 assert self.os.if_has_im_hdr
-                file_str = {'monosdf': 'Image/%03d_0001.exr', 'fvp': 'images/%05d.exr'}[format]
+                file_str = {'monosdf': 'Image/%03d_0001.exr', 'mitsuba': 'Image/%03d_0001.exr', 'fvp': 'images/%05d.exr'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
                     im_hdr_export_path = scene_export_path / (file_str%frame_idx)
@@ -207,7 +209,7 @@ class exporter_scene():
             
             if modality == 'im_sdr':
                 assert self.os.if_has_im_sdr
-                file_str = {'monosdf': 'Image/%03d_0001.png', 'fvp': 'images/%05d.jpg'}[format]
+                file_str = {'monosdf': 'Image/%03d_0001.png', 'mitsuba': 'Image/%03d_0001.png', 'fvp': 'images/%05d.jpg'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
                     im_sdr_export_path = scene_export_path / (file_str%frame_idx)
@@ -216,7 +218,7 @@ class exporter_scene():
                     print(self.os.modality_file_list_dict['im_sdr'][frame_idx])
             
             if modality == 'mi_normal':
-                assert format == 'monosdf'
+                assert format in ['monosdf', 'mitsuba']
                 (scene_export_path / 'MiNormalGlobal').mkdir(parents=True, exist_ok=True)
                 assert self.os.pts_from['mi']
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
@@ -225,7 +227,7 @@ class exporter_scene():
                     print(blue_text('Mitsuba normal (global) %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
             
             if modality == 'mi_depth':
-                assert format == 'monosdf'
+                assert format in ['monosdf', 'mitsuba']
                 (scene_export_path / 'MiDepth').mkdir(parents=True, exist_ok=True)
                 assert self.os.pts_from['mi']
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
@@ -239,7 +241,7 @@ class exporter_scene():
                     print(blue_text('depth (npy) %d exported to: %s'%(frame_id, str(mi_depth_npy_export_path))))
 
             if modality == 'im_mask':
-                file_str = {'monosdf': 'ImMask/%03d_0001.png', 'fvp': 'images/%08d_mask.png'}[format]
+                file_str = {'monosdf': 'ImMask/%03d_0001.png', 'mitsuba': 'ImMask/%03d_0001.png', 'fvp': 'images/%08d_mask.png'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 
                 assert self.os.pts_from['mi']
@@ -369,7 +371,7 @@ class exporter_scene():
                 # for T_, appendix in T_list_:
                 shape_list = []
                 # shape_export_path = scene_export_path / ('scene%s.obj'%appendix)
-                file_str = {'monosdf': 'scene%s.obj'%appendix, 'fvp': 'meshes/recon.ply'}[format]
+                file_str = {'monosdf': 'scene%s.obj'%appendix, 'mitsuba': 'scene%s.obj'%appendix, 'fvp': 'meshes/recon.ply'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 shape_export_path = scene_export_path / file_str
                 
@@ -399,9 +401,13 @@ class exporter_scene():
                     
                     shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
                     if_fixed_water_tight = False
-                    if format == 'monosdf':
-                        shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
+                    if format in ['monosdf', 'mitsuba']:
+                        # shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
+                        
                         if_fixed_water_tight = True
+                        print(red('Overwriting with mehs + hull: %s'%str(shape_export_path)))
+                        shape_tri_mesh_fixed.export(str(shape_export_path))
+
                     elif format == 'fvp': 
                         # scale.txt
                         scene_scale = self.os.scene_scale if hasattr(self.os, 'scene_scale') else 1.
@@ -410,10 +416,22 @@ class exporter_scene():
                         # overwrite the original mesh
                         print(red('Overwriting with mehs + hull: %s'%str(shape_export_path)))
                         shape_tri_mesh_fixed.export(str(shape_export_path))
+
                     else:
                         raise NotImplementedError
+
                     if if_fixed_water_tight:
                         print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
+                
+                '''
+                images/demo_fvp_scale.png
+                - measurement: 1.39, real size in meters: probably 0.6
+                -> scale = 1.39 / 0.6 = 2.3166666666666664
+                '''
+                if  self.os.if_autoscale_scene:
+                    print(red('DONT GOTGETR TO SET CORRECT SCLAE IN SCALE.TXT (equal to 1m object in the scene scale)'))
+                    print('Check the demo as described here: https://gitlab.inria.fr/sibr/projects/indoor_relighting (search scale.txt)')
+                    input(red('Type Y to acknowledge'))
 
     def export_lieccv22(
         self, 
@@ -469,8 +487,14 @@ class exporter_scene():
             frame_export_path.mkdir(parents=True, exist_ok=True)
             frame_export_path_list.append(frame_export_path)
             
-            fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
-            np.save(frame_export_path / 'fov_x.npy', np.array([fov_x]))
+            # fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
+            # fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
+            fx = self._K[frame_idx][0][0]
+            fy = self._K[frame_idx][1][1]
+            fov_x = np.arctan(fx * 2. / self.os.W) * 2. / np.pi * 180.
+            fov_y = np.arctan(fy * 2. / self.os.H) * 2. / np.pi * 180.
+            
+            np.save(frame_export_path / 'fov_xy.npy', {'fov_x': fov_x, 'fov_y': fov_y}) # full fov, in angles
             
             for modality in modality_list_export:
                 '''

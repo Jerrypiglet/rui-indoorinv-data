@@ -890,6 +890,7 @@ class visualizer_scene_3D_o3d(object):
                     cat_name, 
                     # pos=np.mean(bverts, axis=0).tolist(), 
                     # pos=[np.mean(bverts[:, 0], axis=0), np.amax(bverts[:, 1], axis=0)+0.2*(np.amax(bverts[:, 1], axis=0)-np.amin(bverts[:, 1], axis=0)), np.mean(bverts[:, 2], axis=0)], 
+                    font='/System/Library/Fonts/Helvetica.ttc' if self.os.host=='apple' else '/usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf', 
                     pos=[np.mean(bverts[:, 0], axis=0), np.amax(bverts[:, 1], axis=0)+0.05*(np.amax(bverts[:, 1], axis=0)-np.amin(bverts[:, 1], axis=0)), np.mean(bverts[:, 2], axis=0)], 
                     direction=(0., 0., 1), 
                     degree=270., 

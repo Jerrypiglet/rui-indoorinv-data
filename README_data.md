@@ -3,6 +3,7 @@
   - [Free-viewpoint (fvp)](#free-viewpoint-fvp)
   - [Matterport3D (mp)](#matterport3d-mp)
   - [Replica](#replica)
+  - [Real datasets of our capture](#real-datasets-of-our-capture)
   - [Other datasets](#other-datasets)
     - [Mitsuba](#mitsuba)
 
@@ -140,6 +141,18 @@ TODO:
 - [ ] adapt sample pose to z+ up: get rid of self.extra_transform
 - [ ] add check for camera inside mesh (because no obj info available)
 - [ ] NaN in output exr images [issue](https://github.com/facebookresearch/Replica-Dataset/issues/19)
+
+## Real datasets of our capture
+
+Dump to Mitsuba format:
+``` bash
+python test_class_realScene3D.py --export True --export_format mitsuba --vis_3d_o3d True --force
+```
+
+Dump to Mitsubfvp format:
+``` bash
+python test_class_realScene3D.py --export True --export_format fvp --vis_3d_o3d True --force
+```
 
 ## Other datasets
 
