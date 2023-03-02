@@ -126,7 +126,9 @@ def vis_disp_colormap(disp_array_, file=None, normalize=True, min_and_scale=None
         assert valid_mask.dtype==bool
     else:
         valid_mask = np.ones_like(disp_array).astype(bool)
-    
+    if valid_mask.size == 0:
+        valid_mask = np.ones_like(disp_array).astype(bool)
+        
     if normalize:
         if min_and_scale is None:
             depth_min = np.amin(disp_array[valid_mask])

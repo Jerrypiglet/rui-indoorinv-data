@@ -11,8 +11,8 @@ sys.path.insert(0, str(ROOT_PATH))
 
 from lib.utils_io import center_crop
 
-test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22/val/testList_livingroom.txt'
-scene_name = 'indoor_synthetic/livingroom'
+test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22/val/testList_kitchen.txt'
+scene_name = 'indoor_synthetic/kitchen'
 
 scene_name_write = scene_name.split('/')[1] if '/' in scene_name else scene_name
 assert Path(test_list_path).exists(), str(test_list_path)

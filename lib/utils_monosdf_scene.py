@@ -75,6 +75,7 @@ def load_shape_dict_from_shape_file(shape_file_list: list, shape_params_dict={},
     }
 
     if extra_transform is not None:
+        assert extra_transform.shape == (3, 3)
         vertices = (extra_transform @ vertices.T).T
         bverts = (extra_transform @ bverts.T).T
 

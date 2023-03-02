@@ -97,6 +97,7 @@ hdr_radiance_scale = 1.
 scene_name = 'IndoorKitchen_v2'; hdr_radiance_scale = 3.
 if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
 shape_file = base_root / 'RESULTS_monosdf/20230301-135857-mm1-EVAL-20230301-035029IndoorKitchen_v2_HDR_grids_trainval.ply'
+# frame_ids = [223, 222, 221] + [0, 1, 2, 3, 4, 5, 6]
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
 # frame_ids = [0, 1, 2, 3, 4, 5, 6]
 # frame_ids = [0, 6, 10, 13, 69]
@@ -119,9 +120,11 @@ scene_obj = realScene3D(
         'pcd_file': pcd_file, 
         'shape_file': shape_file, 
         'if_rc': if_rc, 
-        'if_autoscale_scene': not opt.export, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
+        'if_autoscale_scene': True, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
         
-        # 'if_reorient_y_up': True, 
+        'if_reorient_y_up': True, 
+        'reorient_blender_angles': [252., 2.38, 208.], 
+        
         # 'normal_up_frame_info': {'frame_id': 3, 'normal_up_hw_1': (0.5, 0.35), 'normal_up_hw_2': (1., 0.6)}, # find one image with mostly floor within the desginated region
         # 'normal_left_frame_info': {'frame_id': 8, 'normal_left_hw_1': (0., 0.), 'normal_left_hw_2': (0.5, 0.5)}, # find one image with mostly floor within the desginated region
         }, 
@@ -362,7 +365,7 @@ if opt.vis_3d_o3d:
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
             'if_cam_axis_only': False, 
-            'cam_vis_scale': 0.5, 
+            'cam_vis_scale': 0.3, 
             'if_cam_traj': False, 
             }, 
         lighting_params=lighting_params_vis, 

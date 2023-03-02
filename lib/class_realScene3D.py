@@ -85,6 +85,22 @@ class realScene3D(mitsubaBase, scene2DBase):
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
         
         self.extra_transform = self.scene_params_dict.get('extra_transform', None)
+        # if self.scene_params_dict.get('if_reorient_y_up', False):
+        #     print(magenta('Re-orienting scene to y-up...'))
+        #     assert self.extra_transform is None, 'extra_transform is not None'
+        #     reorient_blender_angles = self.scene_params_dict['reorient_blender_angles']
+        #     reorient_blender_angles = np.array(reorient_blender_angles).reshape(3,) / 180. * np.pi
+        #     coord_conv = [0, 2, 1]
+        #     from scipy.spatial.transform import Rotation
+        #     w2c = Rotation.from_euler('xyz', reorient_blender_angles).as_matrix()
+        #     # coordinate convention
+        #     w2c[1] = -w2c[1]
+        #     w2c = w2c[coord_conv]
+        #     w2c[:,2] = - w2c[:,2]
+        #     w2c[:,0] *= -1
+        #     c2w = np.linalg.inv(w2c)
+        #     self.extra_transform = c2w
+            
         if self.extra_transform is not None:
             self.extra_transform_inv = self.extra_transform.T
             self.extra_transform_homo = np.eye(4, dtype=np.float32)
@@ -125,6 +141,7 @@ class realScene3D(mitsubaBase, scene2DBase):
         monosdf_scale_tuple = ()
         if self.if_autoscale_scene:
             print(yellow('Autoscaling scene (following MonoSDF)...'))
+            assert self.frame_id_list_input_all == self.frame_id_list, 'You would need all poses to autoscale the scene'
             poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.pose_list]
             poses = np.array(poses)
             min_vertices = poses[:, :3, 3].min(axis=0)
@@ -152,7 +169,8 @@ class realScene3D(mitsubaBase, scene2DBase):
         '''
         normalize shapes pcs
         [TODO] stremaline this into loader functions
-        '''   
+        '''
+        IF_SCENE_RESCALED = False
         if self.if_autoscale_scene:
             if self.scene_params_dict.get('shape_file', '') != '':
                 print('Scaling shapes...')
@@ -165,87 +183,57 @@ class realScene3D(mitsubaBase, scene2DBase):
                 self.pcd = (self.pcd - center.reshape((1, 3))) * scale
                 self.xyz_max = (self.xyz_max - center.reshape((3,))) * scale
                 self.xyz_min = (self.xyz_min - center.reshape((3,))) * scale
-                
+            IF_SCENE_RESCALED = True
+
+            # self.pose_list = [np.hstack((pose[:3, :3], (pose[:3, 3:4]-center.reshape((3, 1)))*scale)) for pose in self.pose_list] # dont rotate translation!!
+            # self.origin_lookatvector_up_list = [((origin-center.reshape((3, 1)))*scale, lookatvector, up) \
+            #     for (origin, lookatvector, up) in self.origin_lookatvector_up_list] # dont rotate origin!!
+            
+        self.reorient_transform = np.eye(3, dtype=np.float32)
         if self.scene_params_dict.get('if_reorient_y_up', False):
             '''
             [TODO] better align normals to axes with clustering or PCA, than manually pick patches
             '''
             print(magenta('Re-orienting scene to y-up...'))
             
-            reorient_transform_file = self.scene_path / '_T.npy'
+            reorient_transform_file = self.scene_path / '_T_reorient_after_monosdf_centering_scale.npy'
             if reorient_transform_file.exists():
                 print('Loading re-orientation from file: ', reorient_transform_file)
                 self.reorient_transform = np.load(reorient_transform_file)
                 assert self.reorient_transform.shape == (3, 3)
             else:
-                assert hasattr(self, 'mi_normal_global_list')
-                
-                _normal_up_dict = self.scene_params_dict['normal_up_frame_info']
-                _frame_id_up = _normal_up_dict['frame_id']
-                _normal_up_hw_1 = _normal_up_dict['normal_up_hw_1']; _normal_up_hw_1 = [int(_normal_up_hw_1[0]*(self.H-1)), int(_normal_up_hw_1[1]*(self.W-1))]
-                _normal_up_hw_2 = _normal_up_dict['normal_up_hw_2']; _normal_up_hw_2 = [int(_normal_up_hw_2[0]*(self.H-1)), int(_normal_up_hw_2[1]*(self.W-1))]
-                _frame_idx_up = self.frame_id_list.index(_frame_id_up)
-                normal_up_patch = self.mi_normal_global_list[_frame_idx_up][_normal_up_hw_1[0]:_normal_up_hw_2[0]+1, _normal_up_hw_1[1]:_normal_up_hw_2[1]+1]
-                
-                _normal_left_dict = self.scene_params_dict['normal_left_frame_info']
-                _frame_id_left = _normal_left_dict['frame_id']
-                _normal_left_hw_1 = _normal_left_dict['normal_left_hw_1']; _normal_left_hw_1 = [int(_normal_left_hw_1[0]*(self.H-1)), int(_normal_left_hw_1[1]*(self.W-1))]
-                _normal_left_hw_2 = _normal_left_dict['normal_left_hw_2']; _normal_left_hw_2 = [int(_normal_left_hw_2[0]*(self.H-1)), int(_normal_left_hw_2[1]*(self.W-1))]
-                _frame_idx_left = self.frame_id_list.index(_frame_id_left)
-                normal_left_patch = self.mi_normal_global_list[_frame_idx_left][_normal_left_hw_1[0]:_normal_left_hw_2[0]+1, _normal_left_hw_1[1]:_normal_left_hw_2[1]+1]
-
-                import matplotlib.pyplot as plt
-                plt.figure()
-                plt.subplot(2, 2, 1)
-                plt.imshow(self.mi_normal_global_list[_frame_idx_up]/2+0.5)
-                plt.subplot(2, 2, 2)
-                plt.imshow(normal_up_patch/2+0.5)
-                plt.subplot(2, 2, 3)
-                plt.imshow(self.mi_normal_global_list[_frame_idx_left]/2+0.5)
-                plt.subplot(2, 2, 4)
-                plt.imshow(normal_left_patch/2+0.5)
-                plt.show()
-                y_tmp = np.median(normal_up_patch.reshape(-1, 3), axis=0).flatten()
-                y_tmp = y_tmp / (np.linalg.norm(y_tmp)+1e-6)
-                x_tmp = - np.median(normal_left_patch.reshape(-1, 3), axis=0).flatten()
-                x_tmp = x_tmp / (np.linalg.norm(x_tmp)+1e-6)
-                z_tmp = np.cross(x_tmp, y_tmp)
-                x_tmp = np.cross(y_tmp, z_tmp)
-                
-                from scipy.spatial.transform import Rotation as R
-                """get rotation matrix between two vectors using scipy"""
-                # vec1 = np.reshape(normal_up_tmp, (1, -1))
-                # vec2 = np.reshape(np.array([0., 1., 0.]), (1, -1))
-                # r = R.align_vectors(vec2, vec1)
-                # _R = r[0].as_matrix()
-                
-                # _axes_current = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]) @ np.stack((x_tmp, y_tmp, z_tmp)) # (N, 3)
-                _axes_current = np.stack((x_tmp, y_tmp, z_tmp)) # (N, 3)
-                _axes_target = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]) #  (N, 3)
-                self.reorient_transform = np.linalg.inv(_axes_current.T) # https://github.com/nghiaho12/rigid_transform_3D/blob/master/rigid_transform_3D.py; 
-                '''
-                (? @ _axes_current.T).T = _axes_target
-                -> ? = np.linalg.inv(_axes_current.T)
-                '''
-
-                np.save(str(self.scene_path / '_T.npy'), self.reorient_transform)
+                print('Calculating re-orientation from blender angles input...')
+                # self.reorient_transform = self.get_reorient_mat_()
+                # self.reorient_transform = self.get_reorient_mat_from_blender_angles_()
+                reorient_blender_angles = self.scene_params_dict['reorient_blender_angles']
+                reorient_blender_angles = np.array(reorient_blender_angles).reshape(3,) / 180. * np.pi
+                coord_conv = [0, 2, 1]
+                from scipy.spatial.transform import Rotation
+                w2c = Rotation.from_euler('xyz', reorient_blender_angles).as_matrix()
+                # coordinate convention
+                w2c[1] = -w2c[1]
+                w2c = w2c[coord_conv]
+                w2c[:,2] = - w2c[:,2]
+                w2c[:,0] *= -1
+                c2w = np.linalg.inv(w2c)
+                self.reorient_transform = c2w
+            
+                np.save(str(self.scene_path / '_T_reorient_after_monosdf_centering_scale.npy'), self.reorient_transform)
 
             self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
             self.bverts_list = [(self.reorient_transform @ bverts.T).T for bverts in self.bverts_list]
-            for pose in self.pose_list: # modify in place
-                pose[:3, :3] = self.reorient_transform @ pose[:3, :3]
-                pose[:3, 3:4] = self.reorient_transform @ pose[:3, 3:4]
-            for (origin, lookatvector, up) in self.origin_lookatvector_up_list:
-                origin = self.reorient_transform @ origin
-                lookatvector = self.reorient_transform @ lookatvector
-                up = self.reorient_transform @ up
-                
+            
+            self.pose_list = [np.hstack((self.reorient_transform @ pose[:3, :3], self.reorient_transform @ pose[:3, 3:4])) for pose in self.pose_list] # dont rotate translation!!
+            self.origin_lookatvector_up_list = [(self.reorient_transform @ origin, self.reorient_transform @ lookatvector, self.reorient_transform @ up) \
+                for (origin, lookatvector, up) in self.origin_lookatvector_up_list] # dont rotate origin!!
+            IF_SCENE_RESCALED = True
+
+        if IF_SCENE_RESCALED:
             __ = np.eye(4, dtype=np.float32); __[:3, :3] = self.reorient_transform; self.reorient_transform = __
             self.load_mi_scene(self.mi_params_dict, monosdf_scale_tuple=monosdf_scale_tuple, extra_transform_homo=self.reorient_transform)
             self.load_modalities()
             self.get_cam_rays(self.cam_params_dict, force=True)
             self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'), force=True)
-            
 
     @property
     def frame_num(self):
@@ -343,7 +331,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             # shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
             _T = self.extra_transform_homo @ _T
         if monosdf_scale_tuple != ():
-            assert not self.extra_transform
+            # assert self.extra_transform is None
             center, scale = monosdf_scale_tuple
             scale_mat = np.eye(4).astype(np.float32)
             scale_mat[:3, 3] = -center
@@ -443,6 +431,9 @@ class realScene3D(mitsubaBase, scene2DBase):
                 # R = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) @ R # OpenGL -> OpenCV
                 # R = np.concatenate([R[:, 1:2], -R[:, 0:1], R[:, 2:]], 1) # [Rui!!] llff specific; done in llff dataloader
                 # R = R @ np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]]) # [Rui] opengl (llff) -> opencv convention
+                if self.extra_transform is not None:
+                    assert self.extra_transform.shape == (3, 3) # [TODO] support 4x4
+                    R = self.extra_transform[:3, :3] @ R
                 self.pose_list.append(np.hstack((R, t)))
                 assert np.isclose(np.linalg.det(R), 1.0), 'R is not a rotation matrix'
                 
@@ -487,6 +478,9 @@ class realScene3D(mitsubaBase, scene2DBase):
                 if self.if_scale_scene:
                     t = t / self.scene_scale
                 R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
+                if self.extra_transform is not None:
+                    assert self.extra_transform.shape == (3, 3) # [TODO] support 4x4
+                    R = self.extra_transform[:3, :3] @ R
                 self.pose_list.append(np.hstack((R, t)))
 
                 # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
@@ -500,6 +494,8 @@ class realScene3D(mitsubaBase, scene2DBase):
                 self.K_list.append(K)
                 
         assert len(set(self.frame_id_list)) == len(self.frame_id_list), 'frame_id_list is not unique'
+        
+        self.frame_id_list_input_all = self.frame_id_list.copy()
         
         if self.frame_id_list_input != []:
             '''
@@ -544,6 +540,9 @@ class realScene3D(mitsubaBase, scene2DBase):
             assert pcd_file.exists(), 'No pcd file found: ' + str(pcd_file)
             pcd_trimesh = trimesh.load_mesh(str(pcd_file), process=False)
             self.pcd = np.array(pcd_trimesh.vertices)
+            if self.extra_transform is not None:
+                assert self.extra_transform.shape == (3, 3)
+                self.pcd = self.pcd @ self.extra_transform.T
             # import ipdb; ipdb.set_trace()
             # np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
 
@@ -552,3 +551,56 @@ class realScene3D(mitsubaBase, scene2DBase):
             self.if_loaded_pcd = True
             
             print(blue_text('[%s] DONE. load_pcd: %d points'%(self.__class__.__name__, self.pcd.shape[0])))
+            
+    def get_reorient_mat_(self):
+            assert hasattr(self, 'mi_normal_global_list')
+            
+            _normal_up_dict = self.scene_params_dict['normal_up_frame_info']
+            _frame_id_up = _normal_up_dict['frame_id']
+            _normal_up_hw_1 = _normal_up_dict['normal_up_hw_1']; _normal_up_hw_1 = [int(_normal_up_hw_1[0]*(self.H-1)), int(_normal_up_hw_1[1]*(self.W-1))]
+            _normal_up_hw_2 = _normal_up_dict['normal_up_hw_2']; _normal_up_hw_2 = [int(_normal_up_hw_2[0]*(self.H-1)), int(_normal_up_hw_2[1]*(self.W-1))]
+            _frame_idx_up = self.frame_id_list.index(_frame_id_up)
+            normal_up_patch = self.mi_normal_global_list[_frame_idx_up][_normal_up_hw_1[0]:_normal_up_hw_2[0]+1, _normal_up_hw_1[1]:_normal_up_hw_2[1]+1]
+            
+            _normal_left_dict = self.scene_params_dict['normal_left_frame_info']
+            _frame_id_left = _normal_left_dict['frame_id']
+            _normal_left_hw_1 = _normal_left_dict['normal_left_hw_1']; _normal_left_hw_1 = [int(_normal_left_hw_1[0]*(self.H-1)), int(_normal_left_hw_1[1]*(self.W-1))]
+            _normal_left_hw_2 = _normal_left_dict['normal_left_hw_2']; _normal_left_hw_2 = [int(_normal_left_hw_2[0]*(self.H-1)), int(_normal_left_hw_2[1]*(self.W-1))]
+            _frame_idx_left = self.frame_id_list.index(_frame_id_left)
+            normal_left_patch = self.mi_normal_global_list[_frame_idx_left][_normal_left_hw_1[0]:_normal_left_hw_2[0]+1, _normal_left_hw_1[1]:_normal_left_hw_2[1]+1]
+
+            import matplotlib.pyplot as plt
+            plt.figure()
+            plt.subplot(2, 2, 1)
+            plt.imshow(self.mi_normal_global_list[_frame_idx_up]/2+0.5)
+            plt.subplot(2, 2, 2)
+            plt.imshow(normal_up_patch/2+0.5)
+            plt.subplot(2, 2, 3)
+            plt.imshow(self.mi_normal_global_list[_frame_idx_left]/2+0.5)
+            plt.subplot(2, 2, 4)
+            plt.imshow(normal_left_patch/2+0.5)
+            plt.show()
+            y_tmp = np.median(normal_up_patch.reshape(-1, 3), axis=0).flatten()
+            y_tmp = y_tmp / (np.linalg.norm(y_tmp)+1e-6)
+            x_tmp = - np.median(normal_left_patch.reshape(-1, 3), axis=0).flatten()
+            x_tmp = x_tmp / (np.linalg.norm(x_tmp)+1e-6)
+            z_tmp = np.cross(x_tmp, y_tmp)
+            x_tmp = np.cross(y_tmp, z_tmp)
+            
+            from scipy.spatial.transform import Rotation as R
+            """get rotation matrix between two vectors using scipy"""
+            # vec1 = np.reshape(normal_up_tmp, (1, -1))
+            # vec2 = np.reshape(np.array([0., 1., 0.]), (1, -1))
+            # r = R.align_vectors(vec2, vec1)
+            # _R = r[0].as_matrix()
+            
+            # _axes_current = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]) @ np.stack((x_tmp, y_tmp, z_tmp)) # (N, 3)
+            '''
+            (? @ _axes_current.T).T = _axes_target
+            -> ? = np.linalg.inv(_axes_current.T)
+            '''
+            _axes_current = np.stack((x_tmp, y_tmp, z_tmp)) # (N, 3)
+            _axes_target = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]) #  (N, 3)
+            reorient_transform = np.linalg.inv(_axes_current.T) # https://github.com/nghiaho12/rigid_transform_3D/blob/master/rigid_transform_3D.py; 
+            
+            return reorient_transform
