@@ -401,7 +401,7 @@ class exporter_scene():
                     
                     shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
                     if_fixed_water_tight = False
-                    if format in ['monosdf', 'mitsuba']:
+                    if format in ['monosdf']:
                         # shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
                         
                         if_fixed_water_tight = True
@@ -418,7 +418,7 @@ class exporter_scene():
                         shape_tri_mesh_fixed.export(str(shape_export_path))
 
                     else:
-                        raise NotImplementedError
+                        pass
 
                     if if_fixed_water_tight:
                         print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))

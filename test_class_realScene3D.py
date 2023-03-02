@@ -100,6 +100,7 @@ shape_file = base_root / 'RESULTS_monosdf/20230301-135857-mm1-EVAL-20230301-0350
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
 # frame_ids = [0, 1, 2, 3, 4, 5, 6]
 # frame_ids = [0, 6, 10, 13, 69]
+# frame_ids = [0, 3, 8]
 # frame_ids = [0]
 
 scene_obj = realScene3D(
@@ -119,6 +120,10 @@ scene_obj = realScene3D(
         'shape_file': shape_file, 
         'if_rc': if_rc, 
         'if_autoscale_scene': not opt.export, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
+        
+        # 'if_reorient_y_up': True, 
+        # 'normal_up_frame_info': {'frame_id': 3, 'normal_up_hw_1': (0.5, 0.35), 'normal_up_hw_2': (1., 0.6)}, # find one image with mostly floor within the desginated region
+        # 'normal_left_frame_info': {'frame_id': 8, 'normal_left_hw_1': (0., 0.), 'normal_left_hw_2': (0.5, 0.5)}, # find one image with mostly floor within the desginated region
         }, 
     mi_params_dict={
         # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
@@ -135,6 +140,7 @@ scene_obj = realScene3D(
         # 'albedo', 'roughness', 
         # 'depth', 'normal', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'im_normal', 
         ], 
     modality_filename_dict = {
         # 'poses', 
