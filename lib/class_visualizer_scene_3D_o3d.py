@@ -28,6 +28,7 @@ from lib.class_freeviewpointScene3D import freeviewpointScene3D
 from lib.class_matterportScene3D import matterportScene3D
 from lib.class_realScene3D import realScene3D
 from lib.class_texirScene3D import texirScene3D
+from lib.class_simpleScene3D import simpleScene3D
 
 from lib.utils_misc import get_list_of_keys, gen_random_str, yellow, yellow, white_red
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
@@ -54,7 +55,7 @@ class visualizer_scene_3D_o3d(object):
         modality_list_vis: list, 
         if_debug_info: bool=False, 
     ):
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D, simpleScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object

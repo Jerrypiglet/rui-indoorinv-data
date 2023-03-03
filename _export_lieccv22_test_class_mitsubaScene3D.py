@@ -98,12 +98,10 @@ for export to lieccv22
 base_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 
-# scene_name = 'kitchen'
-# window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-# merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
-# shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
-# frame_ids = list(range(109))
-# frame_ids = [0]
+scene_name = 'kitchen'
+window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
+shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
 
 # scene_name = 'bedroom'
 # window_area_emitter_id_list=['window_area_emitter_1', 'window_area_emitter_2'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
@@ -113,11 +111,12 @@ xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 # window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
 # merge_lamp_id_list=[]  # need to manually specify in XML
 
-scene_name = 'livingroom'
-window_area_emitter_id_list=['window_area_emitter_middle', 'window_area_emitter_left', 'window_area_emitter_right'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-merge_lamp_id_list=[]  # need to manually specify in XML
+# scene_name = 'livingroom'
+# window_area_emitter_id_list=['window_area_emitter_middle', 'window_area_emitter_left', 'window_area_emitter_right'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+# merge_lamp_id_list=[]  # need to manually specify in XML
 
 # frame_ids = [0]
+# frame_ids = list(range(109))
 
 '''
 default

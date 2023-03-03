@@ -13,6 +13,7 @@ from lib.class_matterportScene3D import matterportScene3D
 from lib.class_replicaScene3D import replicaScene3D
 from lib.class_realScene3D import realScene3D
 from lib.class_texirScene3D import texirScene3D
+from lib.class_simpleScene3D import simpleScene3D
 
 from lib.utils_vis import vis_index_map, colorize
 from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
@@ -29,7 +30,7 @@ class visualizer_scene_2D(object):
         frame_idx_list=None, # 0-based indexing, [0, ..., os.frame_num-1]
     ):
 
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D, simpleScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
