@@ -135,8 +135,8 @@ class realScene3D(mitsubaBase, scene2DBase):
         normalize poses
         [TODO] stremaline this into loader functions
         '''   
-        self.if_autoscale_scene = self.scene_params_dict['if_autoscale_scene']     
-        monosdf_scale_tuple = ()
+        self.if_autoscale_scene = self.scene_params_dict.get('if_autoscale_scene', False)
+        self.monosdf_scale_tuple = ()
         if self.if_autoscale_scene:
             print(yellow('Autoscaling scene (following MonoSDF)...'))
             assert self.frame_id_list_input_all == self.frame_id_list, 'You would need all poses to autoscale the scene'
@@ -146,7 +146,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             max_vertices = poses[:, :3, 3].max(axis=0)
             center = (min_vertices + max_vertices) / 2.
             scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
-            monosdf_scale_tuple = (center, scale)
+            self.monosdf_scale_tuple = (center, scale)
             
             for pose in self.pose_list: # modify in place
                 pose[:3, 3] = (pose[:3, 3]- center) * scale
@@ -157,12 +157,13 @@ class realScene3D(mitsubaBase, scene2DBase):
         load everything
         '''
 
-        self.load_mi_scene(self.mi_params_dict, monosdf_scale_tuple=monosdf_scale_tuple)
+        self.load_mi_scene(self.mi_params_dict, monosdf_scale_tuple=self.monosdf_scale_tuple)
         self.load_modalities()
 
         if hasattr(self, 'pose_list'): 
             self.get_cam_rays(self.cam_params_dict)
-        self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
+        if hasattr(self, 'mi_scene'):
+            self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'))
 
         '''
         normalize shapes pcs
@@ -230,10 +231,12 @@ class realScene3D(mitsubaBase, scene2DBase):
 
         if IF_SCENE_RESCALED:
             __ = np.eye(4, dtype=np.float32); __[:3, :3] = self.reorient_transform; self.reorient_transform = __
-            self.load_mi_scene(self.mi_params_dict, monosdf_scale_tuple=monosdf_scale_tuple, extra_transform_homo=self.reorient_transform)
+            if hasattr(self, 'mi_scene'):
+                self.load_mi_scene(self.mi_params_dict, monosdf_scale_tuple=self.monosdf_scale_tuple, extra_transform_homo=self.reorient_transform)
             self.load_modalities()
             self.get_cam_rays(self.cam_params_dict, force=True)
-            self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'), force=True)
+            if hasattr(self, 'mi_scene'):
+                self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'), force=True)
 
     @property
     def frame_num(self):
@@ -393,9 +396,9 @@ class realScene3D(mitsubaBase, scene2DBase):
         self.origin_lookatvector_up_list = []
         
         if self.pose_format == 'json':
-            meta_file_path = self.scene_path / 'transforms.json'
-            assert meta_file_path.exists(), 'No meta file found: ' + str(meta_file_path)
-            with open(str(meta_file_path), 'r') as f:
+            # self.pose_file = self.scene_path / 'transforms.json'
+            assert self.pose_file.exists(), 'No meta file found: ' + str(self.pose_file)
+            with open(str(self.pose_file), 'r') as f:
                 meta = json.load(f)
                 
             self.frame_id_list = []

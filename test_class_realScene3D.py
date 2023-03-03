@@ -94,10 +94,14 @@ hdr_radiance_scale = 1.
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
 # frame_ids = [5, 6, 7]
 
-scene_name = 'IndoorKitchen_v2'; hdr_radiance_scale = 3.
+# scene_name = 'IndoorKitchen_v2'; hdr_radiance_scale = 3.
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230301-135857-mm1-EVAL-20230301-035029IndoorKitchen_v2_HDR_grids_trainval.ply'
+
+scene_name = 'IndoorKitchen_v2_2'; hdr_radiance_scale = 2.
 if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
-shape_file = base_root / 'RESULTS_monosdf/20230301-135857-mm1-EVAL-20230301-035029IndoorKitchen_v2_HDR_grids_trainval.ply'
-# frame_ids = [223, 222, 221] + [0, 1, 2, 3, 4, 5, 6]
+shape_file = base_root / 'RESULTS_monosdf/20230303-013146-mm1-EVAL-IndoorKitchen_v2_2_HDR_grids_trainval_tmp.ply'
+
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
 # frame_ids = [0, 1, 2, 3, 4, 5, 6]
 # frame_ids = [0, 6, 10, 13, 69]
@@ -120,10 +124,10 @@ scene_obj = realScene3D(
         'pcd_file': pcd_file, 
         'shape_file': shape_file, 
         'if_rc': if_rc, 
-        'if_autoscale_scene': True, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
         
-        'if_reorient_y_up': True,  #  images/demo_realScene_after_center_scale_reorient.png
-        'reorient_blender_angles': [252., 2.38, 208.], 
+        'if_autoscale_scene': True, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
+        # 'if_reorient_y_up': True,  #  images/demo_realScene_after_center_scale_reorient.png
+        # 'reorient_blender_angles': [252., 2.38, 208.], 
         
         # 'normal_up_frame_info': {'frame_id': 3, 'normal_up_hw_1': (0.5, 0.35), 'normal_up_hw_2': (1., 0.6)}, # find one image with mostly floor within the desginated region
         # 'normal_left_frame_info': {'frame_id': 8, 'normal_left_hw_1': (0., 0.), 'normal_left_hw_2': (0.5, 0.5)}, # find one image with mostly floor within the desginated region
@@ -140,8 +144,6 @@ scene_obj = realScene3D(
         'poses', 
         'im_hdr', 
         'im_sdr', 
-        # 'albedo', 'roughness', 
-        # 'depth', 'normal', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
         # 'im_normal', 
         ], 
@@ -157,12 +159,20 @@ scene_obj = realScene3D(
         # 'im_H_load_sdr': 2012, 'im_W_load_sdr': 3012, 
         # 'im_H_load': 503, 'im_W_load': 753, 
         # 'im_H_resize': 512, 'im_W_resize': 768, 
-        'im_H_load_hdr': 1006, 'im_W_load_hdr': 1506, 
-        'im_H_load_sdr': 1006, 'im_W_load_sdr': 1506, 
-        'im_H_load': 1006, 'im_W_load': 1506, 
+        # 'im_H_load_hdr': 1006, 'im_W_load_hdr': 1506, 
+        # 'im_H_load_sdr': 1006, 'im_W_load_sdr': 1506, 
+        # 'im_H_load': 1006, 'im_W_load': 1506, 
         # 'im_H_resize': 503, 'im_W_resize': 753, # [obsolete] (py38) ruizhu@mm3:~/Documents/Projects/monosdf/preprocess$ python batch_extract.py --pad_H 9 --pad_W 15
+
+        # V2
         # 'im_H_resize': 512, 'im_W_resize': 768, # monosdf
-        'im_H_resize': 360, 'im_W_resize': 540, 
+        
+        # V2_2
+        'im_H_load_hdr': 512, 'im_W_load_hdr': 768, 
+        'im_H_load_sdr': 512, 'im_W_load_sdr': 768, 
+        'im_H_load': 512, 'im_W_load': 768, 
+        # 'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
+        'im_H_resize': 512, 'im_W_resize': 768, # monosdf
         }, 
     cam_params_dict={
         'near': 0.1, 'far': 1., # [in a unit box]
@@ -230,10 +240,10 @@ if opt.export:
             'poses', 
             'im_hdr', 
             'im_sdr', 
-            'im_mask', 
-            'shapes', 
-            'mi_normal', 
-            'mi_depth', 
+            # 'im_mask', 
+            # 'shapes', 
+            # 'mi_normal', 
+            # 'mi_depth', 
             ], 
         if_force=opt.force, 
         # convert from y+ (native to indoor synthetic) to z+
@@ -245,11 +255,29 @@ if opt.export:
         exporter.export_monosdf_fvp_mitsuba(
             # split=opt.split, 
             format='monosdf',
+            modality_list = [
+                'poses', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
+                'shapes', 
+                'mi_normal' if shape_file != '' else '', 
+                'mi_depth' if shape_file != '' else '', 
+            ]
             )
     if opt.export_format == 'mitsuba':
         exporter.export_monosdf_fvp_mitsuba(
             # split=opt.split, 
             format='mitsuba',
+            modality_list = [
+                'poses', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
+                'shapes', 
+                'mi_normal' if shape_file != '' else '', 
+                'mi_depth' if shape_file != '' else '', 
+            ]
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp_mitsuba(
@@ -330,13 +358,8 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
         scene_obj, 
         modality_list_vis=[
-            # 'dense_geo', # fused from 2D
             'poses', 
-            # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
-            # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            # 'layout', 
             'shapes' if shape_file != '' else '', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
-            # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 

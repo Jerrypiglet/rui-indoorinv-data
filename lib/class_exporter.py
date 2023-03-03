@@ -38,6 +38,7 @@ class exporter_scene():
         format: str='monosdf', 
         modality_list: list=[], 
         if_force: bool=False, 
+        scene_shape_file: str='', 
         if_debug_info: bool=False, 
     ):
         
@@ -49,6 +50,7 @@ class exporter_scene():
         self.format = format
         assert self.format in ['monosdf', 'lieccv22', 'fvp', 'mitsuba'], '[%s] format: %s is not supported!'%(self.__class__.__name__, self.format)
         self.if_debug_info = if_debug_info
+        self.scene_shape_file = scene_shape_file
         
         # self.lieccv22_depth_offset = 0.189
         # self.lieccv22_depth_scale = 0.515
@@ -119,6 +121,7 @@ class exporter_scene():
                             scale_mat = np.eye(4).astype(np.float32)
                             if self.os.if_autoscale_scene:
                                 print(yellow('Skipped autoscale (following Monosdf) because dataset is already auto scaled.'))
+                                (center, scale) = self.os.monosdf_scale_tuple
                             else:
                                 poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.os.pose_list]
                                 poses = np.array(poses)
@@ -127,16 +130,25 @@ class exporter_scene():
                                 max_vertices = poses[:, :3, 3].max(axis=0)
                                 center = (min_vertices + max_vertices) / 2.
                                 scale = 2. / (np.max(max_vertices - min_vertices) + 3.)
-                                print('[pose normalization to unit cube] --center, scale--', center, scale)
-                                # we should normalized to unit cube
-                                scale_mat[:3, 3] = -center
-                                scale_mat[:3 ] *= scale 
-                                scale_mat = np.linalg.inv(scale_mat)
-                            if scale_mat_path.exists() and not self.if_force:
+                                
+                            print('[pose normalization to unit cube] --center, scale--', center, scale)
+                            # we should normalized to unit cube
+                            scale_mat[:3, 3] = -center
+                            scale_mat[:3 ] *= scale 
+                            scale_mat = np.linalg.inv(scale_mat)
+                            
+                            if_write = True
+                            if scale_mat_path.exists():
                                 if_overwrite = input(red('scale_mat.npy exists. Overwrite? [y/n]'))
-                                if if_overwrite in ['y', 'Y']:
+                                if if_overwrite in ['y', 'Y'] or self.if_force:
                                     scale_mat_path.unlink()
+                                    if_write = True
+                                else:
+                                    if_write = False
+                            if if_write:
                                 np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale}, allow_pickle=True)
+                            else:
+                                print(red('SKIPPED DUMP scale_mat.npy'), if_overwrite, self.if_force)
                         else:
                             assert scale_mat_path.exists(), 'scale_mat.npy not found in %s'%str(scale_mat_path)
                             scale_mat_dict = np.load(str(scale_mat_path), allow_pickle=True).item()
@@ -399,9 +411,9 @@ class exporter_scene():
                     shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh_tmp)
                     
                     shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull%s.obj'%(shape_export_path.stem, appendix))))
-                    
                     shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
                     if_fixed_water_tight = False
+                    
                     if format in ['monosdf']:
                         # shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
                         
@@ -492,10 +504,11 @@ class exporter_scene():
             # fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
             fx = self.os._K(frame_idx)[0][0]
             fy = self.os._K(frame_idx)[1][1]
-            fov_x = np.arctan(fx * 2. / self.os.W) * 2. / np.pi * 180.
-            fov_y = np.arctan(fy * 2. / self.os.H) * 2. / np.pi * 180.
+            fov_x = np.arctan(0.5 * self.os.W / fx) * 2. / np.pi * 180.
+            fov_y = np.arctan(0.5 * self.os.H / fy) * 2. / np.pi * 180.
             
             np.save(frame_export_path / 'fov_xy.npy', {'fov_x': fov_x, 'fov_y': fov_y}) # full fov, in angles
+            IF_CREATED_EDIT_FOLDER = False
             
             for modality in modality_list_export:
                 '''
@@ -599,28 +612,135 @@ class exporter_scene():
                     cv2.imwrite(str(envMask_export_path), envMask)
                     print(blue_text('envMask exported to: %s'%(str(envMask_export_path))))
                     
+                if modality in ['lighting', 'emission'] and not IF_CREATED_EDIT_FOLDER:
+                    BRDF_results_path = frame_export_path.parent / BRDF_results_folder
+                    BRDF_edited_results_path = frame_export_path.parent / (BRDF_results_folder.replace('BRDFLight', 'EditedBRDFLight'))
+                    if not BRDF_results_path.exists():
+                        print(red('[WARNING] BRDF_results_path does not exist: %s, skipping lighting export'%str(BRDF_results_path)))
+                        continue
+                    if BRDF_edited_results_path.exists():
+                        shutil.rmtree(BRDF_edited_results_path, ignore_errors=True)
+                    shutil.copytree(str(BRDF_results_path), str(BRDF_edited_results_path))
+                    
+                    INPUT_edited_path = Path(str(frame_export_path).replace('input', 'EditedInput'))
+                    if INPUT_edited_path.exists():
+                        shutil.rmtree(INPUT_edited_path, ignore_errors=True)
+                    shutil.copytree(str(frame_export_path), str(INPUT_edited_path))
+                    for _ in INPUT_edited_path.iterdir():
+                        if _.stem.startswith('DEBUG_'): _.unlink()
+                        
+                    TEMP_path = Path(str(frame_export_path).replace('input', 'Temp'))
+                    TEMP_path.mkdir(exist_ok=True)
+
+                    IF_CREATED_EDIT_FOLDER = True
+                        
+                if modality == 'emission':
+                    geo_mesh_file_list = [_ for _ in BRDF_results_path.iterdir() if _.suffix in ['.obj', '.ply']]
+                    pose = self.os.pose_list[frame_idx]
+                    _R, _t = pose[:3, :3], pose[:3, 3:4]
+                    
+                    if hasattr(self.os, 'shape_id_dict'):
+                    # assert hasattr(self.os, 'shape_id_dict') # assuming mitsuba scene loaded from dict or single/multiple shapes (not from xml)
+                        est_scene_dict = self.os.shape_id_dict.copy()
+                    else:
+                        assert self.scene_shape_file != ''
+                        est_scene_dict = {
+                            'type': 'scene',
+                            'shape': {
+                                'id': Path(self.scene_shape_file).stem, 
+                                'type': Path(self.scene_shape_file).suffix[1:],
+                                'filename': str(self.scene_shape_file), 
+                            }, 
+                        }
+
+                    #     assert hasattr(self.os, 'xml_file')
+                    #     est_scene_root = get_XML_root(str(self.os.xml_file))
+                    #     est_scene_root = copy.deepcopy(est_scene_root)
+                    #     est_scene_shapes = est_scene_root.findall('shape')
+                        
+                    geo_mesh_id_list = []
+                    rad_pred_list = []
+                    for geo_mesh_file in geo_mesh_file_list: # images/demo_lieccv22_brdf_light_result.png; just to make sure the new lights and room geometry matches the original GT geometry shape
+                        if 'room' in geo_mesh_file.stem:
+                            continue
+                        assert ('room_' in geo_mesh_file.stem) or ('Lamp' in geo_mesh_file.stem) or ('Win' in geo_mesh_file.stem), 'Unknown geo_mesh_file: %s'%str(geo_mesh_file)
+                        _mesh = trimesh.load(str(geo_mesh_file))
+                        # transform from opengl cam to opencv world
+                        # _light_vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_light_vertices.T  - _t)).T # convert to oopengl camera coords
+                        _vertices_cam = _mesh.vertices
+                        _vertices_cam_opencv = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _vertices_cam.T).T
+                        _vertices_cam_world = (_R @ _vertices_cam_opencv.T + _t).T
+                        _mesh_world = trimesh.Trimesh(vertices=_vertices_cam_world, faces=_mesh.faces if hasattr(_mesh, 'faces') else None)
+                        geo_mesh_file_world = TEMP_path / geo_mesh_file.name
+                        _mesh_world.export(str(geo_mesh_file_world))
+                        shape_id_dict = {
+                            'id': geo_mesh_file.stem, 
+                            'type': geo_mesh_file.suffix[1:],
+                            'filename': str(geo_mesh_file_world), 
+                            }
+                        geo_mesh_id_list.append(shape_id_dict['id'])
+                        est_scene_dict[geo_mesh_file.stem] = shape_id_dict
+                        
+                        _emitter_dat_path = [_ for _ in BRDF_results_path.iterdir() if _.stem.startswith(geo_mesh_file.stem.split('_')[0].replace('Pred', 'Src')) and _.suffix == '.dat']
+                        
+                        if len(_emitter_dat_path) != 1:
+                            print(geo_mesh_file.stem.split('_')[0])
+                            print(_emitter_dat_path)
+                        _emitter_dat_path = _emitter_dat_path[0]
+                        with open(str(_emitter_dat_path), 'rb') as f:
+                            emitter_est_dict = pickle.load(f)
+                            # if 'srcSky' in emitter_est_dict:
+                            #     _rad_pred = emitter_est_dict['srcSky']
+                            _rad_pred = emitter_est_dict['src'].flatten()[:3] # take the sun intensity for windows # [TODO] better way?
+                            rad_pred_list.append(_rad_pred)
+                    # import ipdb; ipdb.set_trace()
+                        
+                    mi_scene_BRDF_results = mi.load_dict(est_scene_dict)
+                    rays_o, rays_d, ray_d_center = self.os.cam_rays_list[frame_idx]
+                    rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
+                    xs_mi = mi.Point3f(self.os.to_d(rays_o_flatten))
+                    ds_mi = mi.Vector3f(self.os.to_d(rays_d_flatten))
+                    rays_mi = mi.Ray3f(xs_mi, ds_mi)
+                    ret = mi_scene_BRDF_results.ray_intersect(rays_mi) # [mitsuba.Scene.ray_intersect] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+                    
+                    # [DEBUG] dump all shapes
+                    for shape_idx, shape, in enumerate(mi_scene_BRDF_results.shapes()):
+                        if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
+                        shape.write_ply(str(TEMP_path / ('%06d.ply'%shape_idx)))
+                    print(blue_text('Scene shapes dumped to: %s')%str(TEMP_path))
+
+                    assert len(ret.shape) == self.os.H*self.os.W
+                    
+                    emission_mask_list = []
+                    for s in tqdm(ret.shape):
+                        if s is not None:
+                            if s.id() in geo_mesh_id_list:
+                                _emitter_idx = geo_mesh_id_list.index(s.id()) + 1
+                                emission_mask_list.append(_emitter_idx)
+                            else:
+                                emission_mask_list.append(0)
+                        else:
+                            emission_mask_list.append(0)
+                    emission_id_map = np.array(emission_mask_list).reshape(self.os.H, self.os.W).astype(np.uint8) # 0 is no emitter
+
+                    emission_mask = (emission_id_map != 0).astype(np.uint8) * 255
+                    emission_mask_export_path = INPUT_edited_path / 'emission_mask.png'
+                    cv2.imwrite(str(emission_mask_export_path), emission_mask)
+                    print(blue_text('emission_mask exported to: %s'%(str(emission_mask_export_path))))
+                    
+                    emission = np.zeros((emission_mask.shape[0], emission_mask.shape[1], 3), dtype=np.float32)
+                    emission_mask_export_path = INPUT_edited_path / 'emission.exr'
+                    for _emitter_idx in np.unique(emission_id_map):
+                        if _emitter_idx == 0: continue
+                        emission[emission_id_map==_emitter_idx, :] = rad_pred_list[_emitter_idx-1].reshape((1, 3)).astype(np.float32)
+                    cv2.imwrite(str(emission_mask_export_path), emission)
+
                 if modality == 'lighting':
                     outLight_file_list = [_ for _ in self.os.scene_path.iterdir() if _.stem.startswith('outLight')]
                     assert len(outLight_file_list) > 0, 'No outLight files found at %s'%str(self.os.scene_path)
                     print(white_blue('Found %d outLight files at'%len(outLight_file_list)), str(self.os.scene_path))
-                    
-                    BRDF_results_path = frame_export_path.parent / BRDF_results_folder
-                    Edited_BRDF_results_path = frame_export_path.parent / (BRDF_results_folder.replace('BRDFLight', 'EditedBRDFLight'))
-                    if not BRDF_results_path.exists():
-                        print(red('[WARNING] BRDF_results_path does not exist: %s, skipping lighting export'%str(BRDF_results_path)))
-                        continue
-                    if Edited_BRDF_results_path.exists():
-                        shutil.rmtree(Edited_BRDF_results_path, ignore_errors=True)
-                    shutil.copytree(str(BRDF_results_path), str(Edited_BRDF_results_path))
-                    
-                    Edited_input_path = Path(str(frame_export_path).replace('input', 'EditedInput'))
-                    if Edited_input_path.exists():
-                        shutil.rmtree(Edited_input_path, ignore_errors=True)
-                    shutil.copytree(str(frame_export_path), str(Edited_input_path))
-                    for _ in Edited_input_path.iterdir():
-                        if _.stem.startswith('DEBUG_'): _.unlink()
-                    
                     assert len(outLight_file_list) == 1
+                    
                     IF_light_visible = False
                     
                     for outLight_file_idx, outLight_file in tqdm(enumerate(outLight_file_list)):
@@ -644,11 +764,11 @@ class exporter_scene():
                         
                         if IF_light_visible:
                             # clean all existing lamps files in EditedInput
-                            for _ in Edited_input_path.iterdir():
+                            for _ in INPUT_edited_path.iterdir():
                                 if 'lampMask' in str(_.stem):
                                     _.unlink(missing_ok=True); print('-Unlinked %s'%str(_))
                             # dump new vis lamp mask
-                            light_mask_path = Edited_input_path / ('lampMask_%d.png'%outLight_file_idx)
+                            light_mask_path = INPUT_edited_path / ('lampMask_%d.png'%outLight_file_idx)
                             light_mask = (~invalid_light_depth_mask).astype(np.uint8) * 255
                             if len(light_mask.shape) == 3: light_mask = light_mask[:, :, 0]
                             cv2.imwrite(str(light_mask_path), light_mask)
@@ -734,7 +854,7 @@ class exporter_scene():
                         _rad_new = np.array([_rad[0]/_rad_max, _rad[1]/_rad_max, _rad[2]/_rad_max])
                         _rad_new_BGR = (_rad_new * 255.).astype(np.uint8)[::-1]
                         
-                        light_edit_txt_path = Edited_input_path / ('light_%d_params.txt'%outLight_file_idx)
+                        light_edit_txt_path = INPUT_edited_path / ('light_%d_params.txt'%outLight_file_idx)
                         
                         if IF_light_visible:
                             _light_vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_light_vertices.T  - _t)).T # convert to oopengl camera coords
@@ -758,16 +878,16 @@ class exporter_scene():
                             # _light_vertices_cam_new = - _light_vertices_cam_dir * _light_vertices_cam_depth_new.reshape(-1, 1)
 
                             light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam, faces=_light_faces)
-                            light_mesh_path = Edited_input_path / ('visLamp_%d.obj'%outLight_file_idx)
+                            light_mesh_path = INPUT_edited_path / ('visLamp_%d.obj'%outLight_file_idx)
                             light_trimesh.export(str(light_mesh_path))
 
                             # clean all existing light - .dat files in EditedInput
-                            for _ in Edited_BRDF_results_path.iterdir():
+                            for _ in BRDF_edited_results_path.iterdir():
                                 if 'visLampSrc_' in str(_):
                                     _.unlink(); print('--Unlinked %s'%str(_))
                             
                             # dump new light - .dat
-                            light_dat_path = Edited_BRDF_results_path / ('visLampSrc_%d.dat'%outLight_file_idx)
+                            light_dat_path = BRDF_edited_results_path / ('visLampSrc_%d.dat'%outLight_file_idx)
                             light_dat_dict = {'center': np.mean(_light_vertices_cam, axis=0).reshape((1, 3)), 'src': np.array(_rad).reshape((1, 3))}
                             with open(light_dat_path, 'wb') as fOut:
                                 pickle.dump(light_dat_dict, fOut)
@@ -821,17 +941,17 @@ class exporter_scene():
                                 0)
 
                             light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam_new, faces=_light_faces)
-                            light_mesh_path = Edited_input_path / ('DEBUG_invLamp_%d.obj'%outLight_file_idx)
+                            light_mesh_path = INPUT_edited_path / ('DEBUG_invLamp_%d.obj'%outLight_file_idx)
                             light_trimesh.export(str(light_mesh_path))
-                            # clean all existing invlamps files in Edited_BRDF_results_path
-                            for _ in Edited_BRDF_results_path.iterdir():
+                            # clean all existing invlamps files in BRDF_edited_results_path
+                            for _ in BRDF_edited_results_path.iterdir():
                                 if 'invLamp' in str(_.stem):
                                     _.unlink(missing_ok=True); print('Unlinked %s'%str(_))
-                            light_mesh_path = Edited_BRDF_results_path / ('invLampPred_0_%d.obj'%outLight_file_idx)
+                            light_mesh_path = BRDF_edited_results_path / ('invLampPred_0_%d.obj'%outLight_file_idx)
                             light_trimesh.export(str(light_mesh_path))
                             
                             assert outLight_file_idx == 0, 'only one light is supported for now'
-                            light_dat_path = Edited_BRDF_results_path / 'invLampSrc.dat'
+                            light_dat_path = BRDF_edited_results_path / 'invLampSrc.dat'
                             light_dat_dict = {
                                 'center': np.mean(_light_vertices_cam_new, axis=0).reshape((1, 3)).astype(np.float32), 
                                 'src': np.array(_rad).reshape((1, 3)).astype(np.float32), 
@@ -854,7 +974,7 @@ class exporter_scene():
                         dump new light - albedo, im
                         '''
                         if IF_light_visible:
-                            albedo_path = Edited_BRDF_results_path / 'albedo.npy'
+                            albedo_path = BRDF_edited_results_path / 'albedo.npy'
                             albedo = np.load(str(albedo_path)) # (1, 3, H, W)
                             albedo[:, :, light_mask==255] = 0
                             np.save(str(albedo_path), albedo)
@@ -866,7 +986,7 @@ class exporter_scene():
                             cv2.imwrite(str(albedo_path).replace('.npy', 'DS.png'), albedoDS_im)
                             np.save(str(albedo_path).replace('.npy', 'DS.npy'), albedoDS_im.transpose(2, 0, 1)[np.newaxis])
 
-                            im_path = Edited_BRDF_results_path / 'im.png'
+                            im_path = BRDF_edited_results_path / 'im.png'
                             im = cv2.imread(str(im_path))
                             im[light_mask==255] = 255
                             cv2.imwrite(str(im_path).replace('.png', '.png'), im)
@@ -881,7 +1001,7 @@ class exporter_scene():
                             # plt.show()
                             
                             # imSmall_path = '/Volumes/RuiT7/ICCV23/indoor_synthetic/EXPORT_lieccv22/Example1_addLamp_turnOffPredLamps/BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize/imSmall.png'
-                            imSmall_path = Edited_BRDF_results_path / 'imSmall.png'
+                            imSmall_path = BRDF_edited_results_path / 'imSmall.png'
                             imSmall_im = cv2.imread(str(imSmall_path)) # uint8, 0 - 255, (H//2, W//2, 3)
                             imSmall_npy = np.load(str(imSmall_path).replace('.png', '.npy')) # float, 0.-1., (1, 3, H//2, W//2)
                             # plt.figure()
@@ -898,7 +1018,7 @@ class exporter_scene():
                             imSmall_npy[:, :, light_mask_small==255] = __.transpose(2, 0, 1)[np.newaxis][:, :, light_mask_small==255]
                             np.save(str(imSmall_path).replace('.png', '.npy'), imSmall_npy)
                             
-                            onMask_path = Edited_BRDF_results_path / 'onMask.png'
+                            onMask_path = BRDF_edited_results_path / 'onMask.png'
                             onMask_im = cv2.imread(str(onMask_path)) # uint8, 0 - 255, (H//2, W//2, 3)
                             onMask_npy = np.load(str(onMask_path).replace('.png', '.npy')) # float, 0.-1., (1, 1, H//2, W//2)
                             cv2.imwrite(str(onMask_path).replace('.png', '.png'), onMask_im)
@@ -912,7 +1032,7 @@ class exporter_scene():
                             '''
                             dump new light - depth
                             '''
-                            prediction_npy_export_path = Edited_input_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
+                            prediction_npy_export_path = INPUT_edited_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                             depth = np.load(str(prediction_npy_export_path))
                             
                             # mi_light_depth = 1./(mi_light_depth+1e-6)
@@ -921,7 +1041,7 @@ class exporter_scene():
                             # mi_light_depth = 1 / (self.lieccv22_depth_scale * mi_light_depth + self.lieccv22_depth_offset)
                             
                             depth[light_mask==255] == mi_light_depth
-                            depth_export_path = Edited_BRDF_results_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
+                            depth_export_path = BRDF_edited_results_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                             np.save(str(depth_export_path), depth)
                             np.save(str(depth_export_path).replace('.npy', 'DS.npy'), depth[::2, ::2][np.newaxis, np.newaxis].astype(np.float32))
                             depth_vis_normalized, depth_min_and_scale = vis_disp_colormap(depth, normalize=True, valid_mask=np.logical_or(~self.os.mi_invalid_depth_mask_list[frame_idx].squeeze(), light_mask==255))
@@ -942,7 +1062,7 @@ class exporter_scene():
                             mi_light_normal_cam_opencv = mi_light_normal_global @ self.os.pose_list[frame_idx][:3, :3]
                             mi_light_normal_cam_opengl = np.stack([mi_light_normal_cam_opencv[:, :, 0], -mi_light_normal_cam_opencv[:, :, 1], -mi_light_normal_cam_opencv[:, :, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)
                             
-                            normal_path = Edited_BRDF_results_path / 'normal.npy'
+                            normal_path = BRDF_edited_results_path / 'normal.npy'
                             normal = np.load(str(normal_path))
                             normal[:, :, light_mask==255] = mi_light_normal_cam_opengl.transpose(2, 0, 1)[np.newaxis][:, :, light_mask==255]
                             normal_vis = np.clip(normal.squeeze().transpose(1, 2, 0)/2.+0.5, 0., 1.)
@@ -951,7 +1071,7 @@ class exporter_scene():
                             cv2.imwrite(str(normal_path).replace('.npy', '.png'), (normal_vis*255).astype(np.uint8))
                             cv2.imwrite(str(normal_path).replace('.npy', 'DS.png'), cv2.resize((normal_vis*255).astype(np.uint8), (_W//2, _H//2), interpolation=cv2.INTER_AREA))
                             
-                            rough_path = Edited_BRDF_results_path / 'rough.npy'
+                            rough_path = BRDF_edited_results_path / 'rough.npy'
                             rough = np.load(str(rough_path)) # (1, 1, H, W), 0.-1.
                             rough[:, :, light_mask==255] = 0.
                             np.save(str(rough_path), rough)
@@ -960,7 +1080,7 @@ class exporter_scene():
                             cv2.imwrite(str(rough_path).replace('.npy', '.png'), rough_vis)
                             cv2.imwrite(str(rough_path).replace('.npy', 'DS.png'), cv2.resize(rough_vis, (_W//2, _H//2), interpolation=cv2.INTER_AREA))
                             
-                            print(blue_text('lighting FILES exported to: %s'%str(Edited_BRDF_results_path)))
+                            print(blue_text('lighting FILES exported to: %s'%str(BRDF_edited_results_path)))
 
                         
         frame_list_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / ('testList_%s.txt'%self.os.scene_name)
