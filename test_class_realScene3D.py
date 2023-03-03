@@ -103,9 +103,6 @@ if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
 shape_file = base_root / 'RESULTS_monosdf/20230303-013146-mm1-EVAL-IndoorKitchen_v2_2_HDR_grids_trainval_tmp.ply'
 
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
-# frame_ids = [0, 1, 2, 3, 4, 5, 6]
-# frame_ids = [0, 6, 10, 13, 69]
-# frame_ids = [0, 3, 8]
 # frame_ids = [0]
 
 scene_obj = realScene3D(
@@ -125,7 +122,7 @@ scene_obj = realScene3D(
         'shape_file': shape_file, 
         'if_rc': if_rc, 
         
-        'if_autoscale_scene': True, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
+        'if_autoscale_scene': False, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
         # 'if_reorient_y_up': True,  #  images/demo_realScene_after_center_scale_reorient.png
         # 'reorient_blender_angles': [252., 2.38, 208.], 
         
