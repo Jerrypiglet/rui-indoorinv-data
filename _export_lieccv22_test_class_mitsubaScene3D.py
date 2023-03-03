@@ -98,9 +98,10 @@ for export to lieccv22
 base_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 
-scene_name = 'kitchen'
-window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
+# scene_name = 'kitchen'
+# window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+# merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
+# shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
 # frame_ids = list(range(109))
 # frame_ids = [0]
 
@@ -112,9 +113,9 @@ merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manu
 # window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
 # merge_lamp_id_list=[]  # need to manually specify in XML
 
-# scene_name = 'livingroom'
-# window_area_emitter_id_list=['window_area_emitter_middle', 'window_area_emitter_left', 'window_area_emitter_right'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-# merge_lamp_id_list=[]  # need to manually specify in XML
+scene_name = 'livingroom'
+window_area_emitter_id_list=['window_area_emitter_middle', 'window_area_emitter_left', 'window_area_emitter_right'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+merge_lamp_id_list=[]  # need to manually specify in XML
 
 # frame_ids = [0]
 
@@ -122,23 +123,8 @@ merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manu
 default
 '''
 eval_models_dict = {
-    'inv-MLP_ckpt_path': '20230111-191305-inv_kitchen_190-10_specT/last.ckpt', 
-    'rad-MLP_ckpt_path': '20230110-132112-rad_kitchen_190-10_specT/last.ckpt', 
     }
 monosdf_shape_dict = {}
-
-'''
-umcomment👇 to use estimated geometry and radiance from monosdf
-'''
-# monosdf_shape_dict = {
-#     '_shape_normalized': 'normalized', 
-#     'shape_file': str(Path(MONOSDF_ROOT) / 'exps/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/plots/20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval_epoch2780.ply'), 
-#     'camera_file': str(Path(MONOSDF_ROOT) / 'data/kitchen/trainval/cameras.npz'), 
-#     'monosdf_conf_path': '20230125-161557-kitchen_HDR_EST_grids_EVALTRAIN2023_01_23_21_23_38_trainval/latest/runconf.conf', 
-#     'monosdf_ckpt_path': 'kitchen_HDR_EST_grids_gamma2_randomPixel_fixedDepthHDR_trainval/2023_01_23_21_23_38/checkpoints/ModelParameters/latest.pth', 
-#     'inv-MLP_ckpt_path': '20230127-001044-inv-kitchen/last.ckpt' # OVERRIDING eval_models_dict
-#     } # load shape from MonoSDF and un-normalize with scale/offset loaded from camera file: images/demo_shapes_monosdf.png
-# monosdf_shape_dict = {}
 
 scene_obj = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -157,7 +143,7 @@ scene_obj = mitsubaScene3D(
         # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
         'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
-        'shape_file': shape_file, 
+        # 'shape_file': shape_file, 
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
@@ -469,6 +455,7 @@ if opt.export:
             'mi_depth', 
             ], 
         if_force=opt.force, 
+        scene_shape_file=shape_file, 
         # convert from y+ (native to indoor synthetic) to z+
         # extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32),  # y=z, z=x, x=y
         # extra_transform = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32),  # z=y, y=x, x=z

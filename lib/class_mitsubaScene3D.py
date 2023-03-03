@@ -265,15 +265,15 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         elif self.scene_params_dict.get('shape_file', '') != '':
             print(yellow('Loading MI scene from shape file: ' + str(self.scene_params_dict['shape_file'])))
             shape_file = Path(self.scene_params_dict['shape_file'])
-            shape_id_dict = {
+            self.shape_id_dict = {
                 'type': shape_file.suffix[1:],
                 'filename': str(shape_file), 
                 }
             if self.extra_transform is not None:
-                shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
+                self.shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
             self.mi_scene = mi.load_dict({
                 'type': 'scene',
-                'shape_id': shape_id_dict, 
+                'shape_id': self.shape_id_dict, 
             })
         else:
             self.mi_scene = mi.load_file(str(self.xml_file))
@@ -437,7 +437,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     f_x = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length - x
                     if 'camera_angle_y' in self.meta:
                         # different focal length in x and y
-                        f_y = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_y']) # original focal length - y
+                        f_y = 0.5*self.H/np.tan(0.5*self.meta['camera_angle_y']) # original focal length - y
                     else:
                         # [TODO] @Liwen always write camera_angle_x and camera_angle_y in json
                         f_y = f_x

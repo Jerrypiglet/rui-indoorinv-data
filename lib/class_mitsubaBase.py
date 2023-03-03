@@ -149,18 +149,18 @@ class mitsubaBase():
         '''
         [!!!] transform to XML scene coords (scale & location) so that ray intersection for GT geometry does not have to adapt to ESTIMATED geometry
         '''
-        shape_id_dict = {
+        self.shape_id_dict = {
             'type': shape_file.suffix[1:],
             'filename': str(shape_file), 
             # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
             }
         if if_shape_normalized:
             # un-normalize to regular Mitsuba scene space
-            shape_id_dict['to_world'] = mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3)
+            self.shape_id_dict['to_world'] = mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3)
             
         self.mi_scene = mi.load_dict({
             'type': 'scene',
-            'shape_id': shape_id_dict, 
+            'shape_id': self.shape_id_dict, 
         })
 
     def load_monosdf_shape(self, shape_params_dict: dict):
@@ -366,9 +366,9 @@ class mitsubaBase():
             print(white_blue('Dumped sampled poses to %s'%str(pose_file_root)))
 
     def load_meta_json_pose(self, pose_file):
-        # assert Path(pose_file).exists(), str(pose_file)
-        if not Path(pose_file).exists():
-            return None, []
+        assert Path(pose_file).exists(), str(pose_file)
+        # if not Path(pose_file).exists():
+            # return None, []
         with open(pose_file, 'r') as f:
             meta = json.load(f)
         Rt_c2w_b_list = []
