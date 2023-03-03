@@ -3,8 +3,8 @@ work with Mitsuba/Blender scenes
 '''
 import sys
 
-# host = 'mm1'
-host = 'apple'
+host = 'mm1'
+# host = 'apple'
 
 from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
 PATH_HOME = PATH_HOME_dict[host]
@@ -29,9 +29,6 @@ from lib.class_eval_rad import evaluator_scene_rad
 from lib.class_eval_monosdf import evaluator_scene_monosdf
 from lib.class_eval_inv import evaluator_scene_inv
 from lib.class_eval_scene import evaluator_scene_scene
-
-from lib.class_renderer_mi_mitsubaScene_3D import renderer_mi_mitsubaScene_3D
-from lib.class_renderer_blender_mitsubaScene_3D import renderer_blender_mitsubaScene_3D
 
 parser = argparse.ArgumentParser()
 # visualizers
@@ -162,8 +159,8 @@ scene_obj = mitsubaScene3D(
         }, 
     mi_params_dict={
         # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
-        'debug_render_test_image': True, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
-        'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
+        'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
+        'debug_dump_mesh': False, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
         'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
@@ -260,42 +257,6 @@ scene_obj = mitsubaScene3D(
     emitter_params_dict={
         },
 )
-
-'''
-Mitsuba/Blender 2D renderer
-'''
-if opt.render_2d:
-    assert opt.renderer in ['mi', 'blender']
-    modality_list = [
-        'im', # both hdr and sdr
-        # 'poses', 
-        # 'seg', 
-        # 'albedo', 
-        # 'roughness', 
-        # 'depth', 'normal', 
-        # 'lighting_envmap', 
-        ]
-    if opt.renderer == 'mi':
-        renderer = renderer_mi_mitsubaScene_3D(
-            scene_obj, 
-            modality_list=modality_list, 
-            im_params_dict={}, 
-            cam_params_dict={}, 
-            mi_params_dict={},
-        )
-    if opt.renderer == 'blender':
-        renderer = renderer_blender_mitsubaScene_3D(
-            scene_obj, 
-            modality_list=modality_list, 
-            host=host, 
-            FORMAT='OPEN_EXR', 
-            # FORMAT='PNG', 
-            im_params_dict={}, 
-            cam_params_dict={}, 
-            mi_params_dict={},
-        )
-    host=host, 
-    renderer.render()
 
 eval_return_dict = {}
 '''
