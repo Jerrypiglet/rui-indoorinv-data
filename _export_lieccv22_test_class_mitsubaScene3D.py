@@ -92,25 +92,6 @@ shape_file = ''
 frame_ids = []
 invalid_frame_id_list = []
 
-# scene_name = 'kitchen_new'; 
-# shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
-# shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230226-021300-mm3-EVAL-20230225-135237kitchen_NEW_HDR_grids_trainval'
-# frame_ids = [204, 205, 206, 207, 208]
-# frame_ids = [210, 211, 212, 213, 214]
-# frame_ids = [215, 216, 217, 218, 209]
-
-# scene_name = 'bedroom'
-# shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
-# shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135215-mm1-EVAL-20230219-211718-bedroom_HDR_grids_trainval.ply'
-
-# scene_name = 'bathroom'
-# shape_file = 'data/indoor_synthetic/bathroom/scene.obj'
-
-# scene_name = 'bathroom'
-# scene_name = 'livingroom'
-
-# shape_file = 'data/indoor_synthetic/EXPORT_fvp/kitchen_new_small/val/meshes/recon.obj'
-
 '''
 for export to lieccv22
 '''
@@ -120,6 +101,8 @@ xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 scene_name = 'kitchen'
 window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
 merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
+# frame_ids = list(range(109))
+# frame_ids = [0]
 
 # scene_name = 'bedroom'
 # window_area_emitter_id_list=['window_area_emitter_1', 'window_area_emitter_2'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
@@ -517,6 +500,7 @@ if opt.export:
             'mi_seg', 
             'mi_depth', 
             'lighting', # ONLY available after getting BRDFLight result from testRealBRDFLight.py
+            'emission', 
             ], 
             split=opt.split, 
             assert_shape=(240, 320),

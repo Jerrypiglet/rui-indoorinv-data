@@ -136,7 +136,7 @@ class exporter_scene():
                                 if_overwrite = input(red('scale_mat.npy exists. Overwrite? [y/n]'))
                                 if if_overwrite in ['y', 'Y']:
                                     scale_mat_path.unlink()
-                            np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale}, allow_pickle=True)
+                                np.save(str(scale_mat_path), {'scale_mat': scale_mat, 'center': center, 'scale': scale}, allow_pickle=True)
                         else:
                             assert scale_mat_path.exists(), 'scale_mat.npy not found in %s'%str(scale_mat_path)
                             scale_mat_dict = np.load(str(scale_mat_path), allow_pickle=True).item()
@@ -490,8 +490,8 @@ class exporter_scene():
             
             # fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
             # fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
-            fx = self._K[frame_idx][0][0]
-            fy = self._K[frame_idx][1][1]
+            fx = self.os._K(frame_idx)[0][0]
+            fy = self.os._K(frame_idx)[1][1]
             fov_x = np.arctan(fx * 2. / self.os.W) * 2. / np.pi * 180.
             fov_y = np.arctan(fy * 2. / self.os.H) * 2. / np.pi * 180.
             

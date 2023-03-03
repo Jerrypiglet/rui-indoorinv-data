@@ -113,7 +113,7 @@ scene_obj = realScene3D(
         'frame_id_list': frame_ids, 
         # 'mitsuba_version': '3.0.0', 
         # 'intrinsics_path': Path(PATH_HOME) / 'data/real' / scene_name / 'intrinsic_mitsubaScene.txt', 
-        # 'axis_up': 'y+', 
+        'axis_up': 'y+', # WILL REORIENT TO y+
         # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
         'pose_file': pose_file, 
