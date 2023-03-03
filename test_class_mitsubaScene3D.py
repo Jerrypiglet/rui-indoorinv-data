@@ -183,7 +183,7 @@ scene_obj = mitsubaScene3D(
         'axis_up': 'y+', 
         # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
-        # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!
+        # 'pose_file': ('Blender', 'train.npy'), # requires scaled Blender scene!\
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
         'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         'shape_file': shape_file, 

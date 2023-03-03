@@ -19,19 +19,12 @@ np.set_printoptions(suppress=True)
 from lib.utils_misc import str2bool, white_magenta
 import argparse
 
-from lib.class_realScene3D import realScene3D
+from lib.class_texirScene3D import texirScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
-from lib.class_visualizer_scene_3D_plt import visualizer_scene_3D_plt
 
-from lib.class_eval_rad import evaluator_scene_rad
-from lib.class_eval_monosdf import evaluator_scene_monosdf
-from lib.class_eval_inv import evaluator_scene_inv
 from lib.class_eval_scene import evaluator_scene_scene
-
-from lib.class_renderer_mi_mitsubaScene_3D import renderer_mi_mitsubaScene_3D
-from lib.class_renderer_blender_mitsubaScene_3D import renderer_blender_mitsubaScene_3D
 
 parser = argparse.ArgumentParser()
 # visualizers
@@ -44,7 +37,11 @@ parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help=
 parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=True, default=False, help='if create color map for all points of Mitsuba; required: input_colors_tuple')
 # parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
 
-parser.add_argument('--split', type=str, default='train', help='')
+# parser.add_argument('--split', type=str, default='train', help='')
+
+# differential renderer
+# parser.add_argument('--render_diff', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
+# parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
 
 # renderer (mi/blender)
 parser.add_argument('--render_2d', type=str2bool, nargs='?', const=True, default=False, help='render 2D modalities')
@@ -60,7 +57,6 @@ parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=
 parser.add_argument('--eval_inv', type=str2bool, nargs='?', const=True, default=False, help='eval trained inv-MLP')
 # evaluator over scene shapes
 parser.add_argument('--eval_scene', type=str2bool, nargs='?', const=True, default=False, help='eval over scene (e.g. shapes for coverage)')
-parser.add_argument('--eval_scene_sample_type', type=str, default='vis_count', help='')
 # evaluator for MonoSDF
 parser.add_argument('--eval_monosdf', type=str2bool, nargs='?', const=True, default=False, help='eval trained MonoSDF')
 
@@ -76,105 +72,86 @@ parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=Fal
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/real'
-xml_root = Path(PATH_HOME) / 'data/real'
+base_root = Path(PATH_HOME) / 'data/TexIR/texir_to_fipt'
+xml_root = Path(PATH_HOME) / 'data/TexIR/texir_to_fipt'
+
+shape_file = ''
+frame_ids = []
+invalid_frame_id_list = []
+
+scene_name = 'Scene1'; shape_file = 'scene_fixed.obj'; hdr_radiance_scale = 0.2
+# frame_ids = [0, 5]
 
 '''
 default
 '''
-eval_models_dict = {}
+eval_models_dict = {
+    }
 monosdf_shape_dict = {}
-shape_file = ''
-frame_ids = []
-invalid_frame_id_list = []
-hdr_radiance_scale = 1.
 
-# scene_name = 'IndoorKitchen_v1'; hdr_radiance_scale = 10.
-# # if_rc = False; pcd_file = 'reconstuction_auto/dense/2/fused.ply'; pose_file = ('json', 'transforms.json')
-# if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
-# frame_ids = [5, 6, 7]
-
-scene_name = 'IndoorKitchen_v2'; hdr_radiance_scale = 3.
-if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
-shape_file = base_root / 'RESULTS_monosdf/20230301-135857-mm1-EVAL-20230301-035029IndoorKitchen_v2_HDR_grids_trainval.ply'
-# frame_ids = [223, 222, 221] + [0, 1, 2, 3, 4, 5, 6]
-# if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
-# frame_ids = [0, 1, 2, 3, 4, 5, 6]
-# frame_ids = [0, 6, 10, 13, 69]
-# frame_ids = [0, 3, 8]
-# frame_ids = [0]
-
-scene_obj = realScene3D(
+scene_obj = texirScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
+        # 'split': 'train', # train, val, train+val
         'frame_id_list': frame_ids, 
-        # 'mitsuba_version': '3.0.0', 
-        # 'intrinsics_path': Path(PATH_HOME) / 'data/real' / scene_name / 'intrinsic_mitsubaScene.txt', 
-        # 'axis_up': 'y+', 
-        # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
+        'axis_up': 'y-', 
+        'extra_transform': np.array([[1., 0., 0.], [0, -1, 0], [0, 0, -1]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
-        'pose_file': pose_file, 
-        'pcd_file': pcd_file, 
+        'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         'shape_file': shape_file, 
-        'if_rc': if_rc, 
-        'if_autoscale_scene': True, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
-        
-        'if_reorient_y_up': True,  #  images/demo_realScene_after_center_scale_reorient.png
-        'reorient_blender_angles': [252., 2.38, 208.], 
-        
-        # 'normal_up_frame_info': {'frame_id': 3, 'normal_up_hw_1': (0.5, 0.35), 'normal_up_hw_2': (1., 0.6)}, # find one image with mostly floor within the desginated region
-        # 'normal_left_frame_info': {'frame_id': 8, 'normal_left_hw_1': (0., 0.), 'normal_left_hw_2': (0.5, 0.5)}, # find one image with mostly floor within the desginated region
+        # 'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
         # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
-        'debug_render_test_image': True if shape_file != '' else False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
-        'debug_dump_mesh': False, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
-        # 'if_sample_rays_pts': True if shape_file != '' else False, # True: to sample camera rays and intersection pts given input mesh and camera poses
+        'debug_render_test_image': True, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
+        'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
-        'if_get_segs': False, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
+        'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
+    # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'poses', 
         'im_hdr', 
         'im_sdr', 
-        # 'albedo', 'roughness', 
-        # 'depth', 'normal', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
-        # 'im_normal', 
+        'im_mask', 
         ], 
     modality_filename_dict = {
         # 'poses', 
-        'im_hdr': 'merged_images/img_%04d.exr', 
-        'im_sdr': 'png_images/img_%04d.png', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        'im_hdr': 'Image/%03d_0001.exr', 
+        'im_sdr': 'Image/%03d_0001.png', 
+        'im_mask': 'valid_mask/%03d.exr', 
     }, 
     im_params_dict={
         'hdr_radiance_scale': hdr_radiance_scale, 
-        # 'im_H_load_hdr': 503, 'im_W_load_hdr': 753, 
-        # 'im_H_load_sdr': 2012, 'im_W_load_sdr': 3012, 
-        # 'im_H_load': 503, 'im_W_load': 753, 
-        # 'im_H_resize': 512, 'im_W_resize': 768, 
-        'im_H_load_hdr': 1006, 'im_W_load_hdr': 1506, 
-        'im_H_load_sdr': 1006, 'im_W_load_sdr': 1506, 
-        'im_H_load': 1006, 'im_W_load': 1506, 
-        # 'im_H_resize': 503, 'im_W_resize': 753, # [obsolete] (py38) ruizhu@mm3:~/Documents/Projects/monosdf/preprocess$ python batch_extract.py --pad_H 9 --pad_W 15
-        # 'im_H_resize': 512, 'im_W_resize': 768, # monosdf
-        'im_H_resize': 360, 'im_W_resize': 540, 
+        'im_H_load': 512, 'im_W_load': 512, 
+        'im_H_resize': 512, 'im_W_resize': 512, 
         }, 
     cam_params_dict={
-        'near': 0.1, 'far': 1., # [in a unit box]
-        # 'near': 0.5, 'far': 20., # [in a unit box]
-        # ==> if sample poses and render images 
-        'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        # 'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
-        # 'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
+        'near': 0.1, 'far': 10., 
     }, 
     lighting_params_dict={
     }, 
     shape_params_dict={
+        'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
+
+        'if_sample_pts_on_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
+        'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
+        'sample_mesh_min': 10, 
+        'sample_mesh_max': 100, 
+
+        'if_simplify_mesh': False,  # default True: simply triangles
+        'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
+        'simplify_mesh_min': 100, 
+        'simplify_mesh_max': 1000, 
+        'if_remesh': True, # False: images/demo_shapes_3D_kitchen_NO_remesh.png; True: images/demo_shapes_3D_kitchen_YES_remesh.png
+        'remesh_max_edge': 0.15,  
+        
+        'if_dump_shape': False, # True to dump fixed shape to obj file
+        'if_fix_watertight': False, 
         },
     emitter_params_dict={
         },
@@ -195,11 +172,8 @@ if opt.eval_scene:
     sample visivility to camera centers on vertices
     [!!!] set 'mesh_color_type': 'eval-vis_count'
     '''
-    if opt.export:
-        eval_scene_sample_type = 'face_normal'
     _ = evaluator_scene.sample_shapes(
-        sample_type=opt.eval_scene_sample_type, # ['']
-        # sample_type='vis_count', # ['']
+        sample_type='vis_count', # ['']
         # sample_type='t', # ['']
         # sample_type='face_normal', # ['']
         shape_params={
@@ -246,20 +220,15 @@ if opt.export:
             # split=opt.split, 
             format='monosdf',
             )
-    if opt.export_format == 'mitsuba':
-        exporter.export_monosdf_fvp_mitsuba(
-            # split=opt.split, 
-            format='mitsuba',
-            )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp_mitsuba(
             # split=opt.split, 
             format='fvp',
             modality_list = [
                 'poses', 
-                'im_hdr', 
-                'im_sdr', 
-                'im_mask', 
+                # 'im_hdr', 
+                # 'im_sdr', 
+                # 'im_mask', 
                 'shapes', 
                 ], 
             appendix=opt.export_appendix, 
@@ -268,15 +237,17 @@ if opt.export:
         exporter.export_lieccv22(
             modality_list = [
             'im_sdr', 
-            'mi_depth', 
             'mi_seg', 
+            'mi_depth', 
+            'lighting', # ONLY available after getting BRDFLight result from testRealBRDFLight.py
             ], 
             # split=opt.split, 
             assert_shape=(240, 320),
-            window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-            merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+            window_area_emitter_id_list=window_area_emitter_id_list, # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+            merge_lamp_id_list=merge_lamp_id_list,  # need to manually specify in XML
+            BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000', # transfer this back once get BRDF results
             # center_crop_HW=(240, 320), 
-            if_no_gt_appendix=True, 
+            if_no_gt_appendix=True, # do not append '_gt' to the end of the file name
         )
     
 '''
@@ -294,14 +265,12 @@ if opt.vis_2d_plt:
             # 'emission', 
             # 'depth', 
             # 'normal', 
-            'mi_depth' if shape_file != '' else '', 
-            'mi_normal' if shape_file != '' else '', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'mi_depth', 
+            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
             # 'seg_area', 'seg_env', 'seg_obj', 
-            # 'mi_seg_area' if shape_file != '' else '', 
-            # 'mi_seg_env' if shape_file != '' else '', 
-            # 'mi_seg_obj' if shape_file != '' else '', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         frame_idx_list=[0, 1, 2, 3, 4], 
         # frame_idx_list=[0], 
@@ -332,17 +301,28 @@ if opt.vis_3d_o3d:
         modality_list_vis=[
             # 'dense_geo', # fused from 2D
             'poses', 
-            # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
-            # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            # 'layout', 
-            'shapes' if shape_file != '' else '', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
-            # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             'mi', # mitsuba sampled rays, pts
             ], 
         if_debug_info=opt.if_debug_info, 
     )
 
     lighting_params_vis={
+        'if_use_mi_geometry': True, 
+        'if_use_loaded_envmap_position': True, # assuming lighting envmap endpoint position dumped by Blender renderer
+        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        'subsample_lighting_wi_rate': 500, # subsample on lighting directions: too many directions (e.g. 128x256)
+        # 'lighting_keep_ratio': 0.05, 
+        # 'lighting_further_clip_ratio': 0.1, 
+        'lighting_scale': 2, 
+        # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
+        # 'lighting_further_clip_ratio': 0.3, 
+        'lighting_keep_ratio': 0., # - good for lighting_envmap
+        'lighting_further_clip_ratio': 0., 
+        # 'lighting_keep_ratio': 0., # - debug
+        # 'lighting_further_clip_ratio': 0., 
+        'lighting_autoscale': False, 
+        'lighting_if_show_hemisphere': True, # mainly to show hemisphere and local axes: images/demo_lighting_envmap_hemisphere_axes_o3d.png
         }
 
     if opt.if_add_rays_from_eval:
@@ -355,6 +335,18 @@ if opt.vis_3d_o3d:
                         'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 0., 1.]]*lpts.shape[0]), # BLUE for EST
                     }),
                 ]) 
+        if 'lighting_fused_list' in eval_return_dict:
+            assert opt.eval_rad
+            for lighting_fused_dict in eval_return_dict['lighting_fused_list']:
+                geometry_list = visualizer_3D_o3d.process_lighting(
+                    lighting_fused_dict, 
+                    lighting_params=lighting_params_vis, 
+                    lighting_source='lighting_envmap', 
+                    lighting_color=[0., 0., 1.], 
+                    if_X_multiplied=True, 
+                    if_use_pts_end=True,
+                    )
+                visualizer_3D_o3d.add_extra_geometry(geometry_list, if_processed_geometry_list=True)
         
     if opt.if_add_color_from_eval:
         if 'samples_v_dict' in eval_return_dict:
@@ -365,31 +357,36 @@ if opt.vis_3d_o3d:
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
             'if_cam_axis_only': False, 
-            'cam_vis_scale': 0.3, 
-            'if_cam_traj': False, 
             }, 
         lighting_params=lighting_params_vis, 
         shapes_params={
             # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
-            'if_labels': True, # [OPTIONAL] if show labels (False: only show bboxes)
+            'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
             # 'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             # 'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_ceiling': False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': False, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
         },
         emitter_params={
+            # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
+            # 'scale_SG_length': 2., 
+            # 'if_sampling_emitter': True, 
+            # 'radiance_scale': radiance_scale, 
+            # 'max_plate': 32, 
         },
         mi_params={
             'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 10,
+            # 'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
+            # 'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
-            'if_cam_rays': True, 
-            'cam_rays_if_pts': shape_file != '', # if cam rays end in surface intersections; set to False to visualize rays of unit length
+            'if_cam_rays': False, 
+            'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             
             'if_normal': False, 

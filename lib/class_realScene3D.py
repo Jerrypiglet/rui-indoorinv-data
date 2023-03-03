@@ -76,9 +76,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             device = self.device, 
         )
 
-        self.if_rc = scene_params_dict.get('if_rc', False) # True: get results from Reality Capture; False: from Colmap and converted by Mustafa
-        
-        self.scene_name, self.frame_id_list_input = get_list_of_keys(scene_params_dict, ['scene_name', 'frame_id_list'], [str, list])
+        self.scene_name, self.frame_id_list_input, self.axis_up = get_list_of_keys(scene_params_dict, ['scene_name', 'frame_id_list', 'axis_up'], [str, list, str])
         self.invalid_frame_id_list = scene_params_dict.get('invalid_frame_id_list', [])
         self.frame_id_list_input = [_ for _ in self.frame_id_list_input if _ not in self.invalid_frame_id_list]
         
@@ -195,6 +193,8 @@ class realScene3D(mitsubaBase, scene2DBase):
             [TODO] better align normals to axes with clustering or PCA, than manually pick patches
             '''
             print(magenta('Re-orienting scene to y-up...'))
+
+            assert self.if_autoscale_scene
             
             reorient_transform_file = self.scene_path / '_T_reorient_after_monosdf_centering_scale.npy'
             if reorient_transform_file.exists():

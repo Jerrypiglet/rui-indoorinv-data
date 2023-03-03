@@ -238,6 +238,7 @@ class scene2DBase():
         else:
             expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_hdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_hdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop) for _, __ in zip(self.modality_file_list_dict['im_hdr'], expected_shape_list)]
+        # print(self.modality_file_list_dict['im_hdr'])
         hdr_radiance_scale = self.im_params_dict.get('hdr_radiance_scale', 1.)
         self.hdr_scale_list = [hdr_radiance_scale] * len(self.im_hdr_list)
 
@@ -264,9 +265,12 @@ class scene2DBase():
             im_sdr_file = self.modality_file_list_dict['im_sdr'][frame_idx]
 
             if not im_sdr_file.exists():
-                print(yellow('[%s] load_im_hdr: converting HDR to SDR and write to disk'%frame_idx))
+                if 'sdr_radiance_scale' in self.im_params_dict:
+                    sdr_radiance_scale = self.im_params_dict['sdr_radiance_scale']
+                else:
+                    sdr_radiance_scale = hdr_radiance_scale
+                print(yellow('[%s] [load_im_hdr] converting HDR to SDR and write to disk (hdr_radiance_scale %.2f)'%(frame_idx, hdr_radiance_scale)))
                 print('-> %s'%str(im_sdr_file))
-                sdr_radiance_scale = self.im_params_dict.get('sdr_radiance_scale', 1.)
                 convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=sdr_radiance_scale)
 
         print(blue_text('[%s] DONE. load_im_hdr'%self.parent_class_name))

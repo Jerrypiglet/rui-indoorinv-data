@@ -10,8 +10,6 @@ import mitsuba as mi
 import shutil
 import matplotlib.pyplot as plt
 
-from lib.class_realScene3D import realScene3D
-from lib.class_replicaScene3D import replicaScene3D
 from lib.utils_OR.utils_OR_mesh import get_rectangle_mesh, get_rectangle_thin_box
 from lib.utils_OR.utils_OR_xml import get_XML_root, transformToXml
 from lib.utils_io import center_crop
@@ -24,6 +22,9 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_monosdfScene3D import monosdfScene3D
 from lib.class_freeviewpointScene3D import freeviewpointScene3D
 from lib.class_matterportScene3D import matterportScene3D
+from lib.class_realScene3D import realScene3D
+from lib.class_replicaScene3D import replicaScene3D
+from lib.class_texirScene3D import texirScene3D
 
 class exporter_scene():
     '''
@@ -40,7 +41,7 @@ class exporter_scene():
         if_debug_info: bool=False, 
     ):
         
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
@@ -428,7 +429,7 @@ class exporter_scene():
                 - measurement: 1.39, real size in meters: probably 0.6
                 -> scale = 1.39 / 0.6 = 2.3166666666666664
                 '''
-                if  self.os.if_autoscale_scene:
+                if self.os.if_autoscale_scene and format == 'fvp':
                     print(red('DONT GOTGETR TO SET CORRECT SCLAE IN SCALE.TXT (equal to 1m object in the scene scale)'))
                     print('Check the demo as described here: https://gitlab.inria.fr/sibr/projects/indoor_relighting (search scale.txt)')
                     input(red('Type Y to acknowledge'))
