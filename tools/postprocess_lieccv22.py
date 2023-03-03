@@ -13,15 +13,27 @@ sys.path.insert(0, str(ROOT_PATH))
 
 from lib.utils_io import center_crop
 
-test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22/train/testList_kitchen.txt'
-scene_name = 'indoor_synthetic/kitchen'
+SPLIT = 'train'
+# SPLIT = 'val'
+
+# test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22' / SPLIT / 'testList_kitchen.txt'
+# scene_name = 'indoor_synthetic/kitchen'
+
+# test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22' / SPLIT / 'testList_bedroom.txt'
+# scene_name = 'indoor_synthetic/bedroom'
+
+# test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22' / SPLIT / 'testList_bathroom.txt'
+# scene_name = 'indoor_synthetic/bathroom'
+
+test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22' / SPLIT / 'testList_livingroom.txt'
+scene_name = 'indoor_synthetic/livingroom'
 
 scene_name_write = scene_name.split('/')[1] if '/' in scene_name else scene_name
 assert Path(test_list_path).exists(), str(test_list_path)
 split = test_list_path.parent.stem
 assert split.split('_')[0] in ['train', 'val'], str(split)
 
-TARGET_PATH = ROOT_PATH / 'data/indoor_synthetic/RESULTS/$TASK/lieccv22' / scene_name_write / split
+TARGET_PATH = ROOT_PATH / 'data/indoor_synthetic/RESULTS/$TASK/lieccv22' / scene_name_write
 
 # BRDF_result_folder = 'BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize'
 BRDF_result_folder = 'BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000'

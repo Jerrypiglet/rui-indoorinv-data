@@ -704,10 +704,10 @@ class exporter_scene():
                     ret = mi_scene_BRDF_results.ray_intersect(rays_mi) # [mitsuba.Scene.ray_intersect] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
                     
                     # [DEBUG] dump all shapes
-                    for shape_idx, shape, in enumerate(mi_scene_BRDF_results.shapes()):
-                        if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
-                        shape.write_ply(str(TEMP_path / ('%06d.ply'%shape_idx)))
-                    print(blue_text('Scene shapes dumped to: %s')%str(TEMP_path))
+                    # for shape_idx, shape, in enumerate(mi_scene_BRDF_results.shapes()):
+                    #     # if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
+                    #     shape.write_ply(str(TEMP_path / ('%06d.ply'%shape_idx)))
+                    # print(blue_text('Scene shapes dumped to: %s')%str(TEMP_path))
 
                     assert len(ret.shape) == self.os.H*self.os.W
                     
