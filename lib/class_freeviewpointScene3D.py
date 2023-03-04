@@ -76,7 +76,9 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
         if self.axis_up != self.axis_up_native:
             assert False, 'do something please'
-
+        
+        self.if_autoscale_scene = False
+        
         self.host = host
         self.device = get_device(self.host, device_id)
 
@@ -160,7 +162,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         im_HW_load_list = [frame_info_all_dict[frame_id] for frame_id in self.frame_id_list]
         self.im_HW_load_list = [(int(_.split(' ')[2])+1, int(_.split(' ')[1])+1) for _ in im_HW_load_list]
         assert len(im_HW_load_list) == len(self.frame_id_list)
-        assert 'im_H_resize' not in self.im_params_dict and 'im_W_resize' not in self.im_params_dict
+        # assert 'im_H_resize' not in self.im_params_dict and 'im_W_resize' not in self.im_params_dict
         self.H_list = [_[0] for _ in self.im_HW_load_list]
         self.W_list = [_[1] for _ in self.im_HW_load_list]
 
@@ -344,6 +346,9 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
                 K = np.array([[float(f), 0, self._W(frame_idx)/2.], [0, float(f), self._H(frame_idx)/2.], [0, 0, 1]], dtype=np.float32)
+                if self.im_W_load != self.W or self.im_H_load != self.H:
+                    scale_factor = [t / s for t, s in zip((self.H, self.W), self.im_HW_load)]
+                    K = resize_intrinsics(K, scale_factor)
                 self.K_list.append(K)
 
             print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
