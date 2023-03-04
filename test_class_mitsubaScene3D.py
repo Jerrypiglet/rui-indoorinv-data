@@ -91,15 +91,17 @@ shape_file = ''
 frame_ids = []
 invalid_frame_id_list = []
 
-scene_name = 'kitchen_new'; 
+# scene_name = 'kitchen'; 
 # shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
+# shape_file = 'data/indoor_synthetic/kitchen_new/scene_subdiv.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230226-021300-mm3-EVAL-20230225-135237kitchen_NEW_HDR_grids_trainval'
 # frame_ids = [204, 205, 206, 207, 208]
 # frame_ids = [210, 211, 212, 213, 214]
 # frame_ids = [215, 216, 217, 218, 209]
 
-# scene_name = 'bedroom'
+scene_name = 'bedroom'
 # shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
+shape_file = 'data/indoor_synthetic/bedroom/scene_suubdiv.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135215-mm1-EVAL-20230219-211718-bedroom_HDR_grids_trainval.ply'
 
 # scene_name = 'bathroom'
@@ -107,7 +109,7 @@ scene_name = 'kitchen_new';
 
 # scene_name = 'bathroom'
 # scene_name = 'livingroom'
-frame_ids = [0]
+# frame_ids = [0]
 
 # shape_file = 'data/indoor_synthetic/EXPORT_fvp/kitchen_new_small/val/meshes/recon.obj'
 
@@ -199,8 +201,8 @@ scene_obj = mitsubaScene3D(
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'poses', 
-        'im_hdr', 
-        'im_sdr', 
+        # 'im_hdr', 
+        # 'im_sdr', 
         # 'lighting_envmap', 
         # 'albedo', 'roughness', 
         # 'emission', 
@@ -604,7 +606,7 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             # 'dense_geo', # fused from 2D
-            'poses', 
+            # 'poses', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             'layout', 

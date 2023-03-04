@@ -98,9 +98,13 @@ hdr_radiance_scale = 1.
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230301-135857-mm1-EVAL-20230301-035029IndoorKitchen_v2_HDR_grids_trainval.ply'
 
-scene_name = 'IndoorKitchen_v2_2'; hdr_radiance_scale = 2.
+# scene_name = 'IndoorKitchen_v2_2'; hdr_radiance_scale = 2.
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230303-013146-mm1-EVAL-IndoorKitchen_v2_2_HDR_grids_trainval_tmp.ply'
+
+scene_name = 'IndoorKitchen_v2_3'; hdr_radiance_scale = 0.5
 if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
-shape_file = base_root / 'RESULTS_monosdf/20230303-013146-mm1-EVAL-IndoorKitchen_v2_2_HDR_grids_trainval_tmp.ply'
+shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
 # frame_ids = [0]
@@ -123,8 +127,9 @@ scene_obj = realScene3D(
         'if_rc': if_rc, 
         
         'if_autoscale_scene': False, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
+        
         # 'if_reorient_y_up': True,  #  images/demo_realScene_after_center_scale_reorient.png
-        # 'reorient_blender_angles': [252., 2.38, 208.], 
+        'reorient_blender_angles': [252., 0.209, -19.3], 
         
         # 'normal_up_frame_info': {'frame_id': 3, 'normal_up_hw_1': (0.5, 0.35), 'normal_up_hw_2': (1., 0.6)}, # find one image with mostly floor within the desginated region
         # 'normal_left_frame_info': {'frame_id': 8, 'normal_left_hw_1': (0., 0.), 'normal_left_hw_2': (0.5, 0.5)}, # find one image with mostly floor within the desginated region
@@ -164,12 +169,12 @@ scene_obj = realScene3D(
         # V2
         # 'im_H_resize': 512, 'im_W_resize': 768, # monosdf
         
-        # V2_2
+        # V2_2/V2_3
         'im_H_load_hdr': 512, 'im_W_load_hdr': 768, 
         'im_H_load_sdr': 512, 'im_W_load_sdr': 768, 
         'im_H_load': 512, 'im_W_load': 768, 
-        # 'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
-        'im_H_resize': 512, 'im_W_resize': 768, # monosdf
+        'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
+        # 'im_H_resize': 512, 'im_W_resize': 768, # monosdf
         }, 
     cam_params_dict={
         'near': 0.1, 'far': 1., # [in a unit box]

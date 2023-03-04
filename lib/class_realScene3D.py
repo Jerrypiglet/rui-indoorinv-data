@@ -195,11 +195,11 @@ class realScene3D(mitsubaBase, scene2DBase):
             '''
             print(magenta('Re-orienting scene to y-up...'))
 
-            assert self.if_autoscale_scene
+            # assert self.if_autoscale_scene
             
             reorient_transform_file = self.scene_path / '_T_reorient_after_monosdf_centering_scale.npy'
             if reorient_transform_file.exists():
-                print('Loading re-orientation from file: ', reorient_transform_file)
+                print(red('Loading re-orientation from file: ', reorient_transform_file))
                 self.reorient_transform = np.load(reorient_transform_file)
                 assert self.reorient_transform.shape == (3, 3)
             else:
@@ -219,7 +219,7 @@ class realScene3D(mitsubaBase, scene2DBase):
                 c2w = np.linalg.inv(w2c)
                 self.reorient_transform = c2w
             
-                np.save(str(self.scene_path / '_T_reorient_after_monosdf_centering_scale.npy'), self.reorient_transform)
+                # np.save(str(self.scene_path / '_T_reorient_after_monosdf_centering_scale.npy'), self.reorient_transform)
 
             self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
             self.bverts_list = [(self.reorient_transform @ bverts.T).T for bverts in self.bverts_list]
@@ -233,11 +233,11 @@ class realScene3D(mitsubaBase, scene2DBase):
             __ = np.eye(4, dtype=np.float32); __[:3, :3] = self.reorient_transform; self.reorient_transform = __
             if hasattr(self, 'mi_scene'):
                 self.load_mi_scene(self.mi_params_dict, monosdf_scale_tuple=self.monosdf_scale_tuple, extra_transform_homo=self.reorient_transform)
-            self.load_modalities()
+            # self.load_modalities()
             self.get_cam_rays(self.cam_params_dict, force=True)
             if hasattr(self, 'mi_scene'):
                 self.process_mi_scene(self.mi_params_dict, if_postprocess_mi_frames=hasattr(self, 'pose_list'), force=True)
-
+                
     @property
     def frame_num(self):
         return len(self.frame_id_list)
@@ -409,6 +409,7 @@ class realScene3D(mitsubaBase, scene2DBase):
                 
             # dict_keys(['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model', 'frames'])
             fl_x, fl_y, cx, cy, w, h, camera_model = get_list_of_keys(meta, ['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model'], [float, float, float, float, int, int, str])
+            w = int(w); h = int(h)
             assert camera_model == 'OPENCV'
             assert int(h) == self.im_params_dict['im_H_load']
             assert int(w) == self.im_params_dict['im_W_load']

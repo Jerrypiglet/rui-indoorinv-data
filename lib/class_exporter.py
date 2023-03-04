@@ -257,7 +257,10 @@ class exporter_scene():
                 file_str = {'monosdf': 'ImMask/%03d_0001.png', 'mitsuba': 'ImMask/%03d_0001.png', 'fvp': 'images/%08d_mask.png'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 
-                assert self.os.pts_from['mi']
+                if not self.os.pts_from['mi']:
+                    print(yellow('Skipped exporting im_mask because mi_depth is not available.'))
+                    continue
+                
                 if hasattr(self.os, 'im_mask_list'):
                     assert len(self.os.im_mask_list) == len(self.os.mi_invalid_depth_mask_list)
                 if_undist_mask = False
@@ -373,7 +376,9 @@ class exporter_scene():
                                 # vertices, faces = np.array(shape_trimesh.vertices), np.array(shape_trimesh.faces)+1
 
             if modality == 'shapes': 
-                assert self.os.if_loaded_shapes, 'shapes not loaded'
+                if not self.os.if_loaded_shapes:
+                    print(yellow('Skipping shapes export since shapes not loaded.'))
+                    continue
                 # T_list_ = [(None, '')]
                 # if self.extra_transform is not None: # [TODO] clean this up with below
                 #     T_list_ = [(self.extra_transform, '')]
