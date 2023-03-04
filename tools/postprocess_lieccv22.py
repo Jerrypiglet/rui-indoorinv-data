@@ -13,14 +13,14 @@ sys.path.insert(0, str(ROOT_PATH))
 
 from lib.utils_io import center_crop
 
-SPLIT = 'train'
-# SPLIT = 'val'
+# SPLIT = 'train'
+SPLIT = 'val'
 
-# test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22' / SPLIT / 'testList_kitchen.txt'
-# scene_name = 'indoor_synthetic/kitchen'
+test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22' / SPLIT / 'testList_kitchen.txt'
+scene_name = 'indoor_synthetic/kitchen'
 
 # test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22' / SPLIT / 'testList_bedroom.txt'
-# scene_name = 'indoor_synthetic/bedroom'
+# scene_name = 'indoor_synthetic/bedroom' 
 
 # test_list_path = ROOT_PATH / 'data/indoor_synthetic_resize/EXPORT_lieccv22' / SPLIT / 'testList_bathroom.txt'
 # scene_name = 'indoor_synthetic/bathroom'
@@ -37,10 +37,13 @@ TARGET_PATH = ROOT_PATH / 'data/indoor_synthetic/RESULTS/$TASK/lieccv22' / scene
 
 # BRDF_result_folder = 'BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize'
 BRDF_result_folder = 'BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000'
-
-Lighting_result_folder = 'EditedRerendering_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000'
-
 EditedBRDF_result_folder = BRDF_result_folder.replace('BRDFLight', 'EditedBRDFLight')
+
+'''
+switch between two re-rendering tasks
+'''
+# RENDER_TASK = 'relight; Lighting_result_folder = 'EditedRerendering_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000'
+RENDER_TASK = 'viewsynthesis'; Lighting_result_folder = 'Rerendering_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000'
 
 expected_shape = (160, 320)
 if_downsize = True # if downsize to 160x320
@@ -97,21 +100,44 @@ for test in tests:
       Lighting_result_path = test.parent / 'input/envMask.png'
       envMask = cv2.imread(str(Lighting_result_path), cv2.IMREAD_UNCHANGED).astype(np.float32)[:, :, np.newaxis] / 255.
       
-      lampMask_files = [_ for _ in (test.parent / 'EditedInput').iterdir() if _.stem.startswith('lampMask')]
-      if len(lampMask_files) == 0:
-         lampMask = None
+      if RENDER_TASK == 'relight':
+         lampMask_files = [_ for _ in (test.parent / 'EditedInput').iterdir() if _.stem.startswith('lampMask')]
+      elif RENDER_TASK == 'viewsynthesis':
+         emitterMask_files = [_ for _ in (test.parent / 'input').iterdir() if _.stem.startswith('winMask')]
+      else:
+         raise ValueError(RENDER_TASK)
+      
+      if len(emitterMask_files) == 0:
+         emitterMask_list = []
+         print('No emitterMask found for %s'%str(test))
          pass
       else:
-         assert len(lampMask_files) == 1, str(lampMask_files)
-         lampMask_file = lampMask_files[0]
-         lampMask = cv2.imread(str(lampMask_file), cv2.IMREAD_UNCHANGED) > 0
-         EditedBRDF_result_path = test.parent / EditedBRDF_result_folder
-         visLamp_files = [_ for _ in EditedBRDF_result_path.iterdir() if _.stem.startswith('visLampSrc')]
-         assert len(visLamp_files) == 1, str(visLamp_files)
-         visLamp_file = visLamp_files[0]
-         with open(str(visLamp_file), 'rb') as f:
-            visLampDict = pickle.load(f)
-            _rad = visLampDict['src'].reshape((1, 3))
+         # assert len(emitterMask_files) == 1, str(emitterMask_files)
+         # emitterMask_file = emitterMask_files[0]
+         emitterMask_list = []
+         for emitterMask_file in emitterMask_files:
+            emitterMask = cv2.imread(str(emitterMask_file), cv2.IMREAD_UNCHANGED) > 0
+            emitter_idx = int(emitterMask_file.stem.split('_')[-1])
+            if RENDER_TASK == 'relight':
+               _BRDF_result_path = test.parent / EditedBRDF_result_folder
+            elif RENDER_TASK == 'viewsynthesis':
+               _BRDF_result_path = test.parent / BRDF_result_folder
+            else:
+               raise ValueError(RENDER_TASK)
+               
+            if RENDER_TASK == 'relight':
+               visEmitter_files = [_ for _ in _BRDF_result_path.iterdir() if _.stem.startswith('visLampSrc_%d'%emitter_idx)]
+            elif RENDER_TASK == 'viewsynthesis':
+               visEmitter_files = [_ for _ in _BRDF_result_path.iterdir() if _.stem.startswith('visWinSrc_%d'%emitter_idx)]
+            else:
+               raise ValueError(RENDER_TASK)
+            assert len(visEmitter_files) == 1, str(visEmitter_files)
+            visEmitter_file = visEmitter_files[0]
+            with open(str(visEmitter_file), 'rb') as f:
+               visEmitterDict = pickle.load(f)
+               _rad = visEmitterDict['src'].flatten()[:3].reshape((1, 3))
+
+            emitterMask_list.append((emitterMask, _rad))
       
       Lighting_result_path = test.parent / Lighting_result_folder
       assert Lighting_result_path.exists(), str(Lighting_result_path)
@@ -119,32 +145,40 @@ for test in tests:
       assert lieccv22_relight_path.exists(), str(lieccv22_relight_path)
       lieccv22_relight = cv2.imread(str(lieccv22_relight_path), cv2.IMREAD_UNCHANGED)
       lieccv22_relight = lieccv22_relight * envMask
-      if lampMask is not None:
-         lieccv22_relight[lampMask] = _rad
+      # if emitterMask is not None:
+      #    lieccv22_relight[emitterMask] = _rad
+      if emitterMask_list != []:
+         for emitterMask, _rad in emitterMask_list:
+            lieccv22_relight[emitterMask] = _rad
       lieccv22_relight = center_crop(lieccv22_relight, expected_shape)
       
-      relight_target_path = Path(str(TARGET_PATH).replace('$TASK', 'relight')) / ('%03d_ori.exr'%frame_id)
+      relight_target_path = Path(str(TARGET_PATH).replace('$TASK', RENDER_TASK)) / ('%03d_ori.exr'%frame_id)
       relight_target_path.parent.mkdir(parents=True, exist_ok=True)
       cv2.imwrite(str(relight_target_path), lieccv22_relight)
-      print('-- relight results saved to %s'%relight_target_path)
+      print('-- %s results saved to %s'%(RENDER_TASK, relight_target_path))
 
-      # ours_relight_path = ROOT_PATH / 'data' / (scene_name.replace('_new', '')+'-relight') / split / ('Image/%03d_0001.exr'%frame_id)
-      ours_relight_path = ROOT_PATH / 'data' / scene_name.split('/')[0] / 'RESULTS/relight/ours' / scene_name.split('/')[1] / ('%03d.exr'%frame_id)
-      assert ours_relight_path.exists(), str(ours_relight_path)
-      ours_relight = cv2.imread(str(ours_relight_path), cv2.IMREAD_UNCHANGED)
-      ours_relight = cv2.resize(ours_relight, (expected_shape[1], expected_shape[0]), interpolation=cv2.INTER_AREA)
+      # ours_render_path = ROOT_PATH / 'data' / (scene_name.replace('_new', '')+'-relight') / split / ('Image/%03d_0001.exr'%frame_id)
+      # ours_render_path = ROOT_PATH / 'data' / scene_name.split('/')[0] / 'RESULTS' / RENDER_TASK / 'ours' / scene_name.split('/')[1] / ('%03d.exr'%frame_id)
+      # assert ours_render_path.exists(), str(ours_render_path)
+      # ours_render = cv2.imread(str(ours_render_path), cv2.IMREAD_UNCHANGED)
+      # ours_render = cv2.resize(ours_render, (expected_shape[1], expected_shape[0]), interpolation=cv2.INTER_AREA)
       
-      relight_ours_ref_target_path = Path(str(TARGET_PATH).replace('$TASK', 'relight')) / ('%03d_ours_ref.exr'%frame_id)
-      cv2.imwrite(str(relight_ours_ref_target_path), ours_relight)
-      print('------- relight reference results saved to %s'%relight_ours_ref_target_path)
+      # relight_ours_ref_target_path = Path(str(TARGET_PATH).replace('$TASK', RENDER_TASK)) / ('%03d_ours_ref.exr'%frame_id)
+      # cv2.imwrite(str(relight_ours_ref_target_path), ours_render)
+      # print('------- %s eference results saved to %s'%(RENDER_TASK, relight_ours_ref_target_path))
       
       if IF_ALIGH:
-         ours_relight_ = ours_relight.flatten()
-         sort_index = np.argsort(ours_relight_)
-         sort_index = sort_index[:int(ours_relight_.shape[0]*0.95)]
-         ours_relight_enery = np.sum(ours_relight.flatten()[sort_index])
+         gt_render_path = ROOT_PATH / 'data' / scene_name.split('/')[0] / scene_name.split('/')[1] / split / ('Image/%03d_0001.exr'%frame_id)
+         assert gt_render_path.exists(), str(gt_render_path)
+         gt_render = cv2.imread(str(gt_render_path), cv2.IMREAD_UNCHANGED)
+         gt_render = cv2.resize(gt_render, (expected_shape[1], expected_shape[0]), interpolation=cv2.INTER_AREA)
+         
+         gt_render_ = gt_render.flatten()
+         sort_index = np.argsort(gt_render_)
+         sort_index = sort_index[:int(gt_render_.shape[0]*0.95)]
+         gt_render_enery = np.sum(gt_render.flatten()[sort_index])
          fvp_exr_enery = np.sum(lieccv22_relight.flatten()[sort_index])
-         lieccv22_relight = lieccv22_relight * ours_relight_enery / fvp_exr_enery
+         lieccv22_relight = lieccv22_relight * gt_render_enery / fvp_exr_enery
          
          cv2.imwrite(str(relight_target_path).replace('_ori.exr', '.exr'), lieccv22_relight)
-         print('-- relight results saved to %s'%relight_target_path)
+         print('-- %s results saved to %s'%(RENDER_TASK, str(relight_target_path).replace('_ori.exr', '.exr')))

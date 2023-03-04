@@ -24,27 +24,35 @@ files = glob.glob(args.folder+"/*.ARW")
 # else:
 # files = glob.glob(args.folder+"/*.CR2")
 
-def treat(f):
-    # exrFilename = (os.path.splitext(f)[0]+".exr").replace('\\', '/')
-    # exrFilename = Path('/Volumes/RuiT7/ICCV23/real/IndoorKitchen_v2/EXR') / (Path(f).stem + '.exr')
-    exrFilename = Path('/Users/jerrypiglet/Downloads/EXR') / (Path(f).stem + '.exr')
+# def treat(f):
+#     # exrFilename = (os.path.splitext(f)[0]+".exr").replace('\\', '/')
+#     # exrFilename = Path('/Volumes/RuiT7/ICCV23/real/IndoorKitchen_v2/EXR') / (Path(f).stem + '.exr')
+#     exrFilename = Path('/home/ruizhu/Downloads/EXR_darkest') / (Path(f).stem + '.exr')
+#     # exrFilename = f
 
-    if not Path(exrFilename).parent.exists():
-        Path(exrFilename).parent.mkdir(parents=True, exist_ok=True)
+#     if not Path(exrFilename).parent.exists():
+#         Path(exrFilename).parent.mkdir(parents=True, exist_ok=True)
         
-    if not os.path.exists(str(exrFilename)):
-        subprocess.call(['/Applications/darktable.app/Contents/MacOS/darktable-cli', f , args.xmp, str(exrFilename)])
-        time.sleep(2)
-        #Open And write with cv as halfFloat
-        im = cv2.imread(str(exrFilename), cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
-        cv2.imwrite(str(exrFilename),im,  [cv2.IMWRITE_EXR_TYPE, cv2.IMWRITE_EXR_TYPE_HALF])
+#     if not os.path.exists(str(exrFilename)):
+#         # subprocess.call(['/Applications/darktable.app/Contents/MacOS/darktable-cli', f , args.xmp, str(exrFilename)])
+#         subprocess.call(['/Applications/darktable.app/Contents/MacOS/darktable-cli', f , args.xmp, str(exrFilename)])
+#         time.sleep(2)
+#         #Open And write with cv as halfFloat
+#         im = cv2.imread(str(exrFilename), cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
+#         cv2.imwrite(str(exrFilename),im,  [cv2.IMWRITE_EXR_TYPE, cv2.IMWRITE_EXR_TYPE_HALF])
 
 i=0
 for f in tqdm(files):
     print(f)
     assert Path(f).exists()
-    thrd = Thread(target=treat, args=(f, ))
-    thrd.start()
-    i+=1
-    if i%5 == 0:
-        thrd.join()
+    # thrd = Thread(target=treat, args=(f, ))
+    # subprocess.call(['/Applications/darktable.app/Contents/MacOS/darktable-cli', f , args.xmp, str(f), '--width 3000'])
+    # exrFilename = Path('/home/ruizhu/Downloads/EXR_darkest') / (Path(f).stem + '.exr')
+    exrFilename = Path('/home/ruizhu/Downloads/EXR_darkest_no_undist') / (Path(f).stem + '.exr')
+    cmd_list = ['darktable-cli', f , args.xmp, str(exrFilename), '--width', '3000']
+    print(' '.join(cmd_list))
+    subprocess.call(cmd_list)
+    # thrd.start()
+    # i+=1
+    # if i%5 == 0:
+    #     thrd.join()
