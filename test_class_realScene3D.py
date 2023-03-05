@@ -102,9 +102,16 @@ hdr_radiance_scale = 1.
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230303-013146-mm1-EVAL-IndoorKitchen_v2_2_HDR_grids_trainval_tmp.ply'
 
-scene_name = 'IndoorKitchen_v2_3'; hdr_radiance_scale = 0.5
+# scene_name = 'IndoorKitchen_v2_3'; hdr_radiance_scale = 0.5
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+
+scene_name = 'IndoorKitchen_v2_3_Dark'; hdr_radiance_scale = 1.
 if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
 shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+
+# scene_name = 'DormRoom_v1'; hdr_radiance_scale = 0.5
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
 
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
 # frame_ids = [0]
@@ -129,7 +136,7 @@ scene_obj = realScene3D(
         'if_autoscale_scene': False, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
         
         # 'if_reorient_y_up': True,  #  images/demo_realScene_after_center_scale_reorient.png
-        'reorient_blender_angles': [252., 0.209, -19.3], 
+        # 'reorient_blender_angles': [252., 0.209, -19.3], 
         
         # 'normal_up_frame_info': {'frame_id': 3, 'normal_up_hw_1': (0.5, 0.35), 'normal_up_hw_2': (1., 0.6)}, # find one image with mostly floor within the desginated region
         # 'normal_left_frame_info': {'frame_id': 8, 'normal_left_hw_1': (0., 0.), 'normal_left_hw_2': (0.5, 0.5)}, # find one image with mostly floor within the desginated region

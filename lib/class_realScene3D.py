@@ -408,8 +408,8 @@ class realScene3D(mitsubaBase, scene2DBase):
                 self.frame_id_list.append(frame_id)
                 
             # dict_keys(['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model', 'frames'])
-            fl_x, fl_y, cx, cy, w, h, camera_model = get_list_of_keys(meta, ['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model'], [float, float, float, float, int, int, str])
-            w = int(w); h = int(h)
+            fl_x, fl_y, cx, cy, camera_model = get_list_of_keys(meta, ['fl_x', 'fl_y', 'cx', 'cy', 'camera_model'], [float, float, float, float, str])
+            w = int(meta['w']); h = int(meta['h'])
             assert camera_model == 'OPENCV'
             assert int(h) == self.im_params_dict['im_H_load']
             assert int(w) == self.im_params_dict['im_W_load']
