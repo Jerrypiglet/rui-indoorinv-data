@@ -168,7 +168,7 @@ for test in tests:
       # print('------- %s eference results saved to %s'%(RENDER_TASK, relight_ours_ref_target_path))
       
       if IF_ALIGH:
-         gt_render_path = ROOT_PATH / 'data' / scene_name.split('/')[0] / scene_name.split('/')[1] / split / ('Image/%03d_0001.exr'%frame_id)
+         gt_render_path = ROOT_PATH / 'data' / scene_name.split('/')[0] / (scene_name.split('/')[1]+'-relight') / split / ('Image/%03d_0001.exr'%frame_id)
          assert gt_render_path.exists(), str(gt_render_path)
          gt_render = cv2.imread(str(gt_render_path), cv2.IMREAD_UNCHANGED)
          gt_render = cv2.resize(gt_render, (expected_shape[1], expected_shape[0]), interpolation=cv2.INTER_AREA)

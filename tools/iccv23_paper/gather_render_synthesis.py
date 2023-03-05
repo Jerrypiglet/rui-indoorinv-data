@@ -42,8 +42,8 @@ filename_dict = {
     'li22-synthesis': NA_file, 
     'li22-relight': data_root_path / 'RESULTS/relight/lieccv22' / '#SCENE_NAME' / '%03d.exr', 
     
-    'fvp-synthesis': wait_file,
-    'fvp-relight': wait_file,
+    'fvp-synthesis': data_root_path / 'RESULTS/viewsynthesis/fvp' / '#SCENE_NAME' / '%03d.exr', 
+    'fvp-relight': data_root_path / 'RESULTS/relight/fvp' / '#SCENE_NAME' / '%03d.exr', 
     
     'milo-synthesis': wait_file, 
     'milo-relight': wait_file, 

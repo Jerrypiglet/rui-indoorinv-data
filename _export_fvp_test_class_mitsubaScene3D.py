@@ -103,14 +103,14 @@ invalid_frame_id_list = []
 # shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135215-mm1-EVAL-20230219-211718-bedroom_HDR_grids_trainval.ply'
 
-scene_name = 'bathroom'
-# shape_file = 'data/indoor_synthetic/bathroom/scene.obj'
-shape_file = 'data/indoor_synthetic/bathroom/scene_subdiv.obj'
+# scene_name = 'bathroom'
+# # shape_file = 'data/indoor_synthetic/bathroom/scene.obj'
+# shape_file = 'data/indoor_synthetic/bathroom/scene_subdiv.obj'
 
-# scene_name = 'livingroom'
+scene_name = 'livingroom'
 # shape_file = 'data/indoor_synthetic/livingroom/scene.obj'
 # shape_file = 'data/indoor_synthetic/livingroom/scene_subdiv.obj'
-# shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135959-mm1-EVAL-20230219-211728-livingroom_HDR_grids_trainval.ply'
+shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135959-mm1-EVAL-20230219-211728-livingroom_HDR_grids_trainval.ply'
 
 # scene_name = 'kitchen-resize'
 # scene_name = 'kitchen'
@@ -130,7 +130,7 @@ shape_file = 'data/indoor_synthetic/bathroom/scene_subdiv.obj'
 # frame_ids = list(range(0, 202, 40))
 # frame_ids = list(range(0, 4, 1))
 # frame_ids = list(range(197))
-frame_ids = [0]
+# frame_ids = [0]
 # frame_ids = list(range(189))
 
 '''

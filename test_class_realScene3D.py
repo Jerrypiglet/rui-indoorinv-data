@@ -106,12 +106,18 @@ hdr_radiance_scale = 1.
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 
-scene_name = 'IndoorKitchen_v2_3_Dark'; hdr_radiance_scale = 1.
-if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
-shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+# scene_name = 'IndoorKitchen_v2_3_Dark'; hdr_radiance_scale = 1.
+# scene_name = 'IndoorKitchen_v2_3_Dark_v2'; hdr_radiance_scale = 1.
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 
 # scene_name = 'DormRoom_v1'; hdr_radiance_scale = 0.5
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+
+scene_name = 'ConferenceRoom'; hdr_radiance_scale = 0.7
+if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+
 
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
 # frame_ids = [0]
@@ -180,8 +186,8 @@ scene_obj = realScene3D(
         'im_H_load_hdr': 512, 'im_W_load_hdr': 768, 
         'im_H_load_sdr': 512, 'im_W_load_sdr': 768, 
         'im_H_load': 512, 'im_W_load': 768, 
-        'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
-        # 'im_H_resize': 512, 'im_W_resize': 768, # monosdf
+        # 'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
+        'im_H_resize': 512, 'im_W_resize': 768, # monosdf
         }, 
     cam_params_dict={
         'near': 0.1, 'far': 1., # [in a unit box]

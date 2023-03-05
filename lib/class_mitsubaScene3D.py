@@ -100,7 +100,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             self.extra_transform_inv = self.extra_transform.T
             self.extra_transform_homo = np.eye(4, dtype=np.float32)
             self.extra_transform_homo[:3, :3] = self.extra_transform
-
+        
+        self.if_autoscale_scene = False
 
         self.scene_path = self.rendering_root / self.scene_name
         self.scene_rendering_path = self.rendering_root / self.scene_name / self.split
