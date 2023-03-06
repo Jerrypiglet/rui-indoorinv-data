@@ -42,6 +42,8 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
     if ext in ['png', 'jpg']:
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     elif ext in ['exr']:
+        assert Path(path).exists(), f"File not found: {path}"
+        # print(path)
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)[:, :, :3]
     elif ext in ['hdr']:
         im = cv2.imread(str(path), -1)

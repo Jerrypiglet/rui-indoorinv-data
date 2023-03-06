@@ -233,11 +233,17 @@ class exporter_scene():
             if modality == 'mi_normal':
                 assert format in ['monosdf', 'mitsuba']
                 (scene_export_path / 'MiNormalGlobal').mkdir(parents=True, exist_ok=True)
+                (scene_export_path / 'MiNormalGlobal_OVERLAY').mkdir(parents=True, exist_ok=True)
                 assert self.os.pts_from['mi']
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
                     mi_normal_export_path = scene_export_path / 'MiNormalGlobal' / ('%03d_0001.png'%frame_idx)
-                    cv2.imwrite(str(mi_normal_export_path), (np.clip(self.os.mi_normal_global_list[frame_idx][:, :, [2, 1, 0]]/2.+0.5, 0., 1.)*255.).astype(np.uint8))
+                    _mi_normal = self.os.mi_normal_global_list[frame_idx][:, :, [2, 1, 0]]/2.+0.5
+                    cv2.imwrite(str(mi_normal_export_path), (np.clip(_mi_normal, 0., 1.)*255.).astype(np.uint8))
                     print(blue_text('Mitsuba normal (global) %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
+                    mi_normal_overlay = self.os.im_sdr_list[frame_idx][:, :, [2, 1, 0]].copy()
+                    mi_normal_overlay = mi_normal_overlay * 0.5 + _mi_normal * 0.5
+                    mi_normal_overlay_export_path = scene_export_path / 'MiNormalGlobal_OVERLAY' / ('%03d_0001.png'%frame_idx)
+                    cv2.imwrite(str(mi_normal_overlay_export_path), (np.clip(mi_normal_overlay, 0., 1.)*255.).astype(np.uint8))
             
             if modality == 'mi_depth':
                 assert format in ['monosdf', 'mitsuba']

@@ -14,8 +14,8 @@ from lib.utils_io import center_crop
 
 # scene_name = 'indoor_synthetic/bedroom'; appendix = '_est_fullres'
 
-scene_name = 'indoor_synthetic/bedroom'; appendix = '_gt_fullres'
-split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(208, 208+14)}
+# scene_name = 'indoor_synthetic/bedroom'; appendix = '_gt_fullres'
+# split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(208, 208+14)}
 
 # scene_name = 'indoor_synthetic/kitchen_new'; appendix = '_est_fullres'
 
@@ -25,8 +25,8 @@ split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': 
 # scene_name = 'indoor_synthetic/bathroom'; appendix = '_gt_fullres'
 # split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(109)), 'val': np.arange(109, 109+13)}
 
-# scene_name = 'indoor_synthetic/livingroom'; appendix = '_est_fullres'
-# split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(208)), 'val': np.arange(213, 213+14)}
+scene_name = 'indoor_synthetic/livingroom'; appendix = '_est_fullres'
+split_fvp = 'trainval'; frame_id_list_dict = {'train': list(range(213)), 'val': np.arange(213, 213+14)}
 
 # ----------
 
@@ -85,6 +85,7 @@ for split in ['val']:
       
       if IF_ALIGH:
          gt_render_path = ROOT_PATH / 'data' / scene_name.split('/')[0] / (scene_name.split('/')[1].replace('_new', '')+'-relight') / split / ('Image/%03d_0001.exr'%(frame_id-OFFSET))
+         print(frame_id, frame_idx, OFFSET)
          assert gt_render_path.exists(), str(gt_render_path)
          gt_render = cv2.imread(str(gt_render_path), cv2.IMREAD_UNCHANGED)
          gt_render = cv2.resize(gt_render, (expected_shape[1], expected_shape[0]), interpolation=cv2.INTER_AREA)

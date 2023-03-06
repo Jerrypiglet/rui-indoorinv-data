@@ -69,6 +69,10 @@ for method in ['GT', 'ours', 'milo', 'li22', 'fvp']:
                 if frame_id_inset is not None:
                     im_inset_path = Path(str(filename_dict[key]).replace('#SCENE_NAME', scene_name) % frame_id_inset)
                 print(im_path, im_inset_path)
+            if scene_name == 'kitchen':
+                im_inset_path = Path('/Volumes/RuiT7/ICCV23/indoor_synthetic/RESULTS/kitchen_lightsource.png')
+            if scene_name == 'bathroom':
+                im_inset_path = Path('/Volumes/RuiT7/ICCV23/indoor_synthetic/RESULTS/bathroom_lightsource.png')
             
             # print('----', im_path)
             assert im_path.exists(), 'image file not found: %s'%str(im_path)
@@ -87,7 +91,7 @@ for method in ['GT', 'ours', 'milo', 'li22', 'fvp']:
                 im_inset = cv2.imread(str(im_inset_path), cv2.IMREAD_UNCHANGED)[:, :, :3]
                 if im_inset.dtype == np.uint8:
                     im_inset = im_inset.astype(np.float32) / 255.
-                if modality in ['synthesis', 'relight'] and not filename_dict[key] in [wait_file, where_file, NA_file]:
+                if modality in ['synthesis', 'relight'] and not filename_dict[key] in [wait_file, where_file, NA_file] and im_inset_path.suffix == '.exr':
                     im_inset = resize(gamma2(im_inset))
                 else:
                     im_inset = resize(clamp(im_inset))

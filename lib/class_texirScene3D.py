@@ -219,6 +219,7 @@ class texirScene3D(mitsubaBase, scene2DBase):
             return
         print(yellow('Loading MI scene from shape file: ' + str(self.shape_file)))
         shape_file = Path(self.shape_file)
+        assert shape_file.exists(), 'Shape file not found: ' + str(shape_file)
         shape_id_dict = {
             'type': shape_file.suffix[1:],
             'filename': str(shape_file), 

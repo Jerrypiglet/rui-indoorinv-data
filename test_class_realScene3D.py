@@ -111,16 +111,65 @@ hdr_radiance_scale = 1.
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 
-# scene_name = 'DormRoom_v1'; hdr_radiance_scale = 0.5
+# scene_name = 'IndoorKitchen_v2_merged'; hdr_radiance_scale = 0.5
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230305-180337-mm3-IndoorKitchen_v2_MERGED_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 
-scene_name = 'ConferenceRoom'; hdr_radiance_scale = 0.7
-if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# scene_name = 'DormRoom'; hdr_radiance_scale = 0.5
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# # shape_file = base_root / 'RESULTS_monosdf/20230305-142814-mm1-EVAL-20230304-173919DormRoom_v1_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230305-141754-mm1-EVAL-20230304-135016DormRoom_v1_HDR_grids_trainval.ply'
+
+# scene_name = 'ConferenceRoom'; hdr_radiance_scale = 0.7
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 
+'''
+------ final
+'''
+# scene_name = 'IndoorKitchen_v2_final_supergloo'; hdr_radiance_scale = 0.5
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_superglue.json')
+# # shape_file = base_root / 'RESULTS_monosdf/20230305-180337-mm3-IndoorKitchen_v2_MERGED_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 
-# if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
-# frame_ids = [0]
+# scene_name = 'DormRoom_v2_final'; hdr_radiance_scale = 0.5
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_colmap.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230306-022845-K-DormRoom_v2_final_supergloo_HDR_grids_trainval_tmp.ply'
+
+# scene_name = 'DormRoom_v2_final_supergloo'; hdr_radiance_scale = 0.5
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230306-022845-K-DormRoom_v2_final_supergloo_HDR_grids_trainval_tmp.ply'
+
+# scene_name = 'IndoorKitchenV3_final'; hdr_radiance_scale = 0.5
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_colmap.json')
+# shape_file = base_root / 'RESULTS_monosdf/'
+
+scene_name = 'IndoorKitchenV3_final_supergloo'; hdr_radiance_scale = 0.5
+if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_superglue.json'); invalid_frame_id_list = [262]
+shape_file = base_root / 'RESULTS_monosdf/20230306-040256-K-IndoorKitchenV3_final_supergloo_HDR_grids_trainval.ply'
+
+# scene_name = 'ConferenceRoom_v2_final'; hdr_radiance_scale = 0.5
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
+# shape_file = base_root / 'RESULTS_monosdf/'
+
+# scene_name = 'ConferenceRoom_v2_final_supergloo'; hdr_radiance_scale = 0.5
+# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_superglue.json')
+# shape_file = base_root / 'RESULTS_monosdf/'
+
+im_params_dict={
+    'hdr_radiance_scale': hdr_radiance_scale, 
+    # V2_2/V2_3
+    'im_H_load_hdr': 512, 'im_W_load_hdr': 768, 
+    'im_H_load_sdr': 512, 'im_W_load_sdr': 768, 
+    'im_H_load': 512, 'im_W_load': 768, 
+}
+if opt.export_format == 'mitsuba':
+    im_params_dict.update({
+        'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
+    })
+else:
+    im_params_dict.update({
+        'im_H_resize': 512, 'im_W_resize': 768, # monosdf
+    })
 
 scene_obj = realScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -168,27 +217,7 @@ scene_obj = realScene3D(
         'im_sdr': 'png_images/img_%04d.png', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
     }, 
-    im_params_dict={
-        'hdr_radiance_scale': hdr_radiance_scale, 
-        # 'im_H_load_hdr': 503, 'im_W_load_hdr': 753, 
-        # 'im_H_load_sdr': 2012, 'im_W_load_sdr': 3012, 
-        # 'im_H_load': 503, 'im_W_load': 753, 
-        # 'im_H_resize': 512, 'im_W_resize': 768, 
-        # 'im_H_load_hdr': 1006, 'im_W_load_hdr': 1506, 
-        # 'im_H_load_sdr': 1006, 'im_W_load_sdr': 1506, 
-        # 'im_H_load': 1006, 'im_W_load': 1506, 
-        # 'im_H_resize': 503, 'im_W_resize': 753, # [obsolete] (py38) ruizhu@mm3:~/Documents/Projects/monosdf/preprocess$ python batch_extract.py --pad_H 9 --pad_W 15
-
-        # V2
-        # 'im_H_resize': 512, 'im_W_resize': 768, # monosdf
-        
-        # V2_2/V2_3
-        'im_H_load_hdr': 512, 'im_W_load_hdr': 768, 
-        'im_H_load_sdr': 512, 'im_W_load_sdr': 768, 
-        'im_H_load': 512, 'im_W_load': 768, 
-        # 'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
-        'im_H_resize': 512, 'im_W_resize': 768, # monosdf
-        }, 
+    im_params_dict=im_params_dict, 
     cam_params_dict={
         'near': 0.1, 'far': 1., # [in a unit box]
         # 'near': 0.5, 'far': 20., # [in a unit box]
@@ -426,7 +455,7 @@ if opt.vis_3d_o3d:
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 10,
 
-            'if_cam_rays': True, 
+            'if_cam_rays': False, 
             'cam_rays_if_pts': shape_file != '', # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             

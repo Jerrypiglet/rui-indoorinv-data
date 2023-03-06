@@ -266,6 +266,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         elif self.scene_params_dict.get('shape_file', '') != '':
             print(yellow('Loading MI scene from shape file: ' + str(self.scene_params_dict['shape_file'])))
             shape_file = Path(self.scene_params_dict['shape_file'])
+            assert shape_file.exists(), 'Shape file not found: ' + str(shape_file)
             self.shape_id_dict = {
                 'type': shape_file.suffix[1:],
                 'filename': str(shape_file), 

@@ -325,6 +325,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             return
         print(yellow('Loading MI scene from shape file: ' + str(self.scene_params_dict['shape_file'])))
         shape_file = Path(self.scene_params_dict['shape_file'])
+        assert shape_file.exists(), 'Shape file not found: ' + str(shape_file)
         shape_id_dict = {
             'type': shape_file.suffix[1:],
             'filename': str(shape_file), 
@@ -408,7 +409,7 @@ class realScene3D(mitsubaBase, scene2DBase):
                 self.frame_id_list.append(frame_id)
                 
             # dict_keys(['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model', 'frames'])
-            fl_x, fl_y, cx, cy, camera_model = get_list_of_keys(meta, ['fl_x', 'fl_y', 'cx', 'cy', 'camera_model'], [float, float, float, float, str])
+            fl_x, fl_y, cx, cy, camera_model = get_list_of_keys(meta, ['fl_x', 'fl_y', 'cx', 'cy', 'camera_model'])
             w = int(meta['w']); h = int(meta['h'])
             assert camera_model == 'OPENCV'
             assert int(h) == self.im_params_dict['im_H_load']
