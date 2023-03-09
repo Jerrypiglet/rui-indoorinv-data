@@ -78,6 +78,7 @@ class realScene3D(mitsubaBase, scene2DBase):
 
         self.scene_name, self.frame_id_list_input, self.axis_up = get_list_of_keys(scene_params_dict, ['scene_name', 'frame_id_list', 'axis_up'], [str, list, str])
         self.invalid_frame_id_list = scene_params_dict.get('invalid_frame_id_list', [])
+        self.invalid_frame_idx_list = scene_params_dict.get('invalid_frame_idx_list', [])
         self.frame_id_list_input = [_ for _ in self.frame_id_list_input if _ not in self.invalid_frame_id_list]
         
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
@@ -403,11 +404,21 @@ class realScene3D(mitsubaBase, scene2DBase):
                 meta = json.load(f)
                 
             self.frame_id_list = []
-            for idx in range(len(meta['frames'])):
-                file_path = meta['frames'][idx]['file_path']
+            for frame_idx in range(len(meta['frames'])):
+                file_path = meta['frames'][frame_idx]['file_path']
                 frame_id = int(file_path.split('/')[-1].split('.')[0].replace('img_', ''))
                 self.frame_id_list.append(frame_id)
-                
+            if self.invalid_frame_id_list != []:
+                _N = len(self.frame_id_list)
+                self.frame_id_list = [x for x in self.frame_id_list if x not in self.invalid_frame_id_list]
+                # print('Invalid frame id list: %s'%str(self.invalid_frame_id_list)
+                print(magenta('FIRSTLY, removed %d invalid frames with invalid_frame_id_list'%(_N - len(self.frame_id_list))))
+            # assert self.invalid_frame_id_list == [], 'not to complicate things'
+            if self.invalid_frame_idx_list != []:
+                _N = len(self.frame_id_list)
+                self.frame_id_list = [x for idx, x in enumerate(self.frame_id_list) if idx not in self.invalid_frame_idx_list]
+                print(magenta('THEN, BASED ON NEW IDX, Removed %d invalid frames with invalid_frame_idx_list'%(_N - len(self.frame_id_list))))
+            
             # dict_keys(['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model', 'frames'])
             fl_x, fl_y, cx, cy, camera_model = get_list_of_keys(meta, ['fl_x', 'fl_y', 'cx', 'cy', 'camera_model'])
             w = int(meta['w']); h = int(meta['h'])
@@ -422,6 +433,11 @@ class realScene3D(mitsubaBase, scene2DBase):
             self.K_list = [K] * len(self.frame_id_list)
             
             for frame_idx in range(len(meta['frames'])):
+                file_path = meta['frames'][frame_idx]['file_path']
+                frame_id = int(file_path.split('/')[-1].split('.')[0].replace('img_', ''))
+                if frame_id in self.invalid_frame_id_list:
+                    continue
+
                 c2w = np.array(meta['frames'][frame_idx]['transform_matrix']).astype(np.float32)
                 c2w[2, :] *= -1
                 c2w = c2w[np.array([1, 0, 2, 3]), :]
@@ -449,6 +465,10 @@ class realScene3D(mitsubaBase, scene2DBase):
                 
                 # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
                 # origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+                
+            if self.invalid_frame_idx_list is not None:
+                self.pose_list = [x for idx, x in enumerate(self.pose_list) if idx not in self.invalid_frame_idx_list]
+                self.origin_lookatvector_up_list = [x for idx, x in enumerate(self.origin_lookatvector_up_list) if idx not in self.invalid_frame_idx_list]
 
         elif self.pose_format in ['bundle']:
             with open(str(self.pose_file), 'r') as camIn:

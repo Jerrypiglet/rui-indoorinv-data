@@ -87,7 +87,10 @@ monosdf_shape_dict = {}
 shape_file = ''
 frame_ids = []
 invalid_frame_id_list = []
+invalid_frame_idx_list = []
 hdr_radiance_scale = 1.
+sdr_radiance_scale = 1.
+if_rc = False; pcd_file = ''; 
 
 # scene_name = 'IndoorKitchen_v1'; hdr_radiance_scale = 10.
 # # if_rc = False; pcd_file = 'reconstuction_auto/dense/2/fused.ply'; pose_file = ('json', 'transforms.json')
@@ -113,7 +116,8 @@ hdr_radiance_scale = 1.
 
 # scene_name = 'IndoorKitchen_v2_merged'; hdr_radiance_scale = 0.5
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
-# shape_file = base_root / 'RESULTS_monosdf/20230305-180337-mm3-IndoorKitchen_v2_MERGED_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+# # shape_file = base_root / 'RESULTS_monosdf/20230305-180337-mm3-IndoorKitchen_v2_MERGED_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230305-180337-mm3-IndoorKitchen_v2_MERGED_HDR_grids_trainval_gamma2_L1_Lr1e-4S25_2.ply'
 
 # scene_name = 'DormRoom'; hdr_radiance_scale = 0.5
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
@@ -122,41 +126,69 @@ hdr_radiance_scale = 1.
 
 # scene_name = 'ConferenceRoom'; hdr_radiance_scale = 0.7
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
-# shape_file = base_root / 'RESULTS_monosdf/20230303-233627-mm3-IndoorKitchen_v2_3_RE_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 
 '''
 ------ final
 '''
 # scene_name = 'IndoorKitchen_v2_final_supergloo'; hdr_radiance_scale = 0.5
-# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_superglue.json')
-# # shape_file = base_root / 'RESULTS_monosdf/20230305-180337-mm3-IndoorKitchen_v2_MERGED_HDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+# pose_file = ('json', 'transforms_superglue.json')
 
 # scene_name = 'DormRoom_v2_final'; hdr_radiance_scale = 0.5
-# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_colmap.json')
+# pose_file = ('json', 'transforms_colmap.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230306-022845-K-DormRoom_v2_final_supergloo_HDR_grids_trainval_tmp.ply'
 
 # scene_name = 'DormRoom_v2_final_supergloo'; hdr_radiance_scale = 0.5
-# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
-# shape_file = base_root / 'RESULTS_monosdf/20230306-022845-K-DormRoom_v2_final_supergloo_HDR_grids_trainval_tmp.ply'
+# pose_file = ('json', 'transforms.json'); 
+# invalid_frame_idx_list = [187, 188, 189, 190, 197, 198, 199, 200, 201, 202, 222, 223, 225, 215, 214, 213, 212, 211, 210, 204, 203, 205]
+# # shape_file = base_root / 'RESULTS_monosdf/20230306-022845-K-DormRoom_v2_final_supergloo_HDR_grids_trainval_tmp.ply'
+# # shape_file = base_root / 'RESULTS_monosdf/20230306-123126-K-DormRoom_v2_final_supergloo_FIXED_SDR_grids_trainval.ply'
+# # shape_file = base_root / 'RESULTS_monosdf/20230306-174427-mm1-DormRoom_v2_final_supergloo_FIXED2_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply' # experimental
+# shape_file = base_root / 'RESULTS_monosdf/20230306-234504-K-DormRoom_v2_final_supergloo_FIXED3_SDR_grids_trainval_tmp.ply'
 
 # scene_name = 'IndoorKitchenV3_final'; hdr_radiance_scale = 0.5
-# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_colmap.json')
+# pose_file = ('json', 'transforms_colmap.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230306-042253-K-IndoorKitchenV3_final_HDR_grids_trainval.ply'
+
+# scene_name = 'IndoorKitchenV3_final_supergloo'; hdr_radiance_scale = 0.5
+# pose_file = ('json', 'transforms_superglue.json'); 
+# invalid_frame_idx_list = [243, 105, 158, 198, 200, 209, 208, 217, 218]
+# shape_file = base_root / 'RESULTS_monosdf/20230306-040256-K-IndoorKitchenV3_final_supergloo_HDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230306-052812-K-IndoorKitchenV3_final_supergloo_HDR_grids_trainval_FIXlast.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230306-040343-K-IndoorKitchenV3_final_supergloo_SDR_grids_trainval.ply'
+
+# scene_name = 'IndoorKitchenV3_final_supergloo_RE'; hdr_radiance_scale = 0.5
+# pose_file = ('json', 'transforms_superglue_RE.json'); 
+# invalid_frame_idx_list = [243, 105, 158, 198, 200, 209, 208, 217, 218]
+# shape_file = base_root / 'RESULTS_monosdf/20230306-040256-K-IndoorKitchenV3_final_supergloo_HDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230306-052812-K-IndoorKitchenV3_final_supergloo_HDR_grids_trainval_FIXlast.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230306-040343-K-IndoorKitchenV3_final_supergloo_SDR_grids_trainval.ply'
+
+# scene_name = 'ConferenceRoomV2_final'; hdr_radiance_scale = 0.5
+# pose_file = ('json', 'transforms_colmap.json')
 # shape_file = base_root / 'RESULTS_monosdf/'
 
-scene_name = 'IndoorKitchenV3_final_supergloo'; hdr_radiance_scale = 0.5
-if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_superglue.json'); invalid_frame_id_list = [262]
-shape_file = base_root / 'RESULTS_monosdf/20230306-040256-K-IndoorKitchenV3_final_supergloo_HDR_grids_trainval.ply'
+# scene_name = 'ConferenceRoomV2_final_supergloo'; hdr_radiance_scale = 1.
+# pose_file = ('json', 'transforms_superglue.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230306-060630-K-ConferenceRoomV2_final_supergloo_HDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230306-072825-K-ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230306-152848-mm1-EVAL-20230306-072825ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
 
-# scene_name = 'ConferenceRoom_v2_final'; hdr_radiance_scale = 0.5
-# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
-# shape_file = base_root / 'RESULTS_monosdf/'
+# scene_name = 'IndoorKitchenV4'; hdr_radiance_scale = 1
+# # # pose_file = ('json', 'transforms_superglue/transforms_bright.json'); invalid_frame_idx_list = [261, 254, 255, 230, 231, 180]
+# # shape_file = base_root / 'RESULTS_monosdf/20230306-190430-mm1-IndoorKitchenV4_SDR_grids_trainval.ply'
+# pose_file = ('json', 'transforms_colmap/transforms.json'); invalid_frame_idx_list = [232, 241]; invalid_frame_id_list = list(range(265, 285)) # need to exclude 265 from both...
+# shape_file = base_root / 'RESULTS_monosdf/20230307-005359-mm1-IndoorKitchenV4_COLMAP_SDR_grids_trainval.ply'
 
-# scene_name = 'ConferenceRoom_v2_final_supergloo'; hdr_radiance_scale = 0.5
-# if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms_superglue.json')
-# shape_file = base_root / 'RESULTS_monosdf/'
+scene_name = 'ConferenceRoomV2_final_MORE'; hdr_radiance_scale = 1.; sdr_radiance_scale = 0.5
+# pose_file = ('json', 'transforms_colmap.json')
+pose_file = ('json', 'transforms_superglue.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230307-022305-mm1-ConferenceRoomV2_final_MORE_SDR_grids_trainval.ply'
+shape_file = base_root / 'RESULTS_monosdf/20230307-030111-mm1-ConferenceRoomV2_final_MORE_HDR_grids_trainval.ply'
+if opt.export_format == 'mitsuba': invalid_frame_idx_list = list(range(190, 227))
 
 im_params_dict={
     'hdr_radiance_scale': hdr_radiance_scale, 
+    'sdr_radiance_scale': sdr_radiance_scale, 
     # V2_2/V2_3
     'im_H_load_hdr': 512, 'im_W_load_hdr': 768, 
     'im_H_load_sdr': 512, 'im_W_load_sdr': 768, 
@@ -183,6 +215,7 @@ scene_obj = realScene3D(
         'axis_up': 'y+', # WILL REORIENT TO y+
         # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
+        'invalid_frame_idx_list': invalid_frame_idx_list,
         'pose_file': pose_file, 
         'pcd_file': pcd_file, 
         'shape_file': shape_file, 
@@ -402,7 +435,7 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
         scene_obj, 
         modality_list_vis=[
-            'poses', 
+            # 'poses', 
             'shapes' if shape_file != '' else '', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             'mi', # mitsuba sampled rays, pts
             ], 

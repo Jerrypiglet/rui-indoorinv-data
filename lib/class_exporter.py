@@ -59,7 +59,7 @@ class exporter_scene():
         for _ in self.modality_list_export:
             if _ == '': continue
             assert _ in self.valid_modalities, '[%s] modality: %s is not supported!'%(self.__class__.__name__, _)
-
+            
     @property
     def valid_modalities(self):
         return ['im_hdr', 'im_sdr', 'poses', 'im_mask', 'shapes', 'mi_normal', 'mi_depth', 'lighting']
@@ -252,7 +252,10 @@ class exporter_scene():
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
                     mi_depth_vis_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.png'%frame_idx)
                     mi_depth = self.os.mi_depth_list[frame_idx].squeeze()
-                    depth_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.os.mi_invalid_depth_mask_list[frame_idx])
+                    if np.sum(~self.os.mi_invalid_depth_mask_list[frame_idx]) == 0:
+                        depth_normalized = mi_depth
+                    else:
+                        depth_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.os.mi_invalid_depth_mask_list[frame_idx])
                     cv2.imwrite(str(mi_depth_vis_export_path), depth_normalized)
                     print(blue_text('depth (vis) %d exported to: %s'%(frame_id, str(mi_depth_vis_export_path))))
                     mi_depth_npy_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.npy'%frame_idx)
