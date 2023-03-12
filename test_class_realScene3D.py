@@ -173,7 +173,7 @@ if_reorient_y_up_skip_shape = False # do not transform shape; only transform pos
 # pose_file = ('json', 'transforms_colmap.json')
 # shape_file = base_root / 'RESULTS_monosdf/'
 
-# +++++ ConferenceRoomV2_final_supergloo_aligned +++++
+# +++++ ConferenceRoomV2_final_supergloo_aligned +++++ [SUPP]
 scene_name = 'ConferenceRoomV2_final_supergloo'; hdr_radiance_scale = 2.
 pose_file = ('json', 'transforms_superglue.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230306-060630-K-ConferenceRoomV2_final_supergloo_HDR_grids_trainval.ply'
@@ -182,9 +182,8 @@ pose_file = ('json', 'transforms_superglue.json')
 shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
 if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
-window_area_emitter_id_list=[''] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-merge_lamp_id_list=['']  # need to manually specify in XML
-
+emitter_thres = 4.
+frame_ids = [9, 161, 180, 50]
 
 '''
 Supplementary
@@ -225,11 +224,10 @@ Supplementary
 
 # +++++ ClassRoom_aligned +++++
 # scene_name = 'ClassRoom'; hdr_radiance_scale = 3 # BETTER intrinsics
-# shape_file = base_root / 'RESULTS_monosdf/20230310-035028-mm1-ClassRoom_SDR_grids_trainval.ply'
-# shape_file = base_root / 'RESULTS_monosdf/20230310-035028-mm1-ClassRoom_SDR_grids_trainval.ply'
+# # shape_file = base_root / 'RESULTS_monosdf/20230310-035028-mm1-ClassRoom_SDR_grids_trainval.ply'
 # pose_file = ('json', 'transforms_colmap.json'); 
 # shape_file = base_root / 'RESULTS_monosdf/classroom.obj'; 
-# shape_file = base_root / 'RESULTS_monosdf/20230310-162753-K-ClassRoom_aligned_SDR_grids_trainval.ply'; 
+# # shape_file = base_root / 'RESULTS_monosdf/20230310-162753-K-ClassRoom_aligned_SDR_grids_trainval.ply'; 
 # if_reorient_y_up = True; reorient_blender_angles = [-184, -19.7, -0.757] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
 
@@ -258,7 +256,7 @@ Supplementary
 # invalid_frame_id_list = [198, 199, 200] # original lighting
 # invalid_frame_idx_list = [7, 8, 171, 172, 173, 174, 175] # bad poses
 # pose_file = ('json', 'transforms_supergloo.json')
-# shape_file = base_root / 'RESULTS_monosdf/20230311-132201-mm1-Bedroom_supergloo_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230311-164356-K-Bedroom_supergloo_aligned_SDR_grids_trainval.ply'
 # if_reorient_y_up = True; reorient_blender_angles = [172, 55.3, -1.07] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
 
@@ -266,9 +264,23 @@ Supplementary
 # invalid_frame_id_list = [198, 199, 200] # original lighting
 # invalid_frame_idx_list = [18, 22, 23, 24, 25, 26] # bad poses
 # pose_file = ('json', 'transforms_colmap.json')
-# shape_file = base_root / 'RESULTS_monosdf/20230311-132159-mm1-Bedroom_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230311-164210-K-Bedroom_aligned_SDR_grids_trainval.ply'
 # if_reorient_y_up = True; reorient_blender_angles = [171, 177, -361] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
+
+# +++++ Bedroom_MORE_aligned +++++
+# scene_name = 'Bedroom_MORE'; hdr_radiance_scale = 1; sdr_radiance_scale = 2
+# invalid_frame_id_list = [198, 199, 200, 202, 203, 206, 207, 209, 217, ] # original lighting
+# invalid_frame_idx_list = [18, 22, 23, 24, 25, 26] # bad poses
+# pose_file = ('json', 'transforms_colmap.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230312-132325-mm3-Bedroom_MORE_aligned_HDR_grids_trainval.ply'
+# if_reorient_y_up = True; reorient_blender_angles = [-197, 177, -10.2]
+# if_reorient_y_up_skip_shape = True
+
+# scene_name = 'Bedroom_MORE_supergloo'; hdr_radiance_scale = 1; sdr_radiance_scale = 2
+# invalid_frame_id_list = [198, 199, 200, 202, 203, 206, 207, 209, 217, ] # original lighting
+# invalid_frame_idx_list = [7, 8, 171, 172, 173, 174, 175] # bad poses
+# pose_file = ('json', 'transforms_supergloo.json')
 
 # <<------------
 
@@ -294,6 +306,10 @@ im_params_dict={
 if opt.export_format == 'mitsuba':
     im_params_dict.update({
         'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
+    })
+elif opt.export_format == 'lieccv22':
+    im_params_dict.update({
+        'im_H_resize': 240, 'im_W_resize': 320, 
     })
 else:
     im_params_dict.update({
@@ -478,11 +494,13 @@ if opt.export:
             'lighting', # ONLY available after getting BRDFLight result from testRealBRDFLight.py
             'emission', 
             ], 
-            # split=opt.split, 
+            split='real', 
             assert_shape=(240, 320),
-            window_area_emitter_id_list=window_area_emitter_id_list, # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-            merge_lamp_id_list=merge_lamp_id_list,  # need to manually specify in XML
+            window_area_emitter_id_list=[], # not available for real images
+            merge_lamp_id_list=[], # not available for real images
+            emitter_thres = emitter_thres, # same as offered to fvp
             BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000', # transfer this back once get BRDF results
+            # BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize', # transfer this back once get BRDF results
             # center_crop_HW=(240, 320), 
             if_no_gt_appendix=True, 
             appendix=opt.export_appendix, 

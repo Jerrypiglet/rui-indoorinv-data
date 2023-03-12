@@ -325,10 +325,11 @@ class realScene3D(mitsubaBase, scene2DBase):
         if not np.allclose(_T, np.eye(4, dtype=np.float32)):
             shape_id_dict['to_world'] = mi.ScalarTransform4f(_T)
 
-        self.mi_scene = mi.load_dict({
+        self.shape_id_dict = {
             'type': 'scene',
             'shape_id': shape_id_dict, 
-        })
+        }
+        self.mi_scene = mi.load_dict(self.shape_id_dict)
 
     def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True, force=False):
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)

@@ -228,7 +228,7 @@ class exporter_scene():
                     im_sdr_export_path = scene_export_path / (file_str%frame_idx)
                     cv2.imwrite(str(im_sdr_export_path), (np.clip(self.os.im_sdr_list[frame_idx][:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
                     print(blue_text('SDR image %d exported to: %s'%(frame_id, str(im_sdr_export_path))))
-                    print(self.os.modality_file_list_dict['im_sdr'][frame_idx])
+                    # print(self.os.modality_file_list_dict['im_sdr'][frame_idx])
             
             if modality == 'mi_normal':
                 assert format in ['monosdf', 'mitsuba']
@@ -320,7 +320,9 @@ class exporter_scene():
                                 
                             transform_item = shape.findall('transform')[0]
                             transform_accu = np.eye(4, dtype=np.float32)
-                            
+                            if hasattr(self.os, 'reorient_transform'):
+                                transform_accu = self.os.reorient_transform @ transform_accu
+
                             if len(transform_item.findall('rotate')) > 0:
                                 rotate_item = transform_item.findall('rotate')[0]
                                 _r_h = xml_rotation_to_matrix_homo(rotate_item)
@@ -475,6 +477,7 @@ class exporter_scene():
         assert_shape=None, 
         window_area_emitter_id_list: list=[], 
         merge_lamp_id_list: list=[], 
+        emitter_thres: float=0., 
         if_no_gt_appendix: bool=False, 
         BRDF_results_folder: str=None,
         ):
@@ -483,6 +486,7 @@ class exporter_scene():
         
         - window_area_emitter_id: id for the are light which is acrually a window...
         - merge_lamp_id_list: list of lamp ids to be merged into one
+        - emitter_thres: use this to get emitter mask, if no ground truth emitter is available
         
         '''
         assert center_crop_HW is None, 'rendered to target sizes for now: no extra center crop'
@@ -509,9 +513,10 @@ class exporter_scene():
             lamp_dict.update({enw_lamp_id: new_lamp})
             for lamp_id in merge_lamp_id_list:
                 lamp_dict.pop(lamp_id)
-            
-        print(yellow('🛋️ Found %d lamps and %d windows'%(len(lamp_dict), len(window_dict))))
-        
+        if window_area_emitter_id_list != [] or merge_lamp_id_list != []:
+            print(yellow('🛋️ Found %d lamps and %d windows in GROUND TRUTH'%(len(lamp_dict), len(window_dict))))
+        else:
+            print(yellow('💡Using emitter_thres %.2f to get emitter mask, if no ground truth emitter is available'%(emitter_thres)))
         
         frame_export_path_list = []
         for frame_idx, frame_id in enumerate(self.os.frame_id_list):
@@ -548,24 +553,10 @@ class exporter_scene():
                     mi_depth_vis_export_path = frame_export_path / ('depth_gt.png' if not if_no_gt_appendix else 'depth.png')
                     mi_depth = self.os.mi_depth_list[frame_idx].squeeze()
                     
-                    # normalize, following Zhengqin
-                    # _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
-                    # prediction = 1./(mi_depth.copy()+1e-6)
-                    # prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
-                    # predictionMin = (prediction + _mask * 1e6).min()
-                    # predictionMax = (prediction - _mask * 1e6).max()
-
-                    # prediction = (prediction - predictionMin ) \
-                    #     / (predictionMax - predictionMin )
-                    # prediction = np.clip(prediction, 0, 1)
-
-                    # prediction = 1 / (self.lieccv22_depth_scale * prediction + self.lieccv22_depth_offset)
-                    # prediction = prediction * (1 - _mask) + _mask * (1.420 + 3.869)
-                    
                     prediction = mi_depth.copy()
                     prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
 
-                    print(np.amax(prediction), np.amin(prediction))
+                    # print(np.amax(prediction), np.amin(prediction))
  
                     prediction_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                     prediction = center_crop(prediction, center_crop_HW)
@@ -581,47 +572,78 @@ class exporter_scene():
                 if modality == 'mi_seg':
                     assert self.os.pts_from['mi']
                     
-                    ret = self.os.mi_rays_ret_list[frame_idx].shape
-                    objMask = (self.os.mi_seg_dict_of_lists['obj'][frame_idx].squeeze()).astype(float) # True for indoor
-                    objMask = center_crop(objMask, center_crop_HW)
-                    objMask = objMask.astype(float).astype(bool)
-                    
                     '''
                     lampMask_%d.png / windowMask_%d.png
                     '''
-                    for emitter_dict in [lamp_dict, window_dict]:
-                    # for emitter_dict in [window_dict]:
-                    # for emitter_dict in [lamp_dict]:
-                        emitter_count = 0
-                        for _, (emitter_id, emitter) in enumerate(emitter_dict.items()):
-                            emitter_name = 'lamp' if emitter_id in lamp_dict else 'win'
-                            if '+' in emitter_id:
-                                emitter_id_list = emitter_id.split('+')
-                            else:
-                                emitter_id_list = [emitter_id]
-                            # emitter_intensity = emitter['emitter_prop']['intensity']
+                    if lamp_dict != {} or window_dict != {}: # ground truth emitters are available
+                        objMask = (self.os.mi_seg_dict_of_lists['obj'][frame_idx].squeeze()).astype(float) # True for indoor
+                        objMask = center_crop(objMask, center_crop_HW)
+                        objMask = objMask.astype(float).astype(bool)
+                        ret = self.os.mi_rays_ret_list[frame_idx].shape
                         
-                            obj_mask_list = []
-                            assert len(ret) == self.os.H*self.os.W
-                            for s in tqdm(ret):
-                                if s is not None and s.emitter() is not None:
-                                    if s.emitter().id() in emitter_id_list:
-                                        obj_mask_list.append(1)
+                        for emitter_dict in [lamp_dict, window_dict]:
+                        # for emitter_dict in [window_dict]:
+                        # for emitter_dict in [lamp_dict]:
+                            emitter_count = 0
+                            for _, (emitter_id, emitter) in enumerate(emitter_dict.items()):
+                                emitter_name = 'lamp' if emitter_id in lamp_dict else 'win'
+                                if '+' in emitter_id:
+                                    emitter_id_list = emitter_id.split('+')
+                                else:
+                                    emitter_id_list = [emitter_id]
+                                # emitter_intensity = emitter['emitter_prop']['intensity']
+                            
+                                obj_mask_list = []
+                                assert len(ret) == self.os.H*self.os.W
+                                for s in tqdm(ret):
+                                    if s is not None and s.emitter() is not None:
+                                        if s.emitter().id() in emitter_id_list:
+                                            obj_mask_list.append(1)
+                                        else:
+                                            obj_mask_list.append(0)
                                     else:
                                         obj_mask_list.append(0)
-                                else:
-                                    obj_mask_list.append(0)
-                            emitter_mask_bool = np.array(obj_mask_list).reshape(self.os.H, self.os.W)
-                            emitter_mask = emitter_mask_bool.astype(np.uint8) * 255
-                            # mi_emitter_prop = [s.emitter() for s in ret.shape if s is not None and s.emitter() is not None]
-                            if np.sum(emitter_mask.reshape(-1)) == 0: continue
-                            emitterMask_export_path = frame_export_path / ('%sMask_%d.png'%(emitter_name, emitter_count)) # 255 for emitter
-                            cv2.imwrite(str(emitterMask_export_path), emitter_mask)
+                                emitter_mask_bool = np.array(obj_mask_list).reshape(self.os.H, self.os.W)
+                                emitter_mask = emitter_mask_bool.astype(np.uint8) * 255
+                                # mi_emitter_prop = [s.emitter() for s in ret.shape if s is not None and s.emitter() is not None]
+                                if np.sum(emitter_mask.reshape(-1)) == 0: continue
+                                emitterMask_export_path = frame_export_path / ('%sMask_%d.png'%(emitter_name, emitter_count)) # 255 for emitter
+                                cv2.imwrite(str(emitterMask_export_path), emitter_mask)
+                                print(blue_text('%sMask exported to: %s'%(emitter_name, str(emitterMask_export_path))))
+                                emitter_count += 1
+                                
+                                if emitter_name == 'win':
+                                    objMask = np.logical_and(objMask, ~emitter_mask_bool)
+                    else:
+                        assert emitter_thres != 0. # get emitter masks from thresholding; pretending to be lamps
+                        im_hdr = self.os.im_hdr_list[frame_idx]
+                        emitter_mask = (im_hdr.sum(axis=-1) > emitter_thres).astype(np.uint8) * 255
+                        # https://stackoverflow.com/questions/16937158/extracting-connected-objects-from-an-image-in-python
+                        # smooth the image (to remove small objects)
+                        from scipy import ndimage
+                        blur_radius = 1.0
+                        threshold = 50
+                        imgf = ndimage.gaussian_filter(emitter_mask, blur_radius)
+                        # find connected components
+                        labeled, nr_objects = ndimage.label(imgf > threshold) 
+                        print("Number of objects is {}".format(nr_objects))
+                        emitter_count = 0
+                        for emitter_count_ in range(1, nr_objects+1):
+                            emitter_name = 'lamp'
+                            emitter_mask_ = labeled == emitter_count_ # labeled==0 is backgroud blob
+                            # if np.sum(emitter_mask_) > 0.3 * self.os.H * self.os.W: continue
+                            # plt.figure()
+                            # plt.imshow(labeled)
+                            # plt.colorbar()
+                            # plt.show()
+                            
+                            emitter_mask_ = emitter_mask_.astype(np.uint8) * 255
+                            emitterMask_export_path = frame_export_path / ('%sMask_%d.png'%(emitter_name, emitter_count_)) # 255 for emitter
+                            cv2.imwrite(str(emitterMask_export_path), emitter_mask_)
                             print(blue_text('%sMask exported to: %s'%(emitter_name, str(emitterMask_export_path))))
                             emitter_count += 1
-                            
-                            if emitter_name == 'win':
-                                objMask = np.logical_and(objMask, ~emitter_mask_bool)
+                        
+                        objMask = np.ones_like(emitter_mask).astype(bool)
                     
                     '''
                     envMask
@@ -665,18 +687,13 @@ class exporter_scene():
                         assert self.scene_shape_file != ''
                         est_scene_dict = {
                             'type': 'scene',
-                            'shape': {
-                                'id': Path(self.scene_shape_file).stem, 
+                            Path(self.scene_shape_file).stem: {
+                                # 'id': , 
                                 'type': Path(self.scene_shape_file).suffix[1:],
                                 'filename': str(self.scene_shape_file), 
                             }, 
                         }
 
-                    #     assert hasattr(self.os, 'xml_file')
-                    #     est_scene_root = get_XML_root(str(self.os.xml_file))
-                    #     est_scene_root = copy.deepcopy(est_scene_root)
-                    #     est_scene_shapes = est_scene_root.findall('shape')
-                        
                     geo_mesh_id_list = []
                     rad_pred_list = []
                     for geo_mesh_file in geo_mesh_file_list: # images/demo_lieccv22_brdf_light_result.png; just to make sure the new lights and room geometry matches the original GT geometry shape
@@ -697,23 +714,38 @@ class exporter_scene():
                             'type': geo_mesh_file.suffix[1:],
                             'filename': str(geo_mesh_file_world), 
                             }
-                        geo_mesh_id_list.append(shape_id_dict['id'])
+                        geo_mesh_id_list.append(geo_mesh_file.stem)
                         est_scene_dict[geo_mesh_file.stem] = shape_id_dict
                         
-                        _emitter_dat_path = [_ for _ in BRDF_results_path.iterdir() if _.stem.startswith(geo_mesh_file.stem.split('_')[0].replace('Pred', 'Src')) and _.suffix == '.dat']
-                        
-                        if len(_emitter_dat_path) != 1:
-                            print(geo_mesh_file.stem.split('_')[0])
-                            print(_emitter_dat_path)
-                        _emitter_dat_path = _emitter_dat_path[0]
-                        with open(str(_emitter_dat_path), 'rb') as f:
-                            emitter_est_dict = pickle.load(f)
-                            # if 'srcSky' in emitter_est_dict:
-                            #     _rad_pred = emitter_est_dict['srcSky']
-                            _rad_pred = emitter_est_dict['src'].flatten()[:3] # take the sun intensity for windows # [TODO] better way?
-                            rad_pred_list.append(_rad_pred)
-                    # import ipdb; ipdb.set_trace()
-                        
+                        _emitter_dat_path_list = [_ for _ in BRDF_results_path.iterdir() if _.suffix == '.dat']
+                        # _.stem == geo_mesh_file.stem.replace('Pred_0_0', 'Src').replace('Pred_0', 'Src').replace('Pred', 'Src') and 
+                        IF_FOUND = False
+                        for _emitter_dat_idx, _emitter_dat_path in enumerate(_emitter_dat_path_list):
+                            _emitter_dat_stem = _emitter_dat_path.stem
+                            geo_mesh_id_match = '----'
+                            if len(_emitter_dat_stem.split('_')) == 2:
+                                _emitter_dat_stem_name, _emitter_dat_stem_idx = _emitter_dat_stem.split('_')
+                                geo_mesh_id_match = '%s_0_%d'%(_emitter_dat_stem_name.replace('Src', 'Pred'), int(_emitter_dat_stem_idx)-1)
+                            else:
+                                _emitter_dat_stem_name = _emitter_dat_stem; _emitter_dat_stem_idx = None
+                                geo_mesh_id_match = '%s_0_0'%(_emitter_dat_stem_name.replace('Src', 'Pred'))
+                            if geo_mesh_id_match != geo_mesh_file.stem:
+                                print('NOT found: ', _emitter_dat_stem_name, _emitter_dat_stem_idx, geo_mesh_id_match, geo_mesh_file.stem)
+                                continue
+                            print('MATCH: ', _emitter_dat_stem_name, _emitter_dat_stem_idx, geo_mesh_id_match, geo_mesh_file.stem)
+                            IF_FOUND = True
+                            with open(str(_emitter_dat_path), 'rb') as f:
+                                emitter_est_dict = pickle.load(f)
+                                # if 'srcSky' in emitter_est_dict:
+                                #     _rad_pred = emitter_est_dict['srcSky']
+                                _rad_pred = emitter_est_dict['src'].flatten()[:3] # take the sun intensity for windows # [TODO] better way?
+                                rad_pred_list.append(_rad_pred)
+                        # if len(_emitter_dat_path_list) != 1: # more than one .dat file matches the emitter; dig into this
+                        if not IF_FOUND:
+                            print(geo_mesh_file.stem)
+                            print([_.stem for _ in BRDF_results_path.iterdir() if _.suffix == '.dat'])
+                            import ipdb; ipdb.set_trace()
+                            
                     mi_scene_BRDF_results = mi.load_dict(est_scene_dict)
                     rays_o, rays_d, ray_d_center = self.os.cam_rays_list[frame_idx]
                     rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
@@ -722,12 +754,6 @@ class exporter_scene():
                     rays_mi = mi.Ray3f(xs_mi, ds_mi)
                     ret = mi_scene_BRDF_results.ray_intersect(rays_mi) # [mitsuba.Scene.ray_intersect] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
                     
-                    # [DEBUG] dump all shapes
-                    # for shape_idx, shape, in enumerate(mi_scene_BRDF_results.shapes()):
-                    #     # if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
-                    #     shape.write_ply(str(TEMP_path / ('%06d.ply'%shape_idx)))
-                    # print(blue_text('Scene shapes dumped to: %s')%str(TEMP_path))
-
                     assert len(ret.shape) == self.os.H*self.os.W
                     
                     emission_mask_list = []
@@ -763,10 +789,49 @@ class exporter_scene():
                     IF_light_visible = False
                     
                     for outLight_file_idx, outLight_file in tqdm(enumerate(outLight_file_list)):
+                        root = get_XML_root(str(outLight_file))
+                        root = copy.deepcopy(root)
+                        shapes = root.findall('shape')
+                        # assert len(shapes) > 0, 'No shapes found in %s; double check you XML file (e.g. did you miss headings)?'%str(outLight_file)
+                        assert len(shapes) == 1 # one new lamp each XML file for now
+                        
+                        # for shape in tqdm(shapes):
+                        shape = shapes[0]
+                        emitters = shape.findall('emitter')
+                        assert len(emitters) == 1
+                        # if shape.get('type') != 'obj':
+                        assert shape.get('type') in ['obj', 'rectangle', 'sphere']
+                        #     assert shape.get('type') == 'rectangle'
+                            
+                        transform_item = shape.findall('transform')[0]
+                        transform_accu = np.eye(4, dtype=np.float32)
+                        
+                        if len(transform_item.findall('rotate')) > 0:
+                            rotate_item = transform_item.findall('rotate')[0]
+                            _r_h = xml_rotation_to_matrix_homo(rotate_item)
+                            transform_accu = _r_h @ transform_accu
+                            
+                        if len(transform_item.findall('matrix')) > 0:
+                            _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
+                            transform_matrix = np.array(_transform).reshape(4, 4).astype(np.float32)
+                            transform_accu = transform_matrix @ transform_accu # [[R,t], [0,0,0,1]]
+                            
+                        assert self.os.extra_transform is None
+                        # transform_accu = self.os.extra_transform_homo @ transform_accu
+                        if hasattr(self.os, 'reorient_transform'):
+                            transform_accu = self.os.reorient_transform @ transform_accu
+                        
+                        transform_item.findall('matrix')[0].set('value', ' '.join(['%.4f'%_ for _ in transform_accu.flatten().tolist()]))
+                        xmlString = transformToXml(root)
+                        outLight_transformed_file = scene_export_path / 'lightings' / (outLight_file.name.replace('.xml', '_transformed.xml'))
+                        (scene_export_path / outLight_transformed_file).parent.mkdir(parents=True, exist_ok=True)
+                        with open(str(outLight_transformed_file), 'w') as xmlOut:
+                            xmlOut.write(xmlString)
+
                         '''
                         dump new light - mask
                         '''
-                        mi_light_scene = mi.load_file(str(outLight_file))
+                        mi_light_scene = mi.load_file(str(outLight_transformed_file))
                         rays_o, rays_d, ray_d_center = self.os.cam_rays_list[frame_idx]
                         rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
                         xs_mi = mi.Point3f(self.os.to_d(rays_o_flatten))
@@ -795,37 +860,6 @@ class exporter_scene():
                         '''
                         shape or dat
                         '''
-                        
-                        root = get_XML_root(str(outLight_file))
-                        root = copy.deepcopy(root)
-                        shapes = root.findall('shape')
-                        # assert len(shapes) > 0, 'No shapes found in %s; double check you XML file (e.g. did you miss headings)?'%str(outLight_file)
-                        assert len(shapes) == 1 # one new lamp each XML file for now
-                        
-                        # for shape in tqdm(shapes):
-                        shape = shapes[0]
-                        emitters = shape.findall('emitter')
-                        assert len(emitters) == 1
-                        # if shape.get('type') != 'obj':
-                        assert shape.get('type') in ['obj', 'rectangle']
-                        #     assert shape.get('type') == 'rectangle'
-                            
-                        transform_item = shape.findall('transform')[0]
-                        transform_accu = np.eye(4, dtype=np.float32)
-                        
-                        if len(transform_item.findall('rotate')) > 0:
-                            rotate_item = transform_item.findall('rotate')[0]
-                            _r_h = xml_rotation_to_matrix_homo(rotate_item)
-                            transform_accu = _r_h @ transform_accu
-                            
-                        if len(transform_item.findall('matrix')) > 0:
-                            _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
-                            transform_matrix = np.array(_transform).reshape(4, 4).astype(np.float32)
-                            transform_accu = transform_matrix @ transform_accu # [[R,t], [0,0,0,1]]
-                            
-                        assert self.os.extra_transform is None
-                        # transform_accu = self.os.extra_transform_homo @ transform_accu
-                            
                         if shape.get('type') == 'rectangle':
                             if IF_light_visible:
                                 (_light_vertices, _light_faces) = get_rectangle_mesh(transform_accu[:3, :3], transform_accu[:3, 3:4])
@@ -855,7 +889,26 @@ class exporter_scene():
                                 ]).reshape((1, 3))
                                 _light_vertices = (transform_accu[:3, :3] @ _light_vertices.T + transform_accu[:3, 3:4]).T
                                 _axes_center = np.mean(_light_vertices, axis=0).reshape((1, 3))
-                            
+                        elif shape.get('type') == 'sphere':
+                            light_mesh = trimesh.creation.icosphere(subdivisions=3)
+                            _light_vertices, _light_faces = light_mesh.vertices, light_mesh.faces
+                            if IF_light_visible:
+                                _light_vertices = (transform_accu[:3, :3] @ _light_vertices.T + transform_accu[:3, 3:4]).T
+                                # light_trimesh = trimesh.Trimesh(vertices=_light_vertices, faces=_light_faces)
+                                # light_trimesh.export(str('tmp_light.obj'))
+                            else:
+                                _axes = transform_accu[:3, :3] @ np.array([
+                                    [1., 0., 0.],
+                                    [0., 1., 0.],
+                                    [0., 0., 1.],
+                                ]) *  np.array([
+                                    max(np.amax(_light_vertices[:, 0]) - np.amin(_light_vertices[:, 0]), 0.01) / 2., 
+                                    max(np.amax(_light_vertices[:, 1]) - np.amin(_light_vertices[:, 1]), 0.01) / 2., 
+                                    max(np.amax(_light_vertices[:, 2]) - np.amin(_light_vertices[:, 2]), 0.01) / 2., 
+                                ]).reshape((1, 3))
+                                _light_vertices = (transform_accu[:3, :3] @ _light_vertices.T + transform_accu[:3, 3:4]).T
+                                _axes_center = np.mean(_light_vertices, axis=0).reshape((1, 3))
+
                         '''
                         dump new light - mesh, .dat; NOT a linear transformation because normalization was done on inverse depth
                         '''
@@ -877,24 +930,6 @@ class exporter_scene():
                         
                         if IF_light_visible:
                             _light_vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_light_vertices.T  - _t)).T # convert to oopengl camera coords
-                            # _light_vertices_cam_depth = -_light_vertices_cam[:, -1]
-                            # assert np.amin(_light_vertices_cam_depth) > 0.
-                            
-                            # _light_vertices_cam_depth_inv = 1. / _light_vertices_cam_depth
-
-                            # _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
-                            # prediction = 1./(mi_depth.copy()+1e-6)
-                            # prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
-                            # predictionMin = (prediction + _mask * 1e6).min()
-                            # predictionMax = (prediction - _mask * 1e6).max()
-                            # _light_vertices_cam_depth_inv = (_light_vertices_cam_depth_inv - predictionMin ) / (predictionMax - predictionMin )
-                            
-                            # _light_vertices_cam_depth_new = 1./(self.lieccv22_depth_scale * _light_vertices_cam_depth_inv + self.lieccv22_depth_offset)
-                            
-                            # _light_vertices_cam_depth_new = _light_vertices_cam_depth
-                            
-                            # _light_vertices_cam_dir = _light_vertices_cam / _light_vertices_cam[:, 2:3]
-                            # _light_vertices_cam_new = - _light_vertices_cam_dir * _light_vertices_cam_depth_new.reshape(-1, 1)
 
                             light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam, faces=_light_faces)
                             light_mesh_path = INPUT_edited_path / ('visLamp_%d.obj'%outLight_file_idx)
@@ -916,40 +951,12 @@ class exporter_scene():
                             Then the best thing we can do about invisible lamps is to maintain the geometry as a box in the new scene, and offset it to the correct location
                             '''
                             _axes_center_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_axes_center.T  - _t)).T # convert to oopengl camera coords
-                            # if_behind_camera = _axes_center_cam[:, -1] < 0
-                            # if if_behind_camera: # flip all exes to be in front of camera, and flip back
-                            #     _axes_center_cam[:, -1] = - _axes_center_cam[:, -1]
-                            #     _axes[:, -1] = - _axes[:, -1]
-                            # _axes_center_cam_depth = _axes_center_cam[:, -1]
-                            # assert np.amin(_axes_center_cam_depth) > 0.
-                            
-                            # _axes_center_cam_depth_inv = 1. / _axes_center_cam_depth
-
-                            # _mask = self.os.mi_invalid_depth_mask_list[frame_idx].squeeze().astype(np.float32)
-                            # prediction = 1./(mi_depth.copy()+1e-6)
-                            # prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
-                            # predictionMin = (prediction + _mask * 1e6).min()
-                            # predictionMax = (prediction - _mask * 1e6).max()
-                            # _axes_center_cam_depth_inv = (_axes_center_cam_depth_inv - predictionMin ) / (predictionMax - predictionMin )
-                            
-                            # _axes_center_cam_depth_new = 1./(self.lieccv22_depth_scale * _axes_center_cam_depth_inv + self.lieccv22_depth_offset)
-                            
-                            # _axes_center_cam_depth_new = _ax`es_center_cam_depth
-                            
-                            # _axes_center_cam_dir = _axes_center_cam / _axes_center_cam[:, 2:3]
-                            # _axes_center_cam_new = _axes_center_cam_dir * _axes_center_cam_depth_new.reshape(-1, 1)
-                            # if _axes_center_cam[:, -1] < 0:
-                            #     _axes_center_cam_new = - _axes_center_cam_new
                             
                             _axes_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_axes.T)).T # does not shift or sheer
                             
                             # validation to make sure the axes are orthogonal (after scaling back)
                             _axes_cam_normalized = _axes_cam / np.linalg.norm(_axes_cam, axis=1, keepdims=True)
                             assert np.allclose(_axes_cam_normalized @ _axes_cam_normalized.T, np.eye(3, dtype=np.float32), atol=1e-3)
-                            
-                            # if if_behind_camera:
-                            #     _axes_cam[:, -1] = - _axes_cam[:, -1]
-                            #     _axes_center_cam_new[:, -1] = - _axes_center_cam_new[:, -1]
                             
                             _axes_center_cam_new = _axes_center_cam
                             
@@ -1054,11 +1061,6 @@ class exporter_scene():
                             prediction_npy_export_path = INPUT_edited_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                             depth = np.load(str(prediction_npy_export_path))
                             
-                            # mi_light_depth = 1./(mi_light_depth+1e-6)
-                            # mi_light_depth = (mi_light_depth - predictionMin ) / (predictionMax - predictionMin )
-                            # mi_light_depth = np.clip(mi_light_depth, 0, 1)
-                            # mi_light_depth = 1 / (self.lieccv22_depth_scale * mi_light_depth + self.lieccv22_depth_offset)
-                            
                             depth[light_mask==255] == mi_light_depth
                             depth_export_path = BRDF_edited_results_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                             np.save(str(depth_export_path), depth)
@@ -1100,9 +1102,10 @@ class exporter_scene():
                             cv2.imwrite(str(rough_path).replace('.npy', 'DS.png'), cv2.resize(rough_vis, (_W//2, _H//2), interpolation=cv2.INTER_AREA))
                             
                             print(blue_text('lighting FILES exported to: %s'%str(BRDF_edited_results_path)))
+                            
 
-                        
         frame_list_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / ('testList_%s.txt'%self.os.scene_name)
+        
         with open(str(frame_list_export_path), 'w') as camOut:
             for frame_export_path in frame_export_path_list:
                 frame_export_path = (Path('data') / dataset_name / frame_export_path.relative_to(self.os.rendering_root / 'EXPORT_lieccv22')).parent
