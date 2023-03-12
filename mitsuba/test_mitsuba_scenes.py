@@ -17,3 +17,4 @@ scene = mi.load_file("data/scenes/kitchen/scene_v3.xml")
 image = mi.render(scene, spp=64)
 mi.util.write_bitmap("rendering_kitchen.png", image)
 mi.util.write_bitmap("rendering_kitchen.exr", image)
+

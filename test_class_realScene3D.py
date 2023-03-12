@@ -92,6 +92,11 @@ hdr_radiance_scale = 1.
 sdr_radiance_scale = 1.
 if_rc = False; pcd_file = ''; 
 
+if_reorient_y_up = False  #  images/demo_realScene_after_center_scale_reorient.png
+reorient_blender_angles = [] # images/demo_blender_rotate.png; Open the input .ply/.obj file in Blender, rotate object axes to align with world, write down the angles
+if_reorient_y_up_skip_shape = False # do not transform shape; only transform posesa
+
+
 # scene_name = 'IndoorKitchen_v1'; hdr_radiance_scale = 10.
 # # if_rc = False; pcd_file = 'reconstuction_auto/dense/2/fused.ply'; pose_file = ('json', 'transforms.json')
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
@@ -143,7 +148,8 @@ if_rc = False; pcd_file = '';
 # # shape_file = base_root / 'RESULTS_monosdf/20230306-022845-K-DormRoom_v2_final_supergloo_HDR_grids_trainval_tmp.ply'
 # # shape_file = base_root / 'RESULTS_monosdf/20230306-123126-K-DormRoom_v2_final_supergloo_FIXED_SDR_grids_trainval.ply'
 # # shape_file = base_root / 'RESULTS_monosdf/20230306-174427-mm1-DormRoom_v2_final_supergloo_FIXED2_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply' # experimental
-# shape_file = base_root / 'RESULTS_monosdf/20230306-234504-K-DormRoom_v2_final_supergloo_FIXED3_SDR_grids_trainval_tmp.ply'
+# # shape_file = base_root / 'RESULTS_monosdf/20230306-234504-K-DormRoom_v2_final_supergloo_FIXED3_SDR_grids_trainval_tmp.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230307-044433-mm1-CONT20230306-234504-DormRoom_v2_final_supergloo_FIXED3_SDR_grids_trainval_tmp.ply'
 
 # scene_name = 'IndoorKitchenV3_final'; hdr_radiance_scale = 0.5
 # pose_file = ('json', 'transforms_colmap.json')
@@ -167,24 +173,115 @@ if_rc = False; pcd_file = '';
 # pose_file = ('json', 'transforms_colmap.json')
 # shape_file = base_root / 'RESULTS_monosdf/'
 
-# scene_name = 'ConferenceRoomV2_final_supergloo'; hdr_radiance_scale = 1.
-# pose_file = ('json', 'transforms_superglue.json')
+# +++++ ConferenceRoomV2_final_supergloo_aligned +++++
+scene_name = 'ConferenceRoomV2_final_supergloo'; hdr_radiance_scale = 2.
+pose_file = ('json', 'transforms_superglue.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230306-060630-K-ConferenceRoomV2_final_supergloo_HDR_grids_trainval.ply'
 # shape_file = base_root / 'RESULTS_monosdf/20230306-072825-K-ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
 # shape_file = base_root / 'RESULTS_monosdf/20230306-152848-mm1-EVAL-20230306-072825ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
+shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
+if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
+# if_reorient_y_up_skip_shape = True
+window_area_emitter_id_list=[''] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+merge_lamp_id_list=['']  # need to manually specify in XML
 
-# scene_name = 'IndoorKitchenV4'; hdr_radiance_scale = 1
+
+'''
+Supplementary
+'''
+# scene_name = 'IndoorKitchenV4'; hdr_radiance_scale = 1 # BETTER intrinsics
 # # # pose_file = ('json', 'transforms_superglue/transforms_bright.json'); invalid_frame_idx_list = [261, 254, 255, 230, 231, 180]
 # # shape_file = base_root / 'RESULTS_monosdf/20230306-190430-mm1-IndoorKitchenV4_SDR_grids_trainval.ply'
 # pose_file = ('json', 'transforms_colmap/transforms.json'); invalid_frame_idx_list = [232, 241]; invalid_frame_id_list = list(range(265, 285)) # need to exclude 265 from both...
 # shape_file = base_root / 'RESULTS_monosdf/20230307-005359-mm1-IndoorKitchenV4_COLMAP_SDR_grids_trainval.ply'
 
-scene_name = 'ConferenceRoomV2_final_MORE'; hdr_radiance_scale = 1.; sdr_radiance_scale = 0.5
+# ------------>>
+# +++++ IndoorKitchenV4_2_aligned +++++
+# scene_name = 'IndoorKitchenV4_2'; hdr_radiance_scale = 1
+# pose_file = ('json', 'transforms_bright.json') # colmap
+# shape_file = base_root / 'RESULTS_monosdf/20230309-170742-mm3-IndoorKitchenV4_2_SDR_grids_trainval.ply'
+# if_reorient_y_up = True; reorient_blender_angles = [-11.2, -43, -181] # images/demo_blender_rotate.png
+# if_reorient_y_up_skip_shape = True
+# <<------------
+
+# ------------>>
+# +++++ DormRoom_v2_1_betterK_supergloo_aligned +++++
+# scene_name = 'DormRoom_v2_1_betterK_supergloo'; hdr_radiance_scale = 0.5 # BETTER intrinsics
+# invalid_frame_idx_list = [10, 11, 12, 13, 14, 16, 17, 18, 84]
+# pose_file = ('json', 'transforms.json'); 
+# # # shape_file = base_root / 'RESULTS_monosdf/20230309-185710-mm1-DormRoom_v2_1_betterK_supergloo_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+# # # shape_file = base_root / 'RESULTS_monosdf/20230309-200858-mm1-DormRoom_v2_1_betterK_supergloo_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+# # shape_file = base_root / 'RESULTS_monosdf/20230309-232118-mm1-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230310-035459-K-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval.ply'
+# if_reorient_y_up = True; reorient_blender_angles = [165, 36.5, -3.1] # images/demo_blender_rotate.png
+# if_reorient_y_up_skip_shape = True
+# <<------------
+
+# ------------>>
+# invalid_frame_id_list = list(range(267, 273)) + list(range(274, 295)) # original lighting
+# invalid_frame_id_list = list(range(267)) + [273] + list(range(288, 295)) # blackboard lighting
+# invalid_frame_id_list = list(range(288)) + list(range(295, 305)) # lamp lighting
+# invalid_frame_idx_list = []
+
+# +++++ ClassRoom_aligned +++++
+# scene_name = 'ClassRoom'; hdr_radiance_scale = 3 # BETTER intrinsics
+# shape_file = base_root / 'RESULTS_monosdf/20230310-035028-mm1-ClassRoom_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230310-035028-mm1-ClassRoom_SDR_grids_trainval.ply'
+# pose_file = ('json', 'transforms_colmap.json'); 
+# shape_file = base_root / 'RESULTS_monosdf/classroom.obj'; 
+# shape_file = base_root / 'RESULTS_monosdf/20230310-162753-K-ClassRoom_aligned_SDR_grids_trainval.ply'; 
+# if_reorient_y_up = True; reorient_blender_angles = [-184, -19.7, -0.757] # images/demo_blender_rotate.png
+# if_reorient_y_up_skip_shape = True
+
+# +++++ ClassRoom_supergloo_aligned +++++
+# scene_name = 'ClassRoom_supergloo'; hdr_radiance_scale = 3 # BETTER intrinsics
+# invalid_frame_id_list = list(range(267, 273)) + list(range(274, 295)) # original lighting
+# pose_file = ('json', 'transforms_superglue.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230310-035030-mm1-ClassRoom_supergloo_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
+# if_reorient_y_up = True; reorient_blender_angles = [-181, 16.5, -2.05] # images/demo_blender_rotate.png
+# if_reorient_y_up_skip_shape = True
+# <<------------
+
+# ------------>>
+# scene_name = 'ConferenceRoomV2_betterK'; hdr_radiance_scale = 0.5
 # pose_file = ('json', 'transforms_colmap.json')
-pose_file = ('json', 'transforms_superglue.json')
-# shape_file = base_root / 'RESULTS_monosdf/20230307-022305-mm1-ConferenceRoomV2_final_MORE_SDR_grids_trainval.ply'
-shape_file = base_root / 'RESULTS_monosdf/20230307-030111-mm1-ConferenceRoomV2_final_MORE_HDR_grids_trainval.ply'
-if opt.export_format == 'mitsuba': invalid_frame_idx_list = list(range(190, 227))
+# shape_file = base_root / 'RESULTS_monosdf/'
+
+# scene_name = 'ConferenceRoomV2_betterK_supergloo'; hdr_radiance_scale = 0.5
+# pose_file = ('json', 'transforms_supergloo.json')
+# shape_file = base_root / 'RESULTS_monosdf/'
+# <<------------
+
+# ------------>>
+# +++++ Bedroom_supergloo_aligned +++++
+# scene_name = 'Bedroom_supergloo'; hdr_radiance_scale = 8; sdr_radiance_scale = 4
+# invalid_frame_id_list = [198, 199, 200] # original lighting
+# invalid_frame_idx_list = [7, 8, 171, 172, 173, 174, 175] # bad poses
+# pose_file = ('json', 'transforms_supergloo.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230311-132201-mm1-Bedroom_supergloo_SDR_grids_trainval.ply'
+# if_reorient_y_up = True; reorient_blender_angles = [172, 55.3, -1.07] # images/demo_blender_rotate.png
+# if_reorient_y_up_skip_shape = True
+
+# scene_name = 'Bedroom'; hdr_radiance_scale = 8; sdr_radiance_scale = 4
+# invalid_frame_id_list = [198, 199, 200] # original lighting
+# invalid_frame_idx_list = [18, 22, 23, 24, 25, 26] # bad poses
+# pose_file = ('json', 'transforms_colmap.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230311-132159-mm1-Bedroom_SDR_grids_trainval.ply'
+# if_reorient_y_up = True; reorient_blender_angles = [171, 177, -361] # images/demo_blender_rotate.png
+# if_reorient_y_up_skip_shape = True
+
+# <<------------
+
+
+'''
+OBSELETE
+'''
+# scene_name = 'ConferenceRoomV2_final_MORE'; hdr_radiance_scale = 1.; sdr_radiance_scale = 0.5
+# # pose_file = ('json', 'transforms_colmap.json')
+# pose_file = ('json', 'transforms_superglue.json')
+# # shape_file = base_root / 'RESULTS_monosdf/20230307-022305-mm1-ConferenceRoomV2_final_MORE_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230307-030111-mm1-ConferenceRoomV2_final_MORE_HDR_grids_trainval.ply'
+# if opt.export_format == 'mitsuba': invalid_frame_idx_list = list(range(190, 227))
 
 im_params_dict={
     'hdr_radiance_scale': hdr_radiance_scale, 
@@ -223,8 +320,9 @@ scene_obj = realScene3D(
         
         'if_autoscale_scene': False, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
         
-        # 'if_reorient_y_up': True,  #  images/demo_realScene_after_center_scale_reorient.png
-        # 'reorient_blender_angles': [252., 0.209, -19.3], 
+        'if_reorient_y_up': if_reorient_y_up,  #  images/demo_realScene_after_center_scale_reorient.png
+        'reorient_blender_angles': reorient_blender_angles, # images/demo_blender_rotate.png; Open the input .ply/.obj file in Blender, rotate object axes to align with world, write down the angles
+        'if_reorient_y_up_skip_shape': if_reorient_y_up_skip_shape, # do not transform shape; only transform posesa
         
         # 'normal_up_frame_info': {'frame_id': 3, 'normal_up_hw_1': (0.5, 0.35), 'normal_up_hw_2': (1., 0.6)}, # find one image with mostly floor within the desginated region
         # 'normal_left_frame_info': {'frame_id': 8, 'normal_left_hw_1': (0., 0.), 'normal_left_hw_2': (0.5, 0.5)}, # find one image with mostly floor within the desginated region
@@ -242,7 +340,6 @@ scene_obj = realScene3D(
         'im_hdr', 
         'im_sdr', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
-        # 'im_normal', 
         ], 
     modality_filename_dict = {
         # 'poses', 
@@ -252,7 +349,7 @@ scene_obj = realScene3D(
     }, 
     im_params_dict=im_params_dict, 
     cam_params_dict={
-        'near': 0.1, 'far': 1., # [in a unit box]
+        'near': 0.2, 'far': 2., # [in a unit box]
         # 'near': 0.5, 'far': 20., # [in a unit box]
         # ==> if sample poses and render images 
         'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
@@ -340,7 +437,8 @@ if opt.export:
                 'shapes', 
                 'mi_normal' if shape_file != '' else '', 
                 'mi_depth' if shape_file != '' else '', 
-            ]
+                ], 
+            appendix=opt.export_appendix, 
             )
     if opt.export_format == 'mitsuba':
         exporter.export_monosdf_fvp_mitsuba(
@@ -354,7 +452,8 @@ if opt.export:
                 'shapes', 
                 'mi_normal' if shape_file != '' else '', 
                 'mi_depth' if shape_file != '' else '', 
-            ]
+                ], 
+            appendix=opt.export_appendix, 
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp_mitsuba(
@@ -366,6 +465,7 @@ if opt.export:
                 'im_sdr', 
                 'im_mask', 
                 'shapes', 
+                'lighting', # new lights
                 ], 
             appendix=opt.export_appendix, 
         )
@@ -375,13 +475,17 @@ if opt.export:
             'im_sdr', 
             'mi_depth', 
             'mi_seg', 
+            'lighting', # ONLY available after getting BRDFLight result from testRealBRDFLight.py
+            'emission', 
             ], 
             # split=opt.split, 
             assert_shape=(240, 320),
-            window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-            merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+            window_area_emitter_id_list=window_area_emitter_id_list, # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+            merge_lamp_id_list=merge_lamp_id_list,  # need to manually specify in XML
+            BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000', # transfer this back once get BRDF results
             # center_crop_HW=(240, 320), 
             if_no_gt_appendix=True, 
+            appendix=opt.export_appendix, 
         )
     
 '''
@@ -435,7 +539,7 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
         scene_obj, 
         modality_list_vis=[
-            # 'poses', 
+            'poses', 
             'shapes' if shape_file != '' else '', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             'mi', # mitsuba sampled rays, pts
             ], 
@@ -465,7 +569,7 @@ if opt.vis_3d_o3d:
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
             'if_cam_axis_only': False, 
-            'cam_vis_scale': 0.3, 
+            'cam_vis_scale': 0.6, 
             'if_cam_traj': False, 
             }, 
         lighting_params=lighting_params_vis, 

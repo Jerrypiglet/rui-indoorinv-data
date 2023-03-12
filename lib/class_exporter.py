@@ -91,14 +91,14 @@ class exporter_scene():
         '''
         export scene to mitsubaScene data structure + monosdf inputs
         and fvp: free viewpoint dataset https://gitlab.inria.fr/sibr/projects/indoor_relighting
-        '''
+        ''' 
         
         assert format in ['monosdf', 'fvp', 'mitsuba'], 'format %s not supported'%format
         
         scene_export_path = self.os.rendering_root / ('EXPORT_%s'%format) / (self.os.scene_name + appendix)
         if split != '':
             scene_export_path = scene_export_path / split
-
+            
         if self.prepare_check_export(scene_export_path) == False:
             return
 
@@ -315,7 +315,7 @@ class exporter_scene():
                             emitters = shape.findall('emitter')
                             assert len(emitters) == 1
                             # if shape.get('type') != 'obj':
-                            assert shape.get('type') in ['obj', 'rectangle']
+                            assert shape.get('type') in ['obj', 'rectangle', 'sphere']
                             #     assert shape.get('type') == 'rectangle'
                                 
                             transform_item = shape.findall('transform')[0]
@@ -341,6 +341,11 @@ class exporter_scene():
                                 light_mesh_path = self.os.scene_path / shape.findall('string')[0].get('value')
                                 assert light_mesh_path.exists()
                                 light_mesh = trimesh.load_mesh(str(light_mesh_path))
+                                _vertices, _light_faces = light_mesh.vertices, light_mesh.faces
+                                _vertices = (transform_accu[:3, :3] @ _vertices.T + transform_accu[:3, 3:4]).T
+                                light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_light_faces)
+                            elif shape.get('type') == 'sphere':
+                                light_mesh = trimesh.creation.icosphere(subdivisions=3)
                                 _vertices, _light_faces = light_mesh.vertices, light_mesh.faces
                                 _vertices = (transform_accu[:3, :3] @ _vertices.T + transform_accu[:3, 3:4]).T
                                 light_trimesh = trimesh.Trimesh(vertices=_vertices, faces=_light_faces)

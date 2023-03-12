@@ -84,22 +84,6 @@ class realScene3D(mitsubaBase, scene2DBase):
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
         
         self.extra_transform = self.scene_params_dict.get('extra_transform', None)
-        # if self.scene_params_dict.get('if_reorient_y_up', False):
-        #     print(magenta('Re-orienting scene to y-up...'))
-        #     assert self.extra_transform is None, 'extra_transform is not None'
-        #     reorient_blender_angles = self.scene_params_dict['reorient_blender_angles']
-        #     reorient_blender_angles = np.array(reorient_blender_angles).reshape(3,) / 180. * np.pi
-        #     coord_conv = [0, 2, 1]
-        #     from scipy.spatial.transform import Rotation
-        #     w2c = Rotation.from_euler('xyz', reorient_blender_angles).as_matrix()
-        #     # coordinate convention
-        #     w2c[1] = -w2c[1]
-        #     w2c = w2c[coord_conv]
-        #     w2c[:,2] = - w2c[:,2]
-        #     w2c[:,0] *= -1
-        #     c2w = np.linalg.inv(w2c)
-        #     self.extra_transform = c2w
-            
         if self.extra_transform is not None:
             self.extra_transform_inv = self.extra_transform.T
             self.extra_transform_homo = np.eye(4, dtype=np.float32)
@@ -194,7 +178,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             '''
             [TODO] better align normals to axes with clustering or PCA, than manually pick patches
             '''
-            print(magenta('Re-orienting scene to y-up...'))
+            print(magenta('Re-orienting scene with provided rotation angles...'))
 
             # assert self.if_autoscale_scene
             
@@ -205,25 +189,15 @@ class realScene3D(mitsubaBase, scene2DBase):
                 assert self.reorient_transform.shape == (3, 3)
             else:
                 print('Calculating re-orientation from blender angles input...')
-                # self.reorient_transform = self.get_reorient_mat_()
-                # self.reorient_transform = self.get_reorient_mat_from_blender_angles_()
                 reorient_blender_angles = self.scene_params_dict['reorient_blender_angles']
-                reorient_blender_angles = np.array(reorient_blender_angles).reshape(3,) / 180. * np.pi
-                coord_conv = [0, 2, 1]
                 from scipy.spatial.transform import Rotation
-                w2c = Rotation.from_euler('xyz', reorient_blender_angles).as_matrix()
-                # coordinate convention
-                w2c[1] = -w2c[1]
-                w2c = w2c[coord_conv]
-                w2c[:,2] = - w2c[:,2]
-                w2c[:,0] *= -1
-                c2w = np.linalg.inv(w2c)
-                self.reorient_transform = c2w
+                reorient_blender_angles = np.array(reorient_blender_angles).reshape(3,) / 180. * np.pi
+                Rs = Rotation.from_euler('xyz', reorient_blender_angles).as_matrix()
+                self.reorient_transform = Rs
             
-                # np.save(str(self.scene_path / '_T_reorient_after_monosdf_centering_scale.npy'), self.reorient_transform)
-
-            self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
-            self.bverts_list = [(self.reorient_transform @ bverts.T).T for bverts in self.bverts_list]
+            if not self.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+                self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
+                self.bverts_list = [computeBox(vertices)[0] for vertices in self.vertices_list] # recompute bounding boxes
             
             self.pose_list = [np.hstack((self.reorient_transform @ pose[:3, :3], self.reorient_transform @ pose[:3, 3:4])) for pose in self.pose_list] # dont rotate translation!!
             self.origin_lookatvector_up_list = [(self.reorient_transform @ origin, self.reorient_transform @ lookatvector, self.reorient_transform @ up) \
@@ -232,8 +206,9 @@ class realScene3D(mitsubaBase, scene2DBase):
 
         if IF_SCENE_RESCALED:
             __ = np.eye(4, dtype=np.float32); __[:3, :3] = self.reorient_transform; self.reorient_transform = __
-            if hasattr(self, 'mi_scene'):
-                self.load_mi_scene(self.mi_params_dict, monosdf_scale_tuple=self.monosdf_scale_tuple, extra_transform_homo=self.reorient_transform)
+            if not self.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+                if hasattr(self, 'mi_scene'):
+                    self.load_mi_scene(self.mi_params_dict, monosdf_scale_tuple=self.monosdf_scale_tuple, extra_transform_homo=self.reorient_transform)
             # self.load_modalities()
             self.get_cam_rays(self.cam_params_dict, force=True)
             if hasattr(self, 'mi_scene'):
@@ -418,6 +393,9 @@ class realScene3D(mitsubaBase, scene2DBase):
                 _N = len(self.frame_id_list)
                 self.frame_id_list = [x for idx, x in enumerate(self.frame_id_list) if idx not in self.invalid_frame_idx_list]
                 print(magenta('THEN, BASED ON NEW IDX, Removed %d invalid frames with invalid_frame_idx_list'%(_N - len(self.frame_id_list))))
+                
+            for frame_idx, frame_id in enumerate(self.frame_id_list):
+                print('frame_idx: %d, frame_id: %d'%(frame_idx, frame_id))
             
             # dict_keys(['fl_x', 'fl_y', 'cx', 'cy', 'w', 'h', 'camera_model', 'frames'])
             fl_x, fl_y, cx, cy, camera_model = get_list_of_keys(meta, ['fl_x', 'fl_y', 'cx', 'cy', 'camera_model'])

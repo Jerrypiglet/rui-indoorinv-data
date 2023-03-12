@@ -21,8 +21,9 @@ assert Path(data_root_path).exists()
 SPLIT = 'train'
 HW = (320, 640)
 # HW_crop = (320, 551)
-
-scene_frame_list = [('kitchen', 192), ('bathroom', 17), ('bedroom', 17)]
+    
+# scene_frame_list = [('kitchen', 192), ('bathroom', 17), ('bedroom', 17)]
+scene_frame_list = [('kitchen', 4), ('bathroom', 108), ('bedroom', 7), ('livingroom', 8) ] # supp
 
 def gamma2(x):
     return np.clip(x ** (1./2.2), 0., 1.)
@@ -100,6 +101,7 @@ for scene_name, frame_id in scene_frame_list:
     emission_error_all_max = np.amax(emission_error_all) / 2.
 
     # for modality in ['emission']:
+    # emission_mask = 
     for modality in ['im', 'albedo', 'roughness', 'emission']:
         label_GT = None
         for method in ['GT', 'ours', 'milo', 'li22', 'neilf', 'ipt']:
