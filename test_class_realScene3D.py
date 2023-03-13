@@ -183,7 +183,8 @@ shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
 if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
 emitter_thres = 4.
-frame_ids = [9, 161, 180, 50]
+# frame_ids = [9, 161] # BRDF
+frame_ids = [180, 68] # re-rendering + relighting
 
 '''
 Supplementary
@@ -204,32 +205,36 @@ Supplementary
 # <<------------
 
 # ------------>>
-# +++++ DormRoom_v2_1_betterK_supergloo_aligned +++++
+# +++++ DormRoom_v2_1_betterK_supergloo_old_aligned +++++ [SUPP]
 # scene_name = 'DormRoom_v2_1_betterK_supergloo'; hdr_radiance_scale = 0.5 # BETTER intrinsics
 # invalid_frame_idx_list = [10, 11, 12, 13, 14, 16, 17, 18, 84]
 # pose_file = ('json', 'transforms.json'); 
 # # # shape_file = base_root / 'RESULTS_monosdf/20230309-185710-mm1-DormRoom_v2_1_betterK_supergloo_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 # # # shape_file = base_root / 'RESULTS_monosdf/20230309-200858-mm1-DormRoom_v2_1_betterK_supergloo_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 # # shape_file = base_root / 'RESULTS_monosdf/20230309-232118-mm1-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
-# shape_file = base_root / 'RESULTS_monosdf/20230310-035459-K-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230310-035459-K-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval.ply' # OLD
+# # shape_file = base_root / 'RESULTS_monosdf/20230311-020104-K-DormRoom_v2_1_betterK_supergloo_aligned_SDR_grids_trainval.ply'
 # if_reorient_y_up = True; reorient_blender_angles = [165, 36.5, -3.1] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
 # <<------------
 
 # ------------>>
-# invalid_frame_id_list = list(range(267, 273)) + list(range(274, 295)) # original lighting
+# # invalid_frame_id_list = list(range(267, 273)) + list(range(274, 295)) # original lighting
 # invalid_frame_id_list = list(range(267)) + [273] + list(range(288, 295)) # blackboard lighting
-# invalid_frame_id_list = list(range(288)) + list(range(295, 305)) # lamp lighting
-# invalid_frame_idx_list = []
+# # invalid_frame_id_list = list(range(288)) + list(range(295, 305)) # lamp lighting
 
-# +++++ ClassRoom_aligned +++++
+# # +++++ ClassRoom_aligned +++++ [SUPP]
 # scene_name = 'ClassRoom'; hdr_radiance_scale = 3 # BETTER intrinsics
+# assert invalid_frame_id_list != []
 # # shape_file = base_root / 'RESULTS_monosdf/20230310-035028-mm1-ClassRoom_SDR_grids_trainval.ply'
 # pose_file = ('json', 'transforms_colmap.json'); 
 # shape_file = base_root / 'RESULTS_monosdf/classroom.obj'; 
 # # shape_file = base_root / 'RESULTS_monosdf/20230310-162753-K-ClassRoom_aligned_SDR_grids_trainval.ply'; 
 # if_reorient_y_up = True; reorient_blender_angles = [-184, -19.7, -0.757] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
+# # frame_ids = [120, 235, 27, 92]
+# frame_ids = [278, 275] # for relighting
+# emitter_thres = 2.
 
 # +++++ ClassRoom_supergloo_aligned +++++
 # scene_name = 'ClassRoom_supergloo'; hdr_radiance_scale = 3 # BETTER intrinsics
@@ -268,7 +273,7 @@ Supplementary
 # if_reorient_y_up = True; reorient_blender_angles = [171, 177, -361] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
 
-# +++++ Bedroom_MORE_aligned +++++
+# +++++ Bedroom_MORE_aligned +++++ [SUPP]
 # scene_name = 'Bedroom_MORE'; hdr_radiance_scale = 1; sdr_radiance_scale = 2
 # invalid_frame_id_list = [198, 199, 200, 202, 203, 206, 207, 209, 217, ] # original lighting
 # invalid_frame_idx_list = [18, 22, 23, 24, 25, 26] # bad poses

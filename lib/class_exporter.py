@@ -320,7 +320,8 @@ class exporter_scene():
                                 
                             transform_item = shape.findall('transform')[0]
                             transform_accu = np.eye(4, dtype=np.float32)
-                            if hasattr(self.os, 'reorient_transform'):
+                            if hasattr(self.os, 'if_reorient_shape') and self.os.if_reorient_shape:
+                                assert hasattr(self.os, 'reorient_transform')
                                 transform_accu = self.os.reorient_transform @ transform_accu
 
                             if len(transform_item.findall('rotate')) > 0:
@@ -632,13 +633,14 @@ class exporter_scene():
                             emitter_name = 'lamp'
                             emitter_mask_ = labeled == emitter_count_ # labeled==0 is backgroud blob
                             # if np.sum(emitter_mask_) > 0.3 * self.os.H * self.os.W: continue
+                            if np.sum(emitter_mask_) < 30: continue
                             # plt.figure()
                             # plt.imshow(labeled)
                             # plt.colorbar()
                             # plt.show()
                             
                             emitter_mask_ = emitter_mask_.astype(np.uint8) * 255
-                            emitterMask_export_path = frame_export_path / ('%sMask_%d.png'%(emitter_name, emitter_count_)) # 255 for emitter
+                            emitterMask_export_path = frame_export_path / ('%sMask_%d.png'%(emitter_name, emitter_count)) # 255 for emitter
                             cv2.imwrite(str(emitterMask_export_path), emitter_mask_)
                             print(blue_text('%sMask exported to: %s'%(emitter_name, str(emitterMask_export_path))))
                             emitter_count += 1
@@ -719,13 +721,13 @@ class exporter_scene():
                         
                         _emitter_dat_path_list = [_ for _ in BRDF_results_path.iterdir() if _.suffix == '.dat']
                         # _.stem == geo_mesh_file.stem.replace('Pred_0_0', 'Src').replace('Pred_0', 'Src').replace('Pred', 'Src') and 
+                        print('----')
                         IF_FOUND = False
                         for _emitter_dat_idx, _emitter_dat_path in enumerate(_emitter_dat_path_list):
                             _emitter_dat_stem = _emitter_dat_path.stem
-                            geo_mesh_id_match = '----'
                             if len(_emitter_dat_stem.split('_')) == 2:
                                 _emitter_dat_stem_name, _emitter_dat_stem_idx = _emitter_dat_stem.split('_')
-                                geo_mesh_id_match = '%s_0_%d'%(_emitter_dat_stem_name.replace('Src', 'Pred'), int(_emitter_dat_stem_idx)-1)
+                                geo_mesh_id_match = '%s_0_%d'%(_emitter_dat_stem_name.replace('Src', 'Pred'), int(_emitter_dat_stem_idx))
                             else:
                                 _emitter_dat_stem_name = _emitter_dat_stem; _emitter_dat_stem_idx = None
                                 geo_mesh_id_match = '%s_0_0'%(_emitter_dat_stem_name.replace('Src', 'Pred'))
@@ -742,7 +744,8 @@ class exporter_scene():
                                 rad_pred_list.append(_rad_pred)
                         # if len(_emitter_dat_path_list) != 1: # more than one .dat file matches the emitter; dig into this
                         if not IF_FOUND:
-                            print(geo_mesh_file.stem)
+                            print('[DEBUG] -----')
+                            print(geo_mesh_file.name)
                             print([_.stem for _ in BRDF_results_path.iterdir() if _.suffix == '.dat'])
                             import ipdb; ipdb.set_trace()
                             
@@ -784,9 +787,20 @@ class exporter_scene():
                     outLight_file_list = [_ for _ in self.os.scene_path.iterdir() if _.stem.startswith('outLight')]
                     assert len(outLight_file_list) > 0, 'No outLight files found at %s'%str(self.os.scene_path)
                     print(white_blue('Found %d outLight files at'%len(outLight_file_list)), str(self.os.scene_path))
-                    assert len(outLight_file_list) == 1
+                    # assert len(outLight_file_list) == 1
                     
                     IF_light_visible = False
+                    outLight_file_count = 0
+    
+                    # clean all existing light - .dat files in EditedInput
+                    for _ in BRDF_edited_results_path.iterdir():
+                        if 'visLampSrc_' in str(_):
+                            _.unlink(); print('--Unlinked %s'%str(_))
+
+                    # clean all existing lamps files in EditedInput
+                    for _ in INPUT_edited_path.iterdir():
+                        if 'lampMask' in str(_.stem):
+                            _.unlink(missing_ok=True); print('-Unlinked %s'%str(_))
                     
                     for outLight_file_idx, outLight_file in tqdm(enumerate(outLight_file_list)):
                         root = get_XML_root(str(outLight_file))
@@ -818,7 +832,8 @@ class exporter_scene():
                             
                         assert self.os.extra_transform is None
                         # transform_accu = self.os.extra_transform_homo @ transform_accu
-                        if hasattr(self.os, 'reorient_transform'):
+                        if hasattr(self.os, 'if_reorient_shape') and self.os.if_reorient_shape:
+                            assert hasattr(self.os, 'reorient_transform')
                             transform_accu = self.os.reorient_transform @ transform_accu
                         
                         transform_item.findall('matrix')[0].set('value', ' '.join(['%.4f'%_ for _ in transform_accu.flatten().tolist()]))
@@ -843,16 +858,14 @@ class exporter_scene():
                         mi_light_depth = np.sum(rays_v_flatten.reshape(self.os._H(frame_idx), self.os._W(frame_idx), 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
                         invalid_light_depth_mask = np.logical_or(np.isnan(mi_light_depth), np.isinf(mi_light_depth))
                         
+                        # print(green_text('=========='), outLight_file_idx, np.sum(~invalid_light_depth_mask))
+                        
                         if np.sum(~invalid_light_depth_mask) > 0:
                             IF_light_visible = True
                         
                         if IF_light_visible:
-                            # clean all existing lamps files in EditedInput
-                            for _ in INPUT_edited_path.iterdir():
-                                if 'lampMask' in str(_.stem):
-                                    _.unlink(missing_ok=True); print('-Unlinked %s'%str(_))
                             # dump new vis lamp mask
-                            light_mask_path = INPUT_edited_path / ('lampMask_%d.png'%outLight_file_idx)
+                            light_mask_path = INPUT_edited_path / ('lampMask_%d.png'%outLight_file_count)
                             light_mask = (~invalid_light_depth_mask).astype(np.uint8) * 255
                             if len(light_mask.shape) == 3: light_mask = light_mask[:, :, 0]
                             cv2.imwrite(str(light_mask_path), light_mask)
@@ -926,25 +939,22 @@ class exporter_scene():
                         _rad_new = np.array([_rad[0]/_rad_max, _rad[1]/_rad_max, _rad[2]/_rad_max])
                         _rad_new_BGR = (_rad_new * 255.).astype(np.uint8)[::-1]
                         
-                        light_edit_txt_path = INPUT_edited_path / ('light_%d_params.txt'%outLight_file_idx)
+                        light_edit_txt_path = INPUT_edited_path / ('light_%d_params.txt'%outLight_file_count)
                         
                         if IF_light_visible:
                             _light_vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_light_vertices.T  - _t)).T # convert to oopengl camera coords
 
                             light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam, faces=_light_faces)
-                            light_mesh_path = INPUT_edited_path / ('visLamp_%d.obj'%outLight_file_idx)
+                            light_mesh_path = INPUT_edited_path / ('visLamp_%d.obj'%outLight_file_count)
                             light_trimesh.export(str(light_mesh_path))
 
-                            # clean all existing light - .dat files in EditedInput
-                            for _ in BRDF_edited_results_path.iterdir():
-                                if 'visLampSrc_' in str(_):
-                                    _.unlink(); print('--Unlinked %s'%str(_))
-                            
                             # dump new light - .dat
-                            light_dat_path = BRDF_edited_results_path / ('visLampSrc_%d.dat'%outLight_file_idx)
+                            light_dat_path = BRDF_edited_results_path / ('visLampSrc_%d.dat'%outLight_file_count)
                             light_dat_dict = {'center': np.mean(_light_vertices_cam, axis=0).reshape((1, 3)), 'src': np.array(_rad).reshape((1, 3))}
                             with open(light_dat_path, 'wb') as fOut:
                                 pickle.dump(light_dat_dict, fOut)
+                                
+                            outLight_file_count += 1
                         else:
                             '''
                             given lieccv22 uses linear transformation on inverse depth, hence non-linear on metric depth, thus the scene is no longer orthographic
@@ -967,16 +977,19 @@ class exporter_scene():
                                 0)
 
                             light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam_new, faces=_light_faces)
-                            light_mesh_path = INPUT_edited_path / ('DEBUG_invLamp_%d.obj'%outLight_file_idx)
+                            light_mesh_path = INPUT_edited_path / ('DEBUG_invLamp_%d.obj'%outLight_file_count)
                             light_trimesh.export(str(light_mesh_path))
                             # clean all existing invlamps files in BRDF_edited_results_path
                             for _ in BRDF_edited_results_path.iterdir():
                                 if 'invLamp' in str(_.stem):
                                     _.unlink(missing_ok=True); print('Unlinked %s'%str(_))
-                            light_mesh_path = BRDF_edited_results_path / ('invLampPred_0_%d.obj'%outLight_file_idx)
+                            light_mesh_path = BRDF_edited_results_path / ('invLampPred_0_%d.obj'%outLight_file_count)
                             light_trimesh.export(str(light_mesh_path))
                             
-                            assert outLight_file_idx == 0, 'only one light is supported for now'
+                            # assert outLight_file_count == 0, 'only one light is supported for now'
+                            if outLight_file_count > 0:
+                                print(yellow('WARNING: only one invis light is supported for now, skipping...'))
+                                continue
                             light_dat_path = BRDF_edited_results_path / 'invLampSrc.dat'
                             light_dat_dict = {
                                 'center': np.mean(_light_vertices_cam_new, axis=0).reshape((1, 3)).astype(np.float32), 

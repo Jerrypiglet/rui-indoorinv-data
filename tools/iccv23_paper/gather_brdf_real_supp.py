@@ -33,7 +33,7 @@ synthetic
 real
 '''
 HW = (360, 540)
-scene_frame_list = [('ConferenceRoomV2_final_supergloo', (9, 180))]
+scene_frame_list = [('ConferenceRoomV2_final_supergloo', (9, 161)), ('ClassRoom', (120, 235))]
 
 def gamma2(x):
     return np.clip(x ** (1./2.2), 0., 1.)

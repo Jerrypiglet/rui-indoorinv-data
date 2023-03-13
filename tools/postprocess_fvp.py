@@ -39,10 +39,12 @@ DATASET = 'indoor_synthetic'
 real
 '''
 expected_shape = (360, 540)
-scene_name = 'real/ConferenceRoomV2_final_supergloo'; appendix = ''
-split_fvp = ''; frame_id_list_dict = {'': list(range(191))}
 IF_ALIGH = False # if align with ours
 DATASET = 'real'
+# scene_name = 'real/ConferenceRoomV2_final_supergloo'; appendix = ''
+# split_fvp = ''; frame_id_list_dict = {'': list(range(191))}
+scene_name = 'real/ClassRoom'; appendix = ''
+split_fvp = ''; frame_id_list_dict = {'': list(range(278))}
 
 # ----------
 

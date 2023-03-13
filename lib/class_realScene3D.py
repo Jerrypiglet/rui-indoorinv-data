@@ -174,6 +174,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             #     for (origin, lookatvector, up) in self.origin_lookatvector_up_list] # dont rotate origin!!
             
         self.reorient_transform = np.eye(3, dtype=np.float32)
+        self.if_reorient_shape = False
         if self.scene_params_dict.get('if_reorient_y_up', False):
             '''
             [TODO] better align normals to axes with clustering or PCA, than manually pick patches
@@ -198,6 +199,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             if not self.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
                 self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
                 self.bverts_list = [computeBox(vertices)[0] for vertices in self.vertices_list] # recompute bounding boxes
+                self.if_reorient_shape = True
             
             self.pose_list = [np.hstack((self.reorient_transform @ pose[:3, :3], self.reorient_transform @ pose[:3, 3:4])) for pose in self.pose_list] # dont rotate translation!!
             self.origin_lookatvector_up_list = [(self.reorient_transform @ origin, self.reorient_transform @ lookatvector, self.reorient_transform @ up) \

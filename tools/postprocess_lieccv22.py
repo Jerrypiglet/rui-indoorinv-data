@@ -34,8 +34,15 @@ scene_name = 'indoor_synthetic/kitchen'
 real
 '''
 DATASET = 'real'; SPLIT = 'real'; expected_shape = (360, 540)
-test_list_path = ROOT_PATH / 'data/real/EXPORT_lieccv22' / SPLIT / 'testList_ConferenceRoomV2_final_supergloo.txt'
+
 scene_name = 'real/ConferenceRoomV2_final_supergloo'
+test_list_path = ROOT_PATH / 'data/real/EXPORT_lieccv22' / SPLIT / 'testList_ConferenceRoomV2_final_supergloo.txt'
+# frame_id_list = [9, 161] # BRDF
+frame_id_list = [68, 180] # synthesis/relight 
+
+# scene_name = 'real/ClassRoom'
+# # test_list_path = ROOT_PATH / 'data/real/EXPORT_lieccv22' / SPLIT / 'testList_ClassRoom.txt'
+# test_list_path = ROOT_PATH / 'data/real/EXPORT_lieccv22' / SPLIT / 'testList_ClassRoom_relight.txt'
 
 scene_name_write = scene_name.split('/')[1] if '/' in scene_name else scene_name
 assert Path(test_list_path).exists(), str(test_list_path)
@@ -68,41 +75,43 @@ assert all([Path(_).exists() for _ in tests]), str(tests)
 for test in tests:
    test_name = str(test).split('/')[-2]
    scene_name_test, frame_id = '_'.join(test_name.split('_')[:-1]), int(test_name.split('_')[-1].replace('frame', ''))
+   if frame_id not in frame_id_list: continue
    
-   if split in ['train', 'real']:
-      BRDF_result_path = test.parent / BRDF_result_folder
-      assert BRDF_result_path.exists(), str(BRDF_result_path)
+   # if split in ['train', 'real']:
+   #    BRDF_result_path = test.parent / BRDF_result_folder
+   #    assert BRDF_result_path.exists(), str(BRDF_result_path)
       
-      Path(str(TARGET_PATH).replace('$TASK', 'brdf')).mkdir(parents=True, exist_ok=True)
+   #    Path(str(TARGET_PATH).replace('$TASK', 'brdf')).mkdir(parents=True, exist_ok=True)
       
-      albedo_vis_path = BRDF_result_path / 'albedo.png'
-      assert albedo_vis_path.exists(), str(albedo_vis_path)
-      # albedo = cv2.imread(str(albedo_vis_path), cv2.IMREAD_UNCHANGED).astype(np.float32)/255.
-      # albedo = (np.clip(albedo**2.2, 0, 1) * 255).astype(np.uint8)
-      albedo = cv2.imread(str(albedo_vis_path), cv2.IMREAD_UNCHANGED)
-      # albedo = center_crop(albedo, expected_shape)
-      albedo = cv2.resize(albedo, (expected_shape[1]*2, expected_shape[0]*2))
-      cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_kd.png'%frame_id)), albedo)
+   #    albedo_vis_path = BRDF_result_path / 'albedo.png'
+   #    assert albedo_vis_path.exists(), str(albedo_vis_path)
+   #    # albedo = cv2.imread(str(albedo_vis_path), cv2.IMREAD_UNCHANGED).astype(np.float32)/255.
+   #    # albedo = (np.clip(albedo**2.2, 0, 1) * 255).astype(np.uint8)
+   #    albedo = cv2.imread(str(albedo_vis_path), cv2.IMREAD_UNCHANGED)
+   #    # albedo = center_crop(albedo, expected_shape)
+   #    albedo = cv2.resize(albedo, (expected_shape[1]*2, expected_shape[0]*2))
+   #    cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_kd.png'%frame_id)), albedo)
       
-      rough_vis_path = BRDF_result_path / 'rough.png'
-      assert rough_vis_path.exists(), str(rough_vis_path)
-      rough = cv2.imread(str(rough_vis_path), cv2.IMREAD_UNCHANGED)
-      # rough = center_crop(rough, expected_shape)
-      rough = cv2.resize(rough, (expected_shape[1]*2, expected_shape[0]*2))
-      cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_roughness.png'%frame_id)), rough)
+   #    rough_vis_path = BRDF_result_path / 'rough.png'
+   #    assert rough_vis_path.exists(), str(rough_vis_path)
+   #    rough = cv2.imread(str(rough_vis_path), cv2.IMREAD_UNCHANGED)
+   #    # rough = center_crop(rough, expected_shape)
+   #    rough = cv2.resize(rough, (expected_shape[1]*2, expected_shape[0]*2))
+   #    cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_roughness.png'%frame_id)), rough)
 
-      INPUT_edited_path = test.parent / 'EditedInput'
-      assert INPUT_edited_path.exists(), str(INPUT_edited_path)
+   #    INPUT_edited_path = test.parent / 'EditedInput'
+   #    assert INPUT_edited_path.exists(), str(INPUT_edited_path)
       
-      emission_path = INPUT_edited_path / 'emission.exr'
-      assert emission_path.exists(), str(emission_path)
-      emission = cv2.imread(str(emission_path), cv2.IMREAD_UNCHANGED)
-      # emission = center_crop(emission, expected_shape)
-      emission = cv2.resize(emission, (expected_shape[1]*2, expected_shape[0]*2))
-      cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_emission.exr'%frame_id)), emission)
+   #    emission_path = INPUT_edited_path / 'emission.exr'
+   #    assert emission_path.exists(), str(emission_path)
+   #    emission = cv2.imread(str(emission_path), cv2.IMREAD_UNCHANGED)
+   #    # emission = center_crop(emission, expected_shape)
+   #    emission = cv2.resize(emission, (expected_shape[1]*2, expected_shape[0]*2))
+   #    cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_emission.exr'%frame_id)), emission)
 
-      print('=== BRDF results saved to %s ==='%str(Path(str(TARGET_PATH).replace('$TASK', 'brdf'))))
-    
+   #    print('=== BRDF results saved to %s ==='%str(Path(str(TARGET_PATH).replace('$TASK', 'brdf'))))
+   
+   # continue
    '''
    relight
    '''
@@ -163,6 +172,14 @@ for test in tests:
       # lieccv22_relight = center_crop(lieccv22_relight, expected_shape)
       lieccv22_relight = cv2.resize(lieccv22_relight, (expected_shape[1]*2, expected_shape[0]*2))
       
+      input_path = test.parent / 'input'
+      lampMask = np.zeros((lieccv22_relight.shape[0], lieccv22_relight.shape[1])).astype(bool)
+      for _ in input_path.iterdir():
+         if _.stem.startswith('lampMask'):
+            lampMask_ = cv2.resize(cv2.imread(str(_), cv2.IMREAD_UNCHANGED), (lieccv22_relight.shape[1], lieccv22_relight.shape[0]), cv2.INTER_NEAREST) > 0
+            lampMask = np.logical_or(lampMask, lampMask_)
+      lieccv22_relight[lampMask] = 0
+
       relight_target_path = Path(str(TARGET_PATH).replace('$TASK', RENDER_TASK)) / ('%03d_ori.exr'%frame_id)
       relight_target_path.parent.mkdir(parents=True, exist_ok=True)
       cv2.imwrite(str(relight_target_path), lieccv22_relight)

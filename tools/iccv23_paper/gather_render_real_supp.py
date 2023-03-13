@@ -26,7 +26,9 @@ real
 '''
 HW = (360, 540)
 data_root_path = Path('data/real')
-scene_frame_list = [('ConferenceRoomV2_final_supergloo', (9, 180))]
+scene_frame_list = [('ConferenceRoomV2_final_supergloo', (179, 68))] # fvp
+# scene_frame_list = [('ConferenceRoomV2_final_supergloo', (180, 68))] # lieccv22
+# scene_frame_list = [('ClassRoom', (90, 55))] # synthesis
 
 assert Path(data_root_path).exists()
 
@@ -49,11 +51,11 @@ filename_dict = {
     # 'GT-synthesis': data_root_path / '#SCENE_NAME' / SPLIT / 'Image' / '%03d_0001.exr', 
     # 'GT-relight': data_root_path / ('#SCENE_NAME'+'-relight') / SPLIT / 'Image' / '%03d_0001.exr',
      
-    'li22-synthesis': data_root_path / 'RESULTS/viewsynthesis/lieccv22' / '#SCENE_NAME' / '%03d.exr', 
-    'li22-relight': data_root_path / 'RESULTS/relight/lieccv22' / '#SCENE_NAME' / '%03d.exr', 
+    'li22-synthesis': data_root_path / 'RESULTS/viewsynthesis/lieccv22' / '#SCENE_NAME' / '%03d_ori.exr', 
+    'li22-relight': data_root_path / 'RESULTS/relight/lieccv22' / '#SCENE_NAME' / '%03d_ori.exr', 
     
-    'fvp-synthesis': data_root_path / 'RESULTS/viewsynthesis/fvp' / '#SCENE_NAME' / '%03d.exr', 
-    'fvp-relight': data_root_path / 'RESULTS/relight/fvp' / '#SCENE_NAME' / '%03d.exr', 
+    'fvp-synthesis': data_root_path / 'RESULTS/viewsynthesis/fvp' / '#SCENE_NAME' / '%03d_ori.exr', 
+    'fvp-relight': data_root_path / 'RESULTS/relight/fvp' / '#SCENE_NAME' / '%03d_ori.exr', 
 
     # 'milo-synthesis': data_root_path / 'RESULTS/viewsynthesis/milo' / '#SCENE_NAME' / '%03d.exr', 
     # 'milo-relight': data_root_path / 'RESULTS/relight/milo' / '#SCENE_NAME' / '%03d.exr', 
@@ -74,8 +76,11 @@ filename_dict = {
 # denoiser = mi.OptixDenoiser((640, 320))
 
 # for method in ['GT', 'ours', 'ours-sem', 'milo', 'ipt', 'li22', 'fvp']:
-for method in ['li22', 'fvp']:
-    for modality in ['synthesis', 'relight']:
+# for method in ['li22', 'fvp']:
+for method in ['fvp']:
+    # for modality in ['synthesis', 'relight']:
+    # for modality in ['synthesis']:
+    for modality in ['relight']:
         for scene_name, frame_id_list in scene_frame_list:
             for frame_idx, frame_id in enumerate(frame_id_list):
                 # frame_id = frame_ids[0]
@@ -113,24 +118,35 @@ for method in ['li22', 'fvp']:
                 else:
                     im = resize(clamp(im))
                     
-                if im_inset_path is not None and method in ['GT'] and modality == 'relight':
-                    # print(scene_name, method, modality)
-                    assert im_inset_path.exists(), 'image file not found: %s'%str(im_inset_path)
-                    # print('=====', im_inset_path)
-                    im_inset = cv2.imread(str(im_inset_path), cv2.IMREAD_UNCHANGED)[:, :, :3]
-                    if im_inset.dtype == np.uint8:
-                        im_inset = im_inset.astype(np.float32) / 255.
-                    if modality in ['synthesis', 'relight'] and not filename_dict[key] in [wait_file, where_file, NA_file] and im_inset_path.suffix == '.exr':
-                        im_inset = resize(gamma2(im_inset))
-                    else:
-                        im_inset = resize(clamp(im_inset))
-                    _H, _W = im.shape[0]//3, im.shape[1]//3
-                    H, W = im.shape[0], im.shape[1]
-                    im_inset = cv2.resize(im_inset, (_W, _H), interpolation=cv2.INTER_AREA)
-                    im[:_H, (W-_W):, :] = im_inset
-                    im[_H:_H+2, (W-_W):, :] = 1.
-                    im[0:_H, (W-_W):(W-_W+2), :] = 1.
-                    im_inset = None
+                if modality == 'relight' and method == 'fvp':
+                    irradiance_path = '/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader/data/real/RESULTS_fvp/%s/exr/outLight0/%05d_irdc.exr'%(scene_name, frame_id)
+                    emission = cv2.imread(irradiance_path, cv2.IMREAD_UNCHANGED)[:, :, :3]
+                    emission = cv2.resize(emission, (im.shape[1], im.shape[0]), interpolation=cv2.INTER_NEAREST)
+                    emission_mask = np.amax(emission, axis=-1) > 0.99
+                    if np.sum(emission_mask) != 0:
+                        __ = np.mean(emission[emission_mask], axis=0, keepdims=True)
+                        # __ = __ / np.amax(__)
+                        __ = np.clip(__**(1./2.2), 0, 1)
+                        im[emission_mask] = __
+                    
+                # if im_inset_path is not None and method in ['GT'] and modality == 'relight':
+                #     # print(scene_name, method, modality)
+                #     assert im_inset_path.exists(), 'image file not found: %s'%str(im_inset_path)
+                #     # print('=====', im_inset_path)
+                #     im_inset = cv2.imread(str(im_inset_path), cv2.IMREAD_UNCHANGED)[:, :, :3]
+                #     if im_inset.dtype == np.uint8:
+                #         im_inset = im_inset.astype(np.float32) / 255.
+                #     if modality in ['synthesis', 'relight'] and not filename_dict[key] in [wait_file, where_file, NA_file] and im_inset_path.suffix == '.exr':
+                #         im_inset = resize(gamma2(im_inset))
+                #     else:
+                #         im_inset = resize(clamp(im_inset))
+                #     _H, _W = im.shape[0]//3, im.shape[1]//3
+                #     H, W = im.shape[0], im.shape[1]
+                #     im_inset = cv2.resize(im_inset, (_W, _H), interpolation=cv2.INTER_AREA)
+                #     im[:_H, (W-_W):, :] = im_inset
+                #     im[_H:_H+2, (W-_W):, :] = 1.
+                #     im[0:_H, (W-_W):(W-_W+2), :] = 1.
+                #     im_inset = None
                     
                 im_target = export_path / ('%s-%s-%d_%s.png'%(method, scene_name, frame_idx, modality))
                 im_target.parent.mkdir(parents=True, exist_ok=True)
