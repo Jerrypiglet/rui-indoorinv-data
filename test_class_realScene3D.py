@@ -92,10 +92,10 @@ hdr_radiance_scale = 1.
 sdr_radiance_scale = 1.
 if_rc = False; pcd_file = ''; 
 
-if_reorient_y_up = False  #  images/demo_realScene_after_center_scale_reorient.png
+if_reorient_rescale = False  #  images/demo_realScene_after_center_scale_reorient.png
 reorient_blender_angles = [] # images/demo_blender_rotate.png; Open the input .ply/.obj file in Blender, rotate object axes to align with world, write down the angles
-if_reorient_y_up_skip_shape = False # do not transform shape; only transform posesa
-
+if_reorient_skip_shape = False # do not transform shape; only transform posesa
+rescale_shape_factor = 1.
 
 # scene_name = 'IndoorKitchen_v1'; hdr_radiance_scale = 10.
 # # if_rc = False; pcd_file = 'reconstuction_auto/dense/2/fused.ply'; pose_file = ('json', 'transforms.json')
@@ -180,8 +180,8 @@ if_reorient_y_up_skip_shape = False # do not transform shape; only transform pos
 # shape_file = base_root / 'RESULTS_monosdf/20230306-072825-K-ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
 # # shape_file = base_root / 'RESULTS_monosdf/20230306-152848-mm1-EVAL-20230306-072825ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
 # # shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
-# # if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
-# # if_reorient_y_up_skip_shape = True
+# # if_reorient_rescale = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
+# # if_reorient_skip_shape = True
 # # emitter_thres = 4.
 # # # frame_ids = [9, 161] # BRDF
 # # # frame_ids = [180, 68] # re-rendering + relighting
@@ -197,12 +197,14 @@ Supplementary
 
 # ------------>>
 # +++++ IndoorKitchenV4_2_aligned +++++
-scene_name = 'IndoorKitchenV4_2'; hdr_radiance_scale = 1
-pose_file = ('json', 'transforms_bright.json') # colmap
-# shape_file = base_root / 'RESULTS_monosdf/20230309-170742-mm3-IndoorKitchenV4_2_SDR_grids_trainval.ply'
-shape_file = base_root / 'RESULTS_monosdf/20230311-014753-K-IndoorKitchenV4_2_aligned_SDR_grids_trainval.ply'
-if_reorient_y_up = True; reorient_blender_angles = [-11.2, -43, -181] # images/demo_blender_rotate.png
-if_reorient_y_up_skip_shape = True
+# scene_name = 'IndoorKitchenV4_2'; hdr_radiance_scale = 1
+# pose_file = ('json', 'transforms_bright.json') # colmap
+# # shape_file = base_root / 'RESULTS_monosdf/20230309-170742-mm3-IndoorKitchenV4_2_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230311-014753-K-IndoorKitchenV4_2_aligned_SDR_grids_trainval.ply'
+# if_reorient_rescale = True; reorient_blender_angles = [-11.2, -43, -181] # images/demo_blender_rotate.png
+# rescale_shape_factor = 0.3
+# if_reorient_skip_shape = True
+# frame_ids = [0]
 # <<------------
 
 # ------------>>
@@ -215,8 +217,8 @@ if_reorient_y_up_skip_shape = True
 # # shape_file = base_root / 'RESULTS_monosdf/20230309-232118-mm1-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 # shape_file = base_root / 'RESULTS_monosdf/20230310-035459-K-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval.ply' # OLD
 # # shape_file = base_root / 'RESULTS_monosdf/20230311-020104-K-DormRoom_v2_1_betterK_supergloo_aligned_SDR_grids_trainval.ply'
-# if_reorient_y_up = True; reorient_blender_angles = [165, 36.5, -3.1] # images/demo_blender_rotate.png
-# if_reorient_y_up_skip_shape = True
+# if_reorient_rescale = True; reorient_blender_angles = [165, 36.5, -3.1] # images/demo_blender_rotate.png
+# if_reorient_skip_shape = True
 # <<------------
 
 # ------------>>
@@ -231,8 +233,8 @@ if_reorient_y_up_skip_shape = True
 # pose_file = ('json', 'transforms_colmap.json'); 
 # # shape_file = base_root / 'RESULTS_monosdf/classroom.obj'; 
 # shape_file = base_root / 'RESULTS_monosdf/20230310-162753-K-ClassRoom_aligned_SDR_grids_trainval.ply'; 
-# if_reorient_y_up = True; reorient_blender_angles = [-184, -19.7, -0.757] # images/demo_blender_rotate.png
-# if_reorient_y_up_skip_shape = True
+# if_reorient_rescale = True; reorient_blender_angles = [-184, -19.7, -0.757] # images/demo_blender_rotate.png
+# if_reorient_skip_shape = True
 # # frame_ids = [120, 235, 27, 92]
 # # frame_ids = [278, 275] # for relighting
 # emitter_thres = 2.
@@ -242,8 +244,8 @@ if_reorient_y_up_skip_shape = True
 # invalid_frame_id_list = list(range(267, 273)) + list(range(274, 295)) # original lighting
 # pose_file = ('json', 'transforms_superglue.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230310-035030-mm1-ClassRoom_supergloo_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
-# if_reorient_y_up = True; reorient_blender_angles = [-181, 16.5, -2.05] # images/demo_blender_rotate.png
-# if_reorient_y_up_skip_shape = True
+# if_reorient_rescale = True; reorient_blender_angles = [-181, 16.5, -2.05] # images/demo_blender_rotate.png
+# if_reorient_skip_shape = True
 # <<------------
 
 # ------------>>
@@ -263,16 +265,16 @@ if_reorient_y_up_skip_shape = True
 # invalid_frame_idx_list = [7, 8, 171, 172, 173, 174, 175] # bad poses
 # pose_file = ('json', 'transforms_supergloo.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230311-164356-K-Bedroom_supergloo_aligned_SDR_grids_trainval.ply'
-# if_reorient_y_up = True; reorient_blender_angles = [172, 55.3, -1.07] # images/demo_blender_rotate.png
-# if_reorient_y_up_skip_shape = True
+# if_reorient_rescale = True; reorient_blender_angles = [172, 55.3, -1.07] # images/demo_blender_rotate.png
+# if_reorient_skip_shape = True
 
 # scene_name = 'Bedroom'; hdr_radiance_scale = 8; sdr_radiance_scale = 4
 # invalid_frame_id_list = [198, 199, 200] # original lighting
 # invalid_frame_idx_list = [18, 22, 23, 24, 25, 26] # bad poses
 # pose_file = ('json', 'transforms_colmap.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230311-164210-K-Bedroom_aligned_SDR_grids_trainval.ply'
-# if_reorient_y_up = True; reorient_blender_angles = [171, 177, -361] # images/demo_blender_rotate.png
-# if_reorient_y_up_skip_shape = True
+# if_reorient_rescale = True; reorient_blender_angles = [171, 177, -361] # images/demo_blender_rotate.png
+# if_reorient_skip_shape = True
 
 # +++++ Bedroom_MORE_aligned +++++ [SUPP]
 # scene_name = 'Bedroom_MORE'; hdr_radiance_scale = 1; sdr_radiance_scale = 2
@@ -280,16 +282,19 @@ if_reorient_y_up_skip_shape = True
 # invalid_frame_idx_list = [18, 22, 23, 24, 25, 26] # bad poses
 # pose_file = ('json', 'transforms_colmap.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230312-132325-mm3-Bedroom_MORE_aligned_HDR_grids_trainval.ply'
-# if_reorient_y_up = True; reorient_blender_angles = [-197, 177, -10.2]
-# if_reorient_y_up_skip_shape = True
+# if_reorient_rescale = True; reorient_blender_angles = [-197, 177, -10.2]
+# if_reorient_skip_shape = True
 
 # scene_name = 'Bedroom_MORE_supergloo'; hdr_radiance_scale = 1; sdr_radiance_scale = 2
 # invalid_frame_id_list = [198, 199, 200, 202, 203, 206, 207, 209, 217, ] # original lighting
 # invalid_frame_idx_list = [7, 8, 171, 172, 173, 174, 175] # bad poses
 # pose_file = ('json', 'transforms_supergloo.json')
-
 # <<------------
 
+
+scene_name = 'CSEKitchen'; hdr_radiance_scale = 1
+pose_file = ('json', 'transforms_colmap.json') # colmap
+# shape_file = base_root / 'RESULTS_monosdf/.ply'
 
 '''
 OBSELETE
@@ -342,9 +347,10 @@ scene_obj = realScene3D(
         
         'if_autoscale_scene': False, # not doing this for exporting, to avoid potential bugs (export to monosdf will handling scale)
         
-        'if_reorient_y_up': if_reorient_y_up,  #  images/demo_realScene_after_center_scale_reorient.png
+        'if_reorient_rescale': if_reorient_rescale,  #  images/demo_realScene_after_center_scale_reorient.png
         'reorient_blender_angles': reorient_blender_angles, # images/demo_blender_rotate.png; Open the input .ply/.obj file in Blender, rotate object axes to align with world, write down the angles
-        'if_reorient_y_up_skip_shape': if_reorient_y_up_skip_shape, # do not transform shape; only transform posesa
+        'rescale_shape_factor': rescale_shape_factor, 
+        'if_reorient_skip_shape': if_reorient_skip_shape, # do not transform shape; only transform posesa
         
         # 'normal_up_frame_info': {'frame_id': 3, 'normal_up_hw_1': (0.5, 0.35), 'normal_up_hw_2': (1., 0.6)}, # find one image with mostly floor within the desginated region
         # 'normal_left_frame_info': {'frame_id': 8, 'normal_left_hw_1': (0., 0.), 'normal_left_hw_2': (0.5, 0.5)}, # find one image with mostly floor within the desginated region
