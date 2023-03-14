@@ -793,7 +793,7 @@ class visualizer_scene_3D_o3d(object):
             shape_bbox.points = o3d.utility.Vector3dVector(bverts)
             shape_bbox.colors = o3d.utility.Vector3dVector([obj_color if not if_emitter else [0., 0., 0.] for i in range(12)]) # black for emitters
             shape_bbox.lines = o3d.utility.Vector2iVector([[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])
-            geometry_list.append(shape_bbox)
+            # geometry_list.append(shape_bbox)
 
             '''
             [optional] load mashes & text labels

@@ -206,7 +206,21 @@ class exporter_scene():
                                 camOut.write('%.6f %.6f %.6f\n'%(R_row[0], R_row[1], R_row[2]))
                             # <t> [a 3-vector describing the camera translation]
                             camOut.write('%.6f %.6f %.6f\n'%(t_.flatten()[0], t_.flatten()[1], t_.flatten()[2]))
-                        
+
+                            lookat_file_path = scene_export_path / 'cameras' / ('%d_cameras.lookat'%frame_idx)
+                            origin = t.flatten()
+                            lookatvector = (R @ np.array([[0.], [0.], [-1.]], dtype=np.float32)).flatten()
+                            up = (R @ np.array([[0.], [1.], [0.]], dtype=np.float32)).flatten()
+                            
+                            lookat_str = '%05d.exr'%frame_idx
+                            lookat_str += (' -D origin=%.4f,%.4f,%.4f'%(origin[0], origin[1], origin[2]))
+                            lookat_str += (' -D target=%.4f,%.4f,%.4f'%((origin+lookatvector)[0], (origin+lookatvector)[1], (origin+lookatvector)[2]))
+                            lookat_str += (' -D up=%.4f,%.4f,%.4f'%(up[0], up[1], up[2]))
+                            fy = self.os._K(frame_idx)[1][1]
+                            fov_y = np.arctan(0.5 * self.os.H / fy) * 2. / np.pi * 180.
+                            lookat_str += ' -D fovy=%.2f -D clip=0.001000,1000.000000'%fov_y
+                            with open(str(lookat_file_path), 'a') as lookat_file:
+                                lookat_file.write(lookat_str + '\n')
                 else:
                     raise NotImplementedError
 
@@ -371,6 +385,7 @@ class exporter_scene():
                             _rad = [float(_) for _ in _rad_item.get('value').split(',')]
                             assert len(_rad) == 3
                             _rad_max = max(_rad)
+                            # _rad_max = 1.
                             _rad_item.set('value', ' '.join(['%.2f'%(_/(_rad_max+1e-6)) for _ in _rad]))
                             
                             xmlString = transformToXml(root)
@@ -406,7 +421,7 @@ class exporter_scene():
                 # for T_, appendix in T_list_:
                 shape_list = []
                 # shape_export_path = scene_export_path / ('scene%s.obj'%appendix)
-                file_str = {'monosdf': 'scene%s.obj'%appendix, 'mitsuba': 'scene%s.obj'%appendix, 'fvp': 'meshes/recon.ply'}[format]
+                file_str = {'monosdf': 'scene%s.obj'%appendix, 'mitsuba': 'scene%s.obj'%appendix, 'fvp': 'meshes/recon.obj'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 shape_export_path = scene_export_path / file_str
                 

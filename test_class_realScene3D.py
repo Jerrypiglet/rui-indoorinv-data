@@ -174,17 +174,17 @@ if_reorient_y_up_skip_shape = False # do not transform shape; only transform pos
 # shape_file = base_root / 'RESULTS_monosdf/'
 
 # +++++ ConferenceRoomV2_final_supergloo_aligned +++++ [SUPP]
-scene_name = 'ConferenceRoomV2_final_supergloo'; hdr_radiance_scale = 2.
-pose_file = ('json', 'transforms_superglue.json')
-# shape_file = base_root / 'RESULTS_monosdf/20230306-060630-K-ConferenceRoomV2_final_supergloo_HDR_grids_trainval.ply'
+# scene_name = 'ConferenceRoomV2_final_supergloo'; hdr_radiance_scale = 2.
+# pose_file = ('json', 'transforms_superglue.json')
+# # shape_file = base_root / 'RESULTS_monosdf/20230306-060630-K-ConferenceRoomV2_final_supergloo_HDR_grids_trainval.ply'
 # shape_file = base_root / 'RESULTS_monosdf/20230306-072825-K-ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
-# shape_file = base_root / 'RESULTS_monosdf/20230306-152848-mm1-EVAL-20230306-072825ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
-shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
-if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
-# if_reorient_y_up_skip_shape = True
-emitter_thres = 4.
-# frame_ids = [9, 161] # BRDF
-frame_ids = [180, 68] # re-rendering + relighting
+# # shape_file = base_root / 'RESULTS_monosdf/20230306-152848-mm1-EVAL-20230306-072825ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
+# # shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
+# # if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
+# # if_reorient_y_up_skip_shape = True
+# # emitter_thres = 4.
+# # # frame_ids = [9, 161] # BRDF
+# # # frame_ids = [180, 68] # re-rendering + relighting
 
 '''
 Supplementary
@@ -197,11 +197,12 @@ Supplementary
 
 # ------------>>
 # +++++ IndoorKitchenV4_2_aligned +++++
-# scene_name = 'IndoorKitchenV4_2'; hdr_radiance_scale = 1
-# pose_file = ('json', 'transforms_bright.json') # colmap
+scene_name = 'IndoorKitchenV4_2'; hdr_radiance_scale = 1
+pose_file = ('json', 'transforms_bright.json') # colmap
 # shape_file = base_root / 'RESULTS_monosdf/20230309-170742-mm3-IndoorKitchenV4_2_SDR_grids_trainval.ply'
-# if_reorient_y_up = True; reorient_blender_angles = [-11.2, -43, -181] # images/demo_blender_rotate.png
-# if_reorient_y_up_skip_shape = True
+shape_file = base_root / 'RESULTS_monosdf/20230311-014753-K-IndoorKitchenV4_2_aligned_SDR_grids_trainval.ply'
+if_reorient_y_up = True; reorient_blender_angles = [-11.2, -43, -181] # images/demo_blender_rotate.png
+if_reorient_y_up_skip_shape = True
 # <<------------
 
 # ------------>>
@@ -219,21 +220,21 @@ Supplementary
 # <<------------
 
 # ------------>>
-# # invalid_frame_id_list = list(range(267, 273)) + list(range(274, 295)) # original lighting
-# invalid_frame_id_list = list(range(267)) + [273] + list(range(288, 295)) # blackboard lighting
+# invalid_frame_id_list = list(range(267, 273)) + list(range(274, 295)) # original lighting
+# # invalid_frame_id_list = list(range(267)) + [273] + list(range(288, 305)) # blackboard lighting
 # # invalid_frame_id_list = list(range(288)) + list(range(295, 305)) # lamp lighting
 
-# # +++++ ClassRoom_aligned +++++ [SUPP]
+# # # +++++ ClassRoom_aligned +++++ [SUPP]
 # scene_name = 'ClassRoom'; hdr_radiance_scale = 3 # BETTER intrinsics
 # assert invalid_frame_id_list != []
 # # shape_file = base_root / 'RESULTS_monosdf/20230310-035028-mm1-ClassRoom_SDR_grids_trainval.ply'
 # pose_file = ('json', 'transforms_colmap.json'); 
-# shape_file = base_root / 'RESULTS_monosdf/classroom.obj'; 
-# # shape_file = base_root / 'RESULTS_monosdf/20230310-162753-K-ClassRoom_aligned_SDR_grids_trainval.ply'; 
+# # shape_file = base_root / 'RESULTS_monosdf/classroom.obj'; 
+# shape_file = base_root / 'RESULTS_monosdf/20230310-162753-K-ClassRoom_aligned_SDR_grids_trainval.ply'; 
 # if_reorient_y_up = True; reorient_blender_angles = [-184, -19.7, -0.757] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
 # # frame_ids = [120, 235, 27, 92]
-# frame_ids = [278, 275] # for relighting
+# # frame_ids = [278, 275] # for relighting
 # emitter_thres = 2.
 
 # +++++ ClassRoom_supergloo_aligned +++++
