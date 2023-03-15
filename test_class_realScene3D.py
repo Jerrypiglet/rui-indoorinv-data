@@ -174,17 +174,17 @@ if_reorient_y_up_skip_shape = False # do not transform shape; only transform pos
 # shape_file = base_root / 'RESULTS_monosdf/'
 
 # +++++ ConferenceRoomV2_final_supergloo_aligned +++++ [SUPP]
-# scene_name = 'ConferenceRoomV2_final_supergloo'; hdr_radiance_scale = 2.
-# pose_file = ('json', 'transforms_superglue.json')
-# # shape_file = base_root / 'RESULTS_monosdf/20230306-060630-K-ConferenceRoomV2_final_supergloo_HDR_grids_trainval.ply'
+scene_name = 'ConferenceRoomV2_final_supergloo'; hdr_radiance_scale = 2.
+pose_file = ('json', 'transforms_superglue.json')
+# shape_file = base_root / 'RESULTS_monosdf/20230306-060630-K-ConferenceRoomV2_final_supergloo_HDR_grids_trainval.ply'
 # shape_file = base_root / 'RESULTS_monosdf/20230306-072825-K-ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
-# # shape_file = base_root / 'RESULTS_monosdf/20230306-152848-mm1-EVAL-20230306-072825ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
-# # shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
-# # if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
-# # if_reorient_y_up_skip_shape = True
-# # emitter_thres = 4.
-# # # frame_ids = [9, 161] # BRDF
-# # # frame_ids = [180, 68] # re-rendering + relighting
+# shape_file = base_root / 'RESULTS_monosdf/20230306-152848-mm1-EVAL-20230306-072825ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
+shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
+# if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
+# if_reorient_y_up_skip_shape = True
+# emitter_thres = 4.
+# # frame_ids = [9, 161] # BRDF
+# # frame_ids = [180, 68] # re-rendering + relighting
 
 '''
 Supplementary
@@ -197,12 +197,12 @@ Supplementary
 
 # ------------>>
 # +++++ IndoorKitchenV4_2_aligned +++++
-scene_name = 'IndoorKitchenV4_2'; hdr_radiance_scale = 1
-pose_file = ('json', 'transforms_bright.json') # colmap
-# shape_file = base_root / 'RESULTS_monosdf/20230309-170742-mm3-IndoorKitchenV4_2_SDR_grids_trainval.ply'
-shape_file = base_root / 'RESULTS_monosdf/20230311-014753-K-IndoorKitchenV4_2_aligned_SDR_grids_trainval.ply'
-if_reorient_y_up = True; reorient_blender_angles = [-11.2, -43, -181] # images/demo_blender_rotate.png
-if_reorient_y_up_skip_shape = True
+# scene_name = 'IndoorKitchenV4_2'; hdr_radiance_scale = 1
+# pose_file = ('json', 'transforms_bright.json') # colmap
+# # shape_file = base_root / 'RESULTS_monosdf/20230309-170742-mm3-IndoorKitchenV4_2_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230311-014753-K-IndoorKitchenV4_2_aligned_SDR_grids_trainval.ply'
+# if_reorient_y_up = True; reorient_blender_angles = [-11.2, -43, -181] # images/demo_blender_rotate.png
+# if_reorient_y_up_skip_shape = True
 # <<------------
 
 # ------------>>
@@ -213,8 +213,8 @@ if_reorient_y_up_skip_shape = True
 # # # shape_file = base_root / 'RESULTS_monosdf/20230309-185710-mm1-DormRoom_v2_1_betterK_supergloo_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 # # # shape_file = base_root / 'RESULTS_monosdf/20230309-200858-mm1-DormRoom_v2_1_betterK_supergloo_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
 # # shape_file = base_root / 'RESULTS_monosdf/20230309-232118-mm1-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval_gamma2_L1_Lr1e-4S25.ply'
-# shape_file = base_root / 'RESULTS_monosdf/20230310-035459-K-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval.ply' # OLD
 # # shape_file = base_root / 'RESULTS_monosdf/20230311-020104-K-DormRoom_v2_1_betterK_supergloo_aligned_SDR_grids_trainval.ply'
+# shape_file = base_root / 'RESULTS_monosdf/20230310-035459-K-DormRoom_v2_1_betterK_supergloo_FIXED_SDR_grids_trainval.ply' # OLD
 # if_reorient_y_up = True; reorient_blender_angles = [165, 36.5, -3.1] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
 # <<------------
@@ -287,9 +287,25 @@ if_reorient_y_up_skip_shape = True
 # invalid_frame_id_list = [198, 199, 200, 202, 203, 206, 207, 209, 217, ] # original lighting
 # invalid_frame_idx_list = [7, 8, 171, 172, 173, 174, 175] # bad poses
 # pose_file = ('json', 'transforms_supergloo.json')
-
 # <<------------
 
+# scene_name = 'CSEKitchen'; hdr_radiance_scale = 4
+# pose_file = ('json', 'transforms_colmap.json') # colmap
+# invalid_frame_id_list = [1, 13]
+# invalid_frame_id_list += [165, 166, 167, 170, 171, 172, 173, 185] # novel lighting ALL; original lighting: 164, 168, 169, 174, 175, 176; 185: lamp off
+# shape_file = base_root / 'RESULTS_monosdf/20230313-214417-mm3-RE-CSEKitchen_HDR_grids_trainval.ply'
+# # shape_file = base_root / 'RESULTS_monosdf/20230313-220318-mm3-CSEKitchen_HDR_grids_trainval_2.ply'
+# if_reorient_y_up = True; reorient_blender_angles = [-24, 30.1, -178]
+# # if_reorient_y_up_skip_shape = True
+
+# scene_name = 'CSEKitchen_supergloo'; hdr_radiance_scale = 4; sdr_radiance_scale = 2
+# pose_file = ('json', 'transforms_supergloo.json') # supergloo
+# invalid_frame_id_list = [1, 13]
+# invalid_frame_id_list += [165, 166, 167, 170, 171, 172, 173, 185] # novel lighting ALL; original lighting: 164, 168, 169, 174, 175, 176; 185: lamp off
+# shape_file = base_root / 'RESULTS_monosdf/20230313-220314-mm3-CSEKitchen_supergloo_HDR_grids_trainval.ply'
+# # shape_file = base_root / 'RESULTS_monosdf/20230313-222459-mm3-CSEKitchen_supergloo_HDR_grids_trainval.ply'
+# if_reorient_y_up = True; reorient_blender_angles = [-25.4, 30, -179]
+# if_reorient_y_up_skip_shape = False
 
 '''
 OBSELETE
@@ -300,6 +316,8 @@ OBSELETE
 # # shape_file = base_root / 'RESULTS_monosdf/20230307-022305-mm1-ConferenceRoomV2_final_MORE_SDR_grids_trainval.ply'
 # shape_file = base_root / 'RESULTS_monosdf/20230307-030111-mm1-ConferenceRoomV2_final_MORE_HDR_grids_trainval.ply'
 # if opt.export_format == 'mitsuba': invalid_frame_idx_list = list(range(190, 227))
+
+frame_ids = [0]
 
 im_params_dict={
     'hdr_radiance_scale': hdr_radiance_scale, 

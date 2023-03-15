@@ -334,6 +334,7 @@ class exporter_scene():
                                 
                             transform_item = shape.findall('transform')[0]
                             transform_accu = np.eye(4, dtype=np.float32)
+                            
                             if hasattr(self.os, 'if_reorient_shape') and self.os.if_reorient_shape:
                                 assert hasattr(self.os, 'reorient_transform')
                                 transform_accu = self.os.reorient_transform @ transform_accu
@@ -421,7 +422,7 @@ class exporter_scene():
                 # for T_, appendix in T_list_:
                 shape_list = []
                 # shape_export_path = scene_export_path / ('scene%s.obj'%appendix)
-                file_str = {'monosdf': 'scene%s.obj'%appendix, 'mitsuba': 'scene%s.obj'%appendix, 'fvp': 'meshes/recon.obj'}[format]
+                file_str = {'monosdf': 'scene%s.obj'%appendix, 'mitsuba': 'scene%s.obj'%appendix, 'fvp': 'meshes/recon.ply'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 shape_export_path = scene_export_path / file_str
                 
@@ -455,7 +456,7 @@ class exporter_scene():
                         # shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
                         
                         if_fixed_water_tight = True
-                        print(red('Overwriting with mehs + hull: %s'%str(shape_export_path)))
+                        print(red('Overwriting with mesh + hull: %s'%str(shape_export_path)))
                         shape_tri_mesh_fixed.export(str(shape_export_path))
 
                     elif format == 'fvp': 
@@ -464,7 +465,7 @@ class exporter_scene():
                         with open(str(scene_export_path / 'scale.txt'), 'w') as camOut:
                             camOut.write('%.4f'%scene_scale)
                         # overwrite the original mesh
-                        print(red('Overwriting with mehs + hull: %s'%str(shape_export_path)))
+                        print(red('Overwriting with mesh + hull: %s'%str(shape_export_path)))
                         shape_tri_mesh_fixed.export(str(shape_export_path))
 
                     else:

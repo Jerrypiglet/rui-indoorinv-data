@@ -183,18 +183,18 @@ class realScene3D(mitsubaBase, scene2DBase):
 
             # assert self.if_autoscale_scene
             
-            reorient_transform_file = self.scene_path / '_T_reorient_after_monosdf_centering_scale.npy'
-            if reorient_transform_file.exists():
-                print(red('Loading re-orientation from file: ', reorient_transform_file))
-                self.reorient_transform = np.load(reorient_transform_file)
-                assert self.reorient_transform.shape == (3, 3)
-            else:
-                print('Calculating re-orientation from blender angles input...')
-                reorient_blender_angles = self.scene_params_dict['reorient_blender_angles']
-                from scipy.spatial.transform import Rotation
-                reorient_blender_angles = np.array(reorient_blender_angles).reshape(3,) / 180. * np.pi
-                Rs = Rotation.from_euler('xyz', reorient_blender_angles).as_matrix()
-                self.reorient_transform = Rs
+            # reorient_transform_file = self.scene_path / '_T_reorient_after_monosdf_centering_scale.npy'
+            # if reorient_transform_file.exists():
+            #     print(red('Loading re-orientation from file: ', reorient_transform_file))
+            #     self.reorient_transform = np.load(reorient_transform_file)
+            #     assert self.reorient_transform.shape == (3, 3)
+            # else:
+            print('Calculating re-orientation from blender angles input...')
+            reorient_blender_angles = self.scene_params_dict['reorient_blender_angles']
+            from scipy.spatial.transform import Rotation
+            reorient_blender_angles = np.array(reorient_blender_angles).reshape(3,) / 180. * np.pi
+            Rs = Rotation.from_euler('xyz', reorient_blender_angles).as_matrix()
+            self.reorient_transform = Rs
             
             if not self.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
                 self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
