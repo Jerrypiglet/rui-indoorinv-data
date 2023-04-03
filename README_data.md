@@ -4,6 +4,9 @@
   - [Matterport3D (mp)](#matterport3d-mp)
   - [Replica](#replica)
   - [Real datasets of our capture](#real-datasets-of-our-capture)
+    - [Convert to .exr files from RAW HDR brackets](#convert-to-exr-files-from-raw-hdr-brackets)
+    - [dump to MonoSDF for geometry](#dump-to-monosdf-for-geometry)
+    - [dump to Mitsuba format for inverse rendering](#dump-to-mitsuba-format-for-inverse-rendering)
   - [Other datasets](#other-datasets)
     - [Mitsuba](#mitsuba)
 
@@ -15,6 +18,7 @@
 # More datasets
 
 - data
+  - real
   - Matterport3D
     - 17DRP5sb8fy (house id)
         - undistorted_normal_images
@@ -140,10 +144,15 @@ python test_class_replicaScene3D.py --export_scene True
 TODO: 
 - [ ] adapt sample pose to z+ up: get rid of self.extra_transform
 - [ ] add check for camera inside mesh (because no obj info available)
-- [ ] NaN in output exr images [issue](https://github.com/facebookresearch/Replica-Dataset/issues/19)
+- [x] NaN in output exr images [issue](https://github.com/facebookresearch/Replica-Dataset/issues/19)
 
 ## Real datasets of our capture
-
+### Convert to .exr files from RAW HDR brackets
+See `real_capture/hdr_convert-canon_pipeline-CSEKitchen-parallel.ipynb`.
+### dump to MonoSDF for geometry
+pass
+### dump to Mitsuba format for inverse rendering
+****
 Dump to Mitsuba format:
 ``` bash
 python test_class_realScene3D.py --export True --export_format mitsuba --vis_3d_o3d True --force

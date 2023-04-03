@@ -544,7 +544,7 @@ Datasets include:
 
 # Todolist
 - [ ] load windows for Mitsuba scene
-- [ ] fix one camera in kitchen sceen (197)
+- [x] fix one camera in kitchen sceen (197)
 - [ ] fix invalid_frame_id_list even when not loading poses
 - [ ] eval-inv:
   - [] GT emission, albedo, roughness, metallic
