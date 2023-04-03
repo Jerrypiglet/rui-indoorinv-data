@@ -177,9 +177,10 @@ if_reorient_y_up_skip_shape = False # do not transform shape; only transform pos
 scene_name = 'ConferenceRoomV2_final_supergloo'; hdr_radiance_scale = 2.
 pose_file = ('json', 'transforms_superglue.json')
 # shape_file = base_root / 'RESULTS_monosdf/20230306-060630-K-ConferenceRoomV2_final_supergloo_HDR_grids_trainval.ply'
-# shape_file = base_root / 'RESULTS_monosdf/20230306-072825-K-ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
+shape_file = base_root / 'RESULTS_monosdf/20230306-072825-K-ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
 # shape_file = base_root / 'RESULTS_monosdf/20230306-152848-mm1-EVAL-20230306-072825ConferenceRoomV2_final_supergloo_SDR_grids_trainval.ply'
-shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
+# shape_file = base_root / 'RESULTS_monosdf/conference-old.obj'
+# shape_file = '/Volumes/RuiT7/ICCV23/real/EXPORT_mitsuba/scene_milo.obj'
 # if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
 # emitter_thres = 4.
