@@ -28,7 +28,7 @@ parser.add_argument('--render_3d', type=str2bool, nargs='?', const=True, default
 parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/public_re_3'
+dataset_root = Path(PATH_HOME) / 'data/public_re_3'
 xml_root = Path(PATH_HOME) / 'data/public_re_3/scenes'
 # intrinsics_path = Path(PATH_HOME) / 'data/intrinsic.txt'
 semantic_labels_root = Path(PATH_HOME) / 'files_openrooms'
@@ -72,7 +72,7 @@ data/public_re_3/main_xml/scene0005_00_more/im_58.png
 # frame_ids = list(range(102))
 
 openrooms_scene = openroomsScene3D(
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
         'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root}, 
     scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 

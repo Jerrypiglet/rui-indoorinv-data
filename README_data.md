@@ -182,7 +182,7 @@ Please note that, if using GT depth, the depth is expected to be in metric unit 
 [2] Export to fvp (free-viewpoint) format (e.g. train + val splits):
 
 ``` bash
-python test_class_mitsubaScene3D.py --export True --export_format fvp --vis_3d_o3d False --force --vis_2d_plt False --split val --eval_scene
+python test_class_mitsubaScene3D.py --export True --export_format fvp --vis_3d_o3d **False** --force --vis_2d_plt False --split val --eval_scene
 ```
 
 Need to transform to z+ up:

@@ -89,8 +89,8 @@ class realScene3D(mitsubaBase, scene2DBase):
             self.extra_transform_homo = np.eye(4, dtype=np.float32)
             self.extra_transform_homo[:3, :3] = self.extra_transform
 
-        self.scene_path = self.rendering_root / self.scene_name
-        self.scene_rendering_path = self.rendering_root / self.scene_name
+        self.scene_path = self.dataset_root / self.scene_name
+        self.scene_rendering_path = self.dataset_root / self.scene_name
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
         self.scene_name_full = self.scene_name # e.g. 'main_xml_scene0008_00_more'
 

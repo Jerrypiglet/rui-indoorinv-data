@@ -90,8 +90,8 @@ class texirScene3D(mitsubaBase, scene2DBase):
             
         self.if_autoscale_scene = False
 
-        self.scene_path = self.rendering_root / self.scene_name
-        self.scene_rendering_path = self.rendering_root / self.scene_name
+        self.scene_path = self.dataset_root / self.scene_name
+        self.scene_rendering_path = self.dataset_root / self.scene_name
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
         self.scene_name_full = self.scene_name # e.g. 'main_xml_scene0008_00_more'
 

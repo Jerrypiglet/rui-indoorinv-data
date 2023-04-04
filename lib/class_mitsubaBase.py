@@ -17,6 +17,7 @@ from lib.utils_io import load_img, resize_intrinsics, center_crop
 from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP, read_cam_params_OR, dump_cam_params_OR
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import get_list_of_keys, green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
+from lib.utils_misc import get_device
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 
@@ -28,10 +29,18 @@ class mitsubaBase():
     '''
     def __init__(
         self, 
-        device: str='', 
+        # device: str='', 
+        host: str='', 
+        device_id: int=-1, 
         if_debug_info: bool=False, 
     ): 
-        self.device = device
+        self.host = host
+        self.device = get_device(self.host, device_id)
+        variant = self.CONF.mi_params_dict.get('variant', '')
+        from lib.global_vars import mi_variant_dict
+        mi.set_variant(variant if variant != '' else mi_variant_dict[self.host])
+
+        # self.device = device
         self.if_debug_info = if_debug_info
 
         # self.if_loaded_colors = False
@@ -43,7 +52,24 @@ class mitsubaBase():
         self.extra_transform_homo = None
         self.if_center_offset = True # pixel centers are 0.5, 1.5, ..., H-1+0.5
 
+        self.shape_file_path = None
+        ''''
+        flags to set
+        '''
         self.if_scale_scene = False
+        self.pcd_color = None
+        self.pts_from = {'mi': False, 'depth': False}
+        self.seg_from = {'mi': False, 'seg': False}
+        
+        self.axis_up = get_list_of_keys(self.CONF.scene_params_dict, ['axis_up'], [str])[0]
+        assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
+        
+        self.extra_transform = self.CONF.scene_params_dict.get('extra_transform', None)
+        if self.extra_transform is not None:
+            # self.extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32) # y=z, z=x, x=y
+            self.extra_transform_inv = self.extra_transform.T
+            self.extra_transform_homo = np.eye(4, dtype=np.float32)
+            self.extra_transform_homo[:3, :3] = self.extra_transform
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
@@ -141,39 +167,39 @@ class mitsubaBase():
 
         print(green_text('DONE. [mi_sample_rays_pts] for %d frames...'%len(cam_rays_list)))
 
-    def load_monosdf_scene(self):
-        shape_file = Path(self.monosdf_shape_dict['shape_file'])
-        if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
-        (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
-        # self.mi_scene = mi.load_file(str(self.xml_file))
-        '''
-        [!!!] transform to XML scene coords (scale & location) so that ray intersection for GT geometry does not have to adapt to ESTIMATED geometry
-        '''
-        self.shape_id_dict = {
-            'type': shape_file.suffix[1:],
-            'filename': str(shape_file), 
-            # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
-            }
-        if if_shape_normalized:
-            # un-normalize to regular Mitsuba scene space
-            self.shape_id_dict['to_world'] = mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3)
+    # def load_monosdf_scene(self):
+    #     shape_file = Path(self.monosdf_shape_dict['shape_file'])
+    #     if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
+    #     (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
+    #     # self.mi_scene = mi.load_file(str(self.xml_file))
+    #     '''
+    #     [!!!] transform to XML scene coords (scale & location) so that ray intersection for GT geometry does not have to adapt to ESTIMATED geometry
+    #     '''
+    #     self.shape_id_dict = {
+    #         'type': shape_file.suffix[1:],
+    #         'filename': str(shape_file), 
+    #         # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
+    #         }
+    #     if if_shape_normalized:
+    #         # un-normalize to regular Mitsuba scene space
+    #         self.shape_id_dict['to_world'] = mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3)
             
-        self.mi_scene = mi.load_dict({
-            'type': 'scene',
-            'shape_id': self.shape_id_dict, 
-        })
+    #     self.mi_scene = mi.load_dict({
+    #         'type': 'scene',
+    #         'shape_id': self.shape_id_dict, 
+    #     })
 
-    def load_monosdf_shape(self, shape_params_dict: dict):
-        '''
-        load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
-        '''
-        if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
-        if if_shape_normalized:
-            scale_offset_tuple, _ = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
-        else:
-            scale_offset_tuple = ()
-        monosdf_shape_dict = load_shape_dict_from_shape_file(Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, scale_offset_tuple)
-        self.append_shape(monosdf_shape_dict)
+    # def load_monosdf_shape(self, shape_params_dict: dict):
+    #     '''
+    #     load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
+    #     '''
+    #     if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
+    #     if if_shape_normalized:
+    #         scale_offset_tuple, _ = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
+    #     else:
+    #         scale_offset_tuple = ()
+    #     monosdf_shape_dict = load_shape_dict_from_shape_file(Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, scale_offset_tuple)
+    #     self.append_shape(monosdf_shape_dict)
 
     def append_shape(self, shape_dict):
         self.vertices_list.append(shape_dict['vertices'])
@@ -613,7 +639,7 @@ class mitsubaBase():
         mitsubaBase._prepare_shapes(self)
 
         scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)
-        shape_dict = load_shape_dict_from_shape_file(self.shape_file, shape_params_dict=shape_params_dict, scale_offset=scale_offset, extra_transform=extra_transform)
+        shape_dict = load_shape_dict_from_shape_file(self.shape_file_path, shape_params_dict=shape_params_dict, scale_offset=scale_offset, extra_transform=extra_transform)
         # , scale_offset=(9.1, 0.)) # read scale.txt and resize room to metric scale in meters
         self.append_shape(shape_dict)
 
@@ -627,7 +653,7 @@ class mitsubaBase():
             )))
 
         if shape_params_dict.get('if_dump_shape', False):
-            dump_shape_dict_to_shape_file(shape_dict, self.shape_file)
+            dump_shape_dict_to_shape_file(shape_dict, self.shape_file_path)
 
 
     def export_poses_cam_txt(self, export_folder: Path, cam_params_dict={}, frame_num_all=-1):

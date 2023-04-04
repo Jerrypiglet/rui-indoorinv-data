@@ -8,6 +8,7 @@ import argparse
 import random
 import string
 import torch
+from pathlib import Path
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -42,6 +43,9 @@ def get_list_of_keys(d, key_list: list, type_list: list=[]) -> list:
 def check_list_of_tensors_size(list_of_tensors: list, tensor_size: tuple):
     for tensor in list_of_tensors:
         assert tuple(tensor.shape) == tensor_size, 'wrong tensor size: %s loaded VS %s required'%(str(tuple(tensor.shape)), str(tensor_size))
+        
+def check_exists(path: Path):
+    assert Path(path).exists(), 'path: %s does not exist!'%path
 
 def get_datetime():
     # today = date.today()

@@ -72,7 +72,7 @@ parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=Fal
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/TexIR/texir_to_fipt'
+dataset_root = Path(PATH_HOME) / 'data/TexIR/texir_to_fipt'
 xml_root = Path(PATH_HOME) / 'data/TexIR/texir_to_fipt'
 
 shape_file = ''
@@ -87,12 +87,12 @@ default
 '''
 eval_models_dict = {
     }
-monosdf_shape_dict = {}
+# monosdf_shape_dict = {}
 
 scene_obj = texirScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
         # 'split': 'train', # train, val, train+val

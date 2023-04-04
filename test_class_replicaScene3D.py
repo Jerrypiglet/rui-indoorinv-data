@@ -74,8 +74,8 @@ parser.add_argument('--if_export', type=str2bool, nargs='?', const=True, default
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/replica_v1'
-assert base_root.exists()
+dataset_root = Path(PATH_HOME) / 'data/replica_v1'
+assert dataset_root.exists()
 sdr_radiance_scale = 1.
 
 # scene_name = 'apartment_0'
@@ -104,11 +104,11 @@ frame_ids = list(range(200))
 scene_obj = replicaScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
         'frame_id_list': frame_ids, 
-        'intrinsics_path': base_root / 'intrinsic_mitsubaScene.txt', 
+        'intrinsics_path': dataset_root / 'intrinsic_mitsubaScene.txt', 
 
         # convert from z+ (native) to y+ and display in y+
         'axis_up': 'y+', 

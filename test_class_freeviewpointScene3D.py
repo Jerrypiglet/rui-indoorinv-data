@@ -74,8 +74,8 @@ parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=Fal
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/free-viewpoint'
-assert base_root.exists()
+dataset_root = Path(PATH_HOME) / 'data/free-viewpoint'
+assert dataset_root.exists()
 
 hdr_radiance_scale = 1.
 
@@ -92,7 +92,7 @@ scene_name = 'asianRoom2'
 scene_obj = freeviewpointScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
         # 'frame_id_list': frame_ids, # comment out to use all frames

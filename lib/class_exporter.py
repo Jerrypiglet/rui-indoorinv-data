@@ -95,7 +95,7 @@ class exporter_scene():
         
         assert format in ['monosdf', 'fvp', 'mitsuba'], 'format %s not supported'%format
         
-        scene_export_path = self.os.rendering_root / ('EXPORT_%s'%format) / (self.os.scene_name + appendix)
+        scene_export_path = self.os.dataset_root / ('EXPORT_%s'%format) / (self.os.scene_name + appendix)
         if split != '':
             scene_export_path = scene_export_path / split
             
@@ -115,7 +115,7 @@ class exporter_scene():
                     '''
                     if format in ['monosdf']: 
                         cameras = {}
-                        scale_mat_path = self.os.rendering_root / 'EXPORT_monosdf' / (self.os.scene_name + appendix) / 'scale_mat.npy'
+                        scale_mat_path = self.os.dataset_root / 'EXPORT_monosdf' / (self.os.scene_name + appendix) / 'scale_mat.npy'
                         scale_mat_path.parent.mkdir(parents=True, exist_ok=True)
                         if split != 'val':
                             scale_mat = np.eye(4).astype(np.float32)
@@ -507,7 +507,7 @@ class exporter_scene():
         
         '''
         assert center_crop_HW is None, 'rendered to target sizes for now: no extra center crop'
-        scene_export_path = self.os.rendering_root / self.os.scene_name / 'EXPORT_lieccv22' / split
+        scene_export_path = self.os.dataset_root / self.os.scene_name / 'EXPORT_lieccv22' / split
         if self.prepare_check_export(scene_export_path) == False:
             return
         
@@ -537,7 +537,7 @@ class exporter_scene():
         
         frame_export_path_list = []
         for frame_idx, frame_id in enumerate(self.os.frame_id_list):
-            frame_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / (self.os.scene_name + '_frame%d'%frame_id + appendix) / 'input'
+            frame_export_path = self.os.dataset_root / 'EXPORT_lieccv22' / split / (self.os.scene_name + '_frame%d'%frame_id + appendix) / 'input'
             frame_export_path.mkdir(parents=True, exist_ok=True)
             frame_export_path_list.append(frame_export_path)
             
@@ -1133,10 +1133,10 @@ class exporter_scene():
                             print(blue_text('lighting FILES exported to: %s'%str(BRDF_edited_results_path)))
                             
 
-        frame_list_export_path = self.os.rendering_root / 'EXPORT_lieccv22' / split / ('testList_%s.txt'%self.os.scene_name)
+        frame_list_export_path = self.os.dataset_root / 'EXPORT_lieccv22' / split / ('testList_%s.txt'%self.os.scene_name)
         
         with open(str(frame_list_export_path), 'w') as camOut:
             for frame_export_path in frame_export_path_list:
-                frame_export_path = (Path('data') / dataset_name / frame_export_path.relative_to(self.os.rendering_root / 'EXPORT_lieccv22')).parent
+                frame_export_path = (Path('data') / dataset_name / frame_export_path.relative_to(self.os.dataset_root / 'EXPORT_lieccv22')).parent
                 camOut.write('%s\n'%(frame_export_path))
         print(white_blue('Exported test list file to: %s'%(str(frame_list_export_path))))

@@ -77,7 +77,7 @@ parser.add_argument('--export_dataset_name', type=str, default='indoor_synthetic
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
+dataset_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 # intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
@@ -92,7 +92,7 @@ invalid_frame_id_list = []
 '''
 for export to lieccv22
 '''
-base_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
+dataset_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 
 scene_name = 'kitchen'
@@ -123,19 +123,19 @@ default
 '''
 eval_models_dict = {
     }
-monosdf_shape_dict = {}
+# monosdf_shape_dict = {}
 
 scene_obj = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root}, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     scene_params_dict={
         'xml_filename': xml_filename, 
         'scene_name': scene_name, 
         'split': opt.split, # train, val, train+val
         'frame_id_list': frame_ids, 
         'mitsuba_version': '3.0.0', 
-        'intrinsics_path': base_root / scene_name / 'intrinsic_mitsubaScene.txt', 
+        'intrinsics_path': dataset_root / scene_name / 'intrinsic_mitsubaScene.txt', 
         'axis_up': 'y+', 
         # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
@@ -143,7 +143,7 @@ scene_obj = mitsubaScene3D(
         # 'pose_file': ('OpenRooms', 'cam.txt'), 
         'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         # 'shape_file': shape_file, 
-        'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
+        # 'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
         # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only

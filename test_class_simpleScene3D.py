@@ -69,14 +69,14 @@ parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=Fal
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/real/EXPORT_mitsuba'
+dataset_root = Path(PATH_HOME) / 'data/real/EXPORT_mitsuba'
 xml_root = Path(PATH_HOME) / 'data/real/EXPORT_mitsuba'
 
 '''
 default
 '''
 eval_models_dict = {}
-monosdf_shape_dict = {}
+# monosdf_shape_dict = {}
 shape_file = ''
 frame_ids = []
 invalid_frame_id_list = []
@@ -84,12 +84,12 @@ hdr_radiance_scale = 1.
 
 scene_name = 'IndoorKitchen_v2_2'; hdr_radiance_scale = 2.
 if_rc = False; pcd_file = ''; pose_file = ('OpenRooms', 'cam.txt')
-shape_file = base_root / scene_name / 'scene.obj'
+shape_file = dataset_root / scene_name / 'scene.obj'
 
 scene_obj = simpleScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
         'frame_id_list': frame_ids, 

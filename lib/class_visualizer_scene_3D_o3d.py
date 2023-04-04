@@ -714,8 +714,8 @@ class visualizer_scene_3D_o3d(object):
         
         assert self.os.if_has_shapes
 
-        if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_obj_mesh', True)
-        if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_emitter_mesh', False)
+        if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_obj_mesh', True)
+        if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_emitter_mesh', False)
         if_ceiling = shapes_params.get('if_ceiling', False)
         if_walls = shapes_params.get('if_walls', False)
 

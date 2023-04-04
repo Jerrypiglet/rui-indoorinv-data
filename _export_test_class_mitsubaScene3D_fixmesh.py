@@ -79,7 +79,7 @@ parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=Fal
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/indoor_synthetic'
+dataset_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic'
 # intrinsics_path = Path(PATH_HOME) / 'data/indoor_synthetic/intrinsic_mitsubaScene.txt'
 
@@ -116,7 +116,7 @@ eval_models_dict = {
     'inv-MLP_ckpt_path': '20230111-191305-inv_kitchen_190-10_specT/last.ckpt', 
     'rad-MLP_ckpt_path': '20230110-132112-rad_kitchen_190-10_specT/last.ckpt', 
     }
-monosdf_shape_dict = {}
+# monosdf_shape_dict = {}
 
 '''
 umcomment👇 to use estimated geometry and radiance from monosdf
@@ -134,7 +134,7 @@ umcomment👇 to use estimated geometry and radiance from monosdf
 scene_obj = mitsubaScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root}, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     scene_params_dict={
         'xml_filename': xml_filename, 
         'scene_name': scene_name, 
@@ -149,7 +149,7 @@ scene_obj = mitsubaScene3D(
         'pose_file': ('OpenRooms', 'cam.txt'), 
         # 'pose_file': ('json', 'transforms.json'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         # 'shape_file': shape_file, 
-        'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
+        # 'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
     mi_params_dict={
         # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only

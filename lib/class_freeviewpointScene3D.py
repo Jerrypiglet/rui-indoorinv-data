@@ -82,7 +82,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         self.host = host
         self.device = get_device(self.host, device_id)
 
-        self.scene_path = self.rendering_root / self.scene_name
+        self.scene_path = self.dataset_root / self.scene_name
         self.scene_rendering_path = self.scene_path
         self.scene_name_full = self.scene_name # e.g.'asianRoom1'
 
