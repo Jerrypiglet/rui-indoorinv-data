@@ -338,8 +338,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         frame_id_list_all = []
         self.frame_split_list = []
         self.frame_offset_list = []
-        if self.pose_format == 'json':
-            self.t_c2w_b_list, self.R_c2w_b_list = [], []
+        # if self.pose_format == 'json':
+        #     self.t_c2w_b_list, self.R_c2w_b_list = [], []
         self.scene_rendering_path_list = []
         
         for pose_file, split in zip(self.pose_file_path_list, self.splits):
@@ -367,12 +367,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
                     pose_list.append(np.hstack((R, t)))
                     origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
-
+                    
             elif self.pose_format in ['Blender', 'json']:
                 '''
                 Blender: 
                     Liwen's Blender convention: (N, 2, 3), [t, euler angles]
-                    Blender x y z == Mitsuba x z -y; Mitsuba x y z == Blender x z -y
+                    Blender x y z == Mitsuba x -z y; Mitsuba x y z == Blender x -z y
                 Json:
                     Liwen's NeRF poses (i.e. transforms.json): [R, t]; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
                 '''
@@ -380,6 +380,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 [NOTE] scene.obj from Liwen is much smaller (s.t. scaling and translation here) compared to scene loaded from scene_v3.xml
                 '''
                 t_c2w_b_list, R_c2w_b_list = [], []
+                T_opengl_opencv = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]], dtype=np.float32) # flip x, y: Liwen's new pose (left-up-forward) -> OpenCV (right-down-forward)
 
                 if self.pose_format == 'Blender':
                     cam_params = np.load(pose_file)
@@ -393,6 +394,15 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         assert np.allclose(R_.as_euler('xyz'), cam_params[idx][1])
                         t_c2w_b_list.append(cam_params[idx][0].reshape((3, 1)).astype(np.float32))
                         assert self.extra_transform is None, 'not suported yet'
+                        
+                    T_blender_left = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # left mul: row-wise
+                    T_blender_right = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # right mul: col-wise
+                    for R_c2w_b, t_c2w_b in zip(R_c2w_b_list, t_c2w_b_list):
+                        R = T_blender_left @ R_c2w_b @ T_blender_right
+                        t = T_blender_left @ t_c2w_b
+                        (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t) # only works for y+ [!!!]
+                        pose_list.append(np.hstack((R, t)))
+                        origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
                 
                 elif self.pose_format == 'json':
                     self.meta, _Rt_c2w_b_list = self.load_meta_json_pose(pose_file)
@@ -417,29 +427,28 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         import ipdb; ipdb.set_trace()
                         assert False, red('computed f_xy is different than read from intrinsics! double check your loaded intrinsics!')
 
-                T_ = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]], dtype=np.float32) # flip x, y: Liwen's new pose (left-up-forward) -> OpenCV (right-down-forward)
-                for R_c2w_b, t_c2w_b in zip(R_c2w_b_list, t_c2w_b_list):
-                    R = R_c2w_b @ T_
-                    t = t_c2w_b
+                    for R_c2w_b, t_c2w_b in zip(R_c2w_b_list, t_c2w_b_list):
+                        R = R_c2w_b @ T_opengl_opencv # right mul: column-wise nagated
+                        t = t_c2w_b
 
-                    (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t) # only works for y+ [!!!]
-                    
-                    if self.extra_transform is not None:
-                        # R = R @ (self.extra_transform_inv.T)
-                        R = self.extra_transform @ R
-                        t = self.extra_transform @ t
-                        origin = self.extra_transform @ origin
-                        lookatvector = self.extra_transform @ lookatvector
-                        up = self.extra_transform @ up
+                        (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t) # only works for y+ [!!!]
                         
-                        # (origin_, lookatvector_, up_) = R_t_to_origin_lookatvector_up_yUP(R, t)
-                        # assert np.allclose(self.extra_transform @ origin, origin_)
-                        # assert np.allclose(self.extra_transform @ (lookatvector-origin), lookatvector_-origin_)
-                        # assert np.allclose(self.extra_transform @ up, up_)
-                        # origin, lookatvector, up = origin_, lookatvector_, up_
+                        if self.extra_transform is not None:
+                            # R = R @ (self.extra_transform_inv.T)
+                            R = self.extra_transform @ R
+                            t = self.extra_transform @ t
+                            origin = self.extra_transform @ origin
+                            lookatvector = self.extra_transform @ lookatvector
+                            up = self.extra_transform @ up
+                            
+                            # (origin_, lookatvector_, up_) = R_t_to_origin_lookatvector_up_yUP(R, t)
+                            # assert np.allclose(self.extra_transform @ origin, origin_)
+                            # assert np.allclose(self.extra_transform @ (lookatvector-origin), lookatvector_-origin_)
+                            # assert np.allclose(self.extra_transform @ up, up_)
+                            # origin, lookatvector, up = origin_, lookatvector_, up_
 
-                    pose_list.append(np.hstack((R, t)))
-                    origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
+                        pose_list.append(np.hstack((R, t)))
+                        origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
                     
             self.pose_list += pose_list
             self.origin_lookatvector_up_list += origin_lookatvector_up_list

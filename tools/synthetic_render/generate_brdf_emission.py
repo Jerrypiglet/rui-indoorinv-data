@@ -153,7 +153,7 @@ render_layers = tree.nodes.new('CompositorNodeRLayers')
 # Create output folder
 modals = MODALS + AOV_MODALS
 modal_file_outputs = []
-modal_dirs = []
+# modal_dirs = []
 for modal in modals:
     modal_dir = os.path.join(out_dir,modal)
     os.makedirs(modal_dir,exist_ok=True)
@@ -162,7 +162,7 @@ for modal in modals:
     links.new(render_layers.outputs[modal],modal_file_output.inputs[0])
     modal_file_output.base_path = modal_dir
     modal_file_outputs.append(modal_file_output)
-    modal_dirs.append(modal_dir)
+    # modal_dirs.append(modal_dir)
 
 rotation_mode = 'XYZ'
 

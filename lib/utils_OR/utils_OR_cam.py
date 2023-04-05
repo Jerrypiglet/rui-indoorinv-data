@@ -9,7 +9,7 @@ from pathlib import Path
 import torch
 from scipy.spatial.transform import Rotation
 
-from utils_misc import red, yellow
+from utils_misc import red, yellow, white_blue, listify_matrix
 from utils_OR.utils_OR_geo import isect_line_plane_v3
 from lib.utils_io import normalize_v
 
@@ -36,7 +36,7 @@ def read_K_list_OR(K_list_file):
     K_list = np.split(K_list, K_num, axis=0) # [[origin, lookat, up], ...]
     return K_list
 
-def convert_OR_poses_to_blender_npy(origin_lookat_up_mtx_list: list):
+def convert_OR_poses_to_blender_npy(origin_lookat_up_mtx_list: list, export_path: Path=None):
     # read original [R|t]
     pose_list = []
     for i,cam_param in enumerate(origin_lookat_up_mtx_list):
@@ -62,6 +62,7 @@ def convert_OR_poses_to_blender_npy(origin_lookat_up_mtx_list: list):
     coord_conv = [0,2,1]
     blender_poses = np.zeros((len(pose_list),2,3))
     for i,pose in enumerate(pose_list):
+        # print('--', pose)
         pos = pose[:,3].clone()
         coord_conv = [0,2,1]
         pos = pos[coord_conv]
@@ -76,6 +77,11 @@ def convert_OR_poses_to_blender_npy(origin_lookat_up_mtx_list: list):
         blender_poses[i,0] = pos.numpy()
         blender_poses[i,1] = angle
         
+    if export_path is not None:
+        assert export_path.suffix == '.npy'
+        np.save(str(export_path), blender_poses)
+        print(white_blue('Dumped camera poses (.npy) to') + str(export_path))
+
     return blender_poses # (N, 2, 3)
 
 def dump_blender_npy_to_json(blender_poses: np.ndarray, file_path_list: list=[], camera_angle_x: float=None, camera_angle_y: float=None, export_path: Path=None):
@@ -113,15 +119,9 @@ def dump_blender_npy_to_json(blender_poses: np.ndarray, file_path_list: list=[],
         assert export_path.suffix == '.json'
         with open(str(export_path), 'w') as out_file:
             json.dump(out_data, out_file, indent=4)
-        print('Dumped camera poses (.json) to %s'%str(export_path))
+        print(white_blue('Dumped camera poses (.json) to') + str(export_path))
         
     return out_data
-
-def listify_matrix(matrix):
-    matrix_list = []
-    for row in matrix:
-        matrix_list.append(list(row))
-    return matrix_list
 
 def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt_list: list=[], cam_params_dict: dict={}, K_list: list=[], frame_num_all: int=-1, appendix='', extra_transform: np.ndarray=None):
     if frame_num_all != -1 and len(origin_lookat_up_mtx_list) != frame_num_all:

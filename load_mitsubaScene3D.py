@@ -10,9 +10,6 @@ host = 'apple'
 from lib.global_vars import PATH_HOME_dict# , INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
 PATH_HOME = Path(PATH_HOME_dict[host])
 sys.path.insert(0, str(PATH_HOME))
-# OR_RAW_ROOT = OR_RAW_ROOT_dict[host]
-# INV_NERF_ROOT = INV_NERF_ROOT_dict[host]
-# MONOSDF_ROOT = MONOSDF_ROOT_dict[host]
 
 import numpy as np
 np.set_printoptions(suppress=True)
@@ -116,17 +113,18 @@ CONF.scene_params_dict.update({
 CONF.cam_params_dict.update({
     # ==> if sample poses and render images 
     'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-    'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
+    'sample_pose_num': 20 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
     'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     })
 
 CONF.mi_params_dict.update({
     'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
-    'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
+    'if_get_segs': True, # [depend on if_sample_rays_pts=True] True: to generate segs similar to those in openroomsScene2D.load_seg()
     })
 
 CONF.im_params_dict.update({
     'im_H_resize': 320, 'im_W_resize': 640, 
+    'spp': 32, 
     })
 
 CONF.shape_params_dict.update({
@@ -152,7 +150,7 @@ scene_obj = mitsubaScene3D(
         # 'depth', 'normal', 
         # 'lighting_SG', 
         'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
+        'shapes', # objs + emitters, geometry shapes + emitter properties``
         ], 
 )
 
@@ -161,19 +159,21 @@ Mitsuba/Blender 2D renderer
 '''
 if opt.render_2d:
     assert opt.renderer in ['mi', 'blender']
-    modality_list = [
-        'im', # both hdr and sdr
-        # 'poses', 
-        # 'seg', 
-        # 'albedo', 
-        # 'roughness', 
-        # 'depth', 'normal', 
-        # 'lightingz    _envmap', 
-        ]
+    # modality_list = [
+    #     'im', # both hdr and sdr
+    #     # 'poses', 
+    #     # 'seg', 
+    #     # 'albedo', 
+    #     # 'roughness', 
+    #     # 'depth', 'normal', 
+    #     # 'lighting_envmap', 
+    #     ]
     if opt.renderer == 'mi':
         renderer = renderer_mi_mitsubaScene_3D(
             scene_obj, 
-            modality_list=modality_list, 
+            modality_list=[
+                'im', # both hdr and sdr
+            ], 
             im_params_dict={}, 
             cam_params_dict={}, 
             mi_params_dict={},
@@ -181,16 +181,25 @@ if opt.render_2d:
     if opt.renderer == 'blender':
         renderer = renderer_blender_mitsubaScene_3D(
             scene_obj, 
-            modality_list=modality_list, 
+            modality_list=[
+                'albedo', 
+                'roughness', 
+                'depth', 
+                'normal', 
+                'index', 
+                'emission', 
+                # 'lighting_envmap', 
+                ], 
             host=host, 
             FORMAT='OPEN_EXR', 
             # FORMAT='PNG', 
-            im_params_dict={}, 
+            im_params_dict={
+                'spp': 32}, 
             cam_params_dict={}, 
             mi_params_dict={},
         )
     host=host, 
-    renderer.render()
+    renderer.render(if_force=opt.force)
 
 eval_return_dict = {}
 

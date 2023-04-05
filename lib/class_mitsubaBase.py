@@ -391,11 +391,14 @@ class mitsubaBase():
         print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
 
         if if_dump:
-            pose_file_root=self.pose_file_path.parent if hasattr(self, 'pose_file') else self.pose_file_path_list[0].parent
-            dump_cam_params_OR(pose_file_root=pose_file_root, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.CONF.cam_params_dict, extra_transform=extra_transform)
+            dump_cam_params_OR(pose_file_root=self.pose_file_root, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.CONF.cam_params_dict, extra_transform=extra_transform)
             
-            # dump pose file in .json format
-            # blender_poses = convert_OR_poses_to_blender_npy(origin_lookat_up_mtx_list=self.origin_lookat_up_list)
+            # Dump pose file in Blender .npy files
+            npy_path = self.pose_file_root / ('%s.npy'%self.split)
+            print('-', self.pose_list[0])
+            blender_poses = convert_OR_poses_to_blender_npy(origin_lookat_up_mtx_list=self.origin_lookat_up_list, export_path=npy_path)
+            
+            # Dump pose file in .json format
             # json_path = pose_file_root / 'transforms.json'
             # # sampled poses should have the same K for simplicity
             # f_x = self._K()[0][0]
@@ -404,7 +407,7 @@ class mitsubaBase():
             # camera_angle_y = 2 * np.arctan(0.5 * self._H() / f_y)
             # dump_blender_npy_to_json(blender_poses=blender_poses, export_path=json_path, camera_angle_x=camera_angle_x, camera_angle_y=camera_angle_y)
             
-            print(white_blue('Dumped sampled poses (cam.txt) to %s'%str(pose_file_root)))
+            print(white_blue('Dumped sampled poses (cam.txt) to') + str(self.pose_file_root))
 
     def load_meta_json_pose(self, pose_file):
         assert Path(pose_file).exists(), str(pose_file)

@@ -104,6 +104,10 @@ class scene2DBase():
     @property
     def if_has_global_HW(self):
         return hasattr(self, 'im_H') and hasattr(self, 'im_W')
+    
+    @property
+    def pose_file_root(self):
+        return self.pose_file_path.parent if hasattr(self, 'pose_file') else self.pose_file_path_list[0].parent
 
     def check_and_sort_modalities(self, modalitiy_list):
         modalitiy_list_new = [_ for _ in self.valid_modalities if _ in modalitiy_list]

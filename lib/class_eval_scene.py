@@ -33,7 +33,6 @@ class evaluator_scene_scene():
         self.device = {
             'apple': 'mps', 
             'mm1': 'cuda', 
-            'qc': '', 
         }[self.host]
         mi.set_variant(mi_variant_dict[self.host])
 
