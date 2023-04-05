@@ -294,9 +294,9 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
             assert False, 'disabled; use '
             if_resample = 'n'
             if hasattr(self, 'pose_list'):
-                if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
+                if_resample = input(red("pose_list loaded. RESAMPLE POSE? [y/n]"))
             if self.pose_file.exists():
-                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(read_cam_params_OR(self.pose_file)))))
+                if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(str(self.pose_file), len(read_cam_params_OR(self.pose_file)))))
             if if_resample in ['Y', 'y']:
                 self.sample_poses(self.mi_params_dict.get('sample_pose_num'), cam_params_dict)
             else:

@@ -74,26 +74,29 @@ class scene2DBase():
     def frame_num(self):
         ...
 
-    def _K(self, frame_idx: int):
+    def _K(self, frame_idx: int=None):
         if hasattr(self, 'K'):
             return self.K
         elif hasattr(self, 'K_list'):
+            assert frame_idx is not None, 'frame_idx is None!'
             return self.K_list[frame_idx]
         else:
             raise ValueError('No intrinsics found for %s'%self.parent_class_name)
 
-    def _H(self, frame_idx: int):
+    def _H(self, frame_idx: int=None):
         if hasattr(self, 'H'):
             return self.H
         elif hasattr(self, 'H_list'):
+            assert frame_idx is not None, 'frame_idx is None!'
             return self.H_list[frame_idx]
         else:
             raise ValueError('No im H found for %s'%self.parent_class_name)
 
-    def _W(self, frame_idx: int):
+    def _W(self, frame_idx: int=None):
         if hasattr(self, 'W'):
             return self.W
         elif hasattr(self, 'W_list'):
+            assert frame_idx is not None, 'frame_idx is None!'
             return self.W_list[frame_idx]
         else:
             raise ValueError('No im W found for %s'%self.parent_class_name)
@@ -256,7 +259,11 @@ class scene2DBase():
 
     def load_layout(self):
         '''
-        load and visualize layout in 3D & 2D; assuming room up direction is axis-aligned
+        Load and visualize layout in 3D & 2D; assuming room axis-up direction is axis-aligned, ...
+        ... by projecting all points to floor plane, and vertically grow a cuboid to form a layout box.
+        
+        [!!!] Assumes that the scene is axis-aligned, and the layout box is aligned with the scene axis.
+        
         images/demo_layout_mitsubaScene_3D_1.png
         images/demo_layout_mitsubaScene_3D_1_BEV.png # red is layout bbox
         '''
@@ -272,25 +279,30 @@ class scene2DBase():
 
         if self.axis_up[0] == 'y':
             self.v_2d = vertices_all[:, [0, 2]]
-            # room_height = np.amax(vertices_all[:, 1]) - np.amin(vertices_all[:, 1])
         elif self.axis_up[0] == 'x':
             self.v_2d = vertices_all[:, [1, 3]]
-            # room_height = np.amax(vertices_all[:, 0]) - np.amin(vertices_all[:, 0])
         elif self.axis_up[0] == 'z':
             self.v_2d = vertices_all[:, [0, 1]]
-            # room_height = np.amax(vertices_all[:, 2]) - np.amin(vertices_all[:, 2])
+            
         # finding minimum 2d bbox (rectangle) from contour
         self.layout_hull_2d, self.layout_hull_pts = minimum_bounding_rectangle(self.v_2d)
         
-        layout_hull_2d_2x = np.vstack((self.layout_hull_2d, self.layout_hull_2d))
+        layout_hull_2d_2x = np.vstack((self.layout_hull_2d, self.layout_hull_2d)) # (8, 2)
         if self.axis_up[0] == 'y':
             self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x[:, 0:1], np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1])), layout_hull_2d_2x[:, 1:2]))
+            self.ceiling_loc = self.xyz_max[1]
+            self.floor_loc = self.xyz_min[1]
         elif self.axis_up[0] == 'x':
-            assert False
+            self.layout_box_3d_transformed = np.hstack((np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1])), layout_hull_2d_2x))
+            self.ceiling_loc = self.xyz_max[0]
+            self.floor_loc = self.xyz_min[0]
         elif self.axis_up[0] == 'z':
             # self.layout_box_3d_transformed = np.hstack((, np.vstack((np.zeros((4, 1)), np.zeros((4, 1))+room_height))))    
-            assert False
+            self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x, np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1]))))
+            self.ceiling_loc = self.xyz_max[2]
+            self.floor_loc = self.xyz_min[2]
 
         print(blue_text('[%s] DONE. load_layout'%self.parent_class_name))
 
         self.if_loaded_layout = True
+        self.if_has_ceilling_floor = True

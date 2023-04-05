@@ -14,7 +14,7 @@ import cv2
 # Import the library using the alias "mi"
 import mitsuba as mi
 from lib.utils_io import load_img, resize_intrinsics, center_crop
-from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP, read_cam_params_OR, dump_cam_params_OR
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP, dump_cam_params_OR, convert_OR_poses_to_blender_npy, dump_blender_npy_to_json
 from lib.utils_dvgo import get_rays_np
 from lib.utils_misc import get_list_of_keys, green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
 from lib.utils_misc import get_device
@@ -46,6 +46,7 @@ class mitsubaBase():
         # self.if_loaded_colors = False
         self.if_loaded_shapes = False
         self.if_loaded_layout = False
+        self.if_has_ceilling_floor = False
 
         self.extra_transform = None
         self.extra_transform_inv = None
@@ -63,6 +64,8 @@ class mitsubaBase():
         
         self.axis_up = get_list_of_keys(self.CONF.scene_params_dict, ['axis_up'], [str])[0]
         assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
+        self.ceiling_loc = None
+        self.floor_loc = None
         
         self.extra_transform = self.CONF.scene_params_dict.get('extra_transform', None)
         if self.extra_transform is not None:
@@ -281,12 +284,16 @@ class mitsubaBase():
 
         assert sample_pose_num is not None
         assert sample_pose_num > 0
-        self.cam_params_dict['samplePoint'] = sample_pose_num
+        self.CONF.cam_params_dict['samplePoint'] = sample_pose_num
 
         for _tmp_folder in ['mi_seg_emitter']:
             tmp_folder = self.scene_rendering_path / _tmp_folder
             if tmp_folder.exists():
-                shutil.rmtree(str(tmp_folder))
+                shutil.rmtree(str(tmp_folder), ignore_errors=True)
+
+        tmp_rendering_path = Path(self.scene_rendering_path) / 'tmp_sample_poses_rendering'
+        if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path), ignore_errors=True)
+        tmp_rendering_path.mkdir(parents=True, exist_ok=True)
                 
         origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
             mitsubaScene=self, 
@@ -295,8 +302,8 @@ class mitsubaBase():
                 'boxes': boxes, 
                 'cads': cads, 
             }, 
-            cam_params_dict=self.cam_params_dict, 
-            path_dict={},
+            cam_params_dict=self.CONF.cam_params_dict, 
+            tmp_rendering_path=tmp_rendering_path, 
         ) # [pointLoc; target; up]
 
         pose_list = []
@@ -367,9 +374,6 @@ class mitsubaBase():
         totalCosts = normal_costs
         camIndex = np.argsort(totalCosts)[::-1][:sample_pose_num]
 
-        tmp_rendering_path = Path(self.scene_rendering_path) / 'tmp_sample_poses_rendering'
-        if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path), ignore_errors=True)
-        tmp_rendering_path.mkdir(parents=True, exist_ok=True)
         print(blue_text('Dumping tmp normal and depth by Mitsuba: %s')%str(tmp_rendering_path))
         for _, i in enumerate(camIndex):
             imageio.imwrite(str(tmp_rendering_path / ('normal_%04d.png'%_)), (np.clip((normal_list[i] + 1.)/2., 0., 1.)*255.).astype(np.uint8))
@@ -387,9 +391,20 @@ class mitsubaBase():
         print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
 
         if if_dump:
-            pose_file_root=self.pose_file.parent if hasattr(self, 'pose_file') else self.pose_file_list[0].parent
-            dump_cam_params_OR(pose_file_root=pose_file_root, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.cam_params_dict, extra_transform=extra_transform)
-            print(white_blue('Dumped sampled poses to %s'%str(pose_file_root)))
+            pose_file_root=self.pose_file_path.parent if hasattr(self, 'pose_file') else self.pose_file_path_list[0].parent
+            dump_cam_params_OR(pose_file_root=pose_file_root, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.CONF.cam_params_dict, extra_transform=extra_transform)
+            
+            # dump pose file in .json format
+            # blender_poses = convert_OR_poses_to_blender_npy(origin_lookat_up_mtx_list=self.origin_lookat_up_list)
+            # json_path = pose_file_root / 'transforms.json'
+            # # sampled poses should have the same K for simplicity
+            # f_x = self._K()[0][0]
+            # f_y = self._K()[1][1]
+            # camera_angle_x = 2 * np.arctan(0.5 * self._W() / f_x)
+            # camera_angle_y = 2 * np.arctan(0.5 * self._H() / f_y)
+            # dump_blender_npy_to_json(blender_poses=blender_poses, export_path=json_path, camera_angle_x=camera_angle_x, camera_angle_y=camera_angle_y)
+            
+            print(white_blue('Dumped sampled poses (cam.txt) to %s'%str(pose_file_root)))
 
     def load_meta_json_pose(self, pose_file):
         assert Path(pose_file).exists(), str(pose_file)

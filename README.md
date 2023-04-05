@@ -540,12 +540,14 @@ Datasets include:
 - Check you have the data 
 
 # Todolist
+- [ ] bring back rendering envmaps
 - [ ] extra transform -> scale, rot, trans, and corresponding functions to apply them
 - [ ] load windows for Mitsuba scene
 - [x] fix one camera in kitchen sceen (197)
 - [ ] fix invalid_frame_id_list even when not loading poses
 - [ ] eval-inv:
   - [] GT emission, albedo, roughness, metallic
+- [ ] add [i2-sdf-dataset](https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)
 - [x] vis envmap in 2D plt
 - [ ] 1./rad* -> * rad_mul
 - [ ] sort out frame_idx and frame_id: [0, 1, 2, ..., frame_num-1] VS [0, 5, 15, 200, ...] (0-based)

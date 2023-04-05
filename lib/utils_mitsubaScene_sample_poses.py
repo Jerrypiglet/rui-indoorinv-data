@@ -22,7 +22,8 @@ def func_mitsubaScene_sample_poses(
         mitsubaScene, 
         lverts, boxes,
         cam_params_dict, 
-        sample_pose_if_vis_plt: bool=False):
+        sample_pose_if_vis_plt: bool=False, 
+        tmp_rendering_path: Path=None):
 
     samplePoint = cam_params_dict['samplePoint']
     sampleNum = cam_params_dict['sampleNum']
@@ -302,12 +303,15 @@ def func_mitsubaScene_sample_poses(
         plt.grid()
         plt.axis('equal')
         # plt.title('a')
+        if tmp_rendering_path is not None:
+            plt.savefig(tmp_rendering_path / 'vis_sampled_poses.png')
+            print('Saved vis_sampled_poses.png to %s'%(tmp_rendering_path / 'vis_sampled_poses.png'))
         plt.show()
 
     return camPoses
 
     
-def mitsubaScene_sample_poses_one_scene(mitsubaScene, scene_dict: dict, cam_params_dict: dict, path_dict: dict):
+def mitsubaScene_sample_poses_one_scene(mitsubaScene, scene_dict: dict, cam_params_dict: dict, tmp_rendering_path: Path=None):
     '''
     generate camera files for one scene: cam.txt, camInitial.txt -> dest_scene_path
 
@@ -342,7 +346,8 @@ def mitsubaScene_sample_poses_one_scene(mitsubaScene, scene_dict: dict, cam_para
             mitsubaScene=mitsubaScene, 
             lverts=lverts, boxes=boxes, \
             cam_params_dict=cam_params_dict, 
-            sample_pose_if_vis_plt=sample_pose_if_vis_plt)
+            sample_pose_if_vis_plt=sample_pose_if_vis_plt, 
+            tmp_rendering_path=tmp_rendering_path)
     
     camNum = len(camPoses)
     assert camNum != 0

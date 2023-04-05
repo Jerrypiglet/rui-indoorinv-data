@@ -89,7 +89,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         self.intrinsics_path = self.scene_path / 'intrinsic_mitsubaScene.txt'
         self.xml_root = get_list_of_keys(self.root_path_dict, ['xml_root'], [PosixPath])[0]
-        self.xml_file = self.xml_root / self.scene_name / self.CONF.data.xml_file
+        self.xml_file_path = self.xml_root / self.scene_name / self.CONF.data.xml_file
         self.pose_format, pose_file = self.CONF.scene_params_dict['pose_file'].split('-')
         assert self.pose_format in ['OpenRooms', 'Blender', 'json'], 'Unsupported pose file: '+pose_file
         self.pose_file_path_list = [self.xml_root / self.scene_name / split / pose_file for split in self.splits]
@@ -231,7 +231,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         #     self.load_monosdf_scene()
         #     assert self.extra_transform is None, 'not suported yet'
         if self.shape_file_path is not None:
-            print(yellow('Loading MI scene from [shape file]: ' + str(self.shape_file_path)))
+            print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
             self.shape_id_dict = {
                 'type': self.shape_file_path.suffix[1:],
                 'filename': str(self.shape_file_path), 
@@ -244,7 +244,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             })
         else:
             # xml file always exists for Mitsuba scenes
-            self.mi_scene = mi.load_file(str(self.xml_file))
+            self.mi_scene = mi.load_file(str(self.xml_file_path))
 
     def process_mi_scene(self, if_postprocess_mi_frames=True, force=False):
         '''
@@ -289,6 +289,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
     def load_intrinsics(self):
         '''
+        Identical intrinsics across all frames
         -> K: (3, 3)
         '''
         self.K = load_matrix(self.intrinsics_path)
@@ -299,6 +300,17 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if self.im_W_load != self.W or self.im_H_load != self.H:
             scale_factor = [t / s for t, s in zip((self.H, self.W), self.im_HW_load)]
             self.K = resize_intrinsics(self.K, scale_factor)
+            
+    def get_pose_num_from_file(self):
+        if self.pose_format == 'OpenRooms':
+            num_poses = sum([len(read_cam_params_OR(pose_file)) for pose_file in self.pose_file_path_list])
+        elif self.pose_format == 'Blender':
+            num_poses = sum([len(np.load(pose_file)) for pose_file in self.pose_file_path_list])
+        elif self.pose_format == 'json':
+            num_poses = sum([len(self.load_meta_json_pose(pose_file)[1]) for pose_file in self.pose_file_path_list])
+        else:
+            assert False, 'Unsupported pose_format: ' + self.pose_format
+        return num_poses
 
     def load_poses(self):
         '''
@@ -312,22 +324,15 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if self.CONF.cam_params_dict.get('if_sample_poses', False):
             if_resample = 'y'
             if hasattr(self, 'pose_list'):
-                if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
+                if_resample = input(red("pose_list loaded. RESAMPLE POSE? [y/n]"))
             if any([pose_file.exists() for pose_file in self.pose_file_path_list]):
-                # assert self.pose_format in ['json']
-                _num_poses = sum([len(self.load_meta_json_pose(pose_file)[1]) for pose_file in self.pose_file_path_list])
-                # if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(self.load_meta_json_pose(self.pose_file)[1]))))
-                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(' + '.join([str(pose_file) for pose_file in self.pose_file_path_list]), _num_poses)))
+                _num_poses = self.get_pose_num_from_file()
+                if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(' + '.join([str(pose_file) for pose_file in self.pose_file_path_list]), _num_poses)))
             if not if_resample in ['N', 'n']:
                 self.sample_poses(self.CONF.cam_params_dict.get('sample_pose_num'), self.extra_transform_inv, if_dump=self.CONF.cam_params_dict.get('sample_pose_if_dump', True))
                 self.scene_rendering_path_list = [self.scene_rendering_path.parent / self.split] * len(self.frame_id_list)
                 return
-            # else:
-            #     print(yellow('ABORTED resample pose.'))
-        # else:
-        #     if not self.pose_file.exists():
-        #     # if not hasattr(self, 'pose_list'):
-        #         self.get_room_center_pose()
+            
         self.pose_list = []
         self.origin_lookatvector_up_list = []
         frame_id_list_all = []
@@ -345,7 +350,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
             if self.pose_format == 'OpenRooms':
                 '''
-                OpenRooms convention (matrices containing origin, lookat, up); The camera coordinates is in OpenCV convention (right-down-forward).
+                OpenRooms convention (i.e. cam.txt).
+                The camera coordinates is in OpenCV convention (right-down-forward).
+                In the file, each camera is a 3x3 matrix with each row containing origin, lookat, up). 
+                [!!!] lookat is a **location** in 3D in front of the camera; lookat-origin is the lookat **vector**.
                 '''
                 cam_params = read_cam_params_OR(pose_file)
                 frame_id_list = list(range(len(cam_params)))
@@ -366,7 +374,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     Liwen's Blender convention: (N, 2, 3), [t, euler angles]
                     Blender x y z == Mitsuba x z -y; Mitsuba x y z == Blender x z -y
                 Json:
-                    Liwen's NeRF poses: [R, t]; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
+                    Liwen's NeRF poses (i.e. transforms.json): [R, t]; processed: in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
                 '''
                 '''
                 [NOTE] scene.obj from Liwen is much smaller (s.t. scaling and translation here) compared to scene loaded from scene_v3.xml
@@ -395,6 +403,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     R_c2w_b_list = [_Rt_c2w_b_list[_][0] for _ in frame_id_list]
                     t_c2w_b_list = [_Rt_c2w_b_list[_][1] for _ in frame_id_list]
                     
+                    # validate previously loaded intrinsics
                     assert 'camera_angle_x' in self.meta
                     f_x = 0.5*self.W/np.tan(0.5*self.meta['camera_angle_x']) # original focal length - x
                     if 'camera_angle_y' in self.meta:
@@ -408,8 +417,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         import ipdb; ipdb.set_trace()
                         assert False, red('computed f_xy is different than read from intrinsics! double check your loaded intrinsics!')
 
-                # self.T_c_b2m = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
-                # self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
                 T_ = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]], dtype=np.float32) # flip x, y: Liwen's new pose (left-up-forward) -> OpenCV (right-down-forward)
                 for R_c2w_b, t_c2w_b in zip(R_c2w_b_list, t_c2w_b_list):
                     R = R_c2w_b @ T_
@@ -428,7 +435,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         # (origin_, lookatvector_, up_) = R_t_to_origin_lookatvector_up_yUP(R, t)
                         # assert np.allclose(self.extra_transform @ origin, origin_)
                         # assert np.allclose(self.extra_transform @ (lookatvector-origin), lookatvector_-origin_)
-                    # assert np.allclose(self.extra_transform @ up, up_)
+                        # assert np.allclose(self.extra_transform @ up, up_)
                         # origin, lookatvector, up = origin_, lookatvector_, up_
 
                     pose_list.append(np.hstack((R, t)))
@@ -438,9 +445,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             self.origin_lookatvector_up_list += origin_lookatvector_up_list
             self.frame_offset_list += [len(frame_id_list_all)] * len(frame_id_list)
             frame_id_list_all += [len(frame_id_list_all) + frame_id for frame_id in frame_id_list]
-            if self.pose_format == 'json':
-                self.t_c2w_b_list += t_c2w_b_list
-                self.R_c2w_b_list += R_c2w_b_list
+            # if self.pose_format == 'json':
+            #     self.t_c2w_b_list += t_c2w_b_list
+            #     self.R_c2w_b_list += R_c2w_b_list
             self.frame_split_list += [split] * len(frame_id_list)
             self.scene_rendering_path_list += [self.scene_rendering_path.parent / split] * len(frame_id_list)
             
@@ -454,8 +461,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             self.frame_offset_list = [frame_offset for _, frame_offset in enumerate(self.frame_offset_list) if frame_id_list_all[_] in self.frame_id_list]
             self.pose_list = [pose for _, pose in enumerate(self.pose_list) if frame_id_list_all[_] in self.frame_id_list]
             self.origin_lookatvector_up_list = [origin_lookatvector_up for _, origin_lookatvector_up in enumerate(self.origin_lookatvector_up_list) if frame_id_list_all[_] in self.frame_id_list]
-            self.t_c2w_b_list = [t_c2w_b for _, t_c2w_b in enumerate(self.t_c2w_b_list) if frame_id_list_all[_] in self.frame_id_list]
-            self.R_c2w_b_list = [R_c2w_b for _, R_c2w_b in enumerate(self.R_c2w_b_list) if frame_id_list_all[_] in self.frame_id_list]
+            # self.t_c2w_b_list = [t_c2w_b for _, t_c2w_b in enumerate(self.t_c2w_b_list) if frame_id_list_all[_] in self.frame_id_list]
+            # self.R_c2w_b_list = [R_c2w_b for _, R_c2w_b in enumerate(self.R_c2w_b_list) if frame_id_list_all[_] in self.frame_id_list]
             self.frame_split_list = [frame_split for _, frame_split in enumerate(self.frame_split_list) if frame_id_list_all[_] in self.frame_id_list]
             self.scene_rendering_path_list = [scene_rendering_path for _, scene_rendering_path in enumerate(self.scene_rendering_path_list) if frame_id_list_all[_] in self.frame_id_list]
 
@@ -468,15 +475,15 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if hasattr(self, 'cam_rays_list'):  return
         self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
 
-    def get_room_center_pose(self):
-        '''
-        generate a single camera, centered at room center and with identity rotation
-        '''
-        if not self.if_loaded_layout:
-            self.load_layout()
-        self.pose_list = [np.hstack((
-            np.eye(3, dtype=np.float32), ((self.xyz_max+self.xyz_min)/2.).reshape(3, 1)
-            ))]
+    # def get_room_center_pose(self):
+    #     '''
+    #     generate a single camera, centered at room center and with identity rotation
+    #     '''
+    #     if not self.if_loaded_layout:
+    #         self.load_layout()
+    #     self.pose_list = [np.hstack((
+    #         np.eye(3, dtype=np.float32), ((self.xyz_max+self.xyz_min)/2.).reshape(3, 1)
+    #         ))]
 
     def load_emission(self):
         '''
@@ -595,7 +602,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
     def load_shapes(self, force=False):
         '''
-        load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
+        load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D
         '''
         if self.if_loaded_shapes and not force: return
         
@@ -605,9 +612,12 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         #     self.load_monosdf_shape(shape_params_dict=shape_params_dict)
         #     assert self.extra_transform is None, 'not suported yet'
         if self.shape_file_path is not None:
-            print(yellow('[%s] load_shapes from [shape file] %s...'%(self.parent_class_name, str(self.shape_file_path))))
+            # load single shape from self.shape_file_path
+            print(yellow('[%s] load_shapes from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
             self.load_single_shape(self.CONF.shape_params_dict, extra_transform=self.extra_transform, force=force)
         else:
+            # load collection of shapes from Mitsuba XML file
+            print(white_blue('[%s] load_shapes from [XML file]'%self.__class__.__name__) + str(self.xml_file_path))
             if_sample_pts_on_mesh = self.CONF.shape_params_dict.get('if_sample_pts_on_mesh', False)
             sample_mesh_ratio = self.CONF.shape_params_dict.get('sample_mesh_ratio', 1.)
             sample_mesh_min = self.CONF.shape_params_dict.get('sample_mesh_min', 100)
@@ -623,9 +633,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             if if_sample_pts_on_mesh:
                 self.sample_pts_list = []
 
-            print(white_blue('[%s] load_shapes from [XML file]...'%self.parent_class_name))
-
-            root = get_XML_root(self.xml_file)
+            root = get_XML_root(self.xml_file_path)
             shapes = root.findall('shape')
             
             for shape in tqdm(shapes):
@@ -742,14 +750,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 self.xyz_min = np.minimum(np.amin(vertices, axis=0), self.xyz_min)
 
 
-        self.if_loaded_shapes = True
-        
-        print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
-            self.__class__.__name__, 
-            len(self.shape_list_valid), 
-            len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
-            len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
-            )))
+            self.if_loaded_shapes = True
+            
+            print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
+                self.__class__.__name__, 
+                len(self.shape_list_valid), 
+                len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
+                len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
+                )))
 
     def get_envmap_axes(self):
         from utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np

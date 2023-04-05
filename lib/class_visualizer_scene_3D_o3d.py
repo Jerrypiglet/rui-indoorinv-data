@@ -507,12 +507,11 @@ class visualizer_scene_3D_o3d(object):
 
         axis_up = self.os.axis_up
         if not if_ceiling:
-            xyz_mask = remove_ceiling(xyz_pcd, axis_up=axis_up, if_debug_info=self.if_debug_info)
+            xyz_mask = remove_ceiling(xyz_pcd, self.os.ceiling_loc, self.os.floor_loc, axis_up=axis_up, if_debug_info=self.if_debug_info)
             xyz_pcd = xyz_pcd[xyz_mask]; pcd_color = pcd_color[xyz_mask]
         if not if_walls:
             assert self.os.if_has_layout
-            layout_bbox_3d = self.os.layout_box_3d_transformed
-            xyz_pcd, pcd_color = remove_walls(layout_bbox_3d, xyz_pcd, pcd_color, if_debug_info=self.if_debug_info)
+            xyz_pcd, pcd_color = remove_walls(xyz_pcd, self.os.layout_box_3d_transformed, pcd_color, if_debug_info=self.if_debug_info)
 
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(xyz_pcd)
@@ -717,6 +716,8 @@ class visualizer_scene_3D_o3d(object):
         if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_obj_mesh', True)
         if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_emitter_mesh', False)
         if_ceiling = shapes_params.get('if_ceiling', False)
+        if if_ceiling:
+            assert self.os.if_has_ceilling_floor, 'scene object has no detected ceiling/floor; did you load_layout for XML-based scene, or detect ceiling/floor for shape-based scene?'
         if_walls = shapes_params.get('if_walls', False)
 
         exclude_obj_id_list = shapes_params.get('exclude_obj_id_list', [])
@@ -793,7 +794,7 @@ class visualizer_scene_3D_o3d(object):
             shape_bbox.points = o3d.utility.Vector3dVector(bverts)
             shape_bbox.colors = o3d.utility.Vector3dVector([obj_color if not if_emitter else [0., 0., 0.] for i in range(12)]) # black for emitters
             shape_bbox.lines = o3d.utility.Vector2iVector([[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])
-            # geometry_list.append(shape_bbox)
+            geometry_list.append(shape_bbox)
 
             '''
             [optional] load mashes & text labels
@@ -808,7 +809,7 @@ class visualizer_scene_3D_o3d(object):
                 # shape_mesh = shape_mesh.as_open3d
                 if not if_ceiling:
                     axis_up = self.os.axis_up
-                    vertices_valid_mask = ~remove_ceiling(vertices, axis_up=axis_up, if_debug_info=True)
+                    vertices_valid_mask = ~remove_ceiling(vertices, self.os.ceiling_loc, self.os.floor_loc, axis_up=axis_up, if_debug_info=True, debug_info_str=_id)
                     faces_mask = np.all(vertices_valid_mask.reshape(-1)[faces-1], axis=1) # (N_total_faces,), bool
                     faces = faces[faces_mask] # (faces_emitters, 3), int, containing 1-based vertex indexes
 
@@ -1086,13 +1087,12 @@ class visualizer_scene_3D_o3d(object):
 
                 if not if_ceiling:
                     axis_up = self.os.axis_up
-                    xyz_mask = remove_ceiling(mi_pts_, axis_up=axis_up, if_debug_info=self.if_debug_info)
+                    xyz_mask = remove_ceiling(mi_pts_, self.os.ceiling_loc, self.os.floor_loc, axis_up=axis_up, if_debug_info=self.if_debug_info)
                     mi_pts_ = mi_pts_[xyz_mask]; mi_color_ = mi_color_[xyz_mask]
 
                 if not if_walls:
                     assert self.os.if_has_layout
-                    layout_bbox_3d = self.os.layout_box_3d_transformed
-                    mi_pts_, mi_color_ = remove_walls(layout_bbox_3d, mi_pts_, mi_color_, if_debug_info=self.if_debug_info)
+                    mi_pts_, mi_color_ = remove_walls(mi_pts_, self.os.layout_box_3d_transformed, mi_color_, if_debug_info=self.if_debug_info)
 
                 assert mi_color_.shape[0] == mi_pts_.shape[0]
                 pcd_pts.points = o3d.utility.Vector3dVector(mi_pts_)

@@ -139,7 +139,7 @@ class exporter_scene():
                             
                             if_write = True
                             if scale_mat_path.exists():
-                                if_overwrite = input(red('scale_mat.npy exists. Overwrite? [y/n]'))
+                                if_overwrite = input(red('scale_mat.npy exists. OVERWRITE? [y/n]'))
                                 if if_overwrite in ['y', 'Y'] or self.if_force:
                                     scale_mat_path.unlink()
                                     if_write = True

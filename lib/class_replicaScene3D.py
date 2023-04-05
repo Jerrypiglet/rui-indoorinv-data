@@ -276,15 +276,15 @@ class replicaScene3D(mitsubaBase, scene2DBase):
             if_resample = 'y'
             # assert False, 'disabled; use '
             if hasattr(self, 'pose_list'):
-                if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
+                if_resample = input(red("pose_list loaded. RESAMPLE POSE? [y/n]"))
             if self.pose_file.exists():
                 # assert self.pose_format in ['json']
                 try:
                     _num_poses = len(self.load_meta_json_pose(self.pose_file)[1])
                 except: 
                     _num_poses = -1
-                # if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(self.load_meta_json_pose(self.pose_file)[1]))))
-                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), _num_poses)))
+                # if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(str(self.pose_file), len(self.load_meta_json_pose(self.pose_file)[1]))))
+                if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(str(self.pose_file), _num_poses)))
             if not if_resample in ['N', 'n']:
                 self.sample_poses(cam_params_dict.get('sample_pose_num'), self.extra_transform_inv, invalid_normal_thres=0.01)
                 return

@@ -95,9 +95,11 @@ xml_root = Path(PATH_HOME) / CONF.data.xml_root
 # xml_file_path = xml_root / CONF.data.xml_file
 # shape_file_path = dataset_root / CONF.scene.shape_file
 
-frame_id_list = [0]
 frame_id_list = CONF.scene.frame_id_list
 invalid_frame_id_list = CONF.scene.invalid_frame_id_list
+
+# [debug] override
+# frame_id_list = [0]
 
 '''
 modify confs
@@ -115,7 +117,7 @@ CONF.cam_params_dict.update({
     # ==> if sample poses and render images 
     'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
     'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
-    'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
+    'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     })
 
 CONF.mi_params_dict.update({
@@ -404,10 +406,10 @@ if opt.vis_3d_o3d:
 
             # 'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             # 'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            # 'if_ceiling': False, 
-            # 'if_walls': False, 
-            'if_ceiling': True, 
-            'if_walls': True, 
+            'if_ceiling': False, 
+            'if_walls': False, 
+            # 'if_ceiling': True, 
+            # 'if_walls': True, 
 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
