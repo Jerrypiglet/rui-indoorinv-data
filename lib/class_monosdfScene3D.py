@@ -66,30 +66,25 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
 
         self.scene_name, (_shape_normalized, shape_file) = get_list_of_keys(scene_params_dict, ['scene_name', 'shape_file'], [str, tuple])
         self.frame_id_list = get_list_of_keys(scene_params_dict, ['frame_id_list'], [list])[0]
-        self.up_axis = get_list_of_keys(scene_params_dict, ['up_axis'], [str])[0]
-        assert self.up_axis in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
+        self.axis_up = get_list_of_keys(scene_params_dict, ['axis_up'], [str])[0]
+        assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
         self.indexing_based = scene_params_dict.get('indexing_based', 0)
 
         self.scene_path = self.rendering_root / self.scene_name
-        self.scene_rendering_path = self.scene_path
-        assert self.scene_rendering_path.exists()
-        # self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
-        # self.xml_file = self.xml_scene_root / self.scene_name / self.xml_filename
+        assert self.scene_path.exists()
+        self.scene_rendering_path_list = [self.scene_path] * len(self.frame_id_list)
 
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['npz'], 'Unsupported pose file: '+pose_file
         self.pose_file = self.scene_path / pose_file
         
-        self.shape_file = self.rendering_root / shape_file
+        self.shape_file = self.scene_path / shape_file
         assert self.shape_file.exists(), 'Shape file not exist: %s'%str(self.shape_file)
         assert _shape_normalized in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%_shape_normalized
         self.shape_if_normalized = _shape_normalized=='normalized'
 
-        # self.im_params_dict = im_params_dict
-        # self.lighting_params_dict = lighting_params_dict
         self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
-        # self.emitter_params_dict = emitter_params_dict
         self.mi_params_dict = mi_params_dict
 
         self.im_H_load, self.im_W_load, self.im_H_resize, self.im_W_resize = get_list_of_keys(im_params_dict, ['im_H_load', 'im_W_load', 'im_H_resize', 'im_W_resize'])
@@ -97,20 +92,11 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         self.im_HW_target = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
         self.H, self.W = self.im_H_resize, self.im_W_resize
         # self.im_lighting_HW_ratios = (self.im_H_resize // self.lighting_params_dict['env_row'], self.im_W_resize // self.lighting_params_dict['env_col'])
-        # assert self.im_lighting_HW_ratios[0] > 0 and self.im_lighting_HW_ratios[1] > 0
-
         self.near = cam_params_dict.get('near', 0.1)
         self.far = cam_params_dict.get('far', 10.)
-        # self.T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
 
         self.host = host
         self.device = get_device(self.host)
-
-        # self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
-        # self.pcd_color = None
-        # self.if_loaded_colors = False
-        # self.if_loaded_shapes = False
-        # self.if_loaded_layout = False
 
         ''''
         flags to set
@@ -130,7 +116,6 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         self.load_poses(self.cam_params_dict)
 
         self.load_modalities()
-        # self.est = {}
 
         self.get_cam_rays(self.cam_params_dict)
         self.process_mi_scene(self.mi_params_dict)
@@ -153,15 +138,6 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
     @property
     def if_has_poses(self):
         return hasattr(self, 'pose_list')
-
-    # @property
-    # def if_has_emission(self):
-    #     return hasattr(self, 'emission_list')
-
-    # @property
-    # def if_has_layout(self):
-    #     return all([_ in self.modality_list for _ in ['layout']])
-
 
     @property
     def if_has_shapes(self): # objs + emitters
@@ -202,8 +178,6 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
             if not (result_ == False):
                 continue
 
-            # if _ == 'emission': self.load_emission()
-            # if _ == 'layout': self.load_layout()
             if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'depth':
                 import ipdb; ipdb.set_trace()
@@ -224,8 +198,6 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
             seg_key = modality.split('_')[-1] 
             return self.mi_seg_dict_of_lists[seg_key]
-        # elif modality == 'emission': 
-        #     return self.emission_list
         else:
             assert False, 'Unsupported modality: ' + modality
 
@@ -242,7 +214,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         self.mi_scene = mi.load_dict({
             'type': 'scene',
             'shape_id':{
-                'type': 'ply',
+                'type': str(self.shape_file.suffix[1:]),
                 'filename': str(self.shape_file), 
             }
         })
@@ -290,23 +262,8 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         '''
         # self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
-        if self.mi_params_dict.get('if_sample_poses', False):
-            assert False, 'disabled; use '
-            if_resample = 'n'
-            if hasattr(self, 'pose_list'):
-                if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
-            if self.pose_file.exists():
-                if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(read_cam_params_OR(self.pose_file)))))
-            if if_resample in ['Y', 'y']:
-                self.sample_poses(self.mi_params_dict.get('sample_pose_num'), cam_params_dict)
-            else:
-                print(yellow('ABORTED resample pose.'))
-        else:
-            if not self.pose_file.exists():
-            # if not hasattr(self, 'pose_list'):
-                self.get_room_center_pose()
 
-        print(white_blue('[mitsubaScene] load_poses from %s'%str(self.pose_file)))
+        print(white_blue('[monosdfScene] load_poses from %s'%str(self.pose_file)))
          
         if self.pose_format == 'npz':
             '''
@@ -320,7 +277,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
             self.K_list = []
             self.pose_list = []
             self.origin_lookatvector_up_list = []
-
+            
             for scale_mat, world_mat in zip(scale_mats, world_mats):
                 '''
                 ipdb> scale_mat
@@ -343,7 +300,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
                 intrinsics, pose = rend_util.load_K_Rt_from_P(None, P)
                 assert pose.shape in ((4, 4), (3, 4))
                 assert intrinsics.shape in ((4, 4), (3, 4), (3, 3))
-
+                
                 # because we do resize and center crop 384x384 when using omnidata model, we need to adjust the camera intrinsic accordingly
                 if center_crop_type == 'center_crop_for_replica':
                     scale = 384 / 680
@@ -370,8 +327,8 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
                 else:
                     raise NotImplementedError
 
-                assert abs(intrinsics[0][2]*2 - self.H) < 1., 'intrinsics->H/2. (%.2f) does not match self.H: (%d); resize intrinsics needed?'%(intrinsics[0][2]*2, self.H)
-                assert abs(intrinsics[1][2]*2 - self.W) < 1., 'intrinsics->W/2. (%.2f) does not match self.W: (%d); resize intrinsics needed?'%(intrinsics[1][2]*2, self.W)
+                # assert abs(intrinsics[0][2]*2 - self.H) < 1., 'intrinsics->H/2. (%.2f) does not match self.H: (%d); resize intrinsics needed?'%(intrinsics[0][2]*2, self.H)
+                # assert abs(intrinsics[1][2]*2 - self.W) < 1., 'intrinsics->W/2. (%.2f) does not match self.W: (%d); resize intrinsics needed?'%(intrinsics[1][2]*2, self.W)
                 
                 self.K_list.append(intrinsics.astype(np.float32))
                 self.pose_list.append(pose.astype(np.float32))
@@ -380,24 +337,14 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
                 t = pose[:3, 3:4].astype(np.float32)
                 assert np.abs(np.linalg.det(R) - 1.) < 1e-5
 
-                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
                 
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
-        print(blue_text('[%s] DONE. load_poses'%self.parent_class_name))
+        print(blue_text('[%s] DONE. load_poses %d'%(self.parent_class_name, len(self.pose_list))))
 
     def get_cam_rays(self, cam_params_dict={}):
         self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, self.K_list, self.pose_list, convention='opencv')
-
-    def get_room_center_pose(self):
-        '''
-        generate a single camera, centered at room center and with identity rotation
-        '''
-        if not self.if_loaded_layout:
-            self.load_layout()
-        self.pose_list = [np.hstack((
-            np.eye(3, dtype=np.float32), ((self.xyz_max+self.xyz_min)/2.).reshape(3, 1)
-            ))]
 
     def load_depth(self):
         '''
@@ -408,7 +355,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
 
         print(white_blue('[%s] load_depth for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
-        self.depth_file_list = [self.scene_rendering_path / (self.modality_filename_dict['depth']%i) for i in self.frame_id_list]
+        self.depth_file_list = [self.scene_rendering_path_list[frame_idx] / (self.modality_filename_dict['depth']%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         self.depth_list = [load_img(depth_file, (self.im_H_load, self.im_W_load), ext='npy', target_HW=self.im_HW_target).astype(np.float32)[:, :] for depth_file in self.depth_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
 
         print(blue_text('[%s] DONE. load_depth')%self.parent_class_name)
@@ -424,9 +371,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
 
         print(white_blue('[%s] load_normal for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
 
-        self.normal_file_list = [self.scene_rendering_path / (self.modality_filename_dict['normal']%i) for i in self.frame_id_list]
-        # aa = np.load(str(self.normal_file_list[0]))
-        # import ipdb; ipdb.set_trace()
+        self.normal_file_list = [self.scene_rendering_path_list[frame_idx] / (self.modality_filename_dict['normal']%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         self.normal_list = [load_img(normal_file, (self.im_H_load, self.im_W_load, 3), ext='npy', target_HW=self.im_HW_target, npy_if_channel_first=True).astype(np.float32) for normal_file in self.normal_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
         # self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
         self.normal_list = [normal * 2. - 1. for normal in self.normal_list]

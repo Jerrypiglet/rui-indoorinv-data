@@ -39,6 +39,8 @@ parser.add_argument('--pcd_color_mode_dense_geo', type=str, default='rgb', help=
 parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=True, default=False, help='if create color map for all points of Mitsuba; required: input_colors_tuple')
 # parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
 
+parser.add_argument('--split', type=str, default='train', help='')
+
 # differential renderer
 # parser.add_argument('--render_diff', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
 # parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
@@ -61,274 +63,76 @@ parser.add_argument('--eval_scene', type=str2bool, nargs='?', const=True, defaul
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/scannet'
-xml_root = Path(PATH_HOME) / 'data/scannet'
 # intrinsics_path = Path(PATH_HOME) / 'data/scannet/intrinsic_mitsubaScene.txt'
 
 radiance_scale = 1.
-'''
-scannet scan 1~4 from MonoSDF
-'''
-scan_id = 1
-# frame_ids = list(range(465))
-frame_ids = list(range(0, 465, 40))
-# frame_ids = [0]
-# shape_file = ('not-normalized', 'GTmesh/scene0050_00_vh_clean_2.ply')
-shape_file = ('normalized', 'ESTmesh/scan1.ply')
+# '''
+# scannet scan 1~4 from MonoSDF
+# '''
+# base_root = Path(PATH_HOME) / 'data/scannet'
+# xml_root = Path(PATH_HOME) / 'data/scannet'
+# scan_id = 1
+# scene_name = 'scan%d'%scan_id
+# # frame_id_list = list(range(465))
+# frame_id_list = list(range(0, 465, 40))
+# # frame_id_list = [0]
+# # shape_file = ('not-normalized', 'GTmesh/scene0050_00_vh_clean_2.ply')
+# shape_file = ('normalized', 'ESTmesh/scan1.ply')
+
+# dumped Monosdf scenes from ICCV23
+base_root = Path(PATH_HOME) / 'data/real/EXPORT_monosdf'
+scene_name = 'IndoorKitchenV4_2_aligned'
+frame_id_list = list(range(255))
+shape_file = ('not-normalized', 'scene_aligned.obj')
 
 mitsuba_scene = monosdfScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root, 'xml_scene_root': xml_root}, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
     scene_params_dict={
-        # 'xml_filename': xml_filename, 
-        'scene_name': 'scan%d'%scan_id, 
-        # 'split': split, 
-        'frame_id_list': frame_ids, 
-        # 'mitsuba_version': '3.0.0', 
-        # 'intrinsics_path': intrinsics_path, 
-        'axis_up': 'z+', 
+        'scene_name': scene_name, 
+        # 'split': opt.split, 
+        'frame_id_list': frame_id_list, 
+        'axis_up': 'y+', 
         'pose_file': ('npz', 'cameras.npz'), # requires scaled Blender scene! in comply with Liwen's IndoorDataset (https://github.com/william122742/inv-nerf/blob/bake/utils/dataset/indoor.py)
         'shape_file': shape_file, 
         }, 
     mi_params_dict={
-        # 'if_also_dump_xml_with_lit_area_lights_only': True,  # True: to dump a second file containing lit-up lamps only
-        # 'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
-        # 'debug_dump_mesh': True, # [DEBUG] True: to dump all object meshes to mitsuba/meshes_dump; load all .ply files into MeshLab to view the entire scene: images/demo_mitsuba_dump_meshes.png
         'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
         'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
-        # sample poses and render images 
-        # 'if_sample_poses': False, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-        # 'poses_sample_num': 200, # Number of poses to sample; set to -1 if not sampling
         },
-    # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
+        # 'im_hdr', 
         'im_sdr', 
         'shapes', # single scene file in ScanNet's case; objs + emitters, geometry shapes + emitter properties
         'depth', 
         'normal', 
-
         # 'im_hdr', 
-        # 'lighting_envmap', 
-        # 'albedo', 'roughness', 
-        # 'emission', 
-        # 'lighting_SG', 
-        # 'layout', 
         ], 
     modality_filename_dict = {
-        # 'poses', 
-        # 'im_hdr': 'Image/%03d_0001.exr', 
-        'im_sdr': '%06d_rgb.png', 
-        # 'lighting_envmap', 
-        # 'albedo': 'DiffCol/%03d_0001.exr', 
-        # 'roughness': 'Roughness/%03d_0001.exr', 
-        # 'emission': 'Emit/%03d_0001.exr', 
-        'depth': '%06d_depth.npy', 
-        'normal': '%06d_normal.npy', 
-        # 'lighting_SG', 
-        # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        'im_hdr': 'Image/%03d_0001.exr', 
+        # 'im_sdr': 'Image/%03d_0001.png', 
+        'im_sdr': '%03d_0001_rgb.png', 
+        # 'depth': 'Depth/%03d_0001.exr', 
+        'depth': '%03d_0001_depth.npy', 
+        # 'normal': 'Normal/%03d_0001.exr', 
+        'normal': '%03d_0001_normal.npy', 
     }, 
     im_params_dict={
-        # 'im_H_resize': 480, 'im_W_resize': 640, 
-        'im_H_load': 384, 'im_W_load': 384, 
-        'im_H_resize': 384, 'im_W_resize': 384, 
-        # 'im_H_resize': 1, 'im_W_resize': 2, 
-        # 'im_H_resize': 32, 'im_W_resize': 64, 
-        # 'spp': 2048, 
-        # 'spp': 16, 
-        # 'im_H_resize': 120, 'im_W_resize': 160, # to use for rendering so that im dimensions == lighting dimensions
-        # 'im_hdr_ext': 'exr', 
+        'im_H_load': 512, 'im_W_load': 768, 
+        'im_H_resize': 512, 'im_W_resize': 768, 
         }, 
     cam_params_dict={
         'center_crop_type': 'no_crop', 
         'near': 0.1, 'far': 10., 
-        # 'heightMin' : 0.7,  
-        # 'heightMax' : 2.,  
-        # 'distMin': 1., # to wall distance min
-        # 'distMax': 4.5, 
-        # 'thetaMin': -60, 
-        # 'thetaMax' : 40, # theta: pitch angle; up+
-        # 'phiMin': -60, # yaw angle
-        # 'phiMax': 60, 
         'sample_pose_if_vis_plt': False, # images/demo_sample_pose.png
     }, 
-    # lighting_params_dict={
-    #     'SG_num': 12, 
-    #     'env_row': 8, 'env_col': 16, # resolution to load; FIXED
-    #     'env_downsample_rate': 2, # (8, 16) -> (4, 8)
-
-    #     # 'env_height': 2, 'env_width': 4, 
-    #     # 'env_height': 8, 'env_width': 16, 
-    #     # 'env_height': 128, 'env_width': 256, 
-    #     'env_height': 256, 'env_width': 512, 
-    # }, 
     shape_params_dict={
         'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
-        # 'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
-
-        'if_sample_mesh': False,  # default True: sample points on each shape -> self.sample_pts_list
-        'sample_mesh_ratio': 0.1, # target num of VERTICES: len(vertices) * sample_mesh_ratio
-        'sample_mesh_min': 10, 
-        'sample_mesh_max': 100, 
-
-        'if_simplify_mesh': False,  # default True: simply triangles
-        'simplify_mesh_ratio': 0.1, # target num of FACES: len(faces) * simplify_mesh_ratio
-        'simplify_mesh_min': 100, 
-        'simplify_mesh_max': 1000, 
-        'if_remesh': True, # False: images/demo_shapes_3D_kitchen_NO_remesh.png; True: images/demo_shapes_3D_kitchen_YES_remesh.png
-        'remesh_max_edge': 0.15,  
         },
-    # emitter_params_dict={
-    #     },
 )
 
-'''
-Mitsuba/Blender 2D renderer
-'''
-if opt.render_2d:
-    assert False
-    assert opt.renderer in ['mi', 'blender']
-    modality_list = [
-        # 'im', # both hdr and sdr
-        # 'poses', 
-        # 'seg', 
-        # 'albedo', 
-        # 'roughness', 
-        # 'depth', 'normal', 
-        'lighting_envmap', 
-        ]
-    if opt.renderer == 'mi':
-        renderer = renderer_mi_mitsubaScene_3D(
-            mitsuba_scene, 
-            modality_list=modality_list, 
-            im_params_dict={}, 
-            cam_params_dict={}, 
-            mi_params_dict={},
-        )
-    if opt.renderer == 'blender':
-        renderer = renderer_blender_mitsubaScene_3D(
-            mitsuba_scene, 
-            modality_list=modality_list, 
-            host=host, 
-            FORMAT='OPEN_EXR', 
-            # FORMAT='PNG', 
-            im_params_dict={}, 
-            cam_params_dict={}, 
-            mi_params_dict={},
-        )
-    host=host, 
-    renderer.render()
-
-
 eval_return_dict = {}
-'''
-Evaluator for rad-MLP
-'''
-if opt.eval_rad:
-    assert False
-    evaluator_rad = evaluator_scene_rad(
-        host=host, 
-        scene_object=mitsuba_scene, 
-        INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='20230110-132112-rad_kitchen_190-10_specT/last.ckpt', # 110
-        dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
-        split=split, 
-        rad_scale=1., 
-    )
-
-    '''
-    render one image by querying rad-MLP: images/demo_eval_radMLP_render.png
-    '''
-    # evaluator_rad.render_im(7, if_plt=True) 
-
-    '''
-    sample and visualize points on emitter surface; show intensity as vectors along normals (BLUE for EST): images/demo_emitter_o3d_sampling.png
-    '''
-    eval_return_dict.update(
-        evaluator_rad.sample_emitter(
-            emitter_params={
-                'max_plate': 32, 
-                'radiance_scale': radiance_scale, 
-                'emitter_type_index_list': emitter_type_index_list, 
-                }))
-    
-    '''
-    sample non-emitter locations along envmap (hemisphere) directions radiance from rad-MLP: images/demo_envmap_o3d_sampling.png
-    '''
-    # eval_return_dict.update(
-    #     evaluator_rad.sample_lighting(
-    #         # sample_type='rad', # 'rad', 'incident-rad'
-    #         sample_type='incident', # 'rad', 'incident-rad'
-    #         subsample_rate_pts=1, 
-    #         if_use_loaded_envmap_position=True, # assuming lighting envmap endpoint position dumped by Blender renderer
-    #     )
-    # )
-
-    '''
-    sample radiance field on shape vertices
-    '''
-    eval_return_dict.update(
-        evaluator_rad.sample_shapes(
-            sample_type='rad', # ['rad']
-            shape_params={
-                'radiance_scale': 1., 
-            }
-        )
-    )
-
-'''
-Evaluator for inv-MLP
-'''
-if opt.eval_inv:
-    assert False
-    evaluator_inv = evaluator_scene_inv(
-        host=host, 
-        scene_object=mitsuba_scene, 
-        INV_NERF_ROOT = INV_NERF_ROOT, 
-        ckpt_path='20230111-191305-inv_kitchen_190-10_specT/last.ckpt', # 110
-        dataset_key='-'.join(['Indoor', scene_name]), # has to be one of the keys from inv-nerf/configs/scene_options.py
-        split=split, 
-        spec=True, 
-    )
-
-    '''
-    sample emission mask on shape vertices
-    '''
-    _ = evaluator_inv.sample_shapes(
-        sample_type='emission_mask', # ['']
-        shape_params={
-        }
-    )
-    for k, v in _.items():
-        if k in eval_return_dict:
-            eval_return_dict[k].update(_[k])
-        else:
-            eval_return_dict[k] = _[k]
-
-'''
-Evaluator for scene
-'''
-if opt.eval_scene:
-    evaluator_scene = evaluator_scene_scene(
-        host=host, 
-        scene_object=mitsuba_scene, 
-    )
-
-    '''
-    sample visivility to camera centers on vertices
-    '''
-    _ = evaluator_scene.sample_shapes(
-        sample_type='vis_count', # ['']
-        # sample_type='t', # ['']
-        shape_params={
-        }
-    )
-    for k, v in _.items():
-        if k in eval_return_dict:
-            eval_return_dict[k].update(_[k])
-        else:
-            eval_return_dict[k] = _[k]
 
 '''
 Matploblib 2D viewer
@@ -394,7 +198,7 @@ if opt.vis_3d_o3d:
     lighting_params_vis={
         'if_use_mi_geometry': True, 
         'if_use_loaded_envmap_position': True, # assuming lighting envmap endpoint position dumped by Blender renderer
-        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_id_list)
         'subsample_lighting_wi_rate': 500, # subsample on lighting directions: too many directions (e.g. 128x256)
         # 'lighting_keep_ratio': 0.05, 
         # 'lighting_further_clip_ratio': 0.1, 
@@ -437,49 +241,13 @@ if opt.vis_3d_o3d:
             assert opt.eval_rad or opt.eval_inv or opt.eval_scene
             visualizer_3D_o3d.extra_input_dict['samples_v_dict'] = eval_return_dict['samples_v_dict']
         
-        # vertex normals
-
-        # if 'samples_v_dict' in eval_return_dict:
-        #     assert opt.eval_rad
-        #     for _id in eval_return_dict['samples_v_dict']:
-        #         lpts, lpts_d = eval_return_dict['samples_v_dict'][_id]['v'], eval_return_dict['samples_v_dict'][_id]['d']
-        #         lpts_end = lpts + 0.1 * lpts_d
-        #         visualizer_3D_o3d.add_extra_geometry([
-        #             ('rays', {
-        #                 'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 1., 0.]]*lpts.shape[0]), # green
-        #             }),
-        #         ]) 
-
-    # for frame_idx, (rays_o, rays_d, _) in enumerate(mitsuba_scene.cam_rays_list):
-    #     normal_up = np.cross(rays_d[0][0], rays_d[0][-1])
-    #     normal_down = np.cross(rays_d[-1][-1], rays_d[-1][0])
-    #     normal_left = np.cross(rays_d[-1][0], rays_d[0][0])
-    #     normal_right = np.cross(rays_d[0][-1], rays_d[-1][-1])
-    #     normals = np.stack((normal_up, normal_down, normal_left, normal_right), axis=0)
-    #     cam_o = rays_o[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
-    #     visualizer_3D_o3d.add_extra_geometry([
-    #         ('rays', {
-    #             'ray_o': cam_o[0:1], 'ray_e': cam_o[0:1] + normals[0:1], 'ray_c': np.array([[0., 0., 0.]]*1), # black
-    #         }),
-    #         ('rays', {
-    #             'ray_o': cam_o[1:2], 'ray_e': cam_o[1:2] + normals[1:2], 'ray_c': np.array([[1., 0., 0.]]*1), # r
-    #         }),
-    #         ('rays', {
-    #             'ray_o': cam_o[2:3], 'ray_e': cam_o[2:3] + normals[2:3], 'ray_c': np.array([[0., 1., 0.]]*1), # g
-    #         }),
-    #         ('rays', {
-    #             'ray_o': cam_o[3:4], 'ray_e': cam_o[3:4] + normals[3:4], 'ray_c': np.array([[0., 0., 1.]]*1), # b
-    #         }),
-    #     ]) 
-
-
     visualizer_3D_o3d.run_o3d(
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
             'if_cam_axis_only': False, 
             }, 
         # dense_geo_params={
-        #     'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
+        #     'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_id_list)
         #     'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
         #     'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
         #     'if_normal': False, # [OPTIONAL] turn off normals to avoid clusters
