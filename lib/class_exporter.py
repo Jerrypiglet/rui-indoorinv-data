@@ -62,7 +62,7 @@ class exporter_scene():
             
     @property
     def valid_modalities(self):
-        return ['im_hdr', 'im_sdr', 'poses', 'im_mask', 'shapes', 'mi_normal', 'mi_depth', 'lighting']
+        return ['im_hdr', 'im_sdr', 'poses', 'im_mask', 'shapes', 'mi_normal', 'mi_depth', 'lighting', 'depth', 'normal']
     
     def prepare_check_export(self, scene_export_path: Path):
         if scene_export_path.exists():
@@ -125,7 +125,7 @@ class exporter_scene():
                             else:
                                 poses = [np.vstack((pose, np.array([0., 0., 0., 1.], dtype=np.float32).reshape((1, 4)))) for pose in self.os.pose_list]
                                 poses = np.array(poses)
-                                assert poses.shape[1:] == (4, 4)
+                                assert poses.shape[1:] == (4, 4), 'poses shape: %s is not (N, 4, 4)'
                                 min_vertices = poses[:, :3, 3].min(axis=0)
                                 max_vertices = poses[:, :3, 3].max(axis=0)
                                 center = (min_vertices + max_vertices) / 2.
@@ -253,7 +253,7 @@ class exporter_scene():
                     mi_normal_export_path = scene_export_path / 'MiNormalGlobal' / ('%03d_0001.png'%frame_idx)
                     _mi_normal = self.os.mi_normal_global_list[frame_idx][:, :, [2, 1, 0]]/2.+0.5
                     cv2.imwrite(str(mi_normal_export_path), (np.clip(_mi_normal, 0., 1.)*255.).astype(np.uint8))
-                    print(blue_text('Mitsuba normal (global) %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
+                    print(blue_text('mi_normal (global) (npy) %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
                     mi_normal_overlay = self.os.im_sdr_list[frame_idx][:, :, [2, 1, 0]].copy()
                     mi_normal_overlay = mi_normal_overlay * 0.5 + _mi_normal * 0.5
                     mi_normal_overlay_export_path = scene_export_path / 'MiNormalGlobal_OVERLAY' / ('%03d_0001.png'%frame_idx)
@@ -274,7 +274,25 @@ class exporter_scene():
                     print(blue_text('depth (vis) %d exported to: %s'%(frame_id, str(mi_depth_vis_export_path))))
                     mi_depth_npy_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.npy'%frame_idx)
                     np.save(str(mi_depth_npy_export_path), mi_depth)
-                    print(blue_text('depth (npy) %d exported to: %s'%(frame_id, str(mi_depth_npy_export_path))))
+                    print(blue_text('mi_depth (npy) %d exported to: %s'%(frame_id, str(mi_depth_npy_export_path))))
+
+            if modality == 'depth':
+                assert format in ['monosdf']
+                scene_export_path.mkdir(parents=True, exist_ok=True)
+                for frame_idx, frame_id in enumerate(self.os.frame_id_list):
+                    depth = self.os.depth_list[frame_idx].squeeze()
+                    depth_npy_export_path = scene_export_path / ('%03d_0001_depth.npy'%frame_idx)
+                    np.save(str(depth_npy_export_path), depth)
+                    print(blue_text('depth (npy) %d exported to: %s'%(frame_id, str(depth_npy_export_path))))
+
+            if modality == 'depth':
+                assert format in ['monosdf']
+                scene_export_path.mkdir(parents=True, exist_ok=True)
+                for frame_idx, frame_id in enumerate(self.os.frame_id_list):
+                    normal = self.os.normal_list[frame_idx].squeeze()
+                    normal_npy_export_path = scene_export_path / ('%03d_0001_normal.npy'%frame_idx)
+                    np.save(str(normal_npy_export_path), normal)
+                    print(blue_text('normal (npy) %d exported to: %s'%(frame_id, str(normal_npy_export_path))))
 
             if modality == 'im_mask':
                 file_str = {'monosdf': 'ImMask/%03d_0001.png', 'mitsuba': 'ImMask/%03d_0001.png', 'fvp': 'images/%08d_mask.png'}[format]

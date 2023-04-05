@@ -82,6 +82,8 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         assert self.shape_file.exists(), 'Shape file not exist: %s'%str(self.shape_file)
         assert _shape_normalized in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%_shape_normalized
         self.shape_if_normalized = _shape_normalized=='normalized'
+        
+        self.if_autoscale_scene = False
 
         self.cam_params_dict = cam_params_dict
         self.shape_params_dict = shape_params_dict
@@ -123,7 +125,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
     @property
     def valid_modalities(self):
         return [
-            # 'im_hdr', 
+            'im_hdr', 
             'im_sdr', 
             # 'albedo', 
             # 'roughness', 
@@ -170,6 +172,10 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
 
     @property
     def frame_num(self):
+        return len(self.frame_id_list)
+
+    @property
+    def frame_num_all(self):
         return len(self.frame_id_list)
 
     def load_modalities(self):
@@ -330,8 +336,8 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
                 # assert abs(intrinsics[0][2]*2 - self.H) < 1., 'intrinsics->H/2. (%.2f) does not match self.H: (%d); resize intrinsics needed?'%(intrinsics[0][2]*2, self.H)
                 # assert abs(intrinsics[1][2]*2 - self.W) < 1., 'intrinsics->W/2. (%.2f) does not match self.W: (%d); resize intrinsics needed?'%(intrinsics[1][2]*2, self.W)
                 
-                self.K_list.append(intrinsics.astype(np.float32))
-                self.pose_list.append(pose.astype(np.float32))
+                self.K_list.append(intrinsics.astype(np.float32)[:3, :3])
+                self.pose_list.append(pose.astype(np.float32)[:3, :4])
 
                 R = pose[:3, :3].astype(np.float32)
                 t = pose[:3, 3:4].astype(np.float32)

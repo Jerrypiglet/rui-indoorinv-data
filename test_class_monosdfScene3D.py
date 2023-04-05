@@ -61,9 +61,14 @@ parser.add_argument('--eval_scene', type=str2bool, nargs='?', const=True, defaul
 
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
-opt = parser.parse_args()
 
-# intrinsics_path = Path(PATH_HOME) / 'data/scannet/intrinsic_mitsubaScene.txt'
+# utils
+parser.add_argument('--export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--export_format', type=str, default='monosdf', help='')
+parser.add_argument('--export_appendix', type=str, default='', help='')
+parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
+
+opt = parser.parse_args()
 
 radiance_scale = 1.
 # '''
@@ -82,10 +87,11 @@ radiance_scale = 1.
 # dumped Monosdf scenes from ICCV23
 base_root = Path(PATH_HOME) / 'data/real/EXPORT_monosdf'
 scene_name = 'IndoorKitchenV4_2_aligned'
-frame_id_list = list(range(255))
+# frame_id_list = list(range(255))
+frame_id_list = [0]
 shape_file = ('not-normalized', 'scene_aligned.obj')
 
-mitsuba_scene = monosdfScene3D(
+scene_obj = monosdfScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
@@ -102,12 +108,11 @@ mitsuba_scene = monosdfScene3D(
         'if_get_segs': True, # [depend on if_sample_rays_pts] True: to generate segs similar to those in openroomsScene2D.load_seg()
         },
     modality_list = [
-        # 'im_hdr', 
+        'im_hdr', 
         'im_sdr', 
         'shapes', # single scene file in ScanNet's case; objs + emitters, geometry shapes + emitter properties
         'depth', 
         'normal', 
-        # 'im_hdr', 
         ], 
     modality_filename_dict = {
         'im_hdr': 'Image/%03d_0001.exr', 
@@ -139,7 +144,7 @@ Matploblib 2D viewer
 '''
 if opt.vis_2d_plt:
     visualizer_2D = visualizer_scene_2D(
-        mitsuba_scene, 
+        scene_obj, 
         modality_list_vis=[
             'im', 
             'depth', 
@@ -164,7 +169,7 @@ if opt.vis_2d_plt:
     if opt.if_add_est_from_eval:
         for modality in ['lighting_envmap']:
             if modality in eval_return_dict:
-                mitsuba_scene.add_modality(eval_return_dict[modality], modality, 'EST')
+                scene_obj.add_modality(eval_return_dict[modality], modality, 'EST')
 
     visualizer_2D.vis_2d_with_plt(
         lighting_params={
@@ -176,12 +181,40 @@ if opt.vis_2d_plt:
             }, 
     )
 
+
+if opt.export:
+    from lib.class_exporter import exporter_scene
+    exporter = exporter_scene(
+        scene_object=scene_obj,
+        format=opt.export_format, 
+        modality_list = [
+            'poses', 
+            'im_hdr', 
+            'im_sdr', 
+            'im_mask', 
+            'shapes', 
+            # 'mi_normal', 
+            # 'mi_depth', 
+            'normal', 
+            'depth', 
+            ], 
+        if_force=opt.force, 
+        
+    )
+    assert opt.export_format == 'monosdf'
+    if opt.export_format == 'monosdf':
+        exporter.export_monosdf_fvp_mitsuba(
+            # split=opt.split, 
+            format='monosdf',
+            appendix='_REEXPORT', 
+            )
+
 '''
 Open3D 3D viewer
 '''
 if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
-        mitsuba_scene, 
+        scene_obj, 
         modality_list_vis=[
             # 'dense_geo', # fused from 2D
             'poses', 
@@ -262,7 +295,7 @@ if opt.vis_3d_o3d:
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
             'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
-            'if_sampled_pts': False, # [OPTIONAL] is show samples pts from mitsuba_scene.sample_pts_list if available
+            'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-vis_count', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count', 'eval-t']
             # 'mesh_color_type': 'eval-t', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask', 'eval-vis_count]
         },

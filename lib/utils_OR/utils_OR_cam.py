@@ -89,7 +89,7 @@ def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt
             with open(str(K_list_file), 'w') as camOut:
                 camOut.write('%d\n'%len(K_list))
                 for K in K_list:
-                    assert K.shape == (3, 3)
+                    assert K.shape == (3, 3), 'K shape: %s'%str(K.shape)
                     for n in range(0, 3):
                         camOut.write('%.3f %.3f %.3f\n'%(K[n, 0], K[n, 1], K[n, 2]))
             print(yellow('K_list file written to %s (%d Ks).'%(K_list_file, len(K_list))))
