@@ -209,7 +209,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             return _
 
         if 'mi_' in modality:
-            assert self.pts_from['mi']
+            assert self.pts_from['mi'], modality
 
         if modality == 'mi_depth': 
             return self.mi_depth_list
@@ -578,18 +578,20 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
         rendered with Blender: lib/class_renderer_blender_mitsubaScene_3D->renderer_blender_mitsubaScene_3D(); 
         '''
-        assert False, 'no longer supported for now'
+        # assert False, 'no longer supported for now'
         print(white_blue('[%s] load_lighting_envmap'))
+        
+        T_w_b2m = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # Blender world to Mitsuba world; no need if load GT obj (already processed with scale and offset)
 
         self.lighting_envmap_list = []
         self.lighting_envmap_position_list = []
 
-        env_row, env_col, env_height, env_width = get_list_of_keys(CONF.self.lighting_params_dict, ['env_row', 'env_col', 'env_height', 'env_width'], [int, int, int, int])
+        env_row, env_col, env_height, env_width = get_list_of_keys(self.CONF.lighting_params_dict, ['env_row', 'env_col', 'env_height', 'env_width'], [int, int, int, int])
         folder_name_appendix = '-%dx%dx%dx%d'%(env_row, env_col, env_height, env_width)
         lighting_envmap_folder_path = self.scene_rendering_path / ('LightingEnvmap'+folder_name_appendix)
         assert lighting_envmap_folder_path.exists(), 'lighting envmap does not exist for: %s'%folder_name_appendix
 
-        for i in tqdm(self.frame_id_list):
+        for frame_id in tqdm(self.frame_id_list):
             envmap = np.zeros((env_row, env_col, 3, env_height, env_width), dtype=np.float32)
             envmap_position = np.zeros((env_row, env_col, 3, env_height, env_width), dtype=np.float32)
             for env_idx in tqdm(range(env_row*env_col)):
@@ -599,7 +601,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
                 lighting_envmap_position_m_file_path = lighting_envmap_folder_path / ('%03d_position_0001_%03d.%s'%(frame_id, env_idx, 'exr'))
                 lighting_envmap_position_m = load_img(lighting_envmap_position_m_file_path, ext='exr', target_HW=(env_height, env_width)) # (H, W, 3), in Blender coords
-                lighting_envmap_position = (lighting_envmap_position_m.reshape(-1, 3) @ (self.T_w_b2m.T)).reshape(env_height, env_width, 3)
+                lighting_envmap_position = (lighting_envmap_position_m.reshape(-1, 3) @ (T_w_b2m.T)).reshape(env_height, env_width, 3)
                 envmap_position[env_idx//env_col, env_idx-env_col*(env_idx//env_col)] = lighting_envmap_position.transpose((2, 0, 1))
                 
             self.lighting_envmap_list.append(envmap)
@@ -771,7 +773,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
     def get_envmap_axes(self):
         from utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np
         assert self.if_has_mitsuba_all
-        normal_list = self.mi_normal_list
+        normal_list = self.mi_normal_opengl_list
         # resample_ratio = self.H // self.CONF.lighting_params_dict['env_row']
         # assert resample_ratio == self.W // self.CONF.lighting_params_dict['env_col']
         # assert resample_ratio > 0

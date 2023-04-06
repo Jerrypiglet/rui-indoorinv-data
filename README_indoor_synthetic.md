@@ -96,7 +96,11 @@ New files generated:
 
 
 ## Render all modalities
-Adjust `spp` properly (e.g. 32 for fast rendering, 4096)
+Adjust `spp` properly (e.g. 32 for fast rendering, 4096).
+
+Set `mitsubaScene3D(modality_list=['poses'])` in *load_mitsubaScene3D.py*.
+
+``` bash
 ### HDR images with Mitsuba
 
 We choose to use Mitsuba to render HDR images (instead of Blender) because of some known issues with Blender rendering (@Liwen).
@@ -130,6 +134,39 @@ Set desired modalities to render in `renderer_blender_mitsubaScene_3D(modality_l
 python load_mitsubaScene3D.py --scene kitchen_mi --render_2d --renderer blender
 ```
 
+New files generated:
+
+<!-- - data/indoor_synthetic/kitchen_mi/train
+  - Depth
+  - Normal
+  - DiffCol # diffuse albedo
+  - Roughness
+  - Emit # emission
+  - IndexMA # [TODO][???]
+  - LightingEnvmap-8x16x256x512 # per-pixel envmaps of each frame; e.g. for each frame, 8x16 envmaps, each of resolution 256x512 -->
+
+```
+.
+└── data/indoor_synthetic/kitchen_mi/train
+    ├── Depth
+    ├── Normal
+    ├── DiffCol # diffuse albedo
+    ├── Roughness
+    ├── Emit # emission
+    ├── IndexMA # [TODO][???]
+    └── LightingEnvmap-8x16x256x512 # per-pixel envmaps of each frame; e.g. for each frame, 8x16 envmaps, each of resolution 256x512
+```
+
+For envmaps, params can be set in *confs/indoor_synthetic.conf* -> `lighting_params_dict`.
+
+To combine envmaps into a single image ([demo](https://i.imgur.com/Y5lumVu.jpg)), set `mitsubaScene3D(modality_list=['im_sdr','poses','lighting_envmap']` and `visualizer_scene_2D(modality_list_vis=['im', 'lighting_envmap']`, then run:
+
+``` bash
+python load_mitsubaScene3D.py --scene kitchen_mi --vis_2d_plt
+```
+
+To visualize other modalities ([demo](https://i.imgur.com/24i0yjA.png)), set `mitsubaScene3D(modality_list` and `visualizer_scene_2D(modality_list_vis` to desired modalities, then run the same command.
 
 # TODO
+= [ ] Blender: how to NOT render HDR images?
 - [ ] fix bpy.ops.import_scene.mitsuba() error

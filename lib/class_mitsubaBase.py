@@ -396,7 +396,7 @@ class mitsubaBase():
             # Dump pose file in Blender .npy files
             npy_path = self.pose_file_root / ('%s.npy'%self.split)
             print('-', self.pose_list[0])
-            blender_poses = convert_OR_poses_to_blender_npy(origin_lookat_up_mtx_list=self.origin_lookat_up_list, export_path=npy_path)
+            blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.pose_list, export_path=npy_path)
             
             # Dump pose file in .json format
             # json_path = pose_file_root / 'transforms.json'

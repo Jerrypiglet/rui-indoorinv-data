@@ -36,23 +36,10 @@ def read_K_list_OR(K_list_file):
     K_list = np.split(K_list, K_num, axis=0) # [[origin, lookat, up], ...]
     return K_list
 
-def convert_OR_poses_to_blender_npy(origin_lookat_up_mtx_list: list, export_path: Path=None):
+def convert_OR_poses_to_blender_npy(pose_list: list, export_path: Path=None):
     # read original [R|t]
-    pose_list = []
-    for i,cam_param in enumerate(origin_lookat_up_mtx_list):
-        origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-        origin = origin.flatten()
-        lookat = lookat.flatten()
-        up = up.flatten()
-        at_vector = normalize_v(lookat - origin)
-        assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
-
-        t = origin.reshape((3, 1)).astype(np.float32)
-        R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
-        
-        pose_list.append(np.hstack((R, t)))
-
-    pose_list = np.stack(pose_list,0)
+    assert pose_list[0].shape == (3, 4)
+    pose_list = np.stack(pose_list, 0)
     pose_list = torch.from_numpy(pose_list)
 
     pose_list = torch.cat([pose_list,torch.zeros_like(pose_list[:,:1,:])],1)

@@ -204,17 +204,19 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         render all modalities except for 'lighting_envmap'
         '''
         if 'lighting_envmap' in self.modality_list:
-            env_height, env_width, env_row, env_col = get_list_of_keys(self.os.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
+            env_height, env_width, env_row, env_col = get_list_of_keys(self.os.CONF.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
             folder_name_appendix = '-%dx%dx%dx%d'%(env_row, env_col, env_height, env_width)
             folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix=folder_name_appendix, if_force=if_force) # _: 'im', folder_name: 'Image'
             self.render_lighting_envmap(render_folder_path)
             return
             
-        npy_file_path = self.os.pose_file_root / ('%s.npy'%self.os.split); assert npy_file_path.exists(), npy_file_path
-        blender_poses = np.load(npy_file_path) # (N, 2, 3)
+        # npy_file_path = self.os.pose_file_root / ('%s.npy'%self.os.split); assert npy_file_path.exists(), npy_file_path
+        # blender_poses = np.load(npy_file_path) # (N, 2, 3)
+        from utils_OR.utils_OR_cam import convert_OR_poses_to_blender_npy
+        blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.os.pose_list)
         assert len(blender_poses) == self.os.frame_num
         
-        blender_poses = blender_poses[0:1] # DEBUG
+        # blender_poses = blender_poses[0:1] # DEBUG
         
         self.modal_file_outputs = []
         _modality_list = list(set(self.modality_list) - set(['lighting_envmap']))
@@ -281,8 +283,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         '''
         print(blue_text('Rendering lighting_envmap to... by Mitsuba: %s')%str(render_folder_path))
         lighting_global_xyz_list, lighting_global_pts_list = self.os.get_envmap_axes() # each of (env_row, env_col, 3, 3)
-        env_row, env_col = self.os.lighting_params_dict['env_row'], self.os.lighting_params_dict['env_col']
-        env_height, env_width = self.os.lighting_params_dict['env_height'], self.os.lighting_params_dict['env_width']
+        env_row, env_col = self.os.CONF.lighting_params_dict['env_row'], self.os.CONF.lighting_params_dict['env_col']
+        env_height, env_width = self.os.CONF.lighting_params_dict['env_height'], self.os.CONF.lighting_params_dict['env_width']
         self.scene.render.resolution_x = env_width
         self.scene.render.resolution_y = env_height
         # [panoramic-cameras] https://docs.blender.org/manual/en/latest/render/cycles/object_settings/cameras.html#panoramic-cameras
@@ -321,7 +323,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             im_rendering_path = str(render_folder_path / ('%03d'%(frame_id)))
             self.scene.render.filepath = str(im_rendering_path)
 
-            for env_idx, (xyz, pts) in tqdm(enumerate(zip(lighting_global_xyz[:5], lighting_global_pts[:5]))):
+            for env_idx, (xyz, pts) in tqdm(enumerate(zip(lighting_global_xyz, lighting_global_pts))):
 
                 # Create the camera object
                 cam_new = bpy.data.objects.new('_%03d'%env_idx, self.cam.data)

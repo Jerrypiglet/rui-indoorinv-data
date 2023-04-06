@@ -96,7 +96,7 @@ frame_id_list = CONF.scene.frame_id_list
 invalid_frame_id_list = CONF.scene.invalid_frame_id_list
 
 # [debug] override
-# frame_id_list = [0]
+frame_id_list = [0]
 
 '''
 modify confs
@@ -141,16 +141,15 @@ scene_obj = mitsubaScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
+        'im_hdr', 
+        'im_sdr', 
         'poses', 
-        # 'im_hdr', 
-        # 'im_sdr', 
         # 'lighting_envmap', 
-        # 'albedo', 'roughness', 
-        # 'emission', 
-        # 'depth', 'normal', 
-        # 'lighting_SG', 
-        'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties``
+        'albedo', 'roughness', 
+        'emission', 
+        'depth', 'normal', 
+        # 'layout', 
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties``
         ], 
 )
 
@@ -159,15 +158,6 @@ Mitsuba/Blender 2D renderer
 '''
 if opt.render_2d:
     assert opt.renderer in ['mi', 'blender']
-    # modality_list = [
-    #     'im', # both hdr and sdr
-    #     # 'poses', 
-    #     # 'seg', 
-    #     # 'albedo', 
-    #     # 'roughness', 
-    #     # 'depth', 'normal', 
-    #     # 'lighting_envmap', 
-    #     ]
     if opt.renderer == 'mi':
         renderer = renderer_mi_mitsubaScene_3D(
             scene_obj, 
@@ -304,17 +294,16 @@ if opt.vis_2d_plt:
             'im', 
             # 'layout', 
             # 'shapes', 
-            # 'albedo', 
-            # 'roughness', 
-            # 'emission', 
-            # 'depth', 
-            # 'normal', 
-            # 'mi_depth', 
+            'albedo', 
+            'roughness', 
+            'emission', 
+            'depth', 
+            'normal', 
+            'mi_depth', 
             'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
             # 'seg_area', 'seg_env', 'seg_obj', 
-            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         frame_idx_list=[0, 1, 2, 3, 4], 
         # frame_idx_list=[0], 
@@ -348,7 +337,6 @@ if opt.vis_3d_o3d:
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             'mi', # mitsuba sampled rays, pts
             # 'dense_geo', # fused from 2D
-            # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
             ], 

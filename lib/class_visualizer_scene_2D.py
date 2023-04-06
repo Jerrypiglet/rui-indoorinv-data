@@ -58,9 +58,9 @@ class visualizer_scene_2D(object):
         self.semseg_colors = np.loadtxt('data/colors/openrooms_colors.txt').astype('uint8')
         if any([_ in ['lighting_SG'] for _ in self.modality_list_vis]):
             self.converter_SG_to_envmap = converter_SG_to_envmap(
-                SG_num=self.os.lighting_params_dict['SG_num'], 
-                env_width=self.os.lighting_params_dict['env_width'], 
-                env_height=self.os.lighting_params_dict['env_height']
+                SG_num=self.os.CONF.lighting_params_dict['SG_num'], 
+                env_width=self.os.CONF.lighting_params_dict['env_width'], 
+                env_height=self.os.CONF.lighting_params_dict['env_height']
                 )
 
     @property
@@ -231,6 +231,12 @@ class visualizer_scene_2D(object):
                 plot = ax.imshow(_im, cmap='jet')
                 plt.colorbar(plot, ax=ax)
                 continue
+
+            if modality == 'roughness':
+                plot = ax.imshow(_im, cmap='gray')
+                plt.colorbar(plot, ax=ax)
+                continue
+
             if modality == 'mi_depth':
                 assert self.os.pts_from['mi']
                 _im[_im==np.inf] = np.mean(_im[_im!=np.inf])
@@ -275,7 +281,7 @@ class visualizer_scene_2D(object):
                 lighting_scale = lighting_params.get('lighting_scale', 0.1)
                 # downsize_ratio = lighting_params.get('downsize_ratio', 1)
                 if source == 'GT':
-                    downsize_ratio = self.os.lighting_params_dict.get('env_downsample_rate', 1)
+                    downsize_ratio = self.os.CONF.lighting_params_dict.get('env_downsample_rate', 1)
                 else:
                     downsize_ratio = 1
                 _im = np.clip(downsample_lighting_envmap(_im, lighting_scale=lighting_scale, downsize_ratio=downsize_ratio)**(1./2.2), 0., 1.)
