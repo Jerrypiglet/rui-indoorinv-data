@@ -5,6 +5,7 @@ import time
 import numpy as np
 import random
 from pathlib import Path
+import mitsuba as mi
 
 from lib.utils_OR.utils_OR_xml import transformToXml, loadMesh, transform_with_transforms_xml_list
 from lib.utils_OR.utils_OR_mesh import write_one_mesh_from_v_f_lists, write_mesh_list_from_v_f_lists, flip_ceiling_normal
@@ -27,7 +28,7 @@ def dump_OR_xml_for_mi(
     if_dump_mesh: bool=False, 
     dump_mesh_path: str='', 
     dump_mesh_dir: Path=Path('.'), 
-    if_also_dump_xml_with_lit_lamps_only: bool=False) -> Path:
+    if_also_dump_xml_with_lit_area_lights_only: bool=False) -> Path:
 
     t = 1000 * time.time() # current time in milliseconds
     np.random.seed(int(t) % 2**32)
@@ -96,6 +97,7 @@ def dump_OR_xml_for_mi(
                     lit_up_lamp_list.append(lamp)
             if if_no_emitter_shape:
                 root.remove(shape)
+                import ipdb; ipdb.set_trace()
                 continue
 
         replace_str_xml(shape.findall('string')[0], lookup_dict)
@@ -115,7 +117,7 @@ def dump_OR_xml_for_mi(
                     transforms_list.append(transform_dict)
             vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py
             if '/uv_mapped.obj' in obj_path:
-                    faces = flip_ceiling_normal(faces, vertices)
+                faces = flip_ceiling_normal(faces, vertices)
             vertices_transformed, _ = transform_with_transforms_xml_list(transforms_list, vertices)
             vertices_list.append(vertices_transformed)
             faces_list.append(faces)
@@ -130,11 +132,14 @@ def dump_OR_xml_for_mi(
             shape.set('id', shape_id)
         shape_ids.append(shape_id)
 
-        for emitter in shape.findall('emitter'):
-            shape.remove(emitter) # removing emitter associated with shapes for now
+        # for emitter in shape.findall('emitter'):
+        #     shape.remove(emitter) # removing emitter associated with shapes for now
 
-            # for rgb in emitter.findall('rgb'):
-            #     rgb.set('name', 'a random name')
+        # for compatibility with Mitsuba
+        for emitter in shape.findall('emitter'):
+            rgbs = emitter.findall('rgb')
+            for rgb in rgbs:
+                rgb.set('name', 'radiance')
 
     if if_dump_mesh:
         write_one_mesh_from_v_f_lists(dump_mesh_path, vertices_list, faces_list, ids_list)
@@ -150,7 +155,7 @@ def dump_OR_xml_for_mi(
 
     # sensor: set transform as first frame
     # cam_file = scene_xml_dir / 'cam.txt'
-    # cam_params = read_cam_params(cam_file)
+    # cam_params = read_cam_params_OR(cam_file)
     # cam_param = cam_params[0]
     # if cam_param is not None:
     if origin_lookatvector_up_tuple != ():
@@ -174,13 +179,69 @@ def dump_OR_xml_for_mi(
     with open(str(xml_dump_path), 'w') as xmlOut:
         xmlOut.write(xmlString )
 
-    if if_also_dump_xml_with_lit_lamps_only:
-        for shape in root.findall('shape'):
-            root.remove(shape)
-        for lamp in lit_up_lamp_list:
-            root.append(lamp)
-        xmlString = transformToXml(root)
-        with open(str(xml_dump_path).replace('.xml', '_lit_up_lamps_only.xml'), 'w') as xmlOut:
-            xmlOut.write(xmlString )
+    # if if_also_dump_xml_with_lit_area_lights_only:
+    #     for shape in root.findall('shape'):
+    #         root.remove(shape)
+    #     for lamp in lit_up_lamp_list:
+    #         root.append(lamp)
+    #     xmlString = transformToXml(root)
+    #     with open(str(xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'), 'w') as xmlOut:
+    #         xmlOut.write(xmlString )
 
     return xml_dump_path
+
+def dump_Indoor_area_lights_only_xml_for_mi(
+    xml_file: str, 
+):
+    '''
+        Dump xml_with_lit_area_lights_only to *_lit_up_area_lights_only.xml
+        work with the Indoor dataset (e.g. kitchen scene)
+    '''
+    xml_dump_path = str(xml_file).replace('.xml', '_lit_up_area_lights_only.xml')
+    tree = et.parse(xml_file)
+    root = copy.deepcopy(tree.getroot())
+    shapes = root.findall('shape')
+    for shape in shapes:
+        if_has_lit_up_area_light = False
+        emitters = shape.findall('emitter')
+        if len(emitters) > 0:
+            assert len(emitters) == 1
+            emitter = emitters[0]
+            assert emitter.get('type') == 'area'
+            rgb = emitter.findall('rgb')[0]
+            assert rgb.get('name') == 'radiance'
+            radiance = np.array(rgb.get('value').split(', ')).astype(np.float32).reshape(3,)
+            if np.amax(radiance) > 1e-3:
+                if_has_lit_up_area_light = True
+
+        if not if_has_lit_up_area_light:
+            root.remove(shape)
+
+    xmlString = transformToXml(root)
+    with open(xml_dump_path, 'w') as xmlOut:
+        xmlOut.write(xmlString )
+    
+    return xml_dump_path
+
+def get_rad_meter_sensor(origin, direction, spp):
+    '''
+    https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_sensors.html#radiance-meter-radiancemeter
+    '''
+    return mi.load_dict({
+        'type': 'radiancemeter',
+        'origin': origin.flatten(),
+        'direction': direction.flatten(),
+        'sampler': {
+            'type': 'independent',
+            'sample_count': spp
+        }, 
+        'film': {
+            'type': 'hdrfilm',
+            'width': 1,
+            'height': 1,
+            'pixel_format': 'rgb',
+            'rfilter': {
+                'type': 'box'
+            }
+        },
+    })

@@ -1,18 +1,17 @@
 from pathlib import Path
+import imagecodecs
 import numpy as np
 np.set_printoptions(precision=4)
 np.set_printoptions(suppress=True)
 from typing import Tuple
+import os
 import cv2
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+from PIL import Image
 import struct
 import h5py
 import random
 from skimage.measure import block_reduce 
-from skimage.measure import block_reduce 
-
-'''
-utils take from Yinhao
-'''
 
 def load_matrix(path: Path, if_inverse_y: bool=False) -> np.ndarray:
     """Read a 1d or 2d matrix from a file (as saved by np.savetxt)"""
@@ -29,39 +28,102 @@ def load_matrix(path: Path, if_inverse_y: bool=False) -> np.ndarray:
             assert False, 'wrong input matrix dimension when if_inverse_y=True!'
     return m
 
-def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tuple[int, int]=(), resize_method: str='area') -> np.ndarray:
+def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tuple[int, int]=(), resize_method: str='area', npy_if_channel_first: bool=False, if_attempt_load: bool=False, if_allow_crop: bool=False) -> np.ndarray:
     '''
     Load an image from a file, trying to maintain its datatype (gray, 16bit, rgb)
     set target_HW to some shape to resize after loading
+    - if_allow_crop: if True, allow to crop the image to the target shape
     '''
     if not Path(path).exists():
         raise FileNotFoundError(path)
         
     assert path.suffix[1:] == ext
-    assert ext in ['png', 'jpg', 'hdr', 'npy']
+    assert ext in ['png', 'jpg', 'hdr', 'npy', 'exr', 'jxr'], f"Unsupported image format: {ext}"
     if ext in ['png', 'jpg']:
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    elif ext in ['exr']:
+        assert Path(path).exists(), f"File not found: {path}"
+        # print(path)
+        im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)[:, :, :3]
     elif ext in ['hdr']:
         im = cv2.imread(str(path), -1)
     elif ext in ['npy']:
         im = np.load(str(path))
+        if npy_if_channel_first:
+            im = im.transpose(1, 2, 0)
+    elif ext in ['jxr']:
+        with open(str(path), 'rb') as fh:
+            img = fh.read()
+        img = imagecodecs.jpegxr_decode(img)
+
+        im = img.copy().astype(np.float32)
+        # print(im.shape, im.dtype, np.amax(im), np.amin(im))
+        mask = im <= 3000
+        im[mask] = im[mask]*8e-8
+        im[~mask] = 0.00024*1.0002**(im[~mask]-3000)
+        # im = 0.0000024 * im
 
     # cv2.imread returns None when it cannot read the file
     if im is None:
         raise RuntimeError(f"Failed to load {path}")
 
-    if len(im.shape) == 3 and im.shape[2] == 3 and ext in ['png', 'jpg', 'hdr']:
+    if len(im.shape) == 3 and im.shape[2] == 3 and ext in ['png', 'jpg', 'hdr', 'exr']:
         # Color image, convert BGR to RGB
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
-    if expected_shape != ():
-        assert tuple(im.shape) == expected_shape
+    if expected_shape != () and len(expected_shape) != 1: # not empty, or channel only e.g. (3,)
+        if tuple(im.shape) != expected_shape:
+            if if_attempt_load:
+                return None
+            elif if_allow_crop:
+                assert im.shape[0]>=expected_shape[0] and im.shape[1]>=expected_shape[1], f"Image {path} is too small to crop to {expected_shape}"
+                im = im[:expected_shape[0], :expected_shape[1]]
+            else:
+                raise RuntimeError('%s != %s: %s'%(str(tuple(im.shape)), str(expected_shape), str(path)))
 
     if target_HW != ():
         im = resize_img(im, target_HW, resize_method)
 
     return im
 
+def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if_mask=True, im_hdr=None):
+    # Read HDR image
+    if im_hdr is None:
+        im_hdr = load_img(Path(hdr_image_path), ext=str(hdr_image_path).split('.')[1]) * scale
+
+    if if_mask:
+        seg_path = png_image_path.replace(im_key, 'immask_')
+        seg = load_img(Path(seg_path))[:, :, 0] / 255. # [0., 1.]
+        seg_area = np.logical_and(seg > 0.49, seg < 0.51).astype(np.float32)
+        seg_env = (seg < 0.1).astype(np.float32)
+        seg_obj = (seg > 0.9) 
+        im_hdr_scaled, hdr_scale = scale_HDR(im_hdr, seg[..., np.newaxis], fixed_scale=True, if_print=True, if_clip_01=False)
+    else:
+        im_hdr_scaled = im_hdr * scale
+    
+    im_SDR = np.clip(im_hdr_scaled**(1.0/2.2), 0., 1.)
+    # im_SDR = np.clip((im_hdr_scaled/4)**(1.0/4), 0., 1.)
+    im_SDR_uint8 = (255. * im_SDR).astype(np.uint8)
+    Path(png_image_path).parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(im_SDR_uint8).save(str(png_image_path))
+
+def tone_mapping_16bit(im_16bit, dest_dtype=np.float32):
+    '''
+    https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_hdr_images
+    -> float32
+    '''
+    assert im_16bit.dtype == np.uint16
+    assert len(im_16bit.shape) == 3 and im_16bit.shape[2] == 3
+    im_return = np.empty_like(im_16bit, dtype=dest_dtype)
+    # for (int i = 0; i < 3; i++) {
+    #     if (jxr_val[i] <= 3000) col_val[i] = jxr_val[i] * 8e-8
+    #     else col_val[i] = 0.00024 * 1.0002 ** (jxr_val[i] - 3000)
+    #     }
+    im_return[im_16bit<=3000] = im_16bit[im_16bit<=3000] * 8e-8
+    im_return[im_16bit>3000] = 0.00024 * 1.0002 ** (im_16bit[im_16bit>3000] - 3000)
+    im_return = im_return * (np.array([0.8, 1.0, 1.6]).reshape(1, 1, 3))
+
+    return im_return
 
 def load_HDR(path: Path, expected_shape: tuple=(), target_HW: Tuple[int, int]=()) -> np.ndarray:
     if not path.exists():
@@ -176,7 +238,7 @@ def load_h5(path: Path) -> np.ndarray:
 #     normal_torch: (3, H, W)
 #     '''
 
-def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=160, SG_num=12):
+def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=160, SG_num=12, allow_resize=True):
     # print('>>>>load_envmap', Path)
     
     if not Path(path).exists():
@@ -191,6 +253,8 @@ def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=1
     #     if_dump = True
     if '_8x16' in path:
         env_heightOrig, env_widthOrig = 8, 16
+    elif '_128x256' in path:
+        env_heightOrig, env_widthOrig = 128, 256
     else:
         env_heightOrig, env_widthOrig = 16, 32
 
@@ -200,13 +264,13 @@ def load_envmap(path: Path, env_height=8, env_width=16, env_row = 120, env_col=1
 
     env = cv2.imread(str(path), -1 ) 
     assert env is not None
-
-    env = env.reshape(env_row, env_heightOrig, env_col,
-        env_widthOrig, 3) # (1920, 5120, 3) -> (120, 16, 160, 32, 3)
+    env = env.reshape(env_row, env_heightOrig, env_col, env_widthOrig, 3) # (1920, 5120, 3) -> (120, 16, 160, 32, 3)
     env = np.ascontiguousarray(env.transpose([4, 0, 2, 1, 3] ) ) # -> (3, 120, 160, 16, 32)
 
     scale = env_heightOrig / env_height
     if scale > 1:
+        import ipdb; ipdb.set_trace()
+        assert allow_resize
         env = block_reduce(env, block_size = (1, 1, 1, 2, 2), func = np.mean )
 
     envInd = np.ones([1, 1, 1], dtype=np.float32 )
@@ -238,16 +302,18 @@ def vis_envmap(envmap, downsample_ratio: int=10, downsize_ratio_hw: int=1, downs
 
     return b
 
-def read_cam_params(camFile: Path) -> list:
-    assert camFile.exists()
-    with open(str(camFile), 'r') as camIn:
-    #     camNum = int(camIn.readline().strip() )
-        cam_data = camIn.read().splitlines()
-    cam_num = int(cam_data[0])
-    cam_params = np.array([x.split(' ') for x in cam_data[1:]]).astype(np.float32)
-    assert cam_params.shape[0] == cam_num * 3
-    cam_params = np.split(cam_params, cam_num, axis=0) # [[origin, lookat, up], ...]
-    return cam_params
+# def read_cam_params_OR(camFile: Path) -> list:
+#     assert Path(camFile).exists()
+#     with open(str(camFile), 'r') as camIn:
+#     #     camNum = int(camIn.readline().strip() )
+#         cam_data = camIn.read().splitlines()
+#     if cam_data == []:
+#         return []
+#     cam_num = int(cam_data[0])
+#     cam_params = np.array([x.split(' ') for x in cam_data[1:]]).astype(np.float32)
+#     assert cam_params.shape[0] == cam_num * 3
+#     cam_params = np.split(cam_params, cam_num, axis=0) # [[origin, lookat, up], ...]
+#     return cam_params
 
 def normalize_v(x) -> np.ndarray:
     return x / np.linalg.norm(x)
@@ -266,3 +332,16 @@ def resize_intrinsics(K: np.ndarray, scale_factor: Tuple[float, float]) -> np.nd
     K[0] *= scale_factor[1]  # width
     K[1] *= scale_factor[0]  # height
     return K
+
+def center_crop(im, center_crop_HW):
+    '''
+    center crop
+    '''
+    if center_crop_HW is None:
+        return im
+    H, W = im.shape[:2]
+    H_crop, W_crop = center_crop_HW
+    assert H_crop <= H and W_crop <= W
+    h_start = (H-H_crop)//2
+    w_start = (W-W_crop)//2
+    return im[h_start:h_start+H_crop, w_start:w_start+W_crop, ...]

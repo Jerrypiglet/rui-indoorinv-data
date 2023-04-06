@@ -12,12 +12,12 @@ np.set_printoptions(suppress=True)
 from lib.utils_io import load_matrix, load_img, load_binary, load_h5
 
 from lib.class_openroomsScene2D import openroomsScene2D
-from lib.class_visualizer_openroomsScene_2D import visualizer_openroomsScene_2D
+from lib.class_visualizer_scene_2D import visualizer_scene_2D
 
 from lib.utils_misc import str2bool
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--vis_2d', type=str2bool, nargs='?', const=True, default=True, help='whether to show projection onto one image with plt (e.g. layout, object bboxes')
+parser.add_argument('--vis_2d', type=str2bool, nargs='?', const=True, default=True, help='whether to show (1) pixel-space modalities (2) projection onto one image (e.g. layout, object bboxes), with plt')
 parser.add_argument('--if_shader', type=str2bool, nargs='?', const=True, default=True, help='')
 opt = parser.parse_args()
 
@@ -64,7 +64,7 @@ openrooms_scene = openroomsScene2D(
 )
 
 if opt.vis_2d:
-    vis_2D = visualizer_openroomsScene_2D(
+    vis_2D = visualizer_scene_2D(
         openrooms_scene, 
         modality_list_vis=[
             # 'depth', 'normal', 'albedo', 'roughness', # images/demo_all_2D.png

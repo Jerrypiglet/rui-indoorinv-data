@@ -39,9 +39,9 @@ def fuse_depth_pcd_tr(depth_list, pose_list, hwf, subsample_rate=1):
 
 from pathlib import Path
 import pickle
-from lib.utils_io import read_cam_params, normalize_v
+from lib.utils_OR.utils_OR_cam import read_cam_params_OR, normalize_v
 
-def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, frame_id_list: list, if_inverse_y: bool=False, if_1_based: bool=True):
+def load_OR_public_poses_to_Rt(cam_params: list, frame_id_list: list, if_inverse_y: bool=False, if_1_based: bool=True):
     '''
     load OpenRooms public pose files (cam.txt and transform.dat[NOT DOING THIS]) and convert to list of per-frame R, t
 
@@ -50,7 +50,7 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
     # ... Transformations for layout is in transforms[0] while transformations for objects is in their 'transform' as desginated in the XML file (reading the transformations: see parse_XML_for_shapes()->shape_dict['transforms_list')
     # ... as a result, here we DO NOT transform cameras according to the layout transformations.
 
-    if_1_based: openrooms_public is 1-based, while rendering and openrooms_public_re is 0-based
+    if_1_based: openrooms_public is 1-based, while rendering and openrooms_scene_dataset is 0-based
     '''
     assert if_inverse_y == False, 'not handling if_inverse_y=True for now'
 
@@ -59,8 +59,6 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
     # rotMat_inv_scene = np.linalg.inv(rotMat_scene)
     # trans_scene = transforms[0][2][1].reshape((3, 1)) # (3,1)
 
-    cam_file = scene_xml_dir / 'cam.txt'
-    cam_params = read_cam_params(cam_file)
 
     pose_list = []
     origin_lookatvector_up_list = []
@@ -83,19 +81,17 @@ def load_OR_public_poses_to_Rt(transforms: np.ndarray, scene_xml_dir: Path, fram
         lookat = lookat.flatten()
         up = up.flatten()
 
-        at_vector = normalize_v(lookat - origin)
-        assert np.amax(np.abs(np.dot(at_vector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
+        lookatvector = normalize_v(lookat - origin)
+        assert np.amax(np.abs(np.dot(lookatvector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
 
         t = origin.reshape((3, 1)).astype(np.float32)
-        R = np.stack((np.cross(-up, at_vector), -up, at_vector), -1).astype(np.float32)
+        R = np.stack((np.cross(-up, lookatvector), -up, lookatvector), -1).astype(np.float32)
         # R = R @ np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]])
         
         pose_list.append(np.hstack((R, t)))
-        origin_lookatvector_up_list.append((origin.reshape((3, 1)), at_vector.reshape((3, 1)), up.reshape((3, 1))))
+        origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
     return pose_list, origin_lookatvector_up_list
-
-
 
 
 def _convert_local_to_cam_coords(normal):
@@ -118,21 +114,3 @@ def _convert_local_to_cam_coords(normal):
 
     return T_cam2local_flattened
 
-def get_T_local_to_camopengl_np(normal):
-    '''
-    args:
-        normal: (H, W, 3), normalized
-    return:
-        camx, camy, normal
-
-    '''
-    # assert normal.shape[:2] == (self.imHeight, self.imWidth)
-    up = np.array([0, 1, 0], dtype=np.float32)[np.newaxis, np.newaxis] # (1, 1, 3)
-    camy_proj = np.sum(up * normal, axis=2, keepdims=True) * normal # (H, W, 3)
-    cam_y = up - camy_proj
-    cam_y = cam_y / (np.linalg.norm(cam_y, axis=2, keepdims=True) + 1e-6) # (H, W, 3)
-    cam_x = - np.cross(cam_y, normal, axis=2)
-    cam_x = cam_x / (np.linalg.norm(cam_x, axis=2, keepdims=True) + 1e-6) # (H, W, 3)
-    T_local_to_camopengl =  np.stack((cam_x, cam_y, normal), axis=-1)# concat as cols: local2cam; (H, W, 3, 3)
-
-    return T_local_to_camopengl

@@ -1,8 +1,8 @@
 import numpy as np
 import torch
-from ..utils_openrooms import get_T_local_to_camopengl_np
+from .utils_OR_cam import get_T_local_to_camopengl_np
 
-def downsample_lighting_envmap(lighting_envmap, downsize_ratio: int=8, lighting_scale: float=1.):
+def downsample_lighting_envmap(lighting_envmap, downsize_ratio: int=20, lighting_scale: float=1.):
     H_grid, W_grid, _, h, w = lighting_envmap.shape
     xx, yy = np.meshgrid(np.arange(0, H_grid, downsize_ratio), np.arange(0, W_grid, downsize_ratio))
     _ = lighting_envmap[xx.T, yy.T, :, :, :] # (30, 40, 3, 8, 16)
@@ -119,3 +119,10 @@ def convert_SG_angles_to_axis_local_np(lighting_SG_local_angles):
     axis_local = np.concatenate([axisX, axisY, axisZ], axis=3) # [H, W, 12, 3]; in a local SG (self.ls) coords
     axis_local = axis_local / (np.linalg.norm(axis_local, axis=3, keepdims=True)+1e-6)
     return axis_local
+
+def get_lighting_envmap_dirs_global(pose, normal, env_height, env_width):
+    wi_num = env_height * env_width
+    ls_local = get_ls_np(env_height, env_width) # (3, 8, 16)
+    lighting_axis_local = ls_local[np.newaxis, np.newaxis].transpose(0, 1, 3, 4, 2).reshape(1, 1, -1, 3) # -> (1, 1, 8*16, 3)
+    axis_np_global = convert_lighting_axis_local_to_global_np(lighting_axis_local, pose, normal).reshape(-1, wi_num, 3) # (120*160, 3, 8, 16)
+    return axis_np_global.astype(np.float32)

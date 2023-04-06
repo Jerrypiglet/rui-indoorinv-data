@@ -1,210 +1,191 @@
 <?xml version="1.0" ?>
 <scene version="0.6.0">
     <integrator type="path"/>
-    <shape id="scene0552_00_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/layoutMesh/scene0552_00/uv_mapped.obj"/>
+    <shape id="scene0008_00_object" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/layoutMesh/scene0008_00/uv_mapped.obj"/>
         <transform name="toWorld">
             <scale x="1.000000" y="1.000000" z="1.000000"/>
             <rotate angle="90.000000" x="-1.000000" y="0.000000" z="0.000000"/>
-            <translate x="-3.196167" y="-1.013438" z="3.049284"/>
+            <translate x="-5.530121" y="-1.629818" z="4.279355"/>
         </transform>
     </shape>
-    <shape id="scene0552_00_objectDB203" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/layoutMesh/scene0552_00/container.obj"/>
+    <shape id="scene0008_00_object430JM" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/layoutMesh/scene0008_00/container.obj"/>
         <transform name="toWorld">
             <scale x="1.000000" y="1.000000" z="1.000000"/>
             <rotate angle="90.000000" x="-1.000000" y="0.000000" z="0.000000"/>
-            <translate x="-3.196167" y="-1.013438" z="3.049284"/>
+            <translate x="-5.530121" y="-1.629818" z="4.279355"/>
         </transform>
     </shape>
-    <shape id="02933112_a3a6f9e80956ec6f4035f93ab9531db_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02933112/a3a6f9e80956ec6f4035f93ab9531db/alignedNew.obj"/>
+    <shape id="03001627_8086d53c2535511597976c675750537_object" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/8086d53c2535511597976c675750537/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="1.709988" y="1.592203" z="1.627907"/>
-            <rotate angle="36.914182" x="0.000000" y="-1.000000" z="0.000000"/>
-            <translate x="-2.458608" y="-0.432006" z="-0.352188"/>
-            <translate x="0.000000" y="-0.123197" z="0.000000"/>
-            <translate x="0.120567" y="0.000000" z="-0.172139"/>
-            <translate x="0.089371" y="0.000000" z="0.063900"/>
+            <scale x="1.380682" y="1.168676" z="1.729683"/>
+            <rotate angle="24.104826" x="0.000000" y="-1.000000" z="0.000000"/>
+            <translate x="-0.223059" y="-1.240332" z="1.062963"/>
+            <translate x="0.000000" y="-0.162996" z="0.000000"/>
+            <translate x="0.058855" y="0.000000" z="-0.149466"/>
         </transform>
     </shape>
-    <shape id="04379243_3b64bf8731a6a2a63c5e1addd9922bf2_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04379243/3b64bf8731a6a2a63c5e1addd9922bf2/alignedNew.obj"/>
+    <shape id="03001627_8086d53c2535511597976c675750537_objectC5ETW" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/8086d53c2535511597976c675750537/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="1.249620" y="2.305992" z="1.343305"/>
-            <rotate angle="35.139617" x="0.000000" y="-1.000000" z="0.000000"/>
-            <translate x="-0.155500" y="-0.570678" z="-0.508989"/>
-            <translate x="0.000000" y="0.006216" z="0.000000"/>
+            <scale x="1.363009" y="1.276198" z="1.593932"/>
+            <rotate angle="30.819561" x="0.000000" y="-1.000000" z="0.000000"/>
+            <translate x="1.540528" y="-1.275865" z="1.512624"/>
+            <translate x="0.000000" y="-0.106626" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03337140_2cc64133d27c1946ce5d6e9371bb5c33_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03337140/2cc64133d27c1946ce5d6e9371bb5c33/alignedNew.obj"/>
+    <shape id="04379243_3c899eb5c23784f9febad4f49b26ec52_object" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04379243/3c899eb5c23784f9febad4f49b26ec52/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="1.299957" y="1.216284" z="1.157164"/>
-            <rotate angle="139.048589" x="0.000000" y="1.000000" z="0.000000"/>
-            <translate x="1.851709" y="-0.425046" z="-1.309348"/>
-            <translate x="0.000000" y="-0.138854" z="0.000000"/>
+            <scale x="1.115448" y="1.418524" z="1.108859"/>
+            <rotate angle="17.281119" x="0.000000" y="-1.000000" z="0.000000"/>
+            <translate x="0.645144" y="-1.327023" z="1.262652"/>
+            <translate x="0.000000" y="-0.100514" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_be38dc611c4bdef7f1cdfc0a8f38f2e_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/be38dc611c4bdef7f1cdfc0a8f38f2e/alignedNew.obj"/>
+    <shape id="03636649_6512e3a8e6566fd0cf004563556ddb36_object" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03636649/6512e3a8e6566fd0cf004563556ddb36/aligned_shape.obj"/>
         <transform name="toWorld">
-            <scale x="1.381415" y="0.962629" z="0.938376"/>
-            <rotate angle="41.909261" x="0.000000" y="-1.000000" z="0.000000"/>
-            <translate x="-0.595894" y="-0.563913" z="-0.124524"/>
-            <translate x="0.000000" y="-0.046762" z="0.000000"/>
+            <scale x="0.907105" y="0.916618" z="0.746996"/>
+            <rotate angle="74.036555" x="0.000000" y="1.000000" z="0.000000"/>
+            <translate x="0.569972" y="-0.498640" z="1.515882"/>
+            <translate x="0.000000" y="-0.074393" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_be38dc611c4bdef7f1cdfc0a8f38f2e_objectOHA8J" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/be38dc611c4bdef7f1cdfc0a8f38f2e/alignedNew.obj"/>
+    <shape id="03636649_6512e3a8e6566fd0cf004563556ddb36_objectUWBJ5" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03636649/6512e3a8e6566fd0cf004563556ddb36/aligned_light.obj"/>
+        <emitter type="area">
+            <rgb value="300.768 275.519 278.320" name="radiance"/>
+        </emitter>
         <transform name="toWorld">
-            <scale x="1.349137" y="0.973959" z="0.952795"/>
-            <rotate angle="144.812585" x="0.000000" y="1.000000" z="0.000000"/>
-            <translate x="0.061523" y="-0.561009" z="-1.051270"/>
-            <translate x="0.000000" y="-0.044925" z="0.000000"/>
+            <scale x="0.907105" y="0.916618" z="0.746996"/>
+            <rotate angle="74.036555" x="0.000000" y="1.000000" z="0.000000"/>
+            <translate x="0.569972" y="-0.498640" z="1.515882"/>
+            <translate x="0.000000" y="-0.074393" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="02933112_225905a8841620d7f6fe1e625c287cfa_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02933112/225905a8841620d7f6fe1e625c287cfa/alignedNew.obj"/>
+    <shape id="04379243_3c899eb5c23784f9febad4f49b26ec52_object1D8DZ" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04379243/3c899eb5c23784f9febad4f49b26ec52/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="2.038376" y="1.908020" z="1.989331"/>
-            <rotate angle="142.917941" x="0.000000" y="1.000000" z="0.000000"/>
-            <translate x="0.663493" y="-0.070514" z="-2.129723"/>
-            <translate x="0.000000" y="-0.084506" z="0.000000"/>
+            <scale x="1.466898" y="1.285273" z="1.346409"/>
+            <rotate angle="65.835040" x="0.000000" y="1.000000" z="0.000000"/>
+            <translate x="1.620174" y="-1.385543" z="-0.153921"/>
+            <translate x="0.000000" y="-0.060995" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="04379243_899f815eaad62b56d8cad143689f8b51_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04379243/899f815eaad62b56d8cad143689f8b51/alignedNew.obj"/>
+    <shape id="04379243_3c899eb5c23784f9febad4f49b26ec52_objectZULO9" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04379243/3c899eb5c23784f9febad4f49b26ec52/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="1.642363" y="2.301462" z="1.887870"/>
-            <rotate angle="34.989646" x="0.000000" y="-1.000000" z="0.000000"/>
-            <translate x="-1.223975" y="-0.734586" z="0.772141"/>
-            <translate x="0.000000" y="-0.102330" z="0.000000"/>
-            <translate x="0.099255" y="0.000000" z="-0.141711"/>
+            <scale x="1.390956" y="1.188448" z="1.390923"/>
+            <rotate angle="72.073249" x="0.000000" y="1.000000" z="0.000000"/>
+            <translate x="-2.053277" y="-1.230377" z="-2.541935"/>
+            <translate x="0.000000" y="-0.229968" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="02747177_8a50955facbac20ecf19858fd1963d10_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02747177/8a50955facbac20ecf19858fd1963d10/alignedNew.obj"/>
+    <shape id="03001627_267dcb267138fc92c242632b2a8c3129_object" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/267dcb267138fc92c242632b2a8c3129/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="0.557506" y="0.522457" z="0.553402"/>
-            <rotate angle="53.567697" x="0.000000" y="-1.000000" z="0.000000"/>
-            <translate x="-0.832715" y="-0.765924" z="0.853480"/>
-            <translate x="0.000000" y="-0.079283" z="0.000000"/>
+            <scale x="1.833698" y="1.165857" z="1.641251"/>
+            <rotate angle="110.924727" x="0.000000" y="-1.000000" z="0.000000"/>
+            <translate x="-4.399335" y="-1.167490" z="-1.054664"/>
+            <translate x="0.000000" y="-0.246644" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="02747177_8a50955facbac20ecf19858fd1963d10_objectCOAG8" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02747177/8a50955facbac20ecf19858fd1963d10/alignedNew.obj"/>
+    <shape id="04379243_3c899eb5c23784f9febad4f49b26ec52_object212LO" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04379243/3c899eb5c23784f9febad4f49b26ec52/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="0.572865" y="0.420008" z="0.490357"/>
-            <rotate angle="30.664908" x="0.000000" y="-1.000000" z="0.000000"/>
-            <translate x="-1.308022" y="-0.690276" z="0.784178"/>
-            <translate x="0.000000" y="-0.187920" z="0.000000"/>
+            <scale x="1.021800" y="1.792501" z="1.224211"/>
+            <rotate angle="110.429042" x="0.000000" y="-1.000000" z="0.000000"/>
+            <translate x="-4.091413" y="-1.077240" z="-2.095594"/>
+            <translate x="0.000000" y="-0.296968" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+    <shape id="04379243_3c899eb5c23784f9febad4f49b26ec52_objectP8DNA" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04379243/3c899eb5c23784f9febad4f49b26ec52/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="0.908744" y="1.183988" z="1.095952"/>
-            <rotate angle="44.947431" x="0.000000" y="-1.000000" z="0.000000"/>
-            <translate x="-1.397636" y="-0.663851" z="-0.735536"/>
-            <translate x="0.000000" y="-0.048854" z="0.000000"/>
+            <scale x="1.113264" y="1.880651" z="1.148430"/>
+            <rotate angle="160.524233" x="0.000000" y="1.000000" z="0.000000"/>
+            <translate x="0.916492" y="-1.255703" z="-1.932587"/>
+            <translate x="0.000000" y="-0.105934" z="0.000000"/>
+            <translate x="-0.021900" y="0.000000" z="0.055915"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectH93J9" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+    <shape id="03636649_6512e3a8e6566fd0cf004563556ddb36_objectO99TP" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03636649/6512e3a8e6566fd0cf004563556ddb36/aligned_shape.obj"/>
         <transform name="toWorld">
-            <scale x="0.760968" y="1.193927" z="1.064034"/>
-            <rotate angle="43.548839" x="0.000000" y="-1.000000" z="0.000000"/>
-            <translate x="-1.035159" y="-0.667824" z="-0.391023"/>
-            <translate x="0.000000" y="-0.042356" z="0.000000"/>
+            <scale x="1.249055" y="0.955317" z="0.738018"/>
+            <rotate angle="67.446348" x="0.000000" y="1.000000" z="0.000000"/>
+            <translate x="1.051334" y="-0.335301" z="-2.072994"/>
+            <translate x="0.000000" y="-0.064841" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectMSW47" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+    <shape id="03636649_6512e3a8e6566fd0cf004563556ddb36_object83SPO" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03636649/6512e3a8e6566fd0cf004563556ddb36/aligned_light.obj"/>
+        <emitter type="area">
+            <rgb value="257.139 229.301 221.644" name="radiance"/>
+        </emitter>
         <transform name="toWorld">
-            <scale x="0.899074" y="1.183664" z="0.932599"/>
-            <rotate angle="68.511758" x="0.000000" y="1.000000" z="0.000000"/>
-            <translate x="0.262695" y="-0.693394" z="-0.217076"/>
-            <translate x="0.000000" y="-0.019394" z="0.000000"/>
+            <scale x="1.249055" y="0.955317" z="0.738018"/>
+            <rotate angle="67.446348" x="0.000000" y="1.000000" z="0.000000"/>
+            <translate x="1.051334" y="-0.335301" z="-2.072994"/>
+            <translate x="0.000000" y="-0.064841" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectJRNKV" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+    <shape id="04256520_8659f0f422096e3d26f6c8b5b75f0ee9_object" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04256520/8659f0f422096e3d26f6c8b5b75f0ee9/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="0.935129" y="1.179101" z="1.000203"/>
-            <rotate angle="143.380695" x="0.000000" y="1.000000" z="0.000000"/>
-            <translate x="-0.585437" y="-0.657718" z="-1.612729"/>
-            <translate x="0.000000" y="-0.056229" z="0.000000"/>
+            <scale x="1.789396" y="2.588082" z="2.011839"/>
+            <rotate angle="153.089164" x="0.000000" y="1.000000" z="0.000000"/>
+            <translate x="2.234741" y="-1.261911" z="-1.381925"/>
+            <translate x="0.000000" y="-0.113499" z="0.000000"/>
         </transform>
     </shape>
-    <shape id="03001627_1be38f2624022098f71e06115e9c3b3e_objectS0JYG" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03001627/1be38f2624022098f71e06115e9c3b3e/alignedNew.obj"/>
+    <shape id="04256520_8659f0f422096e3d26f6c8b5b75f0ee9_objectR4B36" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04256520/8659f0f422096e3d26f6c8b5b75f0ee9/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="0.955887" y="1.169743" z="1.160345"/>
-            <rotate angle="119.334888" x="0.000000" y="-1.000000" z="0.000000"/>
-            <translate x="-1.390532" y="-0.669765" z="-1.587804"/>
-            <translate x="0.000000" y="-0.046558" z="0.000000"/>
+            <scale x="1.855564" y="3.032342" z="2.053566"/>
+            <rotate angle="73.025761" x="0.000000" y="1.000000" z="0.000000"/>
+            <translate x="-0.672831" y="-1.166230" z="-2.131989"/>
+            <translate x="0.000000" y="-0.165509" z="0.000000"/>
+            <translate x="-0.033893" y="0.000000" z="0.086534"/>
         </transform>
     </shape>
-    <shape id="04004475_1d2a6082238f011c22d3f170937c6a0b_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/04004475/1d2a6082238f011c22d3f170937c6a0b/alignedNew.obj"/>
+    <shape id="ceiling_lamp_15650_object" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/ceiling_lamp/15650/aligned_shape.obj"/>
         <transform name="toWorld">
-            <scale x="2.096160" y="1.964713" z="1.858918"/>
-            <rotate angle="61.270665" x="0.000000" y="1.000000" z="0.000000"/>
-            <translate x="0.442796" y="-0.188151" z="1.280751"/>
-            <translate x="0.000000" y="-0.133512" z="0.000000"/>
-        </transform>
-    </shape>
-    <shape id="02933112_1c898677c5b4291c847857e42f50ec6e_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02933112/1c898677c5b4291c847857e42f50ec6e/alignedNew.obj"/>
-        <transform name="toWorld">
-            <scale x="1.278060" y="1.296550" z="1.497647"/>
-            <rotate angle="138.349871" x="0.000000" y="1.000000" z="0.000000"/>
-            <translate x="2.498665" y="-0.212843" z="-0.902355"/>
-            <translate x="0.000000" y="-0.184734" z="0.000000"/>
-        </transform>
-    </shape>
-    <shape id="02747177_85d8a1ad55fa646878725384d6baf445_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/02747177/85d8a1ad55fa646878725384d6baf445/alignedNew.obj"/>
-        <transform name="toWorld">
-            <scale x="0.835432" y="0.924063" z="0.661532"/>
-            <rotate angle="55.258352" x="0.000000" y="1.000000" z="0.000000"/>
-            <translate x="-1.983864" y="-0.502653" z="0.230489"/>
-            <translate x="0.000000" y="-0.105214" z="0.000000"/>
-            <translate x="0.045232" y="0.000000" z="-0.064580"/>
-        </transform>
-    </shape>
-    <shape id="ceiling_lamp_15367_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/ceiling_lamp/15367/aligned_shape.obj"/>
-        <transform name="toWorld">
-            <scale x="1.336898" y="0.500000" z="1.336898"/>
-            <rotate angle="90.000000" x="1.000000" y="-0.000000" z="0.000000"/>
-            <translate x="3.687992" y="3.599242" z="2.483000"/>
+            <scale x="1.096491" y="0.500000" z="1.096491"/>
+            <rotate angle="90.000000" x="1.000000" y="0.000000" z="-0.000000"/>
+            <translate x="5.250663" y="4.919281" z="2.496500"/>
             <scale x="1.000000" y="1.000000" z="1.000000"/>
             <rotate angle="90.000000" x="-1.000000" y="0.000000" z="0.000000"/>
-            <translate x="-3.196167" y="-1.013438" z="3.049284"/>
+            <translate x="-5.530121" y="-1.629818" z="4.279355"/>
         </transform>
     </shape>
-    <shape id="ceiling_lamp_15367_objectORMXW" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/ceiling_lamp/15367/aligned_light.obj"/>
+    <shape id="ceiling_lamp_15650_objectKK1TT" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/ceiling_lamp/15650/aligned_light.obj"/>
+        <emitter type="area">
+            <rgb value="309.279 284.860 290.354" name="radiance"/>
+        </emitter>
         <transform name="toWorld">
-            <scale x="1.336898" y="0.500000" z="1.336898"/>
-            <rotate angle="90.000000" x="1.000000" y="-0.000000" z="0.000000"/>
-            <translate x="3.687992" y="3.599242" z="2.483000"/>
+            <scale x="1.096491" y="0.500000" z="1.096491"/>
+            <rotate angle="90.000000" x="1.000000" y="0.000000" z="-0.000000"/>
+            <translate x="5.250663" y="4.919281" z="2.496500"/>
             <scale x="1.000000" y="1.000000" z="1.000000"/>
             <rotate angle="90.000000" x="-1.000000" y="0.000000" z="0.000000"/>
-            <translate x="-3.196167" y="-1.013438" z="3.049284"/>
+            <translate x="-5.530121" y="-1.629818" z="4.279355"/>
         </transform>
     </shape>
-    <shape id="window_3_object" type="obj">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/window/3/alignedNew.obj"/>
+    <shape id="door_1be40a61a6877ff391f6335181cd1375_object" type="obj">
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/uv_mapped/door/1be40a61a6877ff391f6335181cd1375/alignedNew.obj"/>
         <transform name="toWorld">
-            <scale x="0.558993" y="0.771791" z="1.647002"/>
-            <rotate angle="142.261406" x="0.341778" y="-0.664525" z="-0.664525"/>
-            <translate x="-6.008926" y="12.985237" z="0.598461"/>
+            <scale x="1.016693" y="1.253860" z="2.244410"/>
+            <rotate angle="164.847041" x="0.133011" y="0.700824" z="0.700824"/>
+            <translate x="3.301102" y="3.512977" z="1.083490"/>
             <scale x="1.000000" y="1.000000" z="1.000000"/>
             <rotate angle="90.000000" x="-1.000000" y="0.000000" z="0.000000"/>
-            <translate x="-3.196167" y="-1.013438" z="3.049284"/>
+            <translate x="-5.530121" y="-1.629818" z="4.279355"/>
         </transform>
     </shape>
     <sensor type="perspective">
@@ -215,14 +196,14 @@
             <integer name="height" value="480"/>
         </film>
         <sampler type="independent">
-            <integer name="sampleCount" value="1024"/>
+            <integer name="sampleCount" value="2048"/>
         </sampler>
         <transform name="toWorld">
-            <lookat origin="2.1180, 0.2060, -0.4810" target="1.1520, 0.2060, -0.7410" up="0.0000, 1.0000, 0.0000"/>
+            <lookat origin="-3.5640, -0.4050, -2.0010" target="-2.6800, -0.3490, -1.5370" up="-0.0490, 0.9980, -0.0260"/>
         </transform>
     </sensor>
     <emitter type="envmap">
-        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/EnvDataset/1611L.hdr"/>
-        <float name="scale" value="164.1757"/>
+        <string name="filename" value="/Users/jerrypiglet/Documents/Projects/data/EnvDataset/1620L.hdr"/>
+        <float name="scale" value="77.2499"/>
     </emitter>
 </scene>

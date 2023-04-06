@@ -7,6 +7,17 @@ import matplotlib.pyplot as plt
 import argparse
 import random
 import string
+import torch
+from pathlib import Path
+
+from lib.global_vars import mi_variant_dict
+hosts = mi_variant_dict.keys()
+
+def listify_matrix(matrix):
+    matrix_list = []
+    for row in matrix:
+        matrix_list.append(list(row))
+    return matrix_list
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -41,6 +52,9 @@ def get_list_of_keys(d, key_list: list, type_list: list=[]) -> list:
 def check_list_of_tensors_size(list_of_tensors: list, tensor_size: tuple):
     for tensor in list_of_tensors:
         assert tuple(tensor.shape) == tensor_size, 'wrong tensor size: %s loaded VS %s required'%(str(tuple(tensor.shape)), str(tensor_size))
+        
+def check_exists(path: Path):
+    assert Path(path).exists(), 'path: %s does not exist!'%path
 
 def get_datetime():
     # today = date.today()
@@ -55,6 +69,10 @@ def basic_logger(name='basic_logger'):
 # Training
 def red(text):
     return colored(text, 'yellow', 'on_red')
+
+def white_red(text):
+    coloredd = colored(text, 'white', 'on_red')
+    return coloredd
 
 def print_red(text):
     print(red(text))
@@ -80,11 +98,19 @@ def green(text):
     coloredd = colored(text, 'blue', 'on_green')
     return coloredd
 
+def green_text(text):
+    coloredd = colored(text, 'green')
+    return coloredd
+
 def print_green(text):
     print(green(text))
 
 def yellow(text):
     coloredd = colored(text, 'blue', 'on_yellow')
+    return coloredd
+
+def yellow_text(text):
+    coloredd = colored(text, 'yellow')
     return coloredd
 
 # Model
@@ -110,10 +136,12 @@ def vis_disp_colormap(disp_array_, file=None, normalize=True, min_and_scale=None
     cm = plt.get_cmap(cmap_name) # the larger the hotter
     if valid_mask is not None:
         assert valid_mask.shape==disp_array.shape
-        assert valid_mask.dtype==np.bool
+        assert valid_mask.dtype==bool
     else:
-        valid_mask = np.ones_like(disp_array).astype(np.bool)
-    
+        valid_mask = np.ones_like(disp_array).astype(bool)
+    if valid_mask.size == 0:
+        valid_mask = np.ones_like(disp_array).astype(bool)
+        
     if normalize:
         if min_and_scale is None:
             depth_min = np.amin(disp_array[valid_mask])
@@ -124,6 +152,7 @@ def vis_disp_colormap(disp_array_, file=None, normalize=True, min_and_scale=None
         else:
             disp_array -= min_and_scale[0]
             disp_array = disp_array * min_and_scale[1]
+
     disp_array = np.clip(disp_array, 0., 1.)
     disp_array = (cm(disp_array)[:, :, :3] * 255).astype(np.uint8)
     
@@ -139,3 +168,20 @@ def colorize(gray, palette):
     color = Image.fromarray(gray.astype(np.uint8)).convert('P')
     color.putpalette(palette)
     return color
+
+def get_device(host: str, device_id: int=-1):
+    assert host in hosts, 'Unsupported host: %s!'%host
+    device = 'cpu'
+    if host == 'apple':
+        if torch.backends.mps.is_built() and torch.backends.mps.is_available():
+            device = 'mps'
+    else:
+        if torch.cuda.is_available():
+            if device_id == -1:
+                device = 'cuda'
+            else:
+                device = 'cuda:%d'%device_id
+
+    if device == 'cpu':
+        print(yellow('[WARNING] rendering could be slow because device is cpu at %s'%host))
+    return device

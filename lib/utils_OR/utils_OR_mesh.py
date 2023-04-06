@@ -1,12 +1,16 @@
-from inspect import isdatadescriptor
 import trimesh
 import numpy as np
 import quaternion
 import copy
 from pathlib import Path
+import open3d as o3d
+from copy import deepcopy
 
 # original obj operations by Zhengqin
-def loadMesh(name):
+def loadMesh(name, if_convert_to_double_sided=False):
+    '''
+    returns: faces: 1-based!
+    '''
     vertices = []
     faces = []
     with open(str(name), 'r') as meshIn:
@@ -26,8 +30,11 @@ def loadMesh(name):
 
     vertices = np.concatenate(vertices, axis=0).astype(np.float32)
     faces = np.concatenate(faces, axis=0).astype(np.int32)
+    if if_convert_to_double_sided:
+        faces = np.concatenate((faces, 
+        np.stack((faces[:, 0], faces[:, 2], faces[:, 1]), axis=-1)
+        ))
     return vertices, faces
-
 
 def writeMesh(name, vertices, faces):
     assert np.amin(faces)>=1, 'faces has to be 1-based!'
@@ -38,6 +45,79 @@ def writeMesh(name, vertices, faces):
         for n in range(0,faces.shape[0]):
             meshOut.write('f %d %d %d\n' %
                     (faces[n, 0], faces[n, 1], faces[n, 2]))
+
+def split_triangles(mesh: o3d.geometry.TriangleMesh) -> o3d.geometry.TriangleMesh:
+    """
+    https://github.com/isl-org/Open3D/issues/1087
+    Split the mesh in independent triangles    
+    """
+    triangles = np.asarray(mesh.triangles).copy()
+    vertices = np.asarray(mesh.vertices).copy()
+
+    triangles_3 = np.zeros_like(triangles)
+    vertices_3 = np.zeros((len(triangles) * 3, 3), dtype=vertices.dtype)
+    vertices_3_triangles_idxes = np.zeros(len(triangles) * 3, dtype=int)
+
+    for index_triangle, t in enumerate(triangles):
+        index_vertex = index_triangle * 3
+        vertices_3[index_vertex] = vertices[t[0]]
+        vertices_3[index_vertex + 1] = vertices[t[1]]
+        vertices_3[index_vertex + 2] = vertices[t[2]]
+
+        vertices_3_triangles_idxes[index_vertex] = index_triangle
+        vertices_3_triangles_idxes[index_vertex + 1] = index_triangle
+        vertices_3_triangles_idxes[index_vertex + 2] = index_triangle
+
+        triangles_3[index_triangle] = np.arange(index_vertex, index_vertex + 3)
+
+    mesh_return = deepcopy(mesh)
+    mesh_return.triangles = o3d.utility.Vector3iVector(triangles_3)
+    mesh_return.vertices = o3d.utility.Vector3dVector(vertices_3)
+    return mesh_return, vertices_3_triangles_idxes
+
+# --sample mesh--
+def sample_mesh(vertices, faces, sample_mesh_ratio, sample_mesh_min, sample_mesh_max):
+    assert np.amin(faces) == 1
+    shape_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1)
+    N_pts = vertices.shape[0]
+    target_number_of_pts = int(N_pts*sample_mesh_ratio)
+    target_number_of_pts = min(N_pts, min(max(sample_mesh_min, target_number_of_pts), sample_mesh_max)) # 100~1000 or N_triangles triangles
+    sample_pts, face_index = trimesh.sample.sample_surface(shape_tri_mesh, target_number_of_pts)
+    return sample_pts, face_index
+
+def simplify_mesh(vertices, faces, simplify_mesh_ratio, simplify_mesh_min, simplify_mesh_max, if_remesh: bool=False, remesh_max_edge: float=0.05, _id: str=''):
+
+    assert np.amin(faces) == 1
+    shape_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
+    # trimesh.repair.fill_holes(shape_mesh)
+    # trimesh.repair.fix_winding(shape_mesh)
+    # trimesh.repair.fix_inversion(shape_mesh)
+    # trimesh.repair.fix_normals(shape_mesh)
+
+    N_triangles = len(shape_tri_mesh.triangles)
+    target_number_of_triangles = int(N_triangles*simplify_mesh_ratio)
+    target_number_of_triangles = min(N_triangles, min(max(simplify_mesh_min, target_number_of_triangles), simplify_mesh_max)) # 100~1000 or N_triangles triangles
+    if target_number_of_triangles != N_triangles:
+        shape_tri_mesh = shape_tri_mesh.simplify_quadratic_decimation(target_number_of_triangles)
+
+    if if_remesh:
+        vertices, faces = trimesh.remesh.subdivide_to_size(shape_tri_mesh.vertices, shape_tri_mesh.faces, max_edge=remesh_max_edge)
+    else:
+        vertices, faces = shape_tri_mesh.vertices, shape_tri_mesh.faces
+
+    return vertices, faces+1, (N_triangles, target_number_of_triangles)
+
+def colorize_o3d_mesh_faces(shape_mesh, faces, face_colors):
+    '''
+    temporary; watch this thread for built-in o3d function
+    '''
+    shape_mesh, vertices_3_triangles_idxes = split_triangles(shape_mesh) # vertices_3_triangles_idxes: [0, ..., N_faces-1]
+    assert face_colors.shape[0] == faces.shape[0]
+    assert vertices_3_triangles_idxes.shape[0] == faces.shape[0] * 3
+    face_colors_3 = face_colors[vertices_3_triangles_idxes]
+    shape_mesh.vertex_colors = o3d.utility.Vector3dVector(np.clip(face_colors_3, 0., 1.))
+
+    return shape_mesh
 
 def write_one_mesh_from_v_f_lists(mesh_path: str, vertices_list: list, faces_list: list, ids_list: list=[]):
     assert len(vertices_list) == len(faces_list)
@@ -181,6 +261,42 @@ def flip_ceiling_normal(faces, vertices):
     # print('->', faces)
 
     return faces
+
+def get_rectangle_mesh(R: np.ndarray, t: np.ndarray, extra_transform=None):
+    assert R.shape==(3, 3) and t.shape==(3, 1)
+    vertices = (R @ np.array([
+        [-1, -1, 0.], 
+        [-1, 1, 0.], 
+        [1, 1, 0.], 
+        [1, -1, 0.], 
+    ], dtype=np.float32).T + t).T
+    if extra_transform is not None:
+        assert extra_transform.shape == (3, 3)
+        vertices = (extra_transform @ vertices.T).T
+    faces = np.array([
+        [2, 4, 3], 
+        [1, 4, 2], 
+        # [2, 3, 4], 
+        # [1, 2, 4], 
+    ], dtype=np.int32) # a single-sided rectangle mesh; uncomment two faces to get double-sided mesh
+
+    return (vertices, faces)
+
+def get_rectangle_thin_box(R: np.ndarray, t: np.ndarray, extra_transform=None):
+    assert R.shape==(3, 3) and t.shape==(3, 1)
+    axes = np.array([
+        [1., 0., 0.], 
+        [0., 1., 0.], 
+        [0., 0., 0.01], 
+    ])
+    axes = (R @ axes.T).T
+    axes_center = t.reshape(1, 3)
+    if extra_transform is not None:
+        assert extra_transform.shape == (3, 3)
+        axes = (extra_transform @ axes.T).T
+        axes_center = (extra_transform @ axes_center.T).T
+
+    return axes, axes_center
 
 def mesh_to_contour(mesh, if_input_is_v_e=False, if_input_is_Trimesh=False, vertical_dim=-1):
     if if_input_is_v_e:
@@ -330,7 +446,7 @@ def minimum_bounding_rectangle(points):
     rval[2] = np.dot([x2, y1], r)
     rval[3] = np.dot([x1, y1], r)
 
-    return rval
+    return rval, hull_points
 
 def writeMesh_rect(name, vertices):
     if vertices.shape==(4, 3):

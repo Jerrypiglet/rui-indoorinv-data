@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 import torch
 from .SGOptim import SGEnvOptimSkyGrd
+from utils_misc import yellow
 
 window_keys = ['shapeId', 'N_ambient_rep', 'intensity', 'isWindow', 'box3D_world']
 lamp_keys = ['shapeId', 'intensity', 'envScale', 'lamb', 'axis_world', 'intensitySky', 'lambSky', 'axisSky_world', 'intensityGrd', 'lambGrd', 'axisGrd_world', 'envAxis_x_world', 'envAxis_y_world', 'envAxis_z_world', 'lightXmlFile', 'isWindow', 'box3D_world']
@@ -29,48 +30,6 @@ def merge_light_dat_list_of_lists_to_global(light_dat_list_of_lists):
 
     return light_dat_lists_merged
 
-
-def __load_emitter_dat(self, N_ambient_rep: str):
-    '''
-    obsolete: originally .dat files are dumped for each frame, containing both world and per-frame info
-    '''
-    assert N_ambient_rep in ['1ambient', '2ambient', '3SG-SkyGrd'], 'Support for other approx to be added.'
-
-    light_dat_list_of_lists = []
-    for frame_id in self.frame_id_list:
-        light_dir = self.rendering_root / self.meta_split / self.scene_name / ('light_%d'%frame_id)
-        light_files = sorted(glob.glob(str(light_dir / ('light_%s_*.dat'%N_ambient_rep))))
-        if if_save_storage:
-            box_files = sorted(glob.glob((str(light_dir / 'box*.dat').replace('DiffLight', ''))))
-        else:
-            box_files = sorted(glob.glob((str(light_dir / 'box*.dat'))))
-        assert len(light_files) == len(box_files)
-        assert len(light_files) != 0
-        light_dat_lists = {'objs': [], 'windows': []}
-        for light_id, (light_file, box_file) in enumerate(zip(light_files, box_files)):
-            with open(light_file, 'rb') as fIn:
-                light_dat = pickle.load(fIn)
-            with open(box_file, 'rb') as fIn:
-                box_dat = pickle.load(fIn)
-            light_dat.update(box_dat)
-            # print(light_file, light_dat, light_dat['isWindow'])
-            if light_dat['isWindow']:
-                light_dat['N_ambient_rep'] = N_ambient_rep
-                light_dat_lists['windows'].append((light_file, light_dat))
-            else:
-                light_dat_lists['objs'].append((light_file, light_dat))
-
-            # print('-----', frame_id, light_id)
-            # print(light_dat.keys())
-        
-        light_dat_list_of_lists.append(light_dat_lists) # per-frame emitter data (world+cam+local)
-
-        light_dat_lists_world = merge_light_dat_list_of_lists_to_global(light_dat_list_of_lists) # only keeps global emitter data from all frames (_world)
-        # print('=====>', )
-        # print(light_dat_lists_world)
-
-    return light_dat_list_of_lists, light_dat_lists_world
-
 def load_emitter_dat_world(light_dir: Path, N_ambient_rep: str, if_save_storage: bool=False):
     '''
     load .dat files (global/world); not loading per-frame .dat files (light{}/*.dat)
@@ -87,7 +46,8 @@ def load_emitter_dat_world(light_dir: Path, N_ambient_rep: str, if_save_storage:
     else:
         box_files = sorted(glob.glob((str(light_dir / 'box*.dat'))))
 
-    assert len(light_files) != 0, 'No light .dat files found at: '+str(light_dir)
+    if len(light_files) == 0:
+        print(yellow('No light .dat files found at: '+str(light_dir)))
     assert len(light_files) == len(box_files)
 
     emitter_dict_of_lists_world = {'objs': [], 'windows': []}
@@ -166,3 +126,85 @@ def vis_envmap_plt(ax, im_envmap: np.ndarray, quad_labels: list=[]):
         ax.text(W/4., H, quad_labels[1], color='k', fontsize=10)
         ax.text(W/2., H, quad_labels[2], color='k', fontsize=10)
         ax.text(W/4.*3, H, quad_labels[3], color='k', fontsize=10)
+
+def sample_mesh_emitter(emitter_type: str, emitter_idx: int=0, emitter_dict: dict={}, max_plate: int=-1, if_clip_concave_normals: bool=False, if_dense_sample: bool=False):
+    '''
+    Args: 
+        if_dense_sample: True to sample total of max_plate points over the mesh, instead of by default one point per-face
+    '''
+    assert emitter_type == 'lamp', 'no support for windows for now'
+    # lamp, vertices, faces = self.os.lamp_list[emitter_idx]
+    # lamp, vertices, faces = emitter_dict[emitter_type][emitter_idx]
+    vertices, faces = emitter_dict[emitter_type][emitter_idx]['vertices'], emitter_dict[emitter_type][emitter_idx]['faces']
+    assert np.amin(faces) >= 1
+    if 'emitter_prop' in emitter_dict[emitter_type][emitter_idx]:
+        intensity = emitter_dict[emitter_type][emitter_idx]['emitter_prop']['intensity']
+    else:
+        intensity = np.zeros(3,)-1. # (3,)
+    # center = lamp['emitter_prop']['box3D_world']['center'] # (3,)
+
+    # >>>> sample lamp
+    v1 = vertices[faces[:, 0]-1, :]
+    v2 = vertices[faces[:, 1]-1, :]
+    v3 = vertices[faces[:, 2]-1, :]
+
+    lpts = 1.0 / 3.0 * (v1 + v2 + v3)
+    e1 = v2 - v1
+    e2 = v3 - v1
+    lpts_normal = np.cross(e1, e2)
+
+    # [DEBUG] get rid of upper faces
+    # faces = faces[lpts_normal[:, 1]<0]
+    # from lib.utils_OR.utils_OR_mesh import writeMesh
+    # writeMesh('tmp_mesh.obj', vertices, faces)
+    # v1 = vertices[faces[:, 0]-1, :]
+    # v2 = vertices[faces[:, 1]-1, :]
+    # v3 = vertices[faces[:, 2]-1, :]
+    # lpts = 1.0 / 3.0 * (v1 + v2 + v3)
+    # e1 = v2 - v1
+    # e2 = v3 - v1
+    # lpts_normal = np.cross(e1, e2)
+
+    lpts_area = 0.5 * np.sqrt(np.sum(
+        lpts_normal * lpts_normal, axis=1, keepdims = True))
+    lpts_normal = lpts_normal / np.maximum(2 * lpts_area, 1e-6)
+
+    if if_clip_concave_normals:
+        center = np.mean(vertices, axis=0, keepdims = True)
+        normal_flip = (np.sum(lpts_normal * (lpts - center), axis=1, keepdims=True) < 0) # [TODO] ZQ is trying to deal with concave faces. Better ideas?
+        normal_flip = normal_flip.astype(np.float32)
+        lpts_normal = -lpts_normal * normal_flip + (1 - normal_flip) * lpts_normal
+
+    plate_num = lpts.shape[0]
+
+    if max_plate == -1:
+        max_plate = plate_num
+
+    if plate_num > max_plate:
+        prob = float(max_plate)  / float(plate_num)
+        # select_ind = np.random.choice([0, 1], size=(plate_num), p=[1-prob, prob])
+        # lpts = lpts[select_ind == 1]
+        # lpts_normal = lpts_normal[select_ind == 1]
+        # lpts_area = lpts_area[select_ind == 1]
+        select_ind = np.random.choice(np.arange(plate_num), size=max_plate, replace=False)
+        lpts = lpts[select_ind]
+        lpts_normal = lpts_normal[select_ind]
+        lpts_area = lpts_area[select_ind]
+    elif if_dense_sample:
+        import trimesh
+        mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1)
+        lpts, face_index = trimesh.sample.sample_surface(mesh, max_plate)
+        lpts = lpts.astype(np.float32)
+        lpts_normal = lpts_normal[face_index]
+        lpts_area = lpts_area[face_index]
+        prob = float(max_plate)  / float(plate_num)
+    else:
+        prob = 1
+
+    return {
+        'lpts': lpts, 
+        'lpts_normal': lpts_normal, 
+        'lpts_area': lpts_area, 
+        'lpts_intensity': intensity, 
+        'lpts_prob': prob, 
+    }
