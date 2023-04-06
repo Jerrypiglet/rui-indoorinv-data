@@ -230,6 +230,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             'poses', 
             'shapes', 
             'im_hdr', 'im_sdr', 
+            'depth', 'normal', 
             ]
 
     @property
@@ -425,14 +426,7 @@ class realScene3D(mitsubaBase, scene2DBase):
                 c2w[0:3, 1:3] *= -1
 
                 R_, t_ = np.split(c2w[:3], (3,), axis=1)
-                # R = R / np.linalg.norm(R, axis=1, keepdims=True) # somehow R was mistakenly scaled by scale_m2b; need to recover to det(R)=1
                 R = R_; t = t_
-                # R = R_.T
-                # t = -R_.T @ t_
-                # t = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) @ t # OpenGL -> OpenCV
-                # R = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) @ R # OpenGL -> OpenCV
-                # R = np.concatenate([R[:, 1:2], -R[:, 0:1], R[:, 2:]], 1) # [Rui!!] llff specific; done in llff dataloader
-                # R = R @ np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]]) # [Rui] opengl (llff) -> opencv convention
                 if self.extra_transform is not None:
                     assert self.extra_transform.shape == (3, 3) # [TODO] support 4x4
                     R = self.extra_transform[:3, :3] @ R
@@ -557,6 +551,38 @@ class realScene3D(mitsubaBase, scene2DBase):
             self.if_loaded_pcd = True
             
             print(blue_text('[%s] DONE. load_pcd: %d points'%(self.__class__.__name__, self.pcd.shape[0])))
+            
+    def load_depth(self):
+        '''
+        depth;
+        (H, W), ideally in [0., inf]
+        '''
+        if hasattr(self, 'depth_list'): return
+
+        print(white_blue('[%s] load_depth for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
+
+        self.depth_file_list = [self.scene_rendering_path_list[frame_idx] / (self.modality_filename_dict['depth']%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
+        self.depth_list = [load_img(depth_file, (self.im_H_load, self.im_W_load), ext='npy', target_HW=self.im_HW_target).astype(np.float32)[:, :] for depth_file in self.depth_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
+
+        print(blue_text('[%s] DONE. load_depth')%self.parent_class_name)
+
+        self.pts_from['depth'] = True
+
+    def load_normal(self):
+        '''
+        normal, in camera coordinates (OpenGL convention: right-up-backward);
+        (H, W, 3), [-1., 1.]
+        '''
+        if hasattr(self, 'normal_list'): return
+
+        print(white_blue('[%s] load_normal for %d frames...'%(self.parent_class_name, len(self.frame_id_list))))
+
+        self.normal_file_list = [self.scene_rendering_path_list[frame_idx] / (self.modality_filename_dict['normal']%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
+        self.normal_list = [load_img(normal_file, (self.im_H_load, self.im_W_load, 3), ext='npy', target_HW=self.im_HW_target, npy_if_channel_first=True).astype(np.float32) for normal_file in self.normal_file_list] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
+        # self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
+        self.normal_list = [normal * 2. - 1. for normal in self.normal_list]
+        
+        print(blue_text('[%s] DONE. load_normal'%self.parent_class_name))
             
     def get_reorient_mat_(self):
             assert hasattr(self, 'mi_normal_global_list')

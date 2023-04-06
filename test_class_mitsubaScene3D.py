@@ -99,9 +99,9 @@ invalid_frame_id_list = []
 # frame_ids = [210, 211, 212, 213, 214]
 # frame_ids = [215, 216, 217, 218, 209]
 
-scene_name = 'bedroom'
+# scene_name = 'bedroom'
 # shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
-shape_file = 'data/indoor_synthetic/bedroom/scene_suubdiv.obj'
+# shape_file = 'data/indoor_synthetic/bedroom/scene_suubdiv.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135215-mm1-EVAL-20230219-211718-bedroom_HDR_grids_trainval.ply'
 
 # scene_name = 'bathroom'

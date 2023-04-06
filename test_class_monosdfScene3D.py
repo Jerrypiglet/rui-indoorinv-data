@@ -84,12 +84,14 @@ radiance_scale = 1.
 # # shape_file = ('not-normalized', 'GTmesh/scene0050_00_vh_clean_2.ply')
 # shape_file = ('normalized', 'ESTmesh/scan1.ply')
 
-# dumped Monosdf scenes from ICCV23
-base_root = Path(PATH_HOME) / 'data/real/EXPORT_monosdf'
-scene_name = 'IndoorKitchenV4_2_aligned'
-# frame_id_list = list(range(255))
-frame_id_list = [0]
-shape_file = ('not-normalized', 'scene_aligned.obj')
+'''
+Monosdf scenes from ICCV23
+'''
+# base_root = Path(PATH_HOME) / 'data/real/EXPORT_monosdf'
+# scene_name = 'IndoorKitchenV4_2_aligned'
+# # frame_id_list = list(range(255))
+# frame_id_list = [0]
+# shape_file = ('not-normalized', 'scene_aligned.obj')
 
 scene_obj = monosdfScene3D(
     if_debug_info=opt.if_debug_info, 

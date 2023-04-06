@@ -285,11 +285,12 @@ class exporter_scene():
                     np.save(str(depth_npy_export_path), depth)
                     print(blue_text('depth (npy) %d exported to: %s'%(frame_id, str(depth_npy_export_path))))
 
-            if modality == 'depth':
+            if modality == 'normal':
                 assert format in ['monosdf']
                 scene_export_path.mkdir(parents=True, exist_ok=True)
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
-                    normal = self.os.normal_list[frame_idx].squeeze()
+                    normal = (self.os.normal_list[frame_idx].squeeze() + 1.) / 2. # (H, W, 3), [0. 1]
+                    normal = normal.transpose(2, 0, 1) # (3, H, W)
                     normal_npy_export_path = scene_export_path / ('%03d_0001_normal.npy'%frame_idx)
                     np.save(str(normal_npy_export_path), normal)
                     print(blue_text('normal (npy) %d exported to: %s'%(frame_id, str(normal_npy_export_path))))
