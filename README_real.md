@@ -25,7 +25,7 @@ To visualize 2D modalities, run with `--vis_2d_plt` ([ConferenceRoom](https://i.
 
 ## Capturing guide
 
-Please refer to the FITP paper ([TODO]) for details on capturing. The RAW files are S*N RAW images, where N is the number of poses, and S is the number of exposures within a bracketing (e.g. 9 for ConferenceRoom, and 5 for ClassRoom). Organize the data as below:
+Please refer to the FITP paper ([TODO]) for details on capturing. The RAW capture` consist of S*N RAW images, where N is the number of poses, and S is the number of exposures within a bracketing (e.g. 9 for ConferenceRoom, and 5 for ClassRoom). Organize the data as below:
 
 - data/
   - real/
@@ -34,7 +34,7 @@ Please refer to the FITP paper ([TODO]) for details on capturing. The RAW files 
     - ConferenceRoomV2_final_supergloo
       - raw_images # *.ARW for Sony A7M3; *.CR2 for Canon 5D Mark IV
 
-Run the notebook `tools/real_capture/hdr_convert.ipynb` to generate HDR images and poses, yielding the following new files:
+Install denepdencies with `pip install -r tools/real_capture/requirements.txt`. For Arm64 arch, you may need to manually compile [lensfunpy](https://github.com/letmaik/lensfunpy#installation-from-source-on-linuxmacos). Then run the notebook `tools/real_capture/hdr_convert.ipynb` to generate HDR images and poses, yielding the following new files:
 
 - data/
   - real/
