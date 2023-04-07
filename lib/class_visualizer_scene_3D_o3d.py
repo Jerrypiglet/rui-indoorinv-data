@@ -1,4 +1,5 @@
 import numpy as np
+import trimesh
 
 from lib.class_replicaScene3D import replicaScene3D
 np.random.seed(0)
@@ -25,6 +26,9 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.class_monosdfScene3D import monosdfScene3D
 from lib.class_freeviewpointScene3D import freeviewpointScene3D
 from lib.class_matterportScene3D import matterportScene3D
+from lib.class_realScene3D import realScene3D
+from lib.class_texirScene3D import texirScene3D
+from lib.class_simpleScene3D import simpleScene3D
 
 from lib.utils_misc import get_list_of_keys, gen_random_str, yellow, yellow, white_red
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
@@ -51,7 +55,7 @@ class visualizer_scene_3D_o3d(object):
         modality_list_vis: list, 
         if_debug_info: bool=False, 
     ):
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D, simpleScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
@@ -60,7 +64,7 @@ class visualizer_scene_3D_o3d(object):
         self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
             if _ == '': continue
-            assert _ in ['dense_geo', 'poses', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi']
+            assert _ in ['dense_geo', 'poses', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi'], 'Invalid modality: %s'%_
         if 'mi' in self.modality_list_vis:
             self.mi_pcd_color_list = None
         self.extra_geometry_list = []
@@ -326,15 +330,22 @@ class visualizer_scene_3D_o3d(object):
         return pcd_color
         
     def collect_cameras(self, cam_params: dict={}):
+        '''
+        highlight first cam frustrm with blue!
+        highlight last cam frustrm with red!
+        '''
         if not self.os.if_has_poses: 
             print(yellow('[%s] No poses found in scene_object! Did you include \'poses\' in modality_list of scene_obj?'%str(self.__class__.__name__))); return []
 
         if_cam_axis_only = cam_params.get('if_cam_axis_only', False)
         if_cam_traj = cam_params.get('if_cam_traj', False)
         subsample_cam_rate = cam_params.get('subsample_cam_rate', 1)
+        cam_vis_scale = cam_params.get('cam_vis_scale', 1)
+        # near, far = self.os.near * cam_vis_scale * 5, self.os.far * cam_vis_scale * 5
         near, far = self.os.near, self.os.far
+        
 
-        pose_list = self.os.pose_list
+        # pose_list = self.os.pose_list
         # origin_lookatvector_up_list = self.os.origin_lookatvector_up_list
         cam_frustrm_list = []
         # cam_axes_list = []
@@ -367,10 +378,10 @@ class visualizer_scene_3D_o3d(object):
             cam_d = rays_d[[0,0,-1,-1],[0,-1,0,-1]] # get cam_d of 4 corners: (4, 3)
             cam_list.append(np.array([cam_o, *(cam_o+cam_d*max(near, far*0.05))]))
 
-            cam_axis = cam_d.mean(0)
+            cam_axis = cam_d.mean(0) * cam_vis_scale
             cam_axis_list.append(np.array([cam_o, cam_o+cam_axis]))
 
-            cam_up = self.os.origin_lookatvector_up_list[cam_idx][2].reshape(-1)
+            cam_up = self.os.origin_lookatvector_up_list[cam_idx][2].reshape(-1) * cam_vis_scale
             cam_up_list.append(np.array([cam_o, cam_o+cam_up]))
         
         # c2w_list = pose_list
@@ -381,9 +392,9 @@ class visualizer_scene_3D_o3d(object):
             # cam_color = [0.5, 0.5, 0.5]
             cam_color = [0., 0., 0.] # default: black
             if cam_idx == 0:
-                cam_color = [0., 0., 1.] # highlight first cam frustrm with blue
+                cam_color = [0., 0., 1.] # highlight first cam frustrm with blue!
             elif cam_idx == len(cam_list)-1:
-                cam_color = [1., 0., 0.] # highlight last cam frustrm with red
+                cam_color = [1., 0., 0.] # highlight last cam frustrm with red!
 
             cam_frustrm = o3d.geometry.LineSet()
             cam_frustrm.points = o3d.utility.Vector3dVector(cam)
@@ -412,7 +423,7 @@ class visualizer_scene_3D_o3d(object):
                     font='/System/Library/Fonts/Helvetica.ttc' if self.os.host=='apple' else '/usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf', 
                     direction=(0., 0., 1.), 
                     degree=270., 
-                    font_size=50, density=3, text_color=tuple([0, 128, 128]))
+                    font_size=int(50*cam_vis_scale), density=3, text_color=tuple([0, 128, 128]))
                 cam_center_list.append(pcd_10)
 
             cam_axis = cam_axis_list[cam_idx]
@@ -496,12 +507,11 @@ class visualizer_scene_3D_o3d(object):
 
         axis_up = self.os.axis_up
         if not if_ceiling:
-            xyz_mask = remove_ceiling(xyz_pcd, axis_up=axis_up, if_debug_info=self.if_debug_info)
+            xyz_mask = remove_ceiling(xyz_pcd, self.os.ceiling_loc, self.os.floor_loc, axis_up=axis_up, if_debug_info=self.if_debug_info)
             xyz_pcd = xyz_pcd[xyz_mask]; pcd_color = pcd_color[xyz_mask]
         if not if_walls:
             assert self.os.if_has_layout
-            layout_bbox_3d = self.os.layout_box_3d_transformed
-            xyz_pcd, pcd_color = remove_walls(layout_bbox_3d, xyz_pcd, pcd_color, if_debug_info=self.if_debug_info)
+            xyz_pcd, pcd_color = remove_walls(xyz_pcd, self.os.layout_box_3d_transformed, pcd_color, if_debug_info=self.if_debug_info)
 
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(xyz_pcd)
@@ -678,6 +688,15 @@ class visualizer_scene_3D_o3d(object):
 
         return return_list + [layout_bbox_pcd]
 
+    def collect_pcd(self, shape_params: dict={}):
+        assert self.os.if_has_pcd
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(self.os.pcd)
+        pcd.colors = o3d.utility.Vector3dVector([[0.5,0.5,0.5]] * self.os.pcd.shape[0])
+
+        return [pcd]
+        
     def collect_shapes(self, shapes_params: dict={}):
         '''
         collect shapes and bboxes for objs + emitters (shapes)
@@ -689,11 +708,16 @@ class visualizer_scene_3D_o3d(object):
 
         images/demo_shapes_emitter_o3d.png
         '''
+        if (not self.os.if_has_shapes) and self.os.if_has_pcd:
+            return self.collect_pcd(shape_params=shapes_params)
+        
         assert self.os.if_has_shapes
 
-        if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_obj_mesh', True)
-        if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.shape_params_dict.get('if_load_emitter_mesh', False)
+        if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_obj_mesh', True)
+        if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_emitter_mesh', False)
         if_ceiling = shapes_params.get('if_ceiling', False)
+        if not if_ceiling:
+            assert self.os.if_has_ceilling_floor, 'scene object has no detected ceiling/floor; did you load_layout for XML-based scene, or detect ceiling/floor for shape-based scene?'
         if_walls = shapes_params.get('if_walls', False)
 
         exclude_obj_id_list = shapes_params.get('exclude_obj_id_list', [])
@@ -766,10 +790,6 @@ class visualizer_scene_3D_o3d(object):
                     # print(yellow(str(obj_color)), shape_dict['random_id'])
 
 
-            # trimesh.repair.fill_holes(shape_mesh)
-            # trimesh.repair.fix_winding(shape_mesh)
-            # trimesh.repair.fix_inversion(shape_mesh)
-            # trimesh.repair.fix_normals(shape_mesh)
             shape_bbox = o3d.geometry.LineSet()
             shape_bbox.points = o3d.utility.Vector3dVector(bverts)
             shape_bbox.colors = o3d.utility.Vector3dVector([obj_color if not if_emitter else [0., 0., 0.] for i in range(12)]) # black for emitters
@@ -789,7 +809,7 @@ class visualizer_scene_3D_o3d(object):
                 # shape_mesh = shape_mesh.as_open3d
                 if not if_ceiling:
                     axis_up = self.os.axis_up
-                    vertices_valid_mask = ~remove_ceiling(vertices, axis_up=axis_up, if_debug_info=True)
+                    vertices_valid_mask = ~remove_ceiling(vertices, self.os.ceiling_loc, self.os.floor_loc, axis_up=axis_up, if_debug_info=True, debug_info_str=_id)
                     faces_mask = np.all(vertices_valid_mask.reshape(-1)[faces-1], axis=1) # (N_total_faces,), bool
                     faces = faces[faces_mask] # (faces_emitters, 3), int, containing 1-based vertex indexes
 
@@ -804,10 +824,13 @@ class visualizer_scene_3D_o3d(object):
                         (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
                         # print(_id, samples_v.shape[0], vertices.shape[0])
                         # assert mesh_color_type.split('-')[1] == samples_type, 'Make sure this two match (got [%s] VS [%s]): your_evalautor->sample_type, visualizer_3D_o3d->shapes_params->mesh_color_type'%(mesh_color_type.split('-')[1], samples_type)
-                        if samples_type == 'rad':
+                        if samples_type in ['rad', 'rgb_hdr', 'rgb_sdr']:
                             # vertices colored with: radiance in SDR space
                             assert samples_v.shape[0] == vertices.shape[0]
-                            samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
+                            if samples_type in ['rad', 'rgb_hdr']:
+                                samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
+                            else:
+                                samples_v_ = np.clip(samples_v, 0., 1.)
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
                         elif samples_type in ['emission_mask', 'emission_mask_bin', 'roughness', 'metallic']:
                             # vertices colored with: emission prob (non-emitter: blue; emitter: red)
@@ -820,6 +843,10 @@ class visualizer_scene_3D_o3d(object):
                             assert samples_v.shape[0] == vertices.shape[0]
                             samples_v_ = np.clip(samples_v, 0., 1.)
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+                        elif samples_type == 'vertex_normal':
+                            assert samples_v.shape[0] == vertices.shape[0]
+                            samples_v_ = np.clip(samples_v/2.+0.5, 0., 1.)
+                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
                         elif samples_type == 'vis_count':
                             (samples_v_vis_count, max_vis_count) = samples_v
                             assert samples_v_vis_count.shape[0] == vertices.shape[0]
@@ -827,6 +854,8 @@ class visualizer_scene_3D_o3d(object):
                             samples_v_ = (samples_v_vis_count / float(max_vis_count)).reshape(-1, 1)
                             samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
                             samples_v_[samples_v_vis_count==0] = np.array([[1., 1., 1.]]) # set not onserved area to white
+                            samples_v_[samples_v_vis_count==1] = np.array([[0., 1., 0.]]) # set not onserved area to green
+                            samples_v_[samples_v_vis_count==2] = np.array([[1., 1., 0.]]) # set not onserved area to yellow
                             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
                         elif samples_type == 't':
                             (samples_v_t, max_t) = samples_v
@@ -864,6 +893,7 @@ class visualizer_scene_3D_o3d(object):
                     cat_name, 
                     # pos=np.mean(bverts, axis=0).tolist(), 
                     # pos=[np.mean(bverts[:, 0], axis=0), np.amax(bverts[:, 1], axis=0)+0.2*(np.amax(bverts[:, 1], axis=0)-np.amin(bverts[:, 1], axis=0)), np.mean(bverts[:, 2], axis=0)], 
+                    font='/System/Library/Fonts/Helvetica.ttc' if self.os.host=='apple' else '/usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf', 
                     pos=[np.mean(bverts[:, 0], axis=0), np.amax(bverts[:, 1], axis=0)+0.05*(np.amax(bverts[:, 1], axis=0)-np.amin(bverts[:, 1], axis=0)), np.mean(bverts[:, 2], axis=0)], 
                     direction=(0., 0., 1), 
                     degree=270., 
@@ -999,7 +1029,9 @@ class visualizer_scene_3D_o3d(object):
         cam_rays_subsample = mi_params.get('cam_rays_subsample', 10)
 
         if if_cam_rays: 
-            for frame_idx, (rays_o, rays_d, _) in enumerate(self.os.cam_rays_list[:2]): # show only first frame
+            for frame_idx, (rays_o, rays_d, _) in enumerate(self.os.cam_rays_list[:1]): # show only first frame
+                assert rays_o.shape[0] == rays_d.shape[0]
+                assert len(rays_o.shape) == 3, 'should be rays in 2D, not 1D'
                 rays_of_a_view = o3d.geometry.LineSet()
 
                 if cam_rays_if_pts:
@@ -1007,7 +1039,7 @@ class visualizer_scene_3D_o3d(object):
                     rays_t_flatten = ret.t.numpy()[::cam_rays_subsample][:, np.newaxis]
                     rays_t_flatten[rays_t_flatten==np.inf] = 0.
                 else:
-                    rays_t_flatten = np.ones((rays_o.shape[0], 1), dtype=np.float32)
+                    rays_t_flatten = np.ones((prod(rays_o.shape[:2]), 1), dtype=np.float32)[::cam_rays_subsample]
 
                 rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3)[::cam_rays_subsample], rays_d.reshape(-1, 3)[::cam_rays_subsample]
 
@@ -1055,13 +1087,12 @@ class visualizer_scene_3D_o3d(object):
 
                 if not if_ceiling:
                     axis_up = self.os.axis_up
-                    xyz_mask = remove_ceiling(mi_pts_, axis_up=axis_up, if_debug_info=self.if_debug_info)
+                    xyz_mask = remove_ceiling(mi_pts_, self.os.ceiling_loc, self.os.floor_loc, axis_up=axis_up, if_debug_info=self.if_debug_info)
                     mi_pts_ = mi_pts_[xyz_mask]; mi_color_ = mi_color_[xyz_mask]
 
                 if not if_walls:
                     assert self.os.if_has_layout
-                    layout_bbox_3d = self.os.layout_box_3d_transformed
-                    mi_pts_, mi_color_ = remove_walls(layout_bbox_3d, mi_pts_, mi_color_, if_debug_info=self.if_debug_info)
+                    mi_pts_, mi_color_ = remove_walls(mi_pts_, self.os.layout_box_3d_transformed, mi_color_, if_debug_info=self.if_debug_info)
 
                 assert mi_color_.shape[0] == mi_pts_.shape[0]
                 pcd_pts.points = o3d.utility.Vector3dVector(mi_pts_)

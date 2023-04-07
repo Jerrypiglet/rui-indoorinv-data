@@ -5,7 +5,7 @@ from lib.utils_misc import yellow
 
 from utils_OR.utils_OR_mesh import sample_mesh, simplify_mesh, computeBox
 
-def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scale_offset: tuple=(), extra_transform: np.ndarray=None):
+def load_shape_dict_from_shape_file(shape_file_list: list, shape_params_dict={}, scale_offset: tuple=(), extra_transform: np.ndarray=None):
     if_sample_mesh = shape_params_dict.get('if_sample_mesh', False)
     sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
     sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
@@ -20,15 +20,27 @@ def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scal
 
     if if_sample_mesh:
         sample_pts_list = []
+    
+    if not isinstance(shape_file_list, list): shape_file_list = [shape_file_list]
+    shape_file_list = [Path(shape_file) for shape_file in shape_file_list]
+    shape_tri_mesh_list = [trimesh.load_mesh(str(shape_file), process=False, maintain_order=True) for shape_file in shape_file_list]
+    shape_tri_mesh = trimesh.util.concatenate(shape_tri_mesh_list)
+    
+    # print(yellow('Fixing a few issues with the single mesh...'))
+    # trimesh.repair.fill_holes(shape_tri_mesh)
+    # trimesh.repair.fix_winding(shape_tri_mesh)
+    # trimesh.repair.fix_normals(shape_tri_mesh)
 
-    shape_tri_mesh = trimesh.load_mesh(str(shape_file))
+    suffix = shape_file_list[0].suffix
+    shape_file_join = shape_file_list[0].parent / ('%s.%s'%('-'.join(shape_file.stem for shape_file in shape_file_list), suffix))
+
     if_fix_watertight = shape_params_dict.get('if_fix_watertight', False)
     if not shape_tri_mesh.is_watertight and if_fix_watertight:
         trimesh.repair.fill_holes(shape_tri_mesh)
         shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
-        shape_tri_mesh_convex.export(str(shape_file.parent / ('%s_hull.obj'%shape_file.stem)))
+        shape_tri_mesh_convex.export(str(shape_file_list[0].parent / ('%s_hull.%s'%(shape_file_join.stem, suffix))))
         shape_tri_mesh = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
-        print(yellow('[%s] Mesh is not watertight. Filled holes and added convex hull.'%shape_file.stem))
+        print(yellow('[%s] Mesh is not watertight. Filled holes and added convex hull.'%shape_file_join.stem))
 
     vertices, faces = shape_tri_mesh.vertices, shape_tri_mesh.faces+1 # faces is 1-based; [TODO] change to 0-based in all methods
     if scale_offset != ():
@@ -36,7 +48,7 @@ def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scal
         vertices = vertices / scale
         vertices = vertices - offset
 
-    _id = Path(shape_file).stem
+    _id = Path(shape_file_join).stem
 
     # --sample mesh--
     if if_sample_mesh:
@@ -52,7 +64,7 @@ def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scal
 
     bverts, bfaces = computeBox(vertices)
     shape_dict = {
-        'filename': str(shape_file), 
+        'filename': str(shape_file_join), 
         'id': _id, 
         'random_id': 'XXXXXX', 
         'if_in_emitter_dict': False, 
@@ -63,6 +75,7 @@ def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scal
     }
 
     if extra_transform is not None:
+        assert extra_transform.shape == (3, 3)
         vertices = (extra_transform @ vertices.T).T
         bverts = (extra_transform @ bverts.T).T
 
@@ -78,7 +91,7 @@ def load_shape_dict_from_shape_file(shape_file: Path, shape_params_dict={}, scal
 def dump_shape_dict_to_shape_file(shape_dict, shape_file: Path):
     vertices, faces = shape_dict['vertices'], shape_dict['faces']
     shape_tri_mesh = trimesh.Trimesh(vertices, faces-1) # faces is 1-based; [TODO] change to 0-based in all methods
-    shape_file_export = str(shape_file.parent / ('%s_fixed.obj'%shape_file.stem))
+    shape_file_export = str(shape_file.parent / ('%s_fixed.obj'%shape_file_join.stem))
     shape_tri_mesh.export(shape_file_export)
     print(yellow('[%s] Mesh saved to %s.'%(shape_dict['_id'], shape_file_export)))
 

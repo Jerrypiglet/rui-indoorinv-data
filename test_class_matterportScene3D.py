@@ -67,7 +67,9 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 # utils
 parser.add_argument('--if_convert_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
 parser.add_argument('--if_dump_shape', type=str2bool, nargs='?', const=True, default=False, help='if dump shape of entire scene')
-parser.add_argument('--if_export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--export_scene', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
+parser.add_argument('--if_main_region', type=str2bool, nargs='?', const=True, default=False, help='')
 
 opt = parser.parse_args()
 
@@ -75,18 +77,55 @@ base_root = Path(PATH_HOME) / 'data/Matterport3D'
 assert base_root.exists()
 
 '''
-conference room with set of lamps and white chairs
+conference room with set of lamps and white chairs; tones of glass
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&modelId=mp3d.17DRP5sb8fy
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.17DRP5sb8fy_5
 '''
-scene_name = '17DRP5sb8fy'; region_id = 5; hdr_radiance_scale = 10; 
+scene_name = '17DRP5sb8fy'; region_id_list = [5, 6, 7, 9]; hdr_radiance_scale = 10; 
 frame_ids = [21, 22, 46, 47]
 
 '''
-old bedroom
+old bedroom (boy in bed), with hallway
 https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.2t7WUuJeko7_5
 '''
-scene_name = '2t7WUuJeko7'; region_id = 5; hdr_radiance_scale = 10; 
-frame_ids = [18, 19, 20, 21, 22]
+scene_name = '2t7WUuJeko7'; region_id_list = [5, 4]; hdr_radiance_scale = 10; 
+# frame_ids = [20, 21, 22]
+# frame_ids = [20]
+
+'''
+movie room (with hallway, and next room for complete geometry)
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.mJXqzFtmKg4_0
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&modelId=mp3d.mJXqzFtmKg4
+'''
+# scene_name = 'mJXqzFtmKg4'; region_id_list = [0, 19, 16]; hdr_radiance_scale = 10; 
+# frame_ids = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33]
+frame_ids = [18, 19, 21, 22, 24, 25]
+# frame_ids = [25]
+
+'''
+dark bedroom with lamp (with next door hallway) ❌ the lotus lights on the fan is not in the geometry...
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/house-viewer?condition=mpr3d&modelId=mp3d.qoiz87JEwZ2
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.qoiz87JEwZ2_15
+'''
+# scene_name = 'qoiz87JEwZ2'; region_id_list = [15, 16]; hdr_radiance_scale = 10; 
+# frame_ids = [486, 487, 488]
+
+'''
+banquet room
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.PuKPg4mmafe
+https://aspis.cmpt.sfu.ca/scene-toolkit/scans/simple-viewer?condition=mpr3d&modelId=mpr3d.PuKPg4mmafe_5
+'''
+scene_name = 'PuKPg4mmafe'; region_id_list = [5]; hdr_radiance_scale = 10; 
+
+'''
+bedroom ❌ nice room but too much glass
+'''
+scene_name = 'Vvot9Ly1tCj'; region_id_list = [19, 20]; hdr_radiance_scale = 5; 
+
+'''
+bathroom tiny
+'''
+scene_name = 'jh4fc5c5qoQ'; region_id_list = [1, 2]; hdr_radiance_scale = 20; 
 
 scene_obj = matterportScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -96,11 +135,8 @@ scene_obj = matterportScene3D(
         'scene_name': scene_name, 
         # 'frame_id_list': frame_ids, # comment out to use all frames
         'axis_up': 'z+', 
-        'region_id': region_id, 
-        'if_undist': False, # True to use undistorted images/poses
-        # 'pose_file': ('bundle', 'bundle.out'), 
-        # 'pose_file': ('OpenRooms', 'cam.txt'), # after dump to cam.txt
-        # 'if_scale_scene': True, # whether to scale the scene to metric in meters, with given scale in scale.txt
+        'region_id_list': region_id_list, 
+        'if_undist': True, # True to use undistorted images/poses
         }, 
     mi_params_dict={
         'debug_render_test_image': False, # [DEBUG][slow] True: to render an image with first camera, usig Mitsuba: images/demo_mitsuba_render.png
@@ -122,16 +158,17 @@ scene_obj = matterportScene3D(
         'depth': ('matterport_depth_images', 'd', 'png'), 
         'poses': ('matterport_camera_poses', 'pose_', 'txt'), # https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_poses
         'im_sdr_undist': ('undistorted_color_images', 'i', 'jpg'), 
-        'depth_undist': ('undistorted_depth_images', 'd', 'png'), 
-        # 'im_hdr_undist': ('undistorted_hdr_images', 'j', 'jxr'), 
+        # 'depth_undist': ('undistorted_depth_images', 'd', 'png'), 
         # 'normal_undist': ('undistorted_normal_images', 'd', 'png'), 
         # 'im_mask': 'images/%08d_mask.png', 
 
     }, 
     im_params_dict={
         'im_H_load': 1024, 'im_W_load': 1280, 
+        # 'im_H_resize': 1024, 'im_W_resize': 1280, 
         'im_H_resize': 512, 'im_W_resize': 640, 
         'hdr_radiance_scale': hdr_radiance_scale, 
+        'if_need_undist': True # True to use undistorted images or manually undistort (e.g. https://github.com/niessner/Matterport/blob/master/data_organization.md#matterport_camera_intrinsics)
         }, 
     cam_params_dict={
         'if_convert': opt.if_convert_poses, # True to convert poses to cam.txt and K_list.txt
@@ -157,7 +194,7 @@ scene_obj = matterportScene3D(
         },
 )
 
-if opt.if_export:
+if opt.export_scene:
     scene_obj.export_scene(
         modality_list = [
         'poses', 
@@ -168,6 +205,8 @@ if opt.if_export:
         'mi_normal', 
         'mi_depth', 
         ], 
+        if_filter_with_main_region = opt.if_main_region, # True: to filter out frames that have too little coverage of the MAIN region
+        if_force = opt.force, # True to force export
     )
 
 
@@ -184,11 +223,13 @@ if opt.eval_scene:
 
     '''
     sample visivility to camera centers on vertices
-    [!!!] set 'mesh_color_type': 'eval-vis_count'
     '''
     _ = evaluator_scene.sample_shapes(
+        # sample_type='rgb_hdr', # ['']
+        # sample_type='rgb_sdr', # images/demo_eval_scene_shapes-rgb_sdr-matterport.png; VS artifacts as seen in images/demo_eval_scene_shapes-rgb_sdr-matterport-fromWEB.png
         sample_type='vis_count', # ['']
         # sample_type='t', # ['']
+        hdr_radiance_scale = hdr_radiance_scale, 
         shape_params={
         }
     )
@@ -207,9 +248,10 @@ if opt.vis_2d_plt:
         modality_list_vis=[
             'im', 
             # 'im_mask', 
-            'mi_depth', 
-            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            # 'mi_depth', 
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            'mi_normal_im_overlay',
             ], 
         # frame_idx_list=[0], 
     )
@@ -251,7 +293,7 @@ if opt.vis_3d_o3d:
         shapes_params={
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
-            'if_voxel_volume': True, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
+            'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
             'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
             'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available

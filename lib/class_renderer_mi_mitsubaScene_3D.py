@@ -7,7 +7,7 @@ import imageio
 
 from pathlib import Path
 import mitsuba as mi
-from lib.utils_misc import blue_text, yellow, red
+from lib.utils_misc import blue_text, white_blue
 from lib.utils_io import convert_write_png
 from lib.utils_io import normalize_v
 from lib.utils_io import resize_intrinsics
@@ -41,15 +41,15 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
             # 'lighting_envmap', 
         ]
 
-    def render(self):
+    def render(self, if_force: bool=False):
         for _ in self.modality_list:
-            if _ == 'im': self.render_im()
+            if _ == 'im': self.render_im(if_force=if_force)
         
-    def render_im(self):
+    def render_im(self, if_force: bool=False):
         self.spp = self.im_params_dict.get('spp', 1024)
-        folder_name, render_folder_path = self.render_modality_check('im')
+        folder_name, render_folder_path = self.render_modality_check('im', if_force=if_force)
 
-        print(blue_text('Rendering RGB to... by Mitsuba: %s')%str(render_folder_path))
+        print(white_blue('[%s] Rendering RGB to... by [Mitsuba] (spp %d)): %s')%(self.__class__.__name__, self.spp, str(render_folder_path)))
         for i, (origin, lookatvector, up) in tqdm(enumerate(self.os.origin_lookatvector_up_list)):
             sensor = self.get_sensor(origin, origin+lookatvector, up)
             image = mi.render(self.os.mi_scene, spp=self.spp, sensor=sensor)

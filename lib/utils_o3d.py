@@ -23,7 +23,7 @@ def text_3d(text, pos, direction=None, degree=0.0, density=10, font='/usr/share/
     if direction is None:
         direction = (0., 0., 1.)
 
-    assert Path(font).exists()
+    assert Path(font).exists(), f'Font {font} does not exist in your system!'
 
     font_obj = ImageFont.truetype(font, font_size * density)
     # font_obj = ImageFont.load_default()
@@ -186,28 +186,34 @@ def get_sphere(scale=5., resolution=200, hemisphere_normal=None, envmap=None):
     # self.vis.add_geometry(sphere)
     return sphere
 
-def remove_ceiling(xyz_pcd: np.ndarray, axis_up: str='y+', if_debug_info: bool=False):
+def remove_ceiling(xyz_pcd: np.ndarray, ceiling_loc: float, floor_loc: float, axis_up: str='y+', if_debug_info: bool=False, debug_info_str: str=''):
+    '''
+    assuming ceiling and floor are perpendicular to the axis_up
+    '''
     # import ipdb; ipdb.set_trace()
     # remove ceiling points; assuming y axis is up
     ceiling_axis = {'x+': 0, 'y+': 1, 'z+': 2, 'x-': 0, 'y-': 1, 'z-': 2}[axis_up]
-    height_max = np.amax(xyz_pcd[:, ceiling_axis]) # y axis is up
-    height_min = np.amin(xyz_pcd[:, ceiling_axis]) # y axis is up
-    if axis_up[1] == '+':
-        ceiling_loc = height_max
-        floor_loc = height_min
-    else:
-        ceiling_loc = height_min
-        floor_loc = height_max
+    # height_max = np.amax(xyz_pcd[:, ceiling_axis]) # y axis is up
+    # height_min = np.amin(xyz_pcd[:, ceiling_axis]) # y axis is up
+    # if axis_up[1] == '+':
+    #     ceiling_loc = height_max
+    #     floor_loc = height_min
+    # else:
+    #     ceiling_loc = height_min
+    #     floor_loc = height_max
 
     pcd_mask = np.abs(xyz_pcd[:, ceiling_axis] - ceiling_loc) < (0.05 * (ceiling_loc-floor_loc))
     # xyz_pcd = xyz_pcd[pcd_mask]
     # pcd_color = pcd_color[pcd_mask]
-    if if_debug_info:
-        print('Removed points close to ceiling... percentage: %.2f'%(np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
+    if if_debug_info and np.sum(pcd_mask) > 0:
+        print('[%s] Removed points close to ceiling... percentage: %.2f %%'%(debug_info_str, np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
 
     return pcd_mask
 
-def remove_walls(layout_bbox_3d: np.ndarray, xyz_pcd: np.ndarray, pcd_color: np.ndarray, if_debug_info: bool=False):
+def remove_walls(xyz_pcd: np.ndarray, layout_bbox_3d: np.ndarray, pcd_color: np.ndarray, if_debug_info: bool=False):
+    '''
+    assuming walls are axis-aligned
+    '''
     dists_all = np.zeros((xyz_pcd.shape[0]), dtype=np.float32) + np.inf
 
     for wall_v_idxes in [(4, 0, 5), (6, 5, 2), (7, 6, 3), (7, 3, 4)]:

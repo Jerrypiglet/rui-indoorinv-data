@@ -13,14 +13,15 @@ import trimesh
 import cv2
 # Import the library using the alias "mi"
 import mitsuba as mi
-from lib.utils_io import load_img, resize_intrinsics
-from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up, read_cam_params_OR, dump_cam_params_OR
+from lib.utils_io import load_img, resize_intrinsics, center_crop
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP, dump_cam_params_OR, convert_OR_poses_to_blender_npy, dump_blender_npy_to_json
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
+from lib.utils_misc import get_list_of_keys, green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
+from lib.utils_misc import get_device
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 
-from lib.utils_monosdf_scene import load_shape_dict_from_shape_file, load_monosdf_scale_offset
+from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_dict_from_shape_file, load_monosdf_scale_offset
 
 class mitsubaBase():
     '''
@@ -28,17 +29,50 @@ class mitsubaBase():
     '''
     def __init__(
         self, 
-        device: str='', 
+        # device: str='', 
+        host: str='', 
+        device_id: int=-1, 
         if_debug_info: bool=False, 
     ): 
-        self.device = device
+        self.host = host
+        self.device = get_device(self.host, device_id)
+        variant = self.CONF.mi_params_dict.get('variant', '')
+        from lib.global_vars import mi_variant_dict
+        mi.set_variant(variant if variant != '' else mi_variant_dict[self.host])
+
+        # self.device = device
         self.if_debug_info = if_debug_info
 
         # self.if_loaded_colors = False
         self.if_loaded_shapes = False
         self.if_loaded_layout = False
+        self.if_has_ceilling_floor = False
 
         self.extra_transform = None
+        self.extra_transform_inv = None
+        self.extra_transform_homo = None
+        self.if_center_offset = True # pixel centers are 0.5, 1.5, ..., H-1+0.5
+
+        self.shape_file_path = None
+        ''''
+        flags to set
+        '''
+        self.if_scale_scene = False
+        self.pcd_color = None
+        self.pts_from = {'mi': False, 'depth': False}
+        self.seg_from = {'mi': False, 'seg': False}
+        
+        self.axis_up = get_list_of_keys(self.CONF.scene_params_dict, ['axis_up'], [str])[0]
+        assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
+        self.ceiling_loc = None
+        self.floor_loc = None
+        
+        self.extra_transform = self.CONF.scene_params_dict.get('extra_transform', None)
+        if self.extra_transform is not None:
+            # self.extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32) # y=z, z=x, x=y
+            self.extra_transform_inv = self.extra_transform.T
+            self.extra_transform_homo = np.eye(4, dtype=np.float32)
+            self.extra_transform_homo[:3, :3] = self.extra_transform
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
@@ -53,11 +87,15 @@ class mitsubaBase():
         if not isinstance(W_list, list): W_list = [W_list] * len(pose_list)
         assert len(K_list) == len(pose_list) == len(H_list) == len(W_list)
         for _, (H, W, pose, K) in enumerate(zip(H_list, W_list, pose_list, K_list)):
-            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=(convention=='opencv'))
+            rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=(convention=='opencv'), if_center_offset=self.if_center_offset)
             cam_rays_list.append((rays_o, rays_d, ray_d_center))
         return cam_rays_list
 
-    def mi_sample_rays_pts(self, cam_rays_list):
+    def mi_sample_rays_pts(
+        self, 
+        cam_rays_list, 
+        if_force: bool=False,
+        ):
         '''
         sample per-pixel rays in NeRF/DVGO setting
         -> populate: 
@@ -66,7 +104,8 @@ class mitsubaBase():
         [!] note:
             - in both self.mi_pts_list and self.mi_depth_list, np.inf values exist for pixels of infinite depth
         '''
-        if self.pts_from['mi']:
+        if self.pts_from['mi'] and not if_force:
+            print(green('[mi_sample_rays_pts] already populated. skip.'))
             return
 
         self.mi_rays_ret_list = []
@@ -107,7 +146,9 @@ class mitsubaBase():
             mi_normal_global = ret.n.numpy().reshape(self._H(frame_idx), self._W(frame_idx), 3)
             # FLIP inverted normals!
             normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normal_global, axis=-1) > 0, np.any(mi_normal_global != np.inf, axis=-1))
-            mi_normal_global[normals_flip_mask] = -mi_normal_global[normals_flip_mask]
+            if np.sum(normals_flip_mask) > 0:
+                mi_normal_global[normals_flip_mask] = -mi_normal_global[normals_flip_mask]
+                print(yellow('[mi_sample_rays_pts] %d normals flipped!'%np.sum(normals_flip_mask)))
             mi_normal_global[invalid_depth_mask, :] = 0.
             self.mi_normal_global_list.append(mi_normal_global)
 
@@ -129,39 +170,39 @@ class mitsubaBase():
 
         print(green_text('DONE. [mi_sample_rays_pts] for %d frames...'%len(cam_rays_list)))
 
-    def load_monosdf_scene(self):
-        shape_file = Path(self.monosdf_shape_dict['shape_file'])
-        if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
-        (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
-        # self.mi_scene = mi.load_file(str(self.xml_file))
-        '''
-        [!!!] transform to XML scene coords (scale & location) so that ray intersection for GT geometry does not have to adapt to ESTIMATED geometry
-        '''
-        shape_id_dict = {
-            'type': shape_file.suffix[1:],
-            'filename': str(shape_file), 
-            # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
-            }
-        if if_shape_normalized:
-            # un-normalize to regular Mitsuba scene space
-            shape_id_dict['to_world'] = mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3)
+    # def load_monosdf_scene(self):
+    #     shape_file = Path(self.monosdf_shape_dict['shape_file'])
+    #     if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
+    #     (self.monosdf_scale, self.monosdf_offset), self.monosdf_scale_mat = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
+    #     # self.mi_scene = mi.load_file(str(self.xml_file))
+    #     '''
+    #     [!!!] transform to XML scene coords (scale & location) so that ray intersection for GT geometry does not have to adapt to ESTIMATED geometry
+    #     '''
+    #     self.shape_id_dict = {
+    #         'type': shape_file.suffix[1:],
+    #         'filename': str(shape_file), 
+    #         # 'to_world': mi.ScalarTransform4f.scale([1./scale]*3).translate((-offset).flatten().tolist()),
+    #         }
+    #     if if_shape_normalized:
+    #         # un-normalize to regular Mitsuba scene space
+    #         self.shape_id_dict['to_world'] = mi.ScalarTransform4f.translate((-self.monosdf_offset).flatten().tolist()).scale([1./self.monosdf_scale]*3)
             
-        self.mi_scene = mi.load_dict({
-            'type': 'scene',
-            'shape_id': shape_id_dict, 
-        })
+    #     self.mi_scene = mi.load_dict({
+    #         'type': 'scene',
+    #         'shape_id': self.shape_id_dict, 
+    #     })
 
-    def load_monosdf_shape(self, shape_params_dict: dict):
-        '''
-        load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
-        '''
-        if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
-        if if_shape_normalized:
-            scale_offset_tuple, _ = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
-        else:
-            scale_offset_tuple = ()
-        monosdf_shape_dict = load_shape_dict_from_shape_file(Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, scale_offset_tuple)
-        self.append_shape(monosdf_shape_dict)
+    # def load_monosdf_shape(self, shape_params_dict: dict):
+    #     '''
+    #     load a single shape estimated from MonoSDF: images/demo_shapes_monosdf.png
+    #     '''
+    #     if_shape_normalized = self.monosdf_shape_dict['_shape_normalized'] == 'normalized'
+    #     if if_shape_normalized:
+    #         scale_offset_tuple, _ = load_monosdf_scale_offset(Path(self.monosdf_shape_dict['camera_file']))
+    #     else:
+    #         scale_offset_tuple = ()
+    #     monosdf_shape_dict = load_shape_dict_from_shape_file(Path(self.monosdf_shape_dict['shape_file']), shape_params_dict, scale_offset_tuple)
+    #     self.append_shape(monosdf_shape_dict)
 
     def append_shape(self, shape_dict):
         self.vertices_list.append(shape_dict['vertices'])
@@ -197,7 +238,7 @@ class mitsubaBase():
             
             # [class mitsuba.ShapePtr] https://mitsuba.readthedocs.io/en/stable/src/api_reference.html#mitsuba.ShapePtr
             # slow...
-            mi_seg_area_file_folder = self.scene_rendering_path / 'mi_seg_emitter'
+            mi_seg_area_file_folder = self.scene_rendering_path_list[frame_idx] / 'mi_seg_emitter'
             mi_seg_area_file_folder.mkdir(parents=True, exist_ok=True)
             mi_seg_area_file_path = mi_seg_area_file_folder / ('mi_seg_emitter_%d.png'%(self.frame_id_list[frame_idx]))
             if_get_from_scratch = True
@@ -225,12 +266,13 @@ class mitsubaBase():
 
         print(green_text('DONE. [mi_get_segs] for %d frames...'%len(self.mi_rays_ret_list)))
 
-    def sample_poses(self, sample_pose_num: int, extra_transform: np.ndarray=None, invalid_normal_thres=-1):
+    def sample_poses(self, sample_pose_num: int, extra_transform: np.ndarray=None, invalid_normal_thres=-1, if_dump=True):
         '''
         sample and write poses to OpenRooms convention (e.g. pose_format == 'OpenRooms': cam.txt)
         
         invalid_normal_threshold: if pixels of invalid normals exceed this thres, discard pose
         '''
+        
         from lib.utils_mitsubaScene_sample_poses import mitsubaScene_sample_poses_one_scene
         assert self.axis_up == 'y+', 'not supporting other axes for now'
         if not self.if_loaded_layout: self.load_layout()
@@ -242,13 +284,17 @@ class mitsubaBase():
 
         assert sample_pose_num is not None
         assert sample_pose_num > 0
-        self.cam_params_dict['samplePoint'] = sample_pose_num
+        self.CONF.cam_params_dict['samplePoint'] = sample_pose_num
 
         for _tmp_folder in ['mi_seg_emitter']:
             tmp_folder = self.scene_rendering_path / _tmp_folder
             if tmp_folder.exists():
-                shutil.rmtree(str(tmp_folder))
-        
+                shutil.rmtree(str(tmp_folder), ignore_errors=True)
+
+        tmp_rendering_path = Path(self.scene_rendering_path) / 'tmp_sample_poses_rendering'
+        if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path), ignore_errors=True)
+        tmp_rendering_path.mkdir(parents=True, exist_ok=True)
+                
         origin_lookat_up_list = mitsubaScene_sample_poses_one_scene(
             mitsubaScene=self, 
             scene_dict={
@@ -256,8 +302,8 @@ class mitsubaBase():
                 'boxes': boxes, 
                 'cads': cads, 
             }, 
-            cam_params_dict=self.cam_params_dict, 
-            path_dict={},
+            cam_params_dict=self.CONF.cam_params_dict, 
+            tmp_rendering_path=tmp_rendering_path, 
         ) # [pointLoc; target; up]
 
         pose_list = []
@@ -328,9 +374,6 @@ class mitsubaBase():
         totalCosts = normal_costs
         camIndex = np.argsort(totalCosts)[::-1][:sample_pose_num]
 
-        tmp_rendering_path = Path(self.scene_rendering_path) / 'tmp_sample_poses_rendering'
-        if tmp_rendering_path.exists(): shutil.rmtree(str(tmp_rendering_path), ignore_errors=True)
-        tmp_rendering_path.mkdir(parents=True, exist_ok=True)
         print(blue_text('Dumping tmp normal and depth by Mitsuba: %s')%str(tmp_rendering_path))
         for _, i in enumerate(camIndex):
             imageio.imwrite(str(tmp_rendering_path / ('normal_%04d.png'%_)), (np.clip((normal_list[i] + 1.)/2., 0., 1.)*255.).astype(np.uint8))
@@ -347,10 +390,29 @@ class mitsubaBase():
 
         print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
 
-        dump_cam_params_OR(pose_file_root=self.pose_file.parent, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.cam_params_dict, extra_transform=extra_transform)
+        if if_dump:
+            dump_cam_params_OR(pose_file_root=self.pose_file_root, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.CONF.cam_params_dict, extra_transform=extra_transform)
+            
+            # Dump pose file in Blender .npy files
+            npy_path = self.pose_file_root / ('%s.npy'%self.split)
+            print('-', self.pose_list[0])
+            blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.pose_list, export_path=npy_path)
+            
+            # Dump pose file in .json format
+            # json_path = pose_file_root / 'transforms.json'
+            # # sampled poses should have the same K for simplicity
+            # f_x = self._K()[0][0]
+            # f_y = self._K()[1][1]
+            # camera_angle_x = 2 * np.arctan(0.5 * self._W() / f_x)
+            # camera_angle_y = 2 * np.arctan(0.5 * self._H() / f_y)
+            # dump_blender_npy_to_json(blender_poses=blender_poses, export_path=json_path, camera_angle_x=camera_angle_x, camera_angle_y=camera_angle_y)
+            
+            print(white_blue('Dumped sampled poses (cam.txt) to') + str(self.pose_file_root))
 
     def load_meta_json_pose(self, pose_file):
-        assert Path(pose_file).exists(), 'Pose file not found at %s! Check if exist, or if the correct pose format was chosen in key \'pose_file\' of scene_obj.'%str(pose_file)
+        assert Path(pose_file).exists(), str(pose_file)
+        # if not Path(pose_file).exists():
+            # return None, []
         with open(pose_file, 'r') as f:
             meta = json.load(f)
         Rt_c2w_b_list = []
@@ -583,6 +645,34 @@ class mitsubaBase():
         self.lamp_list = []
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
+    
+    def load_single_shape(self, shape_params_dict={}, extra_transform=None, force=False):
+        '''
+        load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
+        '''
+        if self.if_loaded_shapes and not force: return
+        
+        print(white_blue('[%s] load_single_shape for scene...'%self.parent_class_name), yellow('single'))
+
+        mitsubaBase._prepare_shapes(self)
+
+        scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)
+        shape_dict = load_shape_dict_from_shape_file(self.shape_file_path, shape_params_dict=shape_params_dict, scale_offset=scale_offset, extra_transform=extra_transform)
+        # , scale_offset=(9.1, 0.)) # read scale.txt and resize room to metric scale in meters
+        self.append_shape(shape_dict)
+
+        self.if_loaded_shapes = True
+        
+        print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
+            self.parent_class_name, 
+            len(self.shape_list_valid), 
+            len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
+            len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
+            )))
+
+        if shape_params_dict.get('if_dump_shape', False):
+            dump_shape_dict_to_shape_file(shape_dict, self.shape_file_path)
+
 
     def export_poses_cam_txt(self, export_folder: Path, cam_params_dict={}, frame_num_all=-1):
         print(white_blue('[%s] convert poses to OpenRooms format')%self.parent_class_name)
@@ -594,8 +684,8 @@ class mitsubaBase():
 
             # RR = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1]])
             # tt = np.zeros((3, 1))
-            # from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up
-            # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(RR, tt)
+            # from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP
+            # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(RR, tt)
             # print((origin, lookatvector, up))
 
         for T_, appendix in T_list_:
@@ -621,7 +711,7 @@ class mitsubaBase():
 
             if appendix != '':
                 # debug: two prints should agree
-                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(Rt_list[0][0], Rt_list[0][1])
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(Rt_list[0][0], Rt_list[0][1])
                 print((origin.flatten(), lookatvector.flatten(), up.flatten()))
                 print((T_@self.origin_lookatvector_up_list[0][0]).flatten(), (T_@self.origin_lookatvector_up_list[0][1]).flatten(), (T_@self.origin_lookatvector_up_list[0][2]).flatten())
             dump_cam_params_OR(
@@ -639,105 +729,4 @@ class mitsubaBase():
         for shape_idx, shape, in enumerate(mi_scene.shapes()):
             if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
             shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
-        print(blue_text('Scene shapes dumped to: %s')%str(mesh_dump_root))
-
-    def export_scene(self, modality_list=[]):
-        '''
-        export scene to mitsubaScene data structure
-        '''
-        scene_export_path = self.rendering_root / 'scene_export' / self.scene_name
-        if scene_export_path.exists():
-            if_reexport = input(red("scene export path exists:%s . Re-export? [y/n]"%str(scene_export_path)))
-            if if_reexport in ['y', 'Y']:
-                if_delete = input(red("Delete? [y/n]"))
-                if if_delete in ['y', 'Y']:
-                    shutil.rmtree(str(scene_export_path), ignore_errors=True)
-            else:
-                print(red('Aborted export.'))
-                return
-        scene_export_path.mkdir(parents=True, exist_ok=True)
-
-        for modality in modality_list:
-            # assert modality in self.modality_list, 'modality %s not in %s'%(modality, self.modality_list)
-
-            if modality == 'poses':
-                self.export_poses_cam_txt(scene_export_path, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
-            
-            if modality == 'im_hdr':
-                (scene_export_path / 'Image').mkdir(parents=True, exist_ok=True)
-                for _, frame_id in enumerate(self.frame_id_list):
-                    im_hdr_export_path = scene_export_path / 'Image' / ('%03d_0001.exr'%_)
-                    hdr_scale = self.hdr_scale_list[_]
-                    cv2.imwrite(str(im_hdr_export_path), hdr_scale * self.im_hdr_list[_][:, :, [2, 1, 0]])
-                    print(blue_text('HDR image %s exported to: %s'%(frame_id, str(im_hdr_export_path))))
-            
-            if modality == 'im_sdr':
-                (scene_export_path / 'Image').mkdir(parents=True, exist_ok=True)
-                for _, frame_id in enumerate(self.frame_id_list):
-                    im_sdr_export_path = scene_export_path / 'Image' / ('%03d_0001.png'%_)
-                    cv2.imwrite(str(im_sdr_export_path), (np.clip(self.im_sdr_list[_][:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
-                    print(blue_text('SDR image %s exported to: %s'%(frame_id, str(im_sdr_export_path))))
-            
-            if modality == 'mi_normal':
-                (scene_export_path / 'MiNormalGlobal').mkdir(parents=True, exist_ok=True)
-                assert self.pts_from['mi']
-                for _, frame_id in enumerate(self.frame_id_list):
-                    mi_normal_export_path = scene_export_path / 'MiNormalGlobal' / ('%03d_0001.png'%_)
-                    cv2.imwrite(str(mi_normal_export_path), (np.clip(self.mi_normal_global_list[_][:, :, [2, 1, 0]]/2.+0.5, 0., 1.)*255.).astype(np.uint8))
-                    print(blue_text('Mitsuba normal (global) %s exported to: %s'%(frame_id, str(mi_normal_export_path))))
-            
-            if modality == 'mi_depth':
-                (scene_export_path / 'MiDepth').mkdir(parents=True, exist_ok=True)
-                assert self.pts_from['mi']
-                for _, frame_id in enumerate(self.frame_id_list):
-                    mi_depth_vis_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.png'%_)
-                    mi_depth = self.mi_depth_list[_].squeeze()
-                    depth_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.mi_invalid_depth_mask_list[_])
-                    cv2.imwrite(str(mi_depth_vis_export_path), depth_normalized)
-                    print(blue_text('Mitsuba depth (vis) %s exported to: %s'%(frame_id, str(mi_depth_vis_export_path))))
-                    mi_depth_npy_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.npy'%_)
-                    np.save(str(mi_depth_npy_export_path), mi_depth)
-                    print(blue_text('Mitsuba depth (npy) %s exported to: %s'%(frame_id, str(mi_depth_npy_export_path))))
-
-            if modality == 'im_mask':
-                (scene_export_path / 'ImMask').mkdir(parents=True, exist_ok=True)
-                assert self.pts_from['mi']
-                if hasattr(self, 'im_mask_list'):
-                    assert len(self.im_mask_list) == len(self.mi_invalid_depth_mask_list)
-                for _, frame_id in enumerate(self.frame_id_list):
-                    im_mask_export_path = scene_export_path / 'ImMask' / ('%03d_0001.png'%_)
-                    mi_invalid_depth_mask = self.mi_invalid_depth_mask_list[_]
-                    if hasattr(self, 'im_mask_list'):
-                        im_mask = self.im_mask_list[_]
-                        assert mi_invalid_depth_mask.shape == im_mask.shape, 'invalid depth mask shape %s not equal to im_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask.shape)
-                        im_mask = np.logical_and(im_mask, ~mi_invalid_depth_mask)
-                        print('Exporting im_mask from invalid depth mask && loaded im_mask')
-                    else:
-                        im_mask = ~mi_invalid_depth_mask
-                        print('Exporting im_mask from invalid depth mask only')
-                    cv2.imwrite(str(im_mask_export_path), (im_mask*255).astype(np.uint8))
-                    print(blue_text('Mask image (for valid depths) %s exported to: %s'%(frame_id, str(im_mask_export_path))))
-            
-            if modality == 'shapes': 
-                assert self.if_loaded_shapes, 'shapes not loaded'
-                T_list_ = [(None, '')]
-                if self.extra_transform is not None:
-                    T_list_.append((self.extra_transform_inv, '_extra_transform'))
-
-                for T_, appendix in T_list_:
-                    shape_list = []
-                    shape_export_path = scene_export_path / ('scene%s.obj'%appendix)
-                    for vertices, faces in zip(self.vertices_list, self.faces_list):
-                        if T_ is not None:
-                            shape_list.append(trimesh.Trimesh((T_ @ vertices.T).T, faces-1))
-                        else:
-                            shape_list.append(trimesh.Trimesh(vertices, faces-1))
-                    shape_tri_mesh = trimesh.util.concatenate(shape_list)
-                    shape_tri_mesh.export(str(shape_export_path))
-                    if not shape_tri_mesh.is_watertight:
-                        trimesh.repair.fill_holes(shape_tri_mesh)
-                        shape_tri_mesh_convex = trimesh.convex.convex_hull(shape_tri_mesh)
-                        shape_tri_mesh_convex.export(str(shape_export_path.parent / ('%s_hull%s.obj'%(shape_export_path.stem, appendix))))
-                        shape_tri_mesh_fixed = trimesh.util.concatenate([shape_tri_mesh, shape_tri_mesh_convex])
-                        shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
-                        print(yellow('Mesh is not watertight. Filled holes and added convex hull: -> %s%s.obj, %s_hull%s.obj, %s_fixed%s.obj'%(shape_export_path.name, appendix, shape_export_path.name, appendix, shape_export_path.name, appendix)))
+        print(blue_text('Scene shapes dumped to: %s')%str(mesh_dump_root))      

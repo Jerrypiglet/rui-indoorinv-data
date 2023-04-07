@@ -42,6 +42,8 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
     if ext in ['png', 'jpg']:
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     elif ext in ['exr']:
+        assert Path(path).exists(), f"File not found: {path}"
+        # print(path)
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)[:, :, :3]
     elif ext in ['hdr']:
         im = cv2.imread(str(path), -1)
@@ -59,6 +61,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         mask = im <= 3000
         im[mask] = im[mask]*8e-8
         im[~mask] = 0.00024*1.0002**(im[~mask]-3000)
+        # im = 0.0000024 * im
 
     # cv2.imread returns None when it cannot read the file
     if im is None:
@@ -99,7 +102,9 @@ def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if
         im_hdr_scaled = im_hdr * scale
     
     im_SDR = np.clip(im_hdr_scaled**(1.0/2.2), 0., 1.)
+    # im_SDR = np.clip((im_hdr_scaled/4)**(1.0/4), 0., 1.)
     im_SDR_uint8 = (255. * im_SDR).astype(np.uint8)
+    Path(png_image_path).parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(im_SDR_uint8).save(str(png_image_path))
 
 def tone_mapping_16bit(im_16bit, dest_dtype=np.float32):
@@ -327,3 +332,16 @@ def resize_intrinsics(K: np.ndarray, scale_factor: Tuple[float, float]) -> np.nd
     K[0] *= scale_factor[1]  # width
     K[1] *= scale_factor[0]  # height
     return K
+
+def center_crop(im, center_crop_HW):
+    '''
+    center crop
+    '''
+    if center_crop_HW is None:
+        return im
+    H, W = im.shape[:2]
+    H_crop, W_crop = center_crop_HW
+    assert H_crop <= H and W_crop <= W
+    h_start = (H-H_crop)//2
+    w_start = (W-W_crop)//2
+    return im[h_start:h_start+H_crop, w_start:w_start+W_crop, ...]

@@ -1,5 +1,5 @@
 '''
-python3 tools_download_matterport.py --output_dir /newfoundland3/ruizhu/Matterport3D/ --workers_total 16
+python3 tools_download_matterport.py --output_dir /newfoundland3/ruizhu/Matterport3D/ --workers_total 16 --download (or --unzip)
 
 The script download_mp.py works with Python2. Make sure you have an available Python2 binary locally.
 '''
@@ -26,6 +26,9 @@ parser.add_argument('--debug', action='store_true', help='not rendering; just sh
 parser.add_argument('--output_dir', type=str, default='/newfoundland3/ruizhu/Matterport3D/', help='output directory')
 parser.add_argument('--python_bin', type=str, default='python2', help='python binary')
 parser.add_argument('--download', action='store_true', help='')
+parser.add_argument('--unzip', action='store_true', help='')
+parser.add_argument('--delete', action='store_true', help='')
+parser.add_argument('--scenes', nargs='+', help='list of scene names', required=False, default=[])
 # output_dir = '/newfoundland3/ruizhu/Matterport3D/'
 opt = parser.parse_args()
 
@@ -38,21 +41,30 @@ def exec(_):
         subprocess.call(cmd.split(' '))
 
 if __name__ == '__main__':
+    if opt.scenes != []:
+        assert [_ in house_scans_id for _ in opt.scenes]
+        house_scans_id = opt.scenes
 
     if opt.download:
         cmd = '%s download_mp.py -o %s --type %s --id %s'
         cmd_list = [cmd % (opt.python_bin, opt.output_dir, types_str, house_scan_id) for house_scan_id in house_scans_id]
 
     if opt.unzip:
-        cmd = 'unzip -o %s -d %s'
-        cmd_list = [cmd % (opt.output_dir + house_scan_id + '.zip', opt.output_dir + house_scan_id) for house_scan_id in house_scans_id]
+        cmd_list = []
+        scene_paths = [Path(opt.output_dir) / ('v1/scans/%s'%scene) for scene in house_scans_id]
+        for scene_path in scene_paths:
+            for types in types_str.split(' '):
+                zip_path = scene_path / (types+'.zip')
+                if zip_path.exists():
+                    cmd = 'unzip -o %s -d %s'%(str(zip_path), str(Path(opt.output_dir) / 'v1' / 'scans'))
+                    cmd_list.append(cmd)
+                else:
+                    print('WARNING: %s does not exist'%str(zip_path))
 
+    assert opt.download or opt.unzip
     tic = time.time()
     p = Pool(processes=opt.workers_total)
     list(tqdm(p.imap_unordered(exec, cmd_list), total=len(cmd_list)))
     p.close()
     p.join()
     print('==== ...DONE. Took %.2f seconds'%(time.time() - tic))
-
-
-

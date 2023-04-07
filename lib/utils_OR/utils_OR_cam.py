@@ -1,16 +1,20 @@
 import numpy as np
 import os.path as osp
 import os,sys,inspect
+
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir) 
 from pathlib import Path
-from utils_misc import red, yellow
+import torch
+from scipy.spatial.transform import Rotation
+
+from utils_misc import red, yellow, white_blue, listify_matrix
 from utils_OR.utils_OR_geo import isect_line_plane_v3
 from lib.utils_io import normalize_v
 
 def read_cam_params_OR(camFile):
-    assert osp.isfile(str(camFile))
+    assert osp.isfile(str(camFile)), str(camFile)
     with open(str(camFile), 'r') as camIn:
     #     camNum = int(camIn.readline().strip() )
         cam_data = camIn.read().splitlines()
@@ -32,6 +36,80 @@ def read_K_list_OR(K_list_file):
     K_list = np.split(K_list, K_num, axis=0) # [[origin, lookat, up], ...]
     return K_list
 
+def convert_OR_poses_to_blender_npy(pose_list: list, export_path: Path=None):
+    # read original [R|t]
+    assert pose_list[0].shape == (3, 4)
+    pose_list = np.stack(pose_list, 0)
+    pose_list = torch.from_numpy(pose_list)
+
+    pose_list = torch.cat([pose_list,torch.zeros_like(pose_list[:,:1,:])],1)
+    pose_list[:,3,3] = 1.0
+
+    # convert to blender format [translation, euler angle]
+    coord_conv = [0,2,1]
+    blender_poses = np.zeros((len(pose_list),2,3))
+    for i,pose in enumerate(pose_list):
+        # print('--', pose)
+        pos = pose[:,3].clone()
+        coord_conv = [0,2,1]
+        pos = pos[coord_conv]
+        pos[1] = -pos[1]
+        #pos = pos*scale_to_blend + trans_to_blend
+        Rs = pose[:,:3].clone()
+        Rs[:,1] = -Rs[:,1]
+        Rs[:,2] = -Rs[:,2]
+        Rs = Rs[coord_conv]
+        Rs[1] = -Rs[1]
+        angle = Rotation.from_matrix(Rs).as_euler('xyz',degrees=False)
+        blender_poses[i,0] = pos.numpy()
+        blender_poses[i,1] = angle
+        
+    if export_path is not None:
+        assert export_path.suffix == '.npy'
+        np.save(str(export_path), blender_poses)
+        print(white_blue('Dumped camera poses (.npy) to') + str(export_path))
+
+    return blender_poses # (N, 2, 3)
+
+def dump_blender_npy_to_json(blender_poses: np.ndarray, file_path_list: list=[], camera_angle_x: float=None, camera_angle_y: float=None, export_path: Path=None):
+    import bpy
+    import json
+    assert False, 'the conversion is wrong for now'
+    
+    out_data = {}
+    if camera_angle_x is not None:
+        out_data.update({'camera_angle_x': camera_angle_x})
+    if camera_angle_y is not None:
+        out_data.update({'camera_angle_y': camera_angle_y})
+    out_data.update({'frames': []})
+    
+    if file_path_list == []:
+        file_path_list = ['']*len(blender_poses)
+    assert len(file_path_list) == blender_poses.shape[0]
+    
+    
+    for i in range(blender_poses.shape[0]):
+        cam = bpy.context.scene.camera #scene.objects['Camera']
+        cam.location = blender_poses[i,0]
+        cam.rotation_euler[2] = blender_poses[i,1,2]
+        cam.rotation_euler[0] = blender_poses[i,1,0]
+        frame_data = {
+            'file_path': file_path_list[i],
+            'transform_matrix': listify_matrix(cam.matrix_world)
+        }
+        print(i, listify_matrix(cam.matrix_world))
+        out_data['frames'].append(frame_data)
+
+    import ipdb; ipdb.set_trace()
+    
+    if export_path is not None:
+        assert export_path.suffix == '.json'
+        with open(str(export_path), 'w') as out_file:
+            json.dump(out_data, out_file, indent=4)
+        print(white_blue('Dumped camera poses (.json) to') + str(export_path))
+        
+    return out_data
+
 def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt_list: list=[], cam_params_dict: dict={}, K_list: list=[], frame_num_all: int=-1, appendix='', extra_transform: np.ndarray=None):
     if frame_num_all != -1 and len(origin_lookat_up_mtx_list) != frame_num_all:
         if_write_pose_file = input(red('pose num to write %d is less than total available poses in the scene (%d poses). Still write? [y/n]'%(len(origin_lookat_up_mtx_list), frame_num_all)))
@@ -44,7 +122,7 @@ def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt
         pose_file_root.mkdir(parents=True, exist_ok=True)
     pose_file_write = pose_file_root / ('cam%s.txt'%appendix)
     if pose_file_write.exists():
-        if_overwrite_pose_file = input(red('pose file exists: %s (%d poses). Overwrite? [y/n]'%(str(pose_file_write), len(read_cam_params_OR(pose_file_write)))))
+        if_overwrite_pose_file = input(red('pose file exists: %s (%d poses). OVERWRITE? [y/n]'%(str(pose_file_write), len(read_cam_params_OR(pose_file_write)))))
         
     if if_overwrite_pose_file in ['Y', 'y']:
         with open(str(pose_file_write), 'w') as camOut:
@@ -181,7 +259,10 @@ def origin_lookat_up_to_R_t(origin, lookat, up):
 
     return (R, t), lookatvector
     
-def R_t_to_origin_lookatvector_up(R, t):
+def R_t_to_origin_lookatvector_up_yUP(R, t):
+    '''
+    only works for y+ [!!!]
+    '''
     _, __, lookatvector = np.split(R, 3, axis=-1)
     lookatvector = normalize_v(lookatvector)
     up = normalize_v(-__) # (3, 1)

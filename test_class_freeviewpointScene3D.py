@@ -67,30 +67,35 @@ parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, def
 # utils
 parser.add_argument('--if_convert_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
 parser.add_argument('--if_dump_shape', type=str2bool, nargs='?', const=True, default=False, help='if dump shape of entire scene')
-parser.add_argument('--if_export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+
+parser.add_argument('--export', type=str2bool, nargs='?', const=True, default=False, help='if export entire scene to mitsubaScene data structure')
+parser.add_argument('--export_format', type=str, default='monosdf', help='')
+parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
 opt = parser.parse_args()
 
-base_root = Path(PATH_HOME) / 'data/free-viewpoint'
-assert base_root.exists()
+dataset_root = Path(PATH_HOME) / 'data/free-viewpoint'
+assert dataset_root.exists()
+
+hdr_radiance_scale = 1.
 
 # scene_name = 'asianRoom1'
-# scene_name = 'asianRoom2'
+scene_name = 'asianRoom2'
 # scene_name = 'Hall'
 # scene_name = 'Kitchen'
-scene_name = 'Salon2' # Living room
+# scene_name = 'Salon2'; hdr_radiance_scale = 2;  # Living room
 # scene_name = 'sofa91'
 
-frame_ids = [0]
+# frame_ids = [0]
 # frame_ids = [0, 1, 199]
 
 scene_obj = freeviewpointScene3D(
     if_debug_info=opt.if_debug_info, 
     host=host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'rendering_root': base_root}, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
-        'frame_id_list': frame_ids, # comment out to use all frames
+        # 'frame_id_list': frame_ids, # comment out to use all frames
         'axis_up': 'z+', 
         'pose_file': ('bundle', 'bundle.out'), 
         # 'pose_file': ('OpenRooms', 'cam.txt'), # only useful after dumping poses to cam.txt
@@ -119,31 +124,68 @@ scene_obj = freeviewpointScene3D(
     im_params_dict={
         # 'if_allow_crop': True, # image sizes are sometimes larger than size in the meta file because of padding in provided masks
         'if_all_ones_masks': True if scene_name == 'sofa91' else False, # [DEBUG] True: to use all-ones masks (fix issues with sofa91 masks)
+        'hdr_radiance_scale': hdr_radiance_scale, 
+        'im_H_load': 666, 'im_W_load': 998, 
+        'im_H_resize': 512, 'im_W_resize': 768, # monosdf
         }, 
     cam_params_dict={
         'if_convert': opt.if_convert_poses, # True to convert poses to cam.txt and K_list.txt
     }, 
     shape_params_dict={
         'if_dump_shape': opt.if_dump_shape, # True to dump fixed shape to obj file
-        'if_fix_watertight': not opt.if_export, 
+        'if_fix_watertight': not opt.export, 
         },
     emitter_params_dict={
         },
 )
 
-if opt.if_export:
-    scene_obj.export_scene(
+if opt.export:
+    from lib.class_exporter import exporter_scene
+    exporter = exporter_scene(
+        scene_object=scene_obj,
+        format=opt.export_format, 
         modality_list = [
-        'poses', 
-        'im_hdr', 
-        'im_sdr', 
-        'im_mask', 
-        'shapes', 
-        'mi_normal', 
-        'mi_depth', 
-        ], 
+            'poses', 
+            'im_hdr', 
+            'im_sdr', 
+            'im_mask', 
+            'shapes', 
+            'mi_normal', 
+            'mi_depth', 
+            ], 
+        if_force=opt.force, 
     )
-
+    if opt.export_format == 'monosdf':
+        exporter.export_monosdf_fvp_mitsuba(
+            # split=opt.split, 
+            format='monosdf',
+            )
+    if opt.export_format == 'fvp':
+        exporter.export_monosdf_fvp_mitsuba(
+            # split=opt.split, 
+            format='fvp',
+            modality_list = [
+                'poses', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
+                'shapes', 
+                ], 
+        )
+    if opt.export_format == 'lieccv22':
+        exporter.export_lieccv22(
+            modality_list = [
+            'im_sdr', 
+            'mi_depth', 
+            'mi_seg', 
+            ], 
+            # split=opt.split, 
+            assert_shape=(240, 320),
+            window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+            merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+            # center_crop_HW=(240, 320), 
+            if_no_gt_appendix=True, 
+        )
 eval_return_dict = {}
 
 '''
@@ -182,7 +224,7 @@ if opt.vis_2d_plt:
             'im_mask', 
             'mi_depth', 
             'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         # frame_idx_list=[0], 
     )

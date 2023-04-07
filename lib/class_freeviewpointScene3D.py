@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up
+from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up_yUP
 from lib.utils_io import load_img, load_matrix
 # from collections import defaultdict
 # import trimesh
@@ -76,11 +76,13 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
         if self.axis_up != self.axis_up_native:
             assert False, 'do something please'
-
+        
+        self.if_autoscale_scene = False
+        
         self.host = host
         self.device = get_device(self.host, device_id)
 
-        self.scene_path = self.rendering_root / self.scene_name
+        self.scene_path = self.dataset_root / self.scene_name
         self.scene_rendering_path = self.scene_path
         self.scene_name_full = self.scene_name # e.g.'asianRoom1'
 
@@ -150,6 +152,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
             self.frame_id_list = frame_id_all_list
             # if if_missing_frame:
             #     frame_info_all_list = [_ for _ in frame_info_all_list if int(_.split(' ')[0].split('.')[0]) in self.frame_id_list]
+        self.scene_rendering_path_list = [self.scene_rendering_path] * len(self.frame_id_list)
 
         frame_info_all_dict = {int(_.split(' ')[0].split('.')[0]): _ for _ in frame_info_all_list}
         
@@ -159,7 +162,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         im_HW_load_list = [frame_info_all_dict[frame_id] for frame_id in self.frame_id_list]
         self.im_HW_load_list = [(int(_.split(' ')[2])+1, int(_.split(' ')[1])+1) for _ in im_HW_load_list]
         assert len(im_HW_load_list) == len(self.frame_id_list)
-        assert 'im_H_resize' not in self.im_params_dict and 'im_W_resize' not in self.im_params_dict
+        # assert 'im_H_resize' not in self.im_params_dict and 'im_W_resize' not in self.im_params_dict
         self.H_list = [_[0] for _ in self.im_HW_load_list]
         self.W_list = [_[1] for _ in self.im_HW_load_list]
 
@@ -216,7 +219,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         for _ in self.modality_list:
             result_ = scene2DBase.load_modality_(self, _)
             if not (result_ == False): continue
-            if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
+            if _ == 'shapes': self.load_single_shape(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'im_mask': self.load_im_mask()
 
     def get_modality(self, modality, source: str='GT'):
@@ -339,10 +342,13 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
                 R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
                 self.pose_list.append(np.hstack((R, t)))
 
-                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
                 K = np.array([[float(f), 0, self._W(frame_idx)/2.], [0, float(f), self._H(frame_idx)/2.], [0, 0, 1]], dtype=np.float32)
+                if self.im_W_load != self.W or self.im_H_load != self.H:
+                    scale_factor = [t / s for t, s in zip((self.H, self.W), self.im_HW_load)]
+                    K = resize_intrinsics(K, scale_factor)
                 self.K_list.append(K)
 
             print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
@@ -374,30 +380,3 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
     def get_cam_rays(self, cam_params_dict={}):
         if hasattr(self, 'cam_rays_list'):  return
         self.cam_rays_list = self.get_cam_rays_list(self.H_list, self.W_list, self.K_list, self.pose_list, convention='opencv')
-
-    def load_shapes(self, shape_params_dict={}):
-        '''
-        load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
-        '''
-        if self.if_loaded_shapes: return
-        
-        print(white_blue('[%s] load_shapes for scene...'%self.parent_class_name))
-
-        mitsubaBase._prepare_shapes(self)
-
-        scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)
-        shape_dict = load_shape_dict_from_shape_file(self.shape_file, shape_params_dict=shape_params_dict, scale_offset=scale_offset)
-        # , scale_offset=(9.1, 0.)) # read scale.txt and resize room to metric scale in meters
-        self.append_shape(shape_dict)
-
-        self.if_loaded_shapes = True
-        
-        print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
-            self.parent_class_name, 
-            len(self.shape_list_valid), 
-            len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
-            len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
-            )))
-
-        if shape_params_dict.get('if_dump_shape', False):
-            dump_shape_dict_to_shape_file(shape_dict, self.shape_file)
