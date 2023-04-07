@@ -168,5 +168,7 @@ python load_mitsubaScene3D.py --scene kitchen_mi --vis_2d_plt
 To visualize other modalities ([demo](https://i.imgur.com/24i0yjA.png)), set `mitsubaScene3D(modality_list` and `visualizer_scene_2D(modality_list_vis` to desired modalities, then run the same command.
 
 # TODO
-= [ ] Blender: how to NOT render HDR images?
+- [ ] Blender: how to NOT render HDR images?
+- [ ] better if_autoscale_scene with Mustafa's method (using Colmap points?)
+- [ ] deal with extra_transform
 - [ ] fix bpy.ops.import_scene.mitsuba() error

@@ -15,7 +15,7 @@ import string
 # Import the library using the alias "mi"
 import mitsuba as mi
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
+from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red, get_device
 from lib.utils_io import load_matrix, resize_intrinsics
 from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
 
@@ -59,7 +59,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             device_id=device_id, 
         )
 
-
         '''
         scene params and frames
         '''
@@ -72,7 +71,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.invalid_frame_id_list = self.CONF.scene_params_dict.get('invalid_frame_id_list', [])
         self.frame_id_list = [_ for _ in self.frame_id_list if _ not in self.invalid_frame_id_list]
         
-        self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_dict, ['mitsuba_version'], [str])[0]
+        self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_diset_variantct, ['mitsuba_version'], [str])[0]
         self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
         
@@ -96,11 +95,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         # self.monosdf_shape_dict = self.CONF.scene_params_dict.get('monosdf_shape_dict', {})
         # if '_shape_normalized' in self.monosdf_shape_dict:
         #     assert self.monosdf_shape_dict['_shape_normalized'] in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%self.monosdf_shape_dict['_shape_normalized']
-        if self.CONF.scene.shape_file != '':
-            if len(str(self.CONF.scene.shape_file).split('/')) == 1:
-                self.shape_file_path = self.scene_path / self.CONF.scene.shape_file
+        if self.CONF.scene_params_dict.shape_file != '':
+            if len(str(self.CONF.scene_params_dict.shape_file).split('/')) == 1:
+                self.shape_file_path = self.scene_path / self.CONF.scene_params_dict.shape_file
             else:
-                self.shape_file_path = self.dataset_root / self.CONF.scene.shape_file
+                self.shape_file_path = self.dataset_root / self.CONF.scene_params_dict.shape_file
             assert self.shape_file_path.exists(), 'shape file does not exist: %s'%str(self.shape_file_path)
 
         self.near = self.CONF.cam_params_dict.get('near', 0.1)
@@ -227,9 +226,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        # if self.monosdf_shape_dict != {}:
-        #     self.load_monosdf_scene()
-        #     assert self.extra_transform is None, 'not suported yet'
         if self.shape_file_path is not None:
             print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
             self.shape_id_dict = {

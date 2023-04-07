@@ -2,22 +2,25 @@
 work with Mitsuba/Blender scenes
 '''
 import sys
-from pathlib import Path
 
 # host = 'mm1'
 host = 'apple'
 
-from lib.global_vars import PATH_HOME_dict# , INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
-PATH_HOME = Path(PATH_HOME_dict[host])
-sys.path.insert(0, str(PATH_HOME))
+from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
+PATH_HOME = PATH_HOME_dict[host]
+sys.path.insert(0, PATH_HOME)
+OR_RAW_ROOT = OR_RAW_ROOT_dict[host]
+INV_NERF_ROOT = INV_NERF_ROOT_dict[host]
+MONOSDF_ROOT = MONOSDF_ROOT_dict[host]
 
+from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
 import argparse
 from pyhocon import ConfigFactory, ConfigTree
 from lib.utils_misc import str2bool, white_magenta, check_exists
 
-from lib.class_mitsubaScene3D import mitsubaScene3D
+from lib.class_realScene3D import realScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
@@ -44,10 +47,6 @@ parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=Tru
 
 parser.add_argument('--split', type=str, default='train', help='')
 
-# differential renderer
-# parser.add_argument('--render_diff', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
-# parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
-
 # renderer (mi/blender)
 parser.add_argument('--render_2d', type=str2bool, nargs='?', const=True, default=False, help='render 2D modalities')
 parser.add_argument('--renderer', type=str, default='blender', help='mi, blender')
@@ -62,6 +61,7 @@ parser.add_argument('--eval_rad', type=str2bool, nargs='?', const=True, default=
 parser.add_argument('--eval_inv', type=str2bool, nargs='?', const=True, default=False, help='eval trained inv-MLP')
 # evaluator over scene shapes
 parser.add_argument('--eval_scene', type=str2bool, nargs='?', const=True, default=False, help='eval over scene (e.g. shapes for coverage)')
+parser.add_argument('--eval_scene_sample_type', type=str, default='vis_count', help='')
 # evaluator for MonoSDF
 parser.add_argument('--eval_monosdf', type=str2bool, nargs='?', const=True, default=False, help='eval trained MonoSDF')
 
@@ -76,11 +76,11 @@ parser.add_argument('--export_appendix', type=str, default='', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
 # === after refactorization
-parser.add_argument('--scene', type=str, default='kitchen', help='load conf file: confs/indoor_synthetic/\{opt.scene\}.conf')
+parser.add_argument('--scene', type=str, default='ConferenceRoomV2_final_supergloo', help='load conf file: confs/real/\{opt.scene\}.conf')
 
 opt = parser.parse_args()
 
-DATASET = 'indoor_synthetic'
+DATASET = 'real'
 conf_base_path = Path('confs/%s.conf'%DATASET); check_exists(conf_base_path)
 CONF = ConfigFactory.parse_file(str(conf_base_path))
 conf_scene_path = Path('confs/%s/%s.conf'%(DATASET, opt.scene)); check_exists(conf_scene_path)
@@ -88,105 +88,64 @@ conf_scene = ConfigFactory.parse_file(str(conf_scene_path))
 CONF = ConfigTree.merge_configs(CONF, conf_scene)
 
 dataset_root = Path(PATH_HOME) / CONF.data.dataset_root
-xml_root = Path(PATH_HOME) / CONF.data.xml_root
 
+'''
+default
+'''
 frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
+invalid_frame_idx_list = CONF.scene_params_dict.invalid_frame_idx_list
+
+'''
+------ final
+'''
+# +++++ ConferenceRoomV2_final_supergloo_aligned +++++ [SUPP]
+# scene_name = 'ConferenceRoomV2_final_supergloo'
 
 # [debug] override
-frame_id_list = [0]
+# frame_id_list = [0]
 
 '''
 modify confs
 '''
 
+if opt.export_format == 'mitsuba':
+    CONF.im_params_dict.update({
+        'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
+    })
+elif opt.export_format == 'lieccv22':
+    CONF.im_params_dict.update({
+        'im_H_resize': 240, 'im_W_resize': 320, 
+    })
+else:
+    CONF.im_params_dict.update({
+        'im_H_resize': 512, 'im_W_resize': 768, # monosdf
+    })
+    
 CONF.scene_params_dict.update({
     'split': opt.split, # train, val, train+val
     'frame_id_list': frame_id_list, 
     # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
     'invalid_frame_id_list': invalid_frame_id_list, 
     })
-    
-CONF.cam_params_dict.update({
-    # ==> if sample poses and render images 
-    'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-    'sample_pose_num': 20 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
-    'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
-    })
 
 CONF.mi_params_dict.update({
     'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
-    'if_get_segs': True, # [depend on if_sample_rays_pts=True] True: to generate segs similar to those in openroomsScene2D.load_seg()
+    'if_get_segs': False, # [depend on if_sample_rays_pts=True] True: to generate segs similar to those in openroomsScene2D.load_seg()
     })
 
-CONF.im_params_dict.update({
-    'im_H_resize': 320, 'im_W_resize': 640, 
-    'spp': 32, 
-    })
-
-CONF.shape_params_dict.update({
-    'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
-    'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
-    })
-
-'''
-create scene obj
-'''
-scene_obj = mitsubaScene3D(
+scene_obj = realScene3D(
     CONF = CONF, 
-    if_debug_info = opt.if_debug_info, 
-    host = host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
+    if_debug_info=opt.if_debug_info, 
+    host=host, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     modality_list = [
+        'poses', 
         'im_hdr', 
         'im_sdr', 
-        'poses', 
-        # 'lighting_envmap', 
-        'albedo', 'roughness', 
-        'emission', 
-        'depth', 'normal', 
-        # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties``
+        'shapes', # objs + emitters, geometry shapes + emitter properties
         ], 
 )
-
-'''
-Mitsuba/Blender 2D renderer
-'''
-if opt.render_2d:
-    assert opt.renderer in ['mi', 'blender']
-    if opt.renderer == 'mi':
-        renderer = renderer_mi_mitsubaScene_3D(
-            scene_obj, 
-            modality_list=[
-                'im', # both hdr and sdr
-            ], 
-            im_params_dict={}, 
-            cam_params_dict={}, 
-            mi_params_dict={},
-        )
-    if opt.renderer == 'blender':
-        renderer = renderer_blender_mitsubaScene_3D(
-            scene_obj, 
-            modality_list=[
-                'albedo', 
-                'roughness', 
-                'depth', 
-                'normal', 
-                'index', 
-                'emission', 
-                # 'lighting_envmap', 
-                ], 
-            host=host, 
-            FORMAT='OPEN_EXR', 
-            # FORMAT='PNG', 
-            im_params_dict={
-                'spp': 32}, 
-            cam_params_dict={}, 
-            mi_params_dict={},
-        )
-    host=host, 
-    renderer.render(if_force=opt.force)
 
 eval_return_dict = {}
 
@@ -203,8 +162,11 @@ if opt.eval_scene:
     sample visivility to camera centers on vertices
     [!!!] set 'mesh_color_type': 'eval-vis_count'
     '''
+    if opt.export:
+        eval_scene_sample_type = 'face_normal'
     _ = evaluator_scene.sample_shapes(
-        sample_type='vis_count', # ['']
+        sample_type=opt.eval_scene_sample_type, # ['']
+        # sample_type='vis_count', # ['']
         # sample_type='t', # ['']
         # sample_type='face_normal', # ['']
         shape_params={
@@ -235,10 +197,10 @@ if opt.export:
             'poses', 
             'im_hdr', 
             'im_sdr', 
-            'im_mask', 
-            'shapes', 
-            'mi_normal', 
-            'mi_depth', 
+            # 'im_mask', 
+            # 'shapes', 
+            # 'mi_normal', 
+            # 'mi_depth', 
             ], 
         if_force=opt.force, 
         # convert from y+ (native to indoor synthetic) to z+
@@ -248,19 +210,45 @@ if opt.export:
     )
     if opt.export_format == 'monosdf':
         exporter.export_monosdf_fvp_mitsuba(
-            split=opt.split, 
+            # split=opt.split, 
             format='monosdf',
+            modality_list = [
+                'poses', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
+                'shapes', 
+                'mi_normal', 
+                'mi_depth', 
+                ], 
+            appendix=opt.export_appendix, 
+            )
+    if opt.export_format == 'mitsuba':
+        exporter.export_monosdf_fvp_mitsuba(
+            # split=opt.split, 
+            format='mitsuba',
+            modality_list = [
+                'poses', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
+                'shapes', 
+                'mi_normal', 
+                'mi_depth', 
+                ], 
+            appendix=opt.export_appendix, 
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp_mitsuba(
-            split=opt.split, 
+            # split=opt.split, 
             format='fvp',
             modality_list = [
                 'poses', 
-                # 'im_hdr', 
-                # 'im_sdr', 
-                # 'im_mask', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
                 'shapes', 
+                'lighting', # new lights
                 ], 
             appendix=opt.export_appendix, 
         )
@@ -268,17 +256,21 @@ if opt.export:
         exporter.export_lieccv22(
             modality_list = [
             'im_sdr', 
-            'mi_seg', 
             'mi_depth', 
+            'mi_seg', 
             'lighting', # ONLY available after getting BRDFLight result from testRealBRDFLight.py
+            'emission', 
             ], 
-            split=opt.split, 
+            split='real', 
             assert_shape=(240, 320),
-            window_area_emitter_id_list=CONF.scene_params_dict.window_area_emitter_id_list, # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-            merge_lamp_id_list=CONF.scene_params_dict.merge_lamp_id_list,  # need to manually specify in XML
+            window_area_emitter_id_list=[], # not available for real images
+            merge_lamp_id_list=[], # not available for real images
+            emitter_thres = emitter_thres, # same as offered to fvp
             BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000', # transfer this back once get BRDF results
+            # BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize', # transfer this back once get BRDF results
             # center_crop_HW=(240, 320), 
-            if_no_gt_appendix=True, # do not append '_gt' to the end of the file name
+            if_no_gt_appendix=True, 
+            appendix=opt.export_appendix, 
         )
     
 '''
@@ -291,16 +283,11 @@ if opt.vis_2d_plt:
             'im', 
             # 'layout', 
             # 'shapes', 
-            'albedo', 
-            'roughness', 
-            'emission', 
-            'depth', 
-            'normal', 
             'mi_depth', 
             'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
-            # 'seg_area', 'seg_env', 'seg_obj', 
-            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            # 'mi_seg_area', 
+            # 'mi_seg_env', 
+            # 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         frame_idx_list=[0, 1, 2, 3, 4], 
         # frame_idx_list=[0], 
@@ -330,32 +317,13 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             'poses', 
-            'layout', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             'mi', # mitsuba sampled rays, pts
-            # 'dense_geo', # fused from 2D
-            # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
             ], 
         if_debug_info=opt.if_debug_info, 
     )
 
     lighting_params_vis={
-        'if_use_mi_geometry': True, 
-        'if_use_loaded_envmap_position': True, # assuming lighting envmap endpoint position dumped by Blender renderer
-        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_id_list)
-        'subsample_lighting_wi_rate': 500, # subsample on lighting directions: too many directions (e.g. 128x256)
-        # 'lighting_keep_ratio': 0.05, 
-        # 'lighting_further_clip_ratio': 0.1, 
-        'lighting_scale': 2, 
-        # 'lighting_keep_ratio': 0.2, # - good for lighting_SG
-        # 'lighting_further_clip_ratio': 0.3, 
-        'lighting_keep_ratio': 0., # - good for lighting_envmap
-        'lighting_further_clip_ratio': 0., 
-        # 'lighting_keep_ratio': 0., # - debug
-        # 'lighting_further_clip_ratio': 0., 
-        'lighting_autoscale': False, 
-        'lighting_if_show_hemisphere': True, # mainly to show hemisphere and local axes: images/demo_lighting_envmap_hemisphere_axes_o3d.png
         }
 
     if opt.if_add_rays_from_eval:
@@ -368,18 +336,6 @@ if opt.vis_3d_o3d:
                         'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 0., 1.]]*lpts.shape[0]), # BLUE for EST
                     }),
                 ]) 
-        if 'lighting_fused_list' in eval_return_dict:
-            assert opt.eval_rad
-            for lighting_fused_dict in eval_return_dict['lighting_fused_list']:
-                geometry_list = visualizer_3D_o3d.process_lighting(
-                    lighting_fused_dict, 
-                    lighting_params=lighting_params_vis, 
-                    lighting_source='lighting_envmap', 
-                    lighting_color=[0., 0., 1.], 
-                    if_X_multiplied=True, 
-                    if_use_pts_end=True,
-                    )
-                visualizer_3D_o3d.add_extra_geometry(geometry_list, if_processed_geometry_list=True)
         
     if opt.if_add_color_from_eval:
         if 'samples_v_dict' in eval_return_dict:
@@ -390,37 +346,28 @@ if opt.vis_3d_o3d:
         if_shader=opt.if_shader, # set to False to disable faycny shaders 
         cam_params={
             'if_cam_axis_only': False, 
+            'cam_vis_scale': 0.6, 
+            'if_cam_traj': False, 
             }, 
         lighting_params=lighting_params_vis, 
         shapes_params={
             # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
-            'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
+            'if_labels': True, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
-
-            # 'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            # 'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            'if_ceiling': False, 
-            'if_walls': False, 
-            # 'if_ceiling': True, 
-            # 'if_walls': True, 
-
+            # 'if_ceiling': False if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            # 'if_walls': False if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_ceiling': True, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': True, # [OPTIONAL] remove wall meshes to better see the furniture 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
         },
         emitter_params={
-            # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
-            # 'scale_SG_length': 2., 
-            'if_sampling_emitter': True, 
-            'scene_radiance_scale': CONF.scene_params_dict.scene_radiance_scale, 
-            'max_plate': 32, 
         },
         mi_params={
             'if_pts': False, # if show pts sampled by mi; should close to backprojected pts from OptixRenderer depth maps
             'if_pts_colorize_rgb': True, 
             'pts_subsample': 10,
-            # 'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
-            # 'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
             'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length

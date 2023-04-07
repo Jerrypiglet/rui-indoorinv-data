@@ -64,7 +64,7 @@ class visualizer_scene_3D_o3d(object):
         self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
             if _ == '': continue
-            assert _ in ['dense_geo', 'poses', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi']
+            assert _ in ['dense_geo', 'poses', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi'], 'Invalid modality: %s'%_
         if 'mi' in self.modality_list_vis:
             self.mi_pcd_color_list = None
         self.extra_geometry_list = []
@@ -716,7 +716,7 @@ class visualizer_scene_3D_o3d(object):
         if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_obj_mesh', True)
         if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_emitter_mesh', False)
         if_ceiling = shapes_params.get('if_ceiling', False)
-        if if_ceiling:
+        if not if_ceiling:
             assert self.os.if_has_ceilling_floor, 'scene object has no detected ceiling/floor; did you load_layout for XML-based scene, or detect ceiling/floor for shape-based scene?'
         if_walls = shapes_params.get('if_walls', False)
 

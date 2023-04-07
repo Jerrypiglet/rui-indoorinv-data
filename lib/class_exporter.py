@@ -1,3 +1,5 @@
+            normal_est_vis_ = normal_est_vis * 0.5 + rgb_gt * 0.5
+            writer.add_image('%s_normal_est_OVERLAY/%d'%(PREFIX, batch_id), normal_est_vis_, tid, dataformats='HWC')
 import copy
 import pickle
 import shutil
