@@ -29,9 +29,9 @@ from lib.utils_OR.utils_OR_mesh import computeBox, get_rectangle_mesh
 
 from .class_scene2DBase import scene2DBase
 
-class mitsubaScene3D(mitsubaBase, scene2DBase):
+class i2sdfScene3D(mitsubaBase, scene2DBase):
     '''
-    A class used to visualize/render Mitsuba scene in XML format
+    A class used to load scenes from I2-SDF (https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)
     '''
     def __init__(
         self, 
@@ -53,40 +53,28 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             if_debug_info=if_debug_info, 
             )
         
-        mitsubaBase.__init__(
-            self, 
-            host=host, 
-            device_id=device_id, 
-        )
+        # mitsubaBase.__init__(
+        #     self, 
+        #     host=host, 
+        #     device_id=device_id, 
+        # )
 
         '''
         scene params and frames
         '''
         self.split, self.frame_id_list = get_list_of_keys(self.CONF.scene_params_dict, ['split', 'frame_id_list'], [str, list])
-        self.splits = self.split.split('+')
-        assert all([_.split('_')[0] in ['train', 'val', 'train+val'] for _ in self.splits])
-        if len(self.splits) > 1:
-            print(yellow('Multiple splits: %s'%self.split))
+        assert self.split in ['train', 'val']
         
-        self.invalid_frame_id_list = self.CONF.scene_params_dict.get('invalid_frame_id_list', [])
-        self.frame_id_list = [_ for _ in self.frame_id_list if _ not in self.invalid_frame_id_list]
-        
-        self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_diset_variantct, ['mitsuba_version'], [str])[0]
-        assert self.mitsuba_version in ['3.0.0', '0.6.0']
         self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
         
-        self.scene_name = get_list_of_keys(self.CONF.scene_params_dict, ['scene_name'], [str])[0]
+        self.scene_name, self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_dict, ['scene_name', 'mitsuba_version'], [str, str])
         self.scene_path = self.dataset_root / self.scene_name
-        self.scene_rendering_path = self.dataset_root / self.scene_name / self.split
+        self.scene_rendering_path = self.dataset_root / self.scene_name if self.split == 'train' else self.dataset_root / self.scene_name / 'val'
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
-        self.scene_name_full = self.scene_name # e.g. 'main_xml_scene0008_00_more'
         
         '''
         paths for: intrinsics, xml, pose, shape
         '''
-        self.intrinsics_path = self.scene_path / 'intrinsic_mitsubaScene.txt'
-        self.xml_root = get_list_of_keys(self.root_path_dict, ['xml_root'], [PosixPath])[0]
-        self.xml_file_path = self.xml_root / self.scene_name / self.CONF.data.xml_file
         self.pose_format, pose_file = self.CONF.scene_params_dict['pose_file'].split('-')
         assert self.pose_format in ['OpenRooms', 'Blender', 'json'], 'Unsupported pose file: '+pose_file
         self.pose_file_path_list = [self.xml_root / self.scene_name / split / pose_file for split in self.splits]
