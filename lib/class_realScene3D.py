@@ -155,10 +155,6 @@ class realScene3D(mitsubaBase, scene2DBase):
             ]
 
     @property
-    def if_has_poses(self):
-        return hasattr(self, 'pose_list')
-
-    @property
     def if_has_shapes(self): # objs + emitters
         return 'shapes' in self.modality_list and self.CONF.scene_params_dict.get('shape_file', '') != ''
 
@@ -166,30 +162,11 @@ class realScene3D(mitsubaBase, scene2DBase):
     def if_has_pcd(self):
         return 'shapes' in self.modality_list and self.CONF.scene_params_dict.get('pcd_file', '') != ''
 
-    @property
-    def if_has_mitsuba_scene(self):
-        return True
-
-    @property
-    def if_has_mitsuba_rays_pts(self):
-        return self.CONF.mi_params_dict['if_sample_rays_pts']
-
-    @property
-    def if_has_mitsuba_segs(self):
-        return self.CONF.mi_params_dict['if_get_segs']
 
     @property
     def if_has_seg(self):
         return False, 'Segs not saved to labels. Use mi_seg_area, mi_seg_env, mi_seg_obj instead.'
         # return all([_ in self.modality_list for _ in ['seg']])
-
-    @property
-    def if_has_mitsuba_all(self):
-        return all([self.if_has_mitsuba_scene, self.if_has_mitsuba_rays_pts, self.if_has_mitsuba_segs, ])
-
-    @property
-    def if_has_colors(self): # no semantic label colors
-        return False
 
     def load_modalities(self):
         for _ in self.modality_list:
@@ -245,40 +222,6 @@ class realScene3D(mitsubaBase, scene2DBase):
             print(yellow('No shape file specified. Skip loading MI scene.'))
             return
 
-    def process_mi_scene(self, if_postprocess_mi_frames=True, force=False):
-        debug_render_test_image = self.CONF.mi_params_dict.get('debug_render_test_image', False)
-        if debug_render_test_image:
-            '''
-            images/demo_mitsuba_render.png
-            '''
-            test_rendering_path = self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'
-            print(blue_text('Rendering... test frame by Mitsuba: %s')%str(test_rendering_path))
-            if self.mi_scene.integrator() is None:
-                print(yellow('No integrator found in the scene. Skipped: debug_render_test_image'))
-            else:
-                image = mi.render(self.mi_scene, spp=16)
-                mi.util.write_bitmap(str(test_rendering_path), image)
-                print(blue_text('DONE.'))
-
-        debug_dump_mesh = self.CONF.mi_params_dict.get('debug_dump_mesh', False)
-        if debug_dump_mesh:
-            '''
-            images/demo_mitsuba_dump_meshes.png
-            '''
-            mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
-            self.dump_mi_meshes(self.mi_scene, mesh_dump_root)
-
-        if if_postprocess_mi_frames:
-            if_sample_rays_pts = self.CONF.mi_params_dict.get('if_sample_rays_pts', True)
-            if if_sample_rays_pts:
-                self.mi_sample_rays_pts(self.cam_rays_list, if_force=force)
-                self.pts_from['mi'] = True
-            
-            if_get_segs = self.CONF.mi_params_dict.get('if_get_segs', True)
-            if if_get_segs:
-                assert if_sample_rays_pts
-                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
-                self.seg_from['mi'] = True
                 
     def load_poses(self):
         print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file))))

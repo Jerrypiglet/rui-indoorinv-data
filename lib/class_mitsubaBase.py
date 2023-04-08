@@ -76,10 +76,68 @@ class mitsubaBase():
             self.extra_transform_homo = np.eye(4, dtype=np.float32)
             self.extra_transform_homo[:3, :3] = self.extra_transform
 
+    @property
+    def if_has_mitsuba_scene(self):
+        return True
+
+    @property
+    def if_has_mitsuba_rays_pts(self):
+        return self.CONF.mi_params_dict['if_sample_rays_pts']
+
+    @property
+    def if_has_mitsuba_segs(self):
+        return self.CONF.mi_params_dict['if_get_segs']
+
+    @property
+    def if_has_mitsuba_all(self):
+        return all([self.if_has_mitsuba_scene, self.if_has_mitsuba_rays_pts, self.if_has_mitsuba_segs, ])
+
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
             return x
         return torch.from_numpy(x).to(self.device)
+    
+    def process_mi_scene(self, if_postprocess_mi_frames=True, force=False):
+        '''
+        debug_render_test_image: render test image
+        debug_dump_mesh: dump all shapes into meshes
+        if_postprocess_mi_frames: for each frame, sample rays and generate segmentation maps
+        '''
+        
+        debug_render_test_image = self.CONF.mi_params_dict.get('debug_render_test_image', False)
+        if debug_render_test_image:
+            '''
+            images/demo_mitsuba_render.png
+            '''
+            test_rendering_path = self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'
+            print(blue_text('Rendering... test frame by Mitsuba: %s')%str(test_rendering_path))
+            if self.mi_scene.integrator() is None:
+                print(yellow('No integrator found in the scene. Skipped: debug_render_test_image'))
+            else:
+                image = mi.render(self.mi_scene, spp=16)
+                mi.util.write_bitmap(str(test_rendering_path), image)
+                print(blue_text('DONE.'))
+
+        debug_dump_mesh = self.CONF.mi_params_dict.get('debug_dump_mesh', False)
+        if debug_dump_mesh:
+            '''
+            images/demo_mitsuba_dump_meshes.png
+            '''
+            mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
+            self.dump_mi_meshes(self.mi_scene, mesh_dump_root)
+
+        if if_postprocess_mi_frames:
+            if_sample_rays_pts = self.CONF.mi_params_dict.get('if_sample_rays_pts', True)
+            if if_sample_rays_pts:
+                self.mi_sample_rays_pts(self.cam_rays_list, if_force=force)
+                self.pts_from['mi'] = True
+            
+            if_get_segs = self.CONF.mi_params_dict.get('if_get_segs', True)
+            if if_get_segs:
+                assert if_sample_rays_pts
+                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
+                self.seg_from['mi'] = True
+
 
     def get_cam_rays_list(self, H_list: list, W_list: list, K_list: list, pose_list: list, convention: str='opencv'):
         assert convention in ['opengl', 'opencv']

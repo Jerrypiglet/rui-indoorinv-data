@@ -106,6 +106,14 @@ class scene2DBase():
         return hasattr(self, 'im_H') and hasattr(self, 'im_W')
     
     @property
+    def if_has_poses(self):
+        return hasattr(self, 'pose_list')
+    
+    @property
+    def if_has_colors(self): # no semantic label colors
+        return False
+    
+    @property
     def pose_file_root(self):
         return self.pose_file_path.parent if hasattr(self, 'pose_file') else self.pose_file_path_list[0].parent
 
