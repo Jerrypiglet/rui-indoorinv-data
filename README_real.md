@@ -23,6 +23,34 @@ python load_realScene3D.py --scene ClassRoom
 
 To visualize 2D modalities, run with `--vis_2d_plt` ([ConferenceRoom](https://i.imgur.com/gi4gTdd.png)).
 
+## Dump to Monosdf format
+
+Export to the format of[adapted MonoSDF for FIPT](https://github.com/Jerrypiglet/monosdf) project, for training geometry on indoor_synthetic dataset and real-world scenes in FIPT.
+
+``` bash
+python load_realScene3D.py --scene ConferenceRoomV2_final_supergloo --export --export_format monosdf
+```
+
+Then in [MonoSDF for FIPT](https://github.com/Jerrypiglet/monosdf) code, run:
+
+``` bash
+python training/exp_runner.py --conf confs/real.conf --conf_add confs/real_ConferenceRoomV2_final_supergloo_SDR.conf --exps_folder {path to monosdf/exps/} --prefix DATE-’
+```
+
+### Additional notes on getting axis-aligned geometry
+
+You may have notices that parameter `reorient_blender_angles` is provided for the ConferenceRoom scene. The parameters are intended to re-orient the original scene poses (acquired from Colmap or Superglue) so that the scene geometry is axis-aligned (for improved results with MonoSDF by reducing aliasing in its feature grid). However it is not possible to acquire those angles beforehand if started with only poses but no corresponding geometry. 
+
+Our solution is two-step training with MonoSDF:
+
+(1) Set `if_reorient_y_up=False`, export the scene to MonoSDF, train a rough geometry (e.g. for 1 epoch).
+(2) Load the trained mesh into Blender ([Before](https://i.imgur.com/IWEbwdP.jpg)). Use the rotation tool to make the mesh axis-aligned, and up direction is y+. Copy the rotations angles ([mid-right panel here](https://i.imgur.com/5Ij7vr3.jpg)) to the .conf file -> `reorient_blender_angles`, and the rough geometry to `shape_file`.
+(3) Set `if_reorient_y_up=True`, re-export the scene to MonoSDF to get re-oriented poses (and rough shape), train the final geometry, and it will be axis-aligned.
+
+To validate the re-oriented poses and rough shape, check the images under *data/real/EXPORT_monosdf/ConferenceRoomV2_final_supergloo/MiNormalGlobal_OVERLAY*, which overlays the normal map (acquired from the re-oriented rough shape and poses, to original RGB image) should like ![this](https://i.imgur.com/lmA7fU4.png).
+
+## Dump to FIPT format
+
 ## Capturing guide
 
 ### RAW data

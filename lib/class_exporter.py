@@ -1,5 +1,3 @@
-            normal_est_vis_ = normal_est_vis * 0.5 + rgb_gt * 0.5
-            writer.add_image('%s_normal_est_OVERLAY/%d'%(PREFIX, batch_id), normal_est_vis_, tid, dataformats='HWC')
 import copy
 import pickle
 import shutil
@@ -111,7 +109,7 @@ class exporter_scene():
 
             if modality == 'poses':
                 if format in ['monosdf', 'mitsuba']: 
-                    self.os.export_poses_cam_txt(scene_export_path, cam_params_dict=self.os.cam_params_dict, frame_num_all=self.os.frame_num_all)
+                    self.os.export_poses_cam_txt(scene_export_path, cam_params_dict=self.os.CONF.cam_params_dict, frame_num_all=self.os.frame_num_all)
                     '''
                     cameras for MonoSDF
                     '''

@@ -75,8 +75,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
         
-        self.if_autoscale_scene = False
-
         self.scene_name, self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_dict, ['scene_name', 'mitsuba_version'], [str, str])
         self.scene_path = self.dataset_root / self.scene_name
         self.scene_rendering_path = self.dataset_root / self.scene_name / self.split

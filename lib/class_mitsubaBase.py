@@ -57,7 +57,9 @@ class mitsubaBase():
         ''''
         flags to set
         '''
-        self.if_scale_scene = False
+        self.if_scale_scene = False # if scale scale scene with self.scene_path / 'scale.txt'
+        self.if_autoscale_scene = False # if auto-scale scene as did in MonoSDF (by translating/scaling all camera centers to fit in a unit box ([-1, 1]))
+        
         self.pcd_color = None
         self.pts_from = {'mi': False, 'depth': False}
         self.seg_from = {'mi': False, 'seg': False}
