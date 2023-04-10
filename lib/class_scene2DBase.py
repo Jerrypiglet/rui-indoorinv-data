@@ -210,9 +210,7 @@ class scene2DBase():
         else:
             expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_sdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_sdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop)/255. for _, __ in zip(self.modality_file_list_dict['im_sdr'], expected_shape_list)]
-
-        # print(self.modality_file_list_dict['im_sdr'])
-
+        
         print(blue_text('[%s] DONE. load_im_sdr')%self.parent_class_name)
 
     def load_im_hdr(self):

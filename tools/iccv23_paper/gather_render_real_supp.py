@@ -83,8 +83,8 @@ for method in ['fvp']:
     for modality in ['relight']:
         for scene_name, frame_id_list in scene_frame_list:
             for frame_idx, frame_id in enumerate(frame_id_list):
-                # frame_id = frame_ids[0]
-                # frame_id_inset = frame_ids[1] if modality == 'relight' else None
+                # frame_id = frame_id_list[0]
+                # frame_id_inset = frame_id_list[1] if modality == 'relight' else None
                 key = '%s-%s'%(method, modality)
                 if key not in filename_dict:
                     continue

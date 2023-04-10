@@ -5,12 +5,12 @@ from tqdm import tqdm
 from collections import defaultdict
 import torch
 import time
+import trimesh
 from pathlib import Path
 import imageio
 import json
 import shutil
-import trimesh
-import cv2
+import open3d as o3d
 # Import the library using the alias "mi"
 import mitsuba as mi
 from lib.utils_io import load_img, resize_intrinsics, center_crop
@@ -47,10 +47,11 @@ class mitsubaBase():
         self.if_loaded_shapes = False
         self.if_loaded_layout = False
         self.if_has_ceilling_floor = False
+        self.if_loaded_tsdf = False
 
-        self.extra_transform = None
-        self.extra_transform_inv = None
-        self.extra_transform_homo = None
+        # self.extra_transform = None
+        # self.extra_transform_inv = None
+        # self.extra_transform_homo = None
         self.if_center_offset = True # pixel centers are 0.5, 1.5, ..., H-1+0.5
 
         self.shape_file_path = None
@@ -69,12 +70,55 @@ class mitsubaBase():
         self.ceiling_loc = None
         self.floor_loc = None
         
-        self.extra_transform = self.CONF.scene_params_dict.get('extra_transform', None)
-        if self.extra_transform is not None:
-            # self.extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32) # y=z, z=x, x=y
-            self.extra_transform_inv = self.extra_transform.T
-            self.extra_transform_homo = np.eye(4, dtype=np.float32)
-            self.extra_transform_homo[:3, :3] = self.extra_transform
+        # self.extra_transform = self.CONF.scene_params_dict.get('extra_transform', None)
+        # if self.extra_transform is not None:
+        #     # self.extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32) # y=z, z=x, x=y
+        #     self.extra_transform_inv = self.extra_transform.T
+        #     self.extra_transform_homo = np.eye(4, dtype=np.float32)
+        #     self.extra_transform_homo[:3, :3] = self.extra_transform
+        self._R = np.eye(3, dtype=np.float32)
+        self._t = np.zeros((3, 1), dtype=np.float32)
+        self._s = np.ones((3, 1), dtype=np.float32)
+        
+    @property
+    def _T(self):
+        return (self._R, self._t, self._s) # rotation, translation, scale
+    
+    @property
+    def _if_T(self):
+        return not(np.allclose(self._R, np.eye(3, dtype=np.float32)) and np.allclose(self._t, np.zeros((3, 1), dtype=np.float32)) and np.allclose(self._s, np.ones((3, 1), dtype=np.float32)))
+        
+    def apply_T(self, X: np.ndarray, _list=['R']):
+        '''
+        x: (N, 3)
+        '''
+        assert [_ in ['R', 't', 's'] for _ in _list]
+        _R, _t, _s = self._T
+        assert len(X.shape) == 2 and X.shape[1] == 3
+        
+        if 'R' in _list:
+            X = _R @ X.T
+        if 't' in _list:
+            X = X + _t    
+        if 's' in _list:
+            X = _s * X
+        
+        return X.T
+
+    @property
+    def _T_homo(self):
+        _R, _t, _s = self._T
+        return np.vstack((np.hstack((_s*_R, _s*_t)), np.array([0., 0., 0., 1.])))
+    
+    def compose_T(self, R: np.ndarray=np.eye(3, dtype=np.float32), t: np.ndarray=np.zeros((3, 1), dtype=np.float32), s: np.ndarray=np.ones((3, 1), dtype=np.float32)):
+        '''
+        s2(R2(s1(R1x+t1)+t2)) -> s12(R12x+t12)
+        '''
+        assert False, 'not implemented because not needed, for now'
+    #     '''
+    #     s(R(_s(_Rx+_t))+t) => 
+    #     '''
+    #     pass
 
     @property
     def if_has_mitsuba_scene(self):
@@ -91,6 +135,10 @@ class mitsubaBase():
     @property
     def if_has_mitsuba_all(self):
         return all([self.if_has_mitsuba_scene, self.if_has_mitsuba_rays_pts, self.if_has_mitsuba_segs, ])
+
+    @property
+    def if_has_tsdf(self): # objs + emitters
+        return all([_ in self.modality_list for _ in ['tsdf']])
 
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
@@ -137,7 +185,6 @@ class mitsubaBase():
                 assert if_sample_rays_pts
                 self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
                 self.seg_from['mi'] = True
-
 
     def get_cam_rays_list(self, H_list: list, W_list: list, K_list: list, pose_list: list, convention: str='opencv'):
         assert convention in ['opengl', 'opencv']
@@ -197,13 +244,13 @@ class mitsubaBase():
             self.mi_rays_t_list.append(rays_t)
 
             rays_v_flatten = rays_t[:, np.newaxis] * rays_d_flatten
-            mi_depth = np.sum(rays_v_flatten.reshape(self._H(frame_idx), self._W(frame_idx), 3) * ray_d_center.reshape(1, 1, 3), axis=-1)
+            mi_depth = np.sum(rays_v_flatten.reshape(self._H(frame_idx), self._W(frame_idx), 3) * ray_d_center.reshape(1, 1, 3), axis=-1).astype(np.float32)
             invalid_depth_mask = np.logical_or(np.isnan(mi_depth), np.isinf(mi_depth))
             self.mi_invalid_depth_mask_list.append(invalid_depth_mask)
             mi_depth[invalid_depth_mask] = 0.
             self.mi_depth_list.append(mi_depth)
 
-            mi_normal_global = ret.n.numpy().reshape(self._H(frame_idx), self._W(frame_idx), 3)
+            mi_normal_global = ret.n.numpy().reshape(self._H(frame_idx), self._W(frame_idx), 3).astype(np.float32)
             # FLIP inverted normals!
             normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normal_global, axis=-1) > 0, np.any(mi_normal_global != np.inf, axis=-1))
             if np.sum(normals_flip_mask) > 0:
@@ -308,7 +355,7 @@ class mitsubaBase():
                 if mi_seg_area is None:
                     mi_seg_area_file_path.unlink()
                 else:
-                    print(yellow_text('loading mi_seg_emitter from'), '%s'%str(mi_seg_area_file_folder))
+                    print(yellow_text('loading mi_seg_emitter from '), '%s'%str(mi_seg_area_file_folder))
                     if_get_from_scratch = False
                     mi_seg_area = (mi_seg_area / 255.).astype(bool)
 
@@ -483,6 +530,31 @@ class mitsubaBase():
             Rt_c2w_b_list.append((R_, t_))
         return meta, Rt_c2w_b_list
 
+    def load_tsdf(self, force=False):
+        '''
+        get scene geometry in tsdf volume via fusing from depth maps: 
+            images/demo_tsdf.png
+            https://i.imgur.com/r6TET8K.jpg
+        '''
+        if self.if_loaded_tsdf and not force: return
+        tsdf_path = self.CONF.shape_params_dict['tsdf_path']
+        tsdf_path = Path(tsdf_path) if len(tsdf_path.split('/')) != 1 else self.scene_rendering_path / Path(tsdf_path)
+        if tsdf_path.exists():
+            print(white_blue('[%s] Loading tsdf from %s '%self.__class__.__name__) + tsdf_path)
+            tsdf_mesh = trimesh.load_mesh(str(tsdf_path), process=False)
+            self.tsdf_fused_dict = {'vertices': np.array(tsdf_mesh.vertices), 'faces': np.array(tsdf_mesh.faces)}
+            if len(tsdf_mesh.visual.vertex_colors) > 0:
+                self.tsdf_fused_dict.update({'colors': np.array(tsdf_mesh.visual.vertex_colors)[:, :3].astype(np.float32)/255.})
+        else:
+            self.tsdf_fused_dict = self._fuse_tsdf(if_use_mi_geometry=True, dump_path=tsdf_path)
+        
+        if self._if_T: # reorient
+            if not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+                self.tsdf_fused_dict.update({'vertices': self.apply_T(self.tsdf_fused_dict['vertices'], ['R', 't', 's'])})
+    
+        self.if_loaded_tsdf = True
+        print(blue_text('[%s] DONE. load_tsdf. vertices: %d, faces: %d'%(self.__class__.__name__, self.tsdf_fused_dict['vertices'].shape[0], self.tsdf_fused_dict['faces'].shape[0])))
+
     def _fuse_3D_geometry(self, dump_path: Path=Path(''), subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=False, if_lighting=False):
         '''
         fuse depth maps (and RGB, normals) into point clouds in global coordinates of OpenCV convention
@@ -583,6 +655,66 @@ class mitsubaBase():
         geo_fused_dict = {'X': X_global, 'rgb': rgb_global, 'normal': normal_global}
 
         return geo_fused_dict, X_flatten_mask_list
+    
+    def _fuse_tsdf(self, subsample_rate_pts: int=1, subsample_HW_rates: tuple=(1, 1), if_use_mi_geometry: bool=True, dump_path: Path=None):
+        '''
+        fuse TSDF volume from depth maps (adapted from the code by Bohan Yu (MILO paper)):
+            images/demo_tsdf.png
+            https://i.imgur.com/r6TET8K.jpg
+        '''
+        assert self.if_has_poses
+        assert self.if_has_im_sdr
+        if not if_use_mi_geometry:
+            assert self.if_has_depth_normal
+        
+        print(white_blue('[mitsubaBase] fuse_tsdf '), yellow('[use Mitsuba: %s]'%str(if_use_mi_geometry)), \
+            'for %d frames... H %d W %d, subsample_rate_pts: %d, subsample_HW_rates: (%d, %d)'%(len(self.frame_id_list), self._H(), self._W(), subsample_rate_pts, subsample_HW_rates[0], subsample_HW_rates[1]))
+
+        volume = o3d.pipelines.integration.ScalableTSDFVolume(
+            voxel_length=5.0 / 512.0,
+            sdf_trunc=0.1,
+            color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8,
+            volume_unit_resolution=16,
+            depth_sampling_stride=1)
+        intrinsic = o3d.camera.PinholeCameraIntrinsic(self._W(), self._H(), self._K()[0][0], self._K()[1][1], self._K()[0][2], self._K()[1][2])
+        poses = []
+        T_opengl_opencv = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]], dtype=np.float32) # flip x, y: Liwen's new pose (left-up-forward) -> OpenCV (right-down-forward)
+        
+        for p in range(5):
+            for frame_idx, frame_id in tqdm(enumerate(self.frame_id_list)):
+            # for i, frame in enumerate(meta['frames']):
+                input_image = self.im_sdr_list[frame_idx]
+                input_depth = self.mi_depth_list[frame_idx] if if_use_mi_geometry else self.depth_list[frame_idx]
+                rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
+                    o3d.geometry.Image(np.clip(input_image[::-1, ::-1] * 255, 0, 255).astype(np.uint8)),
+                    o3d.geometry.Image(input_depth[::-1, ::-1].copy()),
+                    depth_scale=1.0,
+                    depth_trunc=10.0,
+                    convert_rgb_to_intensity=False)
+                extrinsic = np.vstack((np.hstack([self.pose_list[frame_idx][:3, :3] @ T_opengl_opencv, self.pose_list[frame_idx][:3, 3:4]]), np.array([0, 0, 0, 1])))
+                # print(f"extrinsic {extrinsic}")
+                volume.integrate(rgbd_image, intrinsic, np.linalg.inv(extrinsic))
+                if p == 0:
+                    curr_pose = np.concatenate([
+                        np.dot(extrinsic, np.array([0.0, 0.0, 0.0, 1.0]))[:3],
+                        np.dot(extrinsic, np.array([0.0, 0.0, 1.0, 1.0]))[:3],
+                        np.dot(extrinsic, np.array([0.0, 1.0, 0.0, 0.0]))[:3],
+                    ]).astype(np.float32)
+                    # print(f"curr_pose {curr_pose}")
+                    poses.append(curr_pose)
+        # np.save(os.path.join(dataset_path, "poses.npy"), poses)
+        tsdf_mesh_o3d = volume.extract_triangle_mesh()
+        if dump_path is not None:
+            o3d.io.write_triangle_mesh(str(dump_path), tsdf_mesh_o3d, False, True)
+            print(f"Fused TSDF dumped mesh to {dump_path}")
+            
+        print(blue_text('[%s] DONE. fuse_tsdf'%self.parent_class_name))
+
+        tsdf_fused_dict = {'tsdf_mesh_o3d': tsdf_mesh_o3d, 'vertices': np.asarray(tsdf_mesh_o3d.vertices), 'faces': np.asarray(tsdf_mesh_o3d.triangles)}
+        if tsdf_mesh_o3d.has_vertex_colors:
+            tsdf_fused_dict.update({'colors': np.asarray(tsdf_mesh_o3d.vertex_colors)}) # (N, 3), [0., 1.]
+        
+        return tsdf_fused_dict
 
     def _fuse_3D_lighting(self, lighting_source: str, subsample_rate_pts: int=1, subsample_rate_wi: int=1, if_use_mi_geometry: bool=False, if_use_loaded_envmap_position: bool=False):
         '''
@@ -723,12 +855,7 @@ class mitsubaBase():
 
         self.if_loaded_shapes = True
         
-        print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
-            self.parent_class_name, 
-            len(self.shape_list_valid), 
-            len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
-            len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
-            )))
+        print(blue_text('[%s] DONE. load_single_shape.'%(self.parent_class_name)))
 
         if shape_params_dict.get('if_dump_shape', False):
             dump_shape_dict_to_shape_file(shape_dict, self.shape_file_path)

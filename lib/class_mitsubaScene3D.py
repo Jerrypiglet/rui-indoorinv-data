@@ -71,7 +71,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.invalid_frame_id_list = self.CONF.scene_params_dict.get('invalid_frame_id_list', [])
         self.frame_id_list = [_ for _ in self.frame_id_list if _ not in self.invalid_frame_id_list]
         
-        self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_diset_variantct, ['mitsuba_version'], [str])[0]
+        self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_dict, ['mitsuba_version'], [str])[0]
         self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
         
@@ -114,13 +114,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if 'poses' in self.modality_list:
             self.load_poses() # attempt to generate poses indicated in self.CONF.cam_params_dict
 
-        self.load_modalities()
-
         if hasattr(self, 'pose_list'): 
             self.get_cam_rays()
         if self.CONF.mi_params_dict.get('process_mi_scene', True):
             self.process_mi_scene(if_postprocess_mi_frames=hasattr(self, 'pose_list'))
-
+            
+        self.load_modalities()
+            
     @property
     def frame_num(self):
         return len(self.frame_id_list)
@@ -145,8 +145,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             'emission', 
             'layout', 'shapes', 
             'lighting_envmap', 
+            'tsdf', 
             ]
-
 
     @property
     def if_has_emission(self):
@@ -160,12 +160,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
     def if_has_shapes(self): # objs + emitters
         return all([_ in self.modality_list for _ in ['shapes']])
 
-
     @property
     def if_has_seg(self):
         return False, 'Segs not saved to labels. Use mi_seg_area, mi_seg_env, mi_seg_obj instead.'
         # return all([_ in self.modality_list for _ in ['seg']])
-
 
     def load_modalities(self):
         for _ in self.modality_list:
@@ -176,6 +174,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             if _ == 'emission': self.load_emission()
             if _ == 'layout': self.load_layout()
             if _ == 'shapes': self.load_shapes() # shapes of 1(i.e. furniture) + emitters
+            if _ == 'tsdf': self.load_tsdf()
             if _ == 'depth': raise NotImplementedError
 
     def get_modality(self, modality, source: str='GT'):
@@ -209,8 +208,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 'type': self.shape_file_path.suffix[1:],
                 'filename': str(self.shape_file_path), 
                 }
-            if self.extra_transform is not None:
-                self.shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
+            # if self.extra_transform is not None:
+            #     self.shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
             self.mi_scene = mi.load_dict({
                 'type': 'scene',
                 'shape_id': self.shape_id_dict, 
@@ -218,7 +217,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         else:
             # xml file always exists for Mitsuba scenes
             self.mi_scene = mi.load_file(str(self.xml_file_path))
-
 
     def load_intrinsics(self):
         '''
@@ -262,7 +260,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 _num_poses = self.get_pose_num_from_file()
                 if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(' + '.join([str(pose_file) for pose_file in self.pose_file_path_list]), _num_poses)))
             if not if_resample in ['N', 'n']:
-                self.sample_poses(self.CONF.cam_params_dict.get('sample_pose_num'), self.extra_transform_inv, if_dump=self.CONF.cam_params_dict.get('sample_pose_if_dump', True))
+                self.sample_poses(self.CONF.cam_params_dict.get('sample_pose_num'), if_dump=self.CONF.cam_params_dict.get('sample_pose_if_dump', True))
                 self.scene_rendering_path_list = [self.scene_rendering_path.parent / self.split] * len(self.frame_id_list)
                 return
             
@@ -276,7 +274,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.scene_rendering_path_list = []
         
         for pose_file, split in zip(self.pose_file_path_list, self.splits):
-            print(white_blue('[%s] load_poses from %s'%(self.__class__.__name__, str(pose_file))))
+            print(white_blue('[%s] load_poses from '%(self.__class__.__name__)) + str(pose_file))
             
             pose_list = []
             origin_lookatvector_up_list = []
@@ -296,7 +294,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 for idx in frame_id_list:
                     cam_param = cam_params[idx]
                     origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-                    assert self.extra_transform is None, 'not suported yet'
+                    # assert self.extra_transform is None, 'not suported yet'
                     (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
                     pose_list.append(np.hstack((R, t)))
                     origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
@@ -326,7 +324,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         R_c2w_b_list.append(R_.as_matrix())
                         assert np.allclose(R_.as_euler('xyz'), cam_params[idx][1])
                         t_c2w_b_list.append(cam_params[idx][0].reshape((3, 1)).astype(np.float32))
-                        assert self.extra_transform is None, 'not suported yet'
+                        # assert self.extra_transform is None, 'not suported yet'
                         
                     T_blender_left = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # left mul: row-wise
                     T_blender_right = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # right mul: col-wise
@@ -364,15 +362,15 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         R = R_c2w_b @ T_opengl_opencv # right mul: column-wise nagated
                         t = t_c2w_b
 
-                        (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t) # only works for y+ [!!!]
+                        (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t) # only works for y+ [!!!] [TODO] GET RID OF THIS by using the script from real scene
                         
-                        if self.extra_transform is not None:
-                            # R = R @ (self.extra_transform_inv.T)
-                            R = self.extra_transform @ R
-                            t = self.extra_transform @ t
-                            origin = self.extra_transform @ origin
-                            lookatvector = self.extra_transform @ lookatvector
-                            up = self.extra_transform @ up
+                        # if self.extra_transform is not None:
+                        #     # R = R @ (self.extra_transform_inv.T)
+                        #     R = self.extra_transform @ R
+                        #     t = self.extra_transform @ t
+                        #     origin = self.extra_transform @ origin
+                        #     lookatvector = self.extra_transform @ lookatvector
+                        #     up = self.extra_transform @ up
                             
                             # (origin_, lookatvector_, up_) = R_t_to_origin_lookatvector_up_yUP(R, t)
                             # assert np.allclose(self.extra_transform @ origin, origin_)
@@ -558,7 +556,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if self.shape_file_path is not None:
             # load single shape from self.shape_file_path
             print(yellow('[%s] load_shapes from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
-            self.load_single_shape(self.CONF.shape_params_dict, extra_transform=self.extra_transform, force=force)
+            self.load_single_shape(self.CONF.shape_params_dict, force=force)
         else:
             # load collection of shapes from Mitsuba XML file
             print(white_blue('[%s] load_shapes from [XML file]'%self.__class__.__name__) + str(self.xml_file_path))
@@ -602,7 +600,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
                         transform_m = np.array(_transform).reshape(4, 4).astype(np.float32) @ transform_m # [[R,t], [0,0,0,1]]
                         
-                    (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4], extra_transform=self.extra_transform)
+                    (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4])
                     _id = 'rectangle_'+random_id
                     emitters = shape.findall('emitter')
                     if len(emitters) > 0:
@@ -657,9 +655,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     if N_triangles != faces.shape[0]:
                         print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
                 
-                if self.extra_transform is not None:
-                    vertices = (self.extra_transform @ vertices.T).T
-                    bverts = (self.extra_transform @ bverts.T).T
+                # if self.extra_transform is not None:
+                #     vertices = (self.extra_transform @ vertices.T).T
+                #     bverts = (self.extra_transform @ bverts.T).T
 
                 self.vertices_list.append(vertices)
                 self.faces_list.append(faces)
@@ -692,7 +690,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
                 self.xyz_max = np.maximum(np.amax(vertices, axis=0), self.xyz_max)
                 self.xyz_min = np.minimum(np.amin(vertices, axis=0), self.xyz_min)
-
 
             self.if_loaded_shapes = True
             

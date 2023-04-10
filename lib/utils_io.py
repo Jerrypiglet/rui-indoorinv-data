@@ -84,7 +84,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
     if target_HW != ():
         im = resize_img(im, target_HW, resize_method)
 
-    return im
+    return im.astype(np.float32)
 
 def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if_mask=True, im_hdr=None):
     # Read HDR image
@@ -149,7 +149,7 @@ def load_HDR(path: Path, expected_shape: tuple=(), target_HW: Tuple[int, int]=()
     if target_HW != ():
         im = resize_img(im, target_HW, 'area') # fixed to be 'area' for HDR images
 
-    return im
+    return im.astype(np.float32)
 
 def to_nonHDR(im, extra_scale=1.):
     total_scale = 1.

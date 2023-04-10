@@ -97,9 +97,9 @@ sdr_radiance_scale = 1.
 scene_name = 'room_1'; sdr_radiance_scale = 0.5; 
 # scene_name = 'room_2'
 
-# frame_ids = [23]
-# frame_ids = [0, 10, 199]
-frame_ids = list(range(200))
+# frame_id_list = [23]
+# frame_id_list = [0, 10, 199]
+frame_id_list = list(range(200))
 
 scene_obj = replicaScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -107,7 +107,7 @@ scene_obj = replicaScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
-        'frame_id_list': frame_ids, 
+        'frame_id_list': frame_id_list, 
         'intrinsics_path': dataset_root / 'intrinsic_mitsubaScene.txt', 
 
         # convert from z+ (native) to y+ and display in y+

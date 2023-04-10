@@ -185,3 +185,11 @@ def get_device(host: str, device_id: int=-1):
     if device == 'cpu':
         print(yellow('[WARNING] rendering could be slow because device is cpu at %s'%host))
     return device
+
+def check_nd_array_list_identical(arrays):
+    if len(arrays) < 2:
+        return True
+    for i in range(1, len(arrays)):
+        if not np.array_equal(arrays[i], arrays[i-1]):
+            return False
+    return True

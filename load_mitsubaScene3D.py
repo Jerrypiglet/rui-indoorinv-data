@@ -94,7 +94,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-frame_id_list = [0]
+# frame_id_list = [0]
 
 '''
 modify confs
@@ -126,7 +126,8 @@ CONF.im_params_dict.update({
 
 CONF.shape_params_dict.update({
     'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
-    'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
+    'if_load_emitter_mesh': True, # default True: to load emitter meshes, because not too many emitters
+    'tsdf_path': 'fused_tsdf.ply', # 'test_files/tmp_tsdf.ply', 
     })
 
 '''
@@ -138,15 +139,16 @@ scene_obj = mitsubaScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
-        'im_hdr', 
+        # 'im_hdr', 
         'im_sdr', 
         'poses', 
         # 'lighting_envmap', 
-        'albedo', 'roughness', 
-        'emission', 
-        'depth', 'normal', 
-        # 'layout', 
+        # 'albedo', 'roughness', 
+        # 'emission', 
+        # 'depth', 'normal', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties``
+        # 'layout', 
+        'tsdf', 
         ], 
 )
 
@@ -291,11 +293,11 @@ if opt.vis_2d_plt:
             'im', 
             # 'layout', 
             # 'shapes', 
-            'albedo', 
-            'roughness', 
-            'emission', 
-            'depth', 
-            'normal', 
+            # 'albedo', 
+            # 'roughness', 
+            # 'emission', 
+            # 'depth', 
+            # 'normal', 
             'mi_depth', 
             'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
@@ -330,9 +332,10 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             'poses', 
-            'layout', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            # 'layout', 
             'mi', # mitsuba sampled rays, pts
+            'tsdf', 
             # 'dense_geo', # fused from 2D
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)

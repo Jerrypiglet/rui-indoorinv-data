@@ -64,11 +64,25 @@ class visualizer_scene_3D_o3d(object):
         self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
             if _ == '': continue
-            assert _ in ['dense_geo', 'poses', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi'], 'Invalid modality: %s'%_
+            assert _ in self.valid_modalities, 'Invalid modality: %s'%_
         if 'mi' in self.modality_list_vis:
             self.mi_pcd_color_list = None
         self.extra_geometry_list = []
         self.extra_input_dict = {}
+        
+    @property
+    def valid_modalities(self):
+        return [
+            'dense_geo', 
+            'poses', 
+            'lighting_SG', 
+            'lighting_envmap', 
+            'layout', 
+            'shapes', 
+            'emitters', 
+            'mi', 
+            'tsdf', 
+            ]
 
     def run_demo(self, extra_geometry_list=[]):
 
@@ -209,6 +223,10 @@ class visualizer_scene_3D_o3d(object):
         if 'dense_geo' in modality_list:
             o3d_geometry_list += self.collect_dense_geo(
                 dense_geo_params
+            )
+
+        if 'tsdf' in modality_list:
+            o3d_geometry_list += self.collect_tsdf(
             )
         
         if 'lighting_SG' in modality_list:
@@ -1122,3 +1140,18 @@ class visualizer_scene_3D_o3d(object):
             self.mi_pcd_color_list = [color_map_color(color_tensor, vmin=np.amin(color_tensor), vmax=np.amax(color_tensor)) for color_tensor in color_tensor_list]
 
         assert self.mi_pcd_color_list is not None
+        
+    def collect_tsdf(self):
+        '''
+        load fuse TSDF volume
+        '''
+        assert self.os.if_loaded_tsdf
+        if 'tsdf_mesh_o3d' in self.os.tsdf_fused_dict:
+            tsdf_mesh_o3d = self.os.tsdf_fused_dict['tsdf_mesh_o3d']
+        else:
+            tsdf_mesh_o3d = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(self.os.tsdf_fused_dict['vertices']), o3d.utility.Vector3iVector(self.os.tsdf_fused_dict['faces']))
+            tsdf_mesh_o3d.compute_vertex_normals()
+            tsdf_mesh_o3d.compute_triangle_normals()
+            tsdf_mesh_o3d.vertex_colors = o3d.utility.Vector3dVector(self.os.tsdf_fused_dict['colors'])
+            
+        return [tsdf_mesh_o3d]
