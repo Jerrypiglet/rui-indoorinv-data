@@ -1,6 +1,8 @@
 from pathlib import Path
 import numpy as np
 import trimesh
+
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_opencv
 np.set_printoptions(suppress=True)
 import pyhocon
 from tqdm import tqdm
@@ -9,7 +11,7 @@ random.seed(0)
 import json
 import mitsuba as mi
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, magenta
+from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, magenta, check_nd_array_list_identical
 from lib.utils_io import load_matrix, resize_intrinsics
 
 # from .class_openroomsScene2D import openroomsScene2D
@@ -56,13 +58,11 @@ class realScene3D(mitsubaBase, scene2DBase):
         self.invalid_frame_idx_list = self.CONF.scene_params_dict.get('invalid_frame_idx_list', [])
         self.frame_id_list_input = [_ for _ in self.frame_id_list_input if _ not in self.invalid_frame_id_list]
         
-        # self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
-        
-        self.extra_transform = self.CONF.scene_params_dict.get('extra_transform', None)
-        if self.extra_transform is not None:
-            self.extra_transform_inv = self.extra_transform.T
-            self.extra_transform_homo = np.eye(4, dtype=np.float32)
-            self.extra_transform_homo[:3, :3] = self.extra_transform
+        # self.extra_transform = self.CONF.scene_params_dict.get('extra_transform', None)
+        # if self.extra_transform is not None:
+        #     self.extra_transform_inv = self.extra_transform.T
+        #     self.extra_transform_homo = np.eye(4, dtype=np.float32)
+        #     self.extra_transform_homo[:3, :3] = self.extra_transform
 
         self.scene_path = self.dataset_root / self.scene_name
         self.scene_rendering_path = self.dataset_root / self.scene_name
@@ -70,8 +70,8 @@ class realScene3D(mitsubaBase, scene2DBase):
         self.scene_name_full = self.scene_name
 
         self.pose_format, pose_file = self.CONF.scene_params_dict['pose_file'].split('-')
-        assert self.pose_format in ['json', 'bundle'], 'Unsupported pose file: '+self.pose_file
-        self.pose_file = self.scene_path / pose_file
+        assert self.pose_format in ['json', 'bundle'], 'Unsupported pose file: '+self.pose_file_path
+        self.pose_file_path = self.scene_path / pose_file
 
         if self.CONF.scene_params_dict.shape_file != '':
             if len(str(self.CONF.scene_params_dict.shape_file).split('/')) == 1:
@@ -83,6 +83,9 @@ class realScene3D(mitsubaBase, scene2DBase):
         self.near = self.CONF.cam_params_dict.get('near', 0.1)
         self.far = self.CONF.cam_params_dict.get('far', 10.)
 
+        if self.CONF.scene_params_dict.get('if_reorient_y_up', False):
+            self.compute_reorient_T()
+            
         self.load_poses()
         self.scene_rendering_path_list = [self.scene_rendering_path] * len(self.frame_id_list)
         
@@ -91,52 +94,51 @@ class realScene3D(mitsubaBase, scene2DBase):
         '''
 
         self.load_mi_scene()
-        self.load_modalities()
 
         if hasattr(self, 'pose_list'): 
             self.get_cam_rays()
         if hasattr(self, 'mi_scene'):
             self.process_mi_scene(if_postprocess_mi_frames=hasattr(self, 'pose_list'))
+            
+        self.load_modalities()
 
         '''
         re-orient scene to be axis-aligned
         '''
-        IF_SCENE_RESCALED = False
+        # IF_SCENE_RESCALED = False
         
-        self.reorient_transform = np.eye(3, dtype=np.float32)
-        self.if_reorient_shape = False
-        if self.CONF.scene_params_dict.get('if_reorient_y_up', False):
-            '''
-            [TODO] better align normals to axes with clustering or PCA, then manually pick patches
-            '''
-            print(magenta('Re-orienting scene with provided rotation angles...'))
+        # self.reorient_transform = np.eye(3, dtype=np.float32)
+        # self.if_reorient_shape = False
+        
+    def compute_reorient_T(self):
+        '''
+        [TODO] better align normals to axes with clustering or PCA, then manually pick patches
+        '''
+        print('Calculating re-orientation from blender angles input...')
+        reorient_blender_angles = self.CONF.scene_params_dict['reorient_blender_angles']
+        from scipy.spatial.transform import Rotation
+        reorient_blender_angles = np.array(reorient_blender_angles).reshape(3,) / 180. * np.pi
+        self._R = Rotation.from_euler('xyz', reorient_blender_angles).as_matrix()
+        # self.reorient_transform = Rs
+        
+        # if not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+        #     self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
+        #     self.bverts_list = [computeBox(vertices)[0] for vertices in self.vertices_list] # recompute bounding boxes
+            # self.if_reorient_shape = True
+        
+        # self.pose_list = [np.hstack((self.reorient_transform @ pose[:3, :3], self.reorient_transform @ pose[:3, 3:4])) for pose in self.pose_list] # dont rotate translation!!
+        # self.origin_lookatvector_up_list = [(self.reorient_transform @ origin, self.reorient_transform @ lookatvector, self.reorient_transform @ up) \
+        #     for (origin, lookatvector, up) in self.origin_lookatvector_up_list] # dont rotate origin!!
+        # IF_SCENE_RESCALED = True
 
-            print('Calculating re-orientation from blender angles input...')
-            reorient_blender_angles = self.CONF.scene_params_dict['reorient_blender_angles']
-            from scipy.spatial.transform import Rotation
-            reorient_blender_angles = np.array(reorient_blender_angles).reshape(3,) / 180. * np.pi
-            Rs = Rotation.from_euler('xyz', reorient_blender_angles).as_matrix()
-            self.reorient_transform = Rs
-            
-            if not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
-                self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
-                self.bverts_list = [computeBox(vertices)[0] for vertices in self.vertices_list] # recompute bounding boxes
-                self.if_reorient_shape = True
-            
-            self.pose_list = [np.hstack((self.reorient_transform @ pose[:3, :3], self.reorient_transform @ pose[:3, 3:4])) for pose in self.pose_list] # dont rotate translation!!
-            self.origin_lookatvector_up_list = [(self.reorient_transform @ origin, self.reorient_transform @ lookatvector, self.reorient_transform @ up) \
-                for (origin, lookatvector, up) in self.origin_lookatvector_up_list] # dont rotate origin!!
-            IF_SCENE_RESCALED = True
-
-        if IF_SCENE_RESCALED:
-            __ = np.eye(4, dtype=np.float32); __[:3, :3] = self.reorient_transform; self.reorient_transform = __
-            if not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
-                if hasattr(self, 'mi_scene'):
-                    self.load_mi_scene(input_extra_transform_homo=self.reorient_transform)
-            # self.load_modalities()
-            self.get_cam_rays(force=True)
-            if hasattr(self, 'mi_scene'):
-                self.process_mi_scene(if_postprocess_mi_frames=hasattr(self, 'pose_list'), force=True)
+        # __ = np.eye(4, dtype=np.float32); __[:3, :3] = self.reorient_transform; self.reorient_transform = __
+        # if not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+        #     if hasattr(self, 'mi_scene'):
+        #         self.load_mi_scene(input_extra_transform_homo=self.reorient_transform)
+        # self.load_modalities()
+        # self.get_cam_rays(force=True)
+        # if hasattr(self, 'mi_scene'):
+        #     self.process_mi_scene(if_postprocess_mi_frames=hasattr(self, 'pose_list'), force=True)
                 
     @property
     def frame_num(self):
@@ -152,6 +154,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             'poses', 
             'shapes', 
             'im_hdr', 'im_sdr', 
+            'tsdf', 
             ]
 
     @property
@@ -174,6 +177,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             if not (result_ == False):
                 continue
             if _ == 'shapes': self.load_shapes() # shapes of 1(i.e. furniture) + emitters
+            if _ == 'tsdf': self.load_tsdf()
 
     def get_modality(self, modality, source: str='GT'):
         _ = scene2DBase.get_modality_(self, modality, source)
@@ -197,6 +201,7 @@ class realScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
+
         if self.shape_file_path is not None:
             print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
             self.shape_id_dict = {
@@ -205,10 +210,14 @@ class realScene3D(mitsubaBase, scene2DBase):
                 }
             
             _T = np.eye(4, dtype=np.float32)
-            if self.extra_transform is not None:
-                _T = self.extra_transform_homo @ _T
+            # if self.extra_transform is not None:
+            #     _T = self.extra_transform_homo @ _T
             if input_extra_transform_homo is not None:
                 _T = input_extra_transform_homo @ _T
+                
+            if self._if_T and not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+                _T = self._T_homo @ _T
+                    
             if not np.allclose(_T, np.eye(4, dtype=np.float32)):
                 self.shape_id_dict['to_world'] = mi.ScalarTransform4f(_T)        
             
@@ -221,19 +230,18 @@ class realScene3D(mitsubaBase, scene2DBase):
             # self.mi_scene = mi.load_file(str(self.xml_file_path))
             print(yellow('No shape file specified. Skip loading MI scene.'))
             return
-
                 
     def load_poses(self):
-        print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file))))
+        print(white_blue('[%s] load_poses from %s '%self.__class__.name) + str(self.pose_file_path))
 
         self.pose_list = []
         self.K_list = []
         self.origin_lookatvector_up_list = []
         
         if self.pose_format == 'json':
-            # self.pose_file = self.scene_path / 'transforms.json'
-            assert self.pose_file.exists(), 'No meta file found: ' + str(self.pose_file)
-            with open(str(self.pose_file), 'r') as f:
+            # self.pose_file_path = self.scene_path / 'transforms.json'
+            assert self.pose_file_path.exists(), 'No meta file found: ' + str(self.pose_file_path)
+            with open(str(self.pose_file_path), 'r') as f:
                 meta = json.load(f)
                 
             self.frame_id_list = []
@@ -281,9 +289,9 @@ class realScene3D(mitsubaBase, scene2DBase):
 
                 R_, t_ = np.split(c2w[:3], (3,), axis=1)
                 R = R_; t = t_
-                if self.extra_transform is not None:
-                    assert self.extra_transform.shape == (3, 3) # [TODO] support 4x4
-                    R = self.extra_transform[:3, :3] @ R
+                # if self.extra_transform is not None:
+                #     assert self.extra_transform.shape == (3, 3) # [TODO] support 4x4
+                #     R = self.extra_transform[:3, :3] @ R
                 self.pose_list.append(np.hstack((R, t)))
                 assert np.isclose(np.linalg.det(R), 1.0), 'R is not a rotation matrix'
                 
@@ -292,7 +300,7 @@ class realScene3D(mitsubaBase, scene2DBase):
                 up = R @ np.array([[0.], [-1.], [0.]], dtype=np.float32)
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
                 
-                # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
+                # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_opencv(R, t)
                 # origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
                 
             if self.invalid_frame_idx_list is not None:
@@ -300,16 +308,16 @@ class realScene3D(mitsubaBase, scene2DBase):
                 self.origin_lookatvector_up_list = [x for idx, x in enumerate(self.origin_lookatvector_up_list) if idx not in self.invalid_frame_idx_list]
 
         elif self.pose_format in ['bundle']:
-            with open(str(self.pose_file), 'r') as camIn:
+            with open(str(self.pose_file_path), 'r') as camIn:
                 cam_data = camIn.read().splitlines()
             
-            with open(str(self.pose_file).replace('_bundle.out', '.csv'), 'r') as csvIn:
+            with open(str(self.pose_file_path).replace('_bundle.out', '.csv'), 'r') as csvIn:
                 csv_data = csvIn.read().splitlines()
             self.frame_id_list = [int(line.split(',')[0].replace('img_', '').replace('.png', '')) for line in csv_data[1:]]
             assert len(self.frame_id_list) == int(cam_data[1].split(' ')[0])
             
             # just double check with lst file
-            with open(str(self.pose_file).replace('_bundle.out', '.lst'), 'r') as lstIn:
+            with open(str(self.pose_file_path).replace('_bundle.out', '.lst'), 'r') as lstIn:
                 lst_data = lstIn.read().splitlines()
             frame_id_list_lst = [int(line.split('\\')[-1].replace('img_', '').replace('.png', '')) for line in lst_data if line != '']
             assert self.frame_id_list == frame_id_list_lst
@@ -332,16 +340,13 @@ class realScene3D(mitsubaBase, scene2DBase):
                 if self.if_scale_scene:
                     t = t / self.scene_scale
                 R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
-                if self.extra_transform is not None:
-                    assert self.extra_transform.shape == (3, 3) # [TODO] support 4x4
-                    R = self.extra_transform[:3, :3] @ R
+                # if self.extra_transform is not None:
+                #     assert self.extra_transform.shape == (3, 3) # [TODO] support 4x4
+                #     R = self.extra_transform[:3, :3] @ R
                 self.pose_list.append(np.hstack((R, t)))
 
-                # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_opencv(R, t)
                 # self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
-                origin = t
-                lookatvector = R @ np.array([[0.], [0.], [1.]], dtype=np.float32)
-                up = R @ np.array([[0.], [-1.], [0.]], dtype=np.float32)
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
                 K = np.array([[float(f), 0, self._W(frame_idx)/2.], [0, float(f), self._H(frame_idx)/2.], [0, 0, 1]], dtype=np.float32)
@@ -362,9 +367,16 @@ class realScene3D(mitsubaBase, scene2DBase):
             self.frame_id_list = self.frame_id_list_input
             
         print('frame_id_list:', self.frame_id_list)
-        # print(self.pose_list)
+        # print(self.pose_list)``
+        if check_nd_array_list_identical(self.K_list):
+            self.K = self.K_list[0]
 
         print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.__class__.__name__, len(self.pose_list))))
+
+        if self._if_T: # reorient
+            self.pose_list = [np.hstack((self._R @ pose[:3, :3], self.apply_T(pose[:3, 3:4].T, ['R', 't', 's']).T)) for pose in self.pose_list]
+            self.origin_lookatvector_up_list = [(self._R @ origin, self.apply_T(lookatvector.T, ['R', 't', 's']).T, self._R @ up) \
+                for (origin, lookatvector, up) in self.origin_lookatvector_up_list]
             
     def get_cam_rays(self, force=False):
         if hasattr(self, 'cam_rays_list') and not force:  return
@@ -383,7 +395,7 @@ class realScene3D(mitsubaBase, scene2DBase):
                 return
             mitsubaBase._prepare_shapes(self)
             self.shape_file = self.CONF.scene_params_dict['shape_file']
-            self.load_single_shape(self.CONF.shape_params_dict, extra_transform=self.extra_transform)
+            self.load_single_shape(self.CONF.shape_params_dict)
                 
             self.if_loaded_shapes = True
             print(blue_text('[%s] DONE. load_shapes'%(self.__class__.__name__)))
@@ -394,10 +406,9 @@ class realScene3D(mitsubaBase, scene2DBase):
             assert pcd_file.exists(), 'No pcd file found: ' + str(pcd_file)
             pcd_trimesh = trimesh.load_mesh(str(pcd_file), process=False)
             self.pcd = np.array(pcd_trimesh.vertices)
-            if self.extra_transform is not None:
-                assert self.extra_transform.shape == (3, 3)
-                self.pcd = self.pcd @ self.extra_transform.T
-            # import ipdb; ipdb.set_trace()
+            # if self.extra_transform is not None:
+            #     assert self.extra_transform.shape == (3, 3)
+            #     self.pcd = self.pcd @ self.extra_transform.T
             # np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32)
 
             self.xyz_max = np.amax(self.pcd, axis=0)
@@ -405,6 +416,12 @@ class realScene3D(mitsubaBase, scene2DBase):
             self.if_loaded_pcd = True
             
             print(blue_text('[%s] DONE. load_pcd: %d points'%(self.__class__.__name__, self.pcd.shape[0])))
+    
+        if self._if_T: # reorient
+            if not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+                self.vertices_list = [self.apply_T(vertices, ['R', 't', 's']) for vertices in self.vertices_list]
+                # self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
+                self.bverts_list = [computeBox(vertices)[0] for vertices in self.vertices_list] # recompute bounding boxes
             
     def _get_reorient_mat_(self):
         '''

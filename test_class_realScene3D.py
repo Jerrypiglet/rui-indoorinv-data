@@ -85,7 +85,7 @@ default
 eval_models_dict = {}
 # monosdf_shape_dict = {}
 shape_file = ''
-frame_ids = []
+frame_id_list = []
 invalid_frame_id_list = []
 invalid_frame_idx_list = []
 hdr_radiance_scale = 1.
@@ -100,7 +100,7 @@ if_reorient_y_up_skip_shape = False # do not transform shape; only transform pos
 # scene_name = 'IndoorKitchen_v1'; hdr_radiance_scale = 10.
 # # if_rc = False; pcd_file = 'reconstuction_auto/dense/2/fused.ply'; pose_file = ('json', 'transforms.json')
 # if_rc = True; pcd_file = 'RealityCapture/real_kitchen.ply'; pose_file = ('bundle', 'RealityCapture/real_kitchen_bundle.out')
-# frame_ids = [5, 6, 7]
+# frame_id_list = [5, 6, 7]
 
 # scene_name = 'IndoorKitchen_v2'; hdr_radiance_scale = 3.
 # if_rc = False; pcd_file = ''; pose_file = ('json', 'transforms.json')
@@ -184,8 +184,8 @@ shape_file = dataset_root / 'RESULTS_monosdf/20230306-072825-K-ConferenceRoomV2_
 # if_reorient_y_up = True; reorient_blender_angles = [-175, -140, 2.85] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
 # emitter_thres = 4.
-# # frame_ids = [9, 161] # BRDF
-# # frame_ids = [180, 68] # re-rendering + relighting
+# # frame_id_list = [9, 161] # BRDF
+# # frame_id_list = [180, 68] # re-rendering + relighting
 
 '''
 Supplementary
@@ -234,8 +234,8 @@ Supplementary
 # shape_file = dataset_root / 'RESULTS_monosdf/20230310-162753-K-ClassRoom_aligned_SDR_grids_trainval.ply'; 
 # if_reorient_y_up = True; reorient_blender_angles = [-184, -19.7, -0.757] # images/demo_blender_rotate.png
 # if_reorient_y_up_skip_shape = True
-# # frame_ids = [120, 235, 27, 92]
-# # frame_ids = [278, 275] # for relighting
+# # frame_id_list = [120, 235, 27, 92]
+# # frame_id_list = [278, 275] # for relighting
 # emitter_thres = 2.
 
 # +++++ ClassRoom_supergloo_aligned +++++
@@ -318,7 +318,7 @@ OBSELETE
 # shape_file = dataset_root / 'RESULTS_monosdf/20230307-030111-mm1-ConferenceRoomV2_final_MORE_HDR_grids_trainval.ply'
 # if opt.export_format == 'mitsuba': invalid_frame_idx_list = list(range(190, 227))
 
-frame_ids = [0]
+frame_id_list = [0]
 
 im_params_dict={
     'hdr_radiance_scale': hdr_radiance_scale, 
@@ -347,7 +347,7 @@ scene_obj = realScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
-        'frame_id_list': frame_ids, 
+        'frame_id_list': frame_id_list, 
         # 'mitsuba_version': '3.0.0', 
         # 'intrinsics_path': Path(PATH_HOME) / 'data/real' / scene_name / 'intrinsic_mitsubaScene.txt', 
         'axis_up': 'y+', # WILL REORIENT TO y+

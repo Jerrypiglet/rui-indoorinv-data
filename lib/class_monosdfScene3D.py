@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP, read_cam_params_OR, normalize_v
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_opencv, read_cam_params_OR, normalize_v
 import json
 from lib.utils_io import load_matrix, load_img, convert_write_png
 # from collections import defaultdict
@@ -78,7 +78,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
 
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['npz'], 'Unsupported pose file: '+pose_file
-        self.pose_file = self.scene_path / pose_file
+        self.pose_file_path = self.scene_path / pose_file
         
         self.shape_file = self.dataset_root / shape_file
         assert self.shape_file.exists(), 'Shape file not exist: %s'%str(self.shape_file)
@@ -295,27 +295,27 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
             if_resample = 'n'
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. RESAMPLE POSE? [y/n]"))
-            if self.pose_file.exists():
-                if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(str(self.pose_file), len(read_cam_params_OR(self.pose_file)))))
+            if self.pose_file_path.exists():
+                if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(str(self.pose_file_path), len(read_cam_params_OR(self.pose_file_path)))))
             if if_resample in ['Y', 'y']:
                 self.sample_poses(self.mi_params_dict.get('sample_pose_num'), cam_params_dict)
             else:
                 print(yellow('ABORTED resample pose.'))
         else:
-            if not self.pose_file.exists():
+            if not self.pose_file_path.exists():
             # if not hasattr(self, 'pose_list'):
                 self.get_room_center_pose()
 
-        print(white_blue('[mitsubaScene] load_poses from %s'%str(self.pose_file)))
+        print(white_blue('[mitsubaScene] load_poses from %s'%str(self.pose_file_path)))
          
         if self.pose_format == 'npz':
             '''
             MonoSDF convention
             '''
             center_crop_type = cam_params_dict.get('center_crop_type', 'no_crop')
-            camera_dict = np.load(self.pose_file)
-            scale_mats = [camera_dict['scale_mat_%d' % idx].astype(np.float32) for idx in self.frame_id_list]
-            world_mats = [camera_dict['world_mat_%d' % idx].astype(np.float32) for idx in self.frame_id_list]
+            camera_dict = np.load(self.pose_file_path)
+            world_mats = [camera_dict['world_mat_%d' % frame_id].astype(np.float32) for frame_id in self.frame_id_list]
+            scale_mats = [camera_dict['scale_mat_%d' % frame_id].astype(np.float32) for frame_id in self.frame_id_list]
 
             self.K_list = []
             self.pose_list = []
@@ -370,8 +370,8 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
                 else:
                     raise NotImplementedError
 
-                assert abs(intrinsics[0][2]*2 - self.H) < 1., 'intrinsics->H/2. (%.2f) does not match self.H: (%d); resize intrinsics needed?'%(intrinsics[0][2]*2, self.H)
-                assert abs(intrinsics[1][2]*2 - self.W) < 1., 'intrinsics->W/2. (%.2f) does not match self.W: (%d); resize intrinsics needed?'%(intrinsics[1][2]*2, self.W)
+                assert abs(intrinsics[0][2]*2 - self.im_W_load) < 1., 'intrinsics->H/2. (%.2f) does not match self.im_W_load: (%d); resize intrinsics needed?'%(intrinsics[0][2]*2, self.im_W_load)
+                assert abs(intrinsics[1][2]*2 - self.im_H_load) < 1., 'intrinsics->W/2. (%.2f) does not match self.im_H_load: (%d); resize intrinsics needed?'%(intrinsics[1][2]*2, self.im_H_load)
                 
                 self.K_list.append(intrinsics.astype(np.float32))
                 self.pose_list.append(pose.astype(np.float32))
@@ -380,7 +380,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
                 t = pose[:3, 3:4].astype(np.float32)
                 assert np.abs(np.linalg.det(R) - 1.) < 1e-5
 
-                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up(R, t)
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_opencv(R, t)
                 
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 

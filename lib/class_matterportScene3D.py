@@ -11,7 +11,7 @@ from .class_mitsubaBase import mitsubaBase
 from .class_scene2DBase import scene2DBase
 
 from lib.global_vars import mi_variant_dict
-from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_opencv
 from lib.utils_io import load_img, resize_intrinsics
 from lib.utils_misc import blue_text, magenta, yellow, get_list_of_keys, white_blue, red
 from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_dict_from_shape_file
@@ -78,7 +78,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
 
         # self.pose_format, pose_file = scene_params_dict['pose_file']
         # assert self.pose_format in ['OpenRooms', 'bundle'], 'Unsupported pose file: '+pose_file
-        # self.pose_file = self.scene_path / 'cameras' / pose_file
+        # self.pose_file_path = self.scene_path / 'cameras' / pose_file
 
         self.shape_file_list = [self.scene_path / 'region_segmentations' / ('region%d.ply'%region_id) for region_id in self.region_id_list]
         self.shape_params_dict = shape_params_dict
@@ -507,7 +507,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
 
         if self.cam_params_dict.get('if_convert_poses', False):
-            self.export_poses_cam_txt(self.pose_file.parent, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
+            self.export_poses_cam_txt(self.pose_file_path.parent, cam_params_dict=self.cam_params_dict, frame_num_all=self.frame_num_all)
 
     def load_compare_undist_cam_parameters(self):
         '''

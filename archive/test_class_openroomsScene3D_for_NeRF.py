@@ -45,7 +45,7 @@ data/public_re_3/main_xml1/scene0552_00_more/im_4.png
 '''
 # meta_split = 'main_xml1'
 # scene_name = 'scene0552_00_more'
-frame_ids = list(range(87))
+frame_id_list = list(range(87))
 
 '''
 The classroom scene: one lamp (dark) + one window (directional sun)
@@ -53,7 +53,7 @@ data/public_re_3/mainDiffLight_xml1/scene0552_00_more/im_4.png
 '''
 meta_split = 'mainDiffLight_xml1'
 scene_name = 'scene0552_00_more'
-frame_ids = list(range(87))
+frame_id_list = list(range(87))
 
 '''
 The lounge with very specular floor and 3 lamps
@@ -61,7 +61,7 @@ data/public_re_3/main_xml/scene0008_00_more/im_58.png
 '''
 meta_split = 'main_xml'
 scene_name = 'scene0008_00_more'
-frame_ids = list(range(102))
+frame_id_list = list(range(102))
 
 '''
 The conference room with a ceiling lamp; shiny chairs and floor
@@ -69,12 +69,12 @@ data/public_re_3/main_xml/scene0005_00_more/im_58.png
 '''
 # meta_split = 'main_xml'
 # scene_name = 'scene0005_00_more'
-# frame_ids = list(range(102))
+# frame_id_list = list(range(102))
 
 openrooms_scene = openroomsScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root, 'semantic_labels_root': semantic_labels_root, 'shape_pickles_root': shape_pickles_root, 
         'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root}, 
-    scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_ids}, 
+    scene_params_dict={'meta_split': meta_split, 'scene_name': scene_name, 'frame_id_list': frame_id_list}, 
     # modality_list = ['im_sdr', 'im_hdr', 'seg', 'poses', 'albedo', 'roughness', 'depth', 'normal', 'lighting_SG', 'lighting_envmap'], 
     modality_list = [
         'im_sdr', 'poses', 'seg', 

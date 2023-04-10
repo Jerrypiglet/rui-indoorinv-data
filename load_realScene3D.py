@@ -109,18 +109,19 @@ invalid_frame_idx_list = CONF.scene_params_dict.invalid_frame_idx_list
 modify confs
 '''
 
-if opt.export_format == 'mitsuba':
-    CONF.im_params_dict.update({
-        'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
-    })
-elif opt.export_format == 'lieccv22':
-    CONF.im_params_dict.update({
-        'im_H_resize': 240, 'im_W_resize': 320, 
-    })
-else:
-    CONF.im_params_dict.update({
-        'im_H_resize': 512, 'im_W_resize': 768, # monosdf
-    })
+if opt.export:
+    if opt.export_format == 'mitsuba':
+        CONF.im_params_dict.update({
+            'im_H_resize': 360, 'im_W_resize': 540, # inv-nerf
+        })
+    elif opt.export_format == 'lieccv22':
+        CONF.im_params_dict.update({
+            'im_H_resize': 240, 'im_W_resize': 320, 
+        })
+    elif opt.export_format == 'monosdf':
+        CONF.im_params_dict.update({
+            'im_H_resize': 512, 'im_W_resize': 768, # monosdf
+        })
     
 CONF.scene_params_dict.update({
     'split': opt.split, # train, val, train+val
@@ -134,6 +135,10 @@ CONF.mi_params_dict.update({
     'if_get_segs': False, # [depend on if_sample_rays_pts=True] True: to generate segs similar to those in openroomsScene2D.load_seg()
     })
 
+CONF.shape_params_dict.update({
+    'tsdf_path': 'fused_tsdf.ply', # 'test_files/tmp_tsdf.ply', 
+    })
+
 scene_obj = realScene3D(
     CONF = CONF, 
     if_debug_info=opt.if_debug_info, 
@@ -144,6 +149,7 @@ scene_obj = realScene3D(
         'im_hdr', 
         'im_sdr', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
+        'tsdf', 
         ], 
 )
 
@@ -317,8 +323,9 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             'poses', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             'mi', # mitsuba sampled rays, pts
+            'tsdf', 
             ], 
         if_debug_info=opt.if_debug_info, 
     )

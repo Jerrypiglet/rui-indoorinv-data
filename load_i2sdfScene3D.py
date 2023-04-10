@@ -17,15 +17,11 @@ import argparse
 from pyhocon import ConfigFactory, ConfigTree
 from lib.utils_misc import str2bool, white_magenta, check_exists
 
-from lib.class_mitsubaScene3D import mitsubaScene3D
+from lib.class_i2sdfScene3D import i2sdfScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
-from lib.class_visualizer_scene_3D_plt import visualizer_scene_3D_plt
 
-from lib.class_eval_rad import evaluator_scene_rad
-from lib.class_eval_monosdf import evaluator_scene_monosdf
-from lib.class_eval_inv import evaluator_scene_inv
 from lib.class_eval_scene import evaluator_scene_scene
 
 from lib.class_renderer_mi_mitsubaScene_3D import renderer_mi_mitsubaScene_3D
@@ -43,10 +39,6 @@ parser.add_argument('--if_set_pcd_color_mi', type=str2bool, nargs='?', const=Tru
 # parser.add_argument('--if_add_rays_from_renderer', type=str2bool, nargs='?', const=True, default=False, help='if add camera rays and emitter sample rays from renderer')
 
 parser.add_argument('--split', type=str, default='train', help='')
-
-# differential renderer
-# parser.add_argument('--render_diff', type=str2bool, nargs='?', const=True, default=False, help='differentiable surface rendering')
-# parser.add_argument('--renderer_option', type=str, default='PhySG', help='differentiable renderer option')
 
 # renderer (mi/blender)
 parser.add_argument('--render_2d', type=str2bool, nargs='?', const=True, default=False, help='render 2D modalities')
@@ -76,11 +68,11 @@ parser.add_argument('--export_appendix', type=str, default='', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
 # === after refactorization
-parser.add_argument('--scene', type=str, default='kitchen', help='load conf file: confs/indoor_synthetic/\{opt.scene\}.conf')
+parser.add_argument('--scene', type=str, default='scan332_bedroom_relight_0', help='load conf file: confs/i2sdf/\{opt.scene\}.conf')
 
 opt = parser.parse_args()
 
-DATASET = 'i2-sdf-dataset'
+DATASET = 'i2sdf'
 conf_base_path = Path('confs/%s.conf'%DATASET); check_exists(conf_base_path)
 CONF = ConfigFactory.parse_file(str(conf_base_path))
 conf_scene_path = Path('confs/%s/%s.conf'%(DATASET, opt.scene)); check_exists(conf_scene_path)
@@ -88,13 +80,12 @@ conf_scene = ConfigFactory.parse_file(str(conf_scene_path))
 CONF = ConfigTree.merge_configs(CONF, conf_scene)
 
 dataset_root = Path(PATH_HOME) / CONF.data.dataset_root
-xml_root = Path(PATH_HOME) / CONF.data.xml_root
 
 frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-frame_id_list = [0]
+# frame_id_list = [0, 1, 2, 3, 4]
 
 '''
 modify confs
@@ -103,128 +94,37 @@ modify confs
 CONF.scene_params_dict.update({
     'split': opt.split, # train, val, train+val
     'frame_id_list': frame_id_list, 
-    # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
-    'invalid_frame_id_list': invalid_frame_id_list, 
-    })
-    
-CONF.cam_params_dict.update({
-    # ==> if sample poses and render images 
-    'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-    'sample_pose_num': 20 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
-    'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
-    })
-
-CONF.mi_params_dict.update({
-    'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
-    'if_get_segs': True, # [depend on if_sample_rays_pts=True] True: to generate segs similar to those in openroomsScene2D.load_seg()
-    })
-
-CONF.im_params_dict.update({
-    'im_H_resize': 320, 'im_W_resize': 640, 
-    'spp': 32, 
     })
 
 CONF.shape_params_dict.update({
-    'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
-    'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
+    'tsdf_path': 'fused_tsdf.ply', # 'test_files/tmp_tsdf.ply', 
     })
-
+    
 '''
 create scene obj
 '''
-scene_obj = mitsubaScene3D(
+scene_obj = i2sdfScene3D(
     CONF = CONF, 
     if_debug_info = opt.if_debug_info, 
     host = host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
+    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     modality_list = [
         'im_hdr', 
         'im_sdr', 
         'poses', 
-        # 'lighting_envmap', 
-        'albedo', 'roughness', 
-        'emission', 
+        'ks', 'kd',  
+        'roughness', 
         'depth', 'normal', 
+        'im_mask', 
+        'tsdf', 
+        
         # 'layout', 
+        # 'emission', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties``
         ], 
 )
 
-'''
-Mitsuba/Blender 2D renderer
-'''
-if opt.render_2d:
-    assert opt.renderer in ['mi', 'blender']
-    if opt.renderer == 'mi':
-        renderer = renderer_mi_mitsubaScene_3D(
-            scene_obj, 
-            modality_list=[
-                'im', # both hdr and sdr
-            ], 
-            im_params_dict={}, 
-            cam_params_dict={}, 
-            mi_params_dict={},
-        )
-    if opt.renderer == 'blender':
-        renderer = renderer_blender_mitsubaScene_3D(
-            scene_obj, 
-            modality_list=[
-                'albedo', 
-                'roughness', 
-                'depth', 
-                'normal', 
-                'index', 
-                'emission', 
-                # 'lighting_envmap', 
-                ], 
-            host=host, 
-            FORMAT='OPEN_EXR', 
-            # FORMAT='PNG', 
-            im_params_dict={
-                'spp': 32}, 
-            cam_params_dict={}, 
-            mi_params_dict={},
-        )
-    host=host, 
-    renderer.render(if_force=opt.force)
-
 eval_return_dict = {}
-
-'''
-Evaluator for scene
-'''
-if opt.eval_scene:
-    evaluator_scene = evaluator_scene_scene(
-        host=host, 
-        scene_object=scene_obj, 
-    )
-
-    '''
-    sample visivility to camera centers on vertices
-    [!!!] set 'mesh_color_type': 'eval-vis_count'
-    '''
-    _ = evaluator_scene.sample_shapes(
-        sample_type='vis_count', # ['']
-        # sample_type='t', # ['']
-        # sample_type='face_normal', # ['']
-        shape_params={
-        }
-    )
-    for k, v in _.items():
-        if k in eval_return_dict:
-            eval_return_dict[k].update(_[k])
-        else:
-            eval_return_dict[k] = _[k]
-            
-    if 'face_normals_flipped_mask' in eval_return_dict and opt.export:
-        face_normals_flipped_mask = eval_return_dict['face_normals_flipped_mask']
-        assert face_normals_flipped_mask.shape[0] == scene_obj.faces_list[0].shape[0]
-        if np.sum(face_normals_flipped_mask) > 0:
-            validate_idx = np.where(face_normals_flipped_mask)[0][0]
-            print(validate_idx, scene_obj.faces_list[0][validate_idx])
-            scene_obj.faces_list[0][face_normals_flipped_mask] = scene_obj.faces_list[0][face_normals_flipped_mask][:, [0, 2, 1]]
-            print(white_magenta('[FLIPPED] %d/%d inward face normals'%(np.sum(face_normals_flipped_mask), scene_obj.faces_list[0].shape[0])))
-            print(validate_idx, '->', scene_obj.faces_list[0][validate_idx])
 
 if opt.export:
     from lib.class_exporter import exporter_scene
@@ -289,37 +189,29 @@ if opt.vis_2d_plt:
         scene_obj, 
         modality_list_vis=[
             'im', 
-            # 'layout', 
-            # 'shapes', 
-            'albedo', 
+            'ks', 
+            'kd', 
             'roughness', 
-            'emission', 
             'depth', 
             'normal', 
-            'mi_depth', 
-            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
-            # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
+            'im_mask', 
+            
+            # 'layout', 
+            # 'shapes', 
+            # 'mi_depth', 
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'emission', 
             # 'seg_area', 'seg_env', 'seg_obj', 
-            # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
             ], 
         frame_idx_list=[0, 1, 2, 3, 4], 
-        # frame_idx_list=[0], 
-        # frame_idx_list=[6, 10, 12], 
     )
-    if opt.if_add_est_from_eval:
-        for modality in ['lighting_envmap']:
-            if modality in eval_return_dict:
-                scene_obj.add_modality(eval_return_dict[modality], modality, 'EST')
 
     visualizer_2D.vis_2d_with_plt(
-        lighting_params={
-            'lighting_scale': 1., # rescaling the brightness of the envmap
-            }, 
-        other_params={
-            # 'mi_normal_vis_coords': 'world-blender', 
-            'mi_normal_vis_coords': 'opencv', 
-            'mi_depth_if_sync_scale': False, 
-            }, 
+        # other_params={
+        #     # 'mi_normal_vis_coords': 'world-blender', 
+        #     'mi_normal_vis_coords': 'opencv', 
+        #     'mi_depth_if_sync_scale': False, 
+            # }, 
     )
 
 '''
@@ -330,9 +222,10 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             'poses', 
-            'layout', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
-            'mi', # mitsuba sampled rays, pts
+            'tsdf',
+            # 'layout', 
+            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            # 'mi', # mitsuba sampled rays, pts
             # 'dense_geo', # fused from 2D
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)

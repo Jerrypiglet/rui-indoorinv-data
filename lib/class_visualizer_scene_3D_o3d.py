@@ -29,6 +29,7 @@ from lib.class_matterportScene3D import matterportScene3D
 from lib.class_realScene3D import realScene3D
 from lib.class_texirScene3D import texirScene3D
 from lib.class_simpleScene3D import simpleScene3D
+from lib.class_i2sdfScene3D import i2sdfScene3D
 
 from lib.utils_misc import get_list_of_keys, gen_random_str, yellow, yellow, white_red
 from lib.utils_o3d import text_3d, get_arrow_o3d, get_sphere, remove_walls, remove_ceiling
@@ -55,7 +56,7 @@ class visualizer_scene_3D_o3d(object):
         modality_list_vis: list, 
         if_debug_info: bool=False, 
     ):
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D, simpleScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D, simpleScene3D, i2sdfScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
@@ -64,11 +65,25 @@ class visualizer_scene_3D_o3d(object):
         self.modality_list_vis = list(set(modality_list_vis))
         for _ in self.modality_list_vis:
             if _ == '': continue
-            assert _ in ['dense_geo', 'poses', 'lighting_SG', 'lighting_envmap', 'layout', 'shapes', 'emitters', 'mi'], 'Invalid modality: %s'%_
+            assert _ in self.valid_modalities, 'Invalid modality: %s'%_
         if 'mi' in self.modality_list_vis:
             self.mi_pcd_color_list = None
         self.extra_geometry_list = []
         self.extra_input_dict = {}
+        
+    @property
+    def valid_modalities(self):
+        return [
+            'dense_geo', 
+            'poses', 
+            'lighting_SG', 
+            'lighting_envmap', 
+            'layout', 
+            'shapes', 
+            'emitters', 
+            'mi', 
+            'tsdf', 
+            ]
 
     def run_demo(self, extra_geometry_list=[]):
 
@@ -210,6 +225,10 @@ class visualizer_scene_3D_o3d(object):
             o3d_geometry_list += self.collect_dense_geo(
                 dense_geo_params
             )
+
+        if 'tsdf' in modality_list:
+            o3d_geometry_list += self.collect_tsdf(
+            )
         
         if 'lighting_SG' in modality_list:
             o3d_geometry_list += self.collect_lighting_SG(
@@ -343,7 +362,6 @@ class visualizer_scene_3D_o3d(object):
         cam_vis_scale = cam_params.get('cam_vis_scale', 1)
         # near, far = self.os.near * cam_vis_scale * 5, self.os.far * cam_vis_scale * 5
         near, far = self.os.near, self.os.far
-        
 
         # pose_list = self.os.pose_list
         # origin_lookatvector_up_list = self.os.origin_lookatvector_up_list
@@ -1122,3 +1140,18 @@ class visualizer_scene_3D_o3d(object):
             self.mi_pcd_color_list = [color_map_color(color_tensor, vmin=np.amin(color_tensor), vmax=np.amax(color_tensor)) for color_tensor in color_tensor_list]
 
         assert self.mi_pcd_color_list is not None
+        
+    def collect_tsdf(self):
+        '''
+        load fuse TSDF volume
+        '''
+        assert self.os.if_loaded_tsdf
+        if 'tsdf_mesh_o3d' in self.os.tsdf_fused_dict:
+            tsdf_mesh_o3d = self.os.tsdf_fused_dict['tsdf_mesh_o3d']
+        else:
+            tsdf_mesh_o3d = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(self.os.tsdf_fused_dict['vertices']), o3d.utility.Vector3iVector(self.os.tsdf_fused_dict['faces']))
+            tsdf_mesh_o3d.compute_vertex_normals()
+            tsdf_mesh_o3d.compute_triangle_normals()
+            tsdf_mesh_o3d.vertex_colors = o3d.utility.Vector3dVector(self.os.tsdf_fused_dict['colors'])
+            
+        return [tsdf_mesh_o3d]

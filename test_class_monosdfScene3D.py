@@ -70,9 +70,9 @@ radiance_scale = 1.
 scannet scan 1~4 from MonoSDF
 '''
 scan_id = 1
-# frame_ids = list(range(465))
-frame_ids = list(range(0, 465, 40))
-# frame_ids = [0]
+# frame_id_list = list(range(465))
+frame_id_list = list(range(0, 465, 40))
+# frame_id_list = [0]
 # shape_file = ('not-normalized', 'GTmesh/scene0050_00_vh_clean_2.ply')
 shape_file = ('normalized', 'ESTmesh/scan1.ply')
 
@@ -84,7 +84,7 @@ mitsuba_scene = monosdfScene3D(
         # 'xml_filename': xml_filename, 
         'scene_name': 'scan%d'%scan_id, 
         # 'split': split, 
-        'frame_id_list': frame_ids, 
+        'frame_id_list': frame_id_list, 
         # 'mitsuba_version': '3.0.0', 
         # 'intrinsics_path': intrinsics_path, 
         'axis_up': 'z+', 
@@ -394,7 +394,7 @@ if opt.vis_3d_o3d:
     lighting_params_vis={
         'if_use_mi_geometry': True, 
         'if_use_loaded_envmap_position': True, # assuming lighting envmap endpoint position dumped by Blender renderer
-        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_id_list)
         'subsample_lighting_wi_rate': 500, # subsample on lighting directions: too many directions (e.g. 128x256)
         # 'lighting_keep_ratio': 0.05, 
         # 'lighting_further_clip_ratio': 0.1, 
@@ -479,7 +479,7 @@ if opt.vis_3d_o3d:
             'if_cam_axis_only': False, 
             }, 
         # dense_geo_params={
-        #     'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
+        #     'subsample_pcd_rate': 1, # change this according to how sparse the points you would like to be (also according to num of frame_id_list)
         #     'if_ceiling': False, # [OPTIONAL] remove ceiling points to better see the furniture 
         #     'if_walls': False, # [OPTIONAL] remove wall points to better see the furniture 
         #     'if_normal': False, # [OPTIONAL] turn off normals to avoid clusters

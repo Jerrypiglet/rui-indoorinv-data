@@ -14,6 +14,7 @@ from lib.class_replicaScene3D import replicaScene3D
 from lib.class_realScene3D import realScene3D
 from lib.class_texirScene3D import texirScene3D
 from lib.class_simpleScene3D import simpleScene3D
+from lib.class_i2sdfScene3D import i2sdfScene3D
 
 from lib.utils_vis import vis_index_map, colorize
 from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
@@ -30,7 +31,7 @@ class visualizer_scene_2D(object):
         frame_idx_list=None, # 0-based indexing, [0, ..., os.frame_num-1]
     ):
 
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D, simpleScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D, simpleScene3D, i2sdfScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
@@ -41,7 +42,6 @@ class visualizer_scene_2D(object):
         else:
             assert isinstance(frame_idx_list, list)
             self.frame_idx_list = frame_idx_list
-        # import ipdb; ipdb.set_trace()
         # assert len(self.frame_idx_list) <= self.os.frame_num
         
         self.frame_idx_list = self.frame_idx_list[:min(6, self.os.frame_num)]
@@ -68,7 +68,8 @@ class visualizer_scene_2D(object):
         return [
             'im', 
             'im_mask', 
-            'albedo', 'roughness', 'depth', 'normal', 
+            'albedo', 'roughness', 'kd', 'ks', 
+            'depth', 'normal', 
             'lighting_SG', # convert to lighting_envmap and vis
             'lighting_envmap', 
             'seg_area', 'seg_env', 'seg_obj', 
@@ -150,7 +151,7 @@ class visualizer_scene_2D(object):
                     # other modalities
                     self.vis_2d_modality(fig=subfig, ax_list=ax_list, modality=modality, source=source, **kwargs)
 
-                    if modality in ['albedo', 'emission']:
+                    if modality in ['albedo', 'kd', 'ks', 'emission']:
                         modality_title_appendix = '(in SDR space)'
                     if modality == 'matseg':
                         modality_title_appendix = '(red for invalid areas (e.g. emitters)'
@@ -182,10 +183,10 @@ class visualizer_scene_2D(object):
 
         '''
         # assert self.os.if_has_im_sdr and self.os.if_has_poses
-        if modality in ['depth', 'normal']: assert self.os.if_has_depth_normal
-        if modality in ['albedo', 'roughness']: assert self.os.if_has_BRDF
-        if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.os.if_has_seg
-        if modality in ['mi_depth', 'mi_normal', 'mi_normal_im_overlay', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']: assert self.os.if_has_mitsuba_scene
+        # if modality in ['depth', 'normal']: assert self.os.if_has_depth_normal
+        # if modality in ['albedo', 'kd', 'ks', 'roughness']: assert self.os.if_has_BRDF
+        # if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.os.if_has_seg
+        # if modality in ['mi_depth', 'mi_normal', 'mi_normal_im_overlay', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']: assert self.os.if_has_mitsuba_scene
 
         _list = self.os.get_modality(modality, source=source)
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
@@ -253,7 +254,7 @@ class visualizer_scene_2D(object):
                 plt.colorbar(plot, ax=ax)
                 continue
 
-            if modality in ['albedo', 'emission']:
+            if modality in ['albedo', 'kd', 'ks', 'emission']:
                 # convert albedo to SDR for better vis
                _im = np.clip(_im ** (1./2.2), 0., 1.)
 

@@ -86,8 +86,8 @@ scene_name = 'asianRoom2'
 # scene_name = 'Salon2'; hdr_radiance_scale = 2;  # Living room
 # scene_name = 'sofa91'
 
-# frame_ids = [0]
-# frame_ids = [0, 1, 199]
+# frame_id_list = [0]
+# frame_id_list = [0, 1, 199]
 
 scene_obj = freeviewpointScene3D(
     if_debug_info=opt.if_debug_info, 
@@ -95,7 +95,7 @@ scene_obj = freeviewpointScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
-        # 'frame_id_list': frame_ids, # comment out to use all frames
+        # 'frame_id_list': frame_id_list, # comment out to use all frames
         'axis_up': 'z+', 
         'pose_file': ('bundle', 'bundle.out'), 
         # 'pose_file': ('OpenRooms', 'cam.txt'), # only useful after dumping poses to cam.txt

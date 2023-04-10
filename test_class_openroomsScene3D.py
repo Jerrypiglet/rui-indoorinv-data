@@ -81,7 +81,7 @@ data/public_re_3/main_xml1/scene0552_00/im_4.png
 '''
 # meta_split = 'main_xml1'
 # scene_name = 'scene0552_00'
-# frame_ids = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
+# frame_id_list = [0, 1, 2, 3, 4] + list(range(5, 87, 10))
 
 
 '''
@@ -97,7 +97,7 @@ data/public_re_3/main_xml/scene0008_00_more/im_58.png
 # meta_split = 'main_xml'
 # scene_name = 'scene0008_00_more'
 # emitter_type_index_list = [('lamp', 0)]
-# frame_ids = list(range(0, 345, 10))
+# frame_id_list = list(range(0, 345, 10))
 
 '''
 The classroom scene: one lamp (dark) + one window (directional sun)
@@ -107,8 +107,8 @@ dataset_version = 'public_re_0203'
 meta_split = 'mainDiffLight_xml1'
 # meta_split = 'main_xml1'
 scene_name = 'scene0552_00'
-# frame_ids = list(range(200))
-frame_ids = [0]
+# frame_id_list = list(range(200))
+frame_id_list = [0]
 
 '''
 The conference room with one lamp
@@ -118,7 +118,7 @@ images/demo_eval_scene_shapes-vis_count-train-public_re_0203_main_xml_scene0005_
 # dataset_version = 'public_re_0203'
 # meta_split = 'main_xml'
 # scene_name = 'scene0005_00'
-# frame_ids = list(range(200))
+# frame_id_list = list(range(200))
 
 '''
 The classroom scene: one lamp (lit up) + one window (less sun)
@@ -128,8 +128,8 @@ data/public_re_0203/main_xml1/scene0552_00/im_4.png
 # dataset_version = 'public_re_0203'
 # meta_split = 'main_xml1'
 # scene_name = 'scene0552_00'
-# # frame_ids = list(range(200))
-# frame_ids = [0]
+# # frame_id_list = list(range(200))
+# frame_id_list = [0]
 # radiance_rescale = 1./5. # RE
 
 radiance_scale_vis = 0.001 # GT max radiance ~300. -> ~3.
@@ -166,7 +166,7 @@ scene_obj = openroomsScene3D(
     scene_params_dict={
         'meta_split': meta_split, 
         'scene_name': scene_name, 
-        'frame_id_list': frame_ids, 
+        'frame_id_list': frame_id_list, 
         'axis_up': 'y+', 
         'monosdf_shape_dict': monosdf_shape_dict, # comment out if load GT shape from XML; otherwise load shape from MonoSDF to **'shape' and Mitsuba scene**
         }, 
@@ -519,7 +519,7 @@ if opt.vis_3d_o3d:
     )
 
     lighting_params_vis={
-        'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        'subsample_lighting_pts_rate': 100, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_id_list)
         # 'lighting_keep_ratio': 0.05, 
         # 'lighting_further_clip_ratio': 0.1, 
         'lighting_scale': 2., 
@@ -602,7 +602,7 @@ if opt.vis_3d_o3d:
             'if_labels': True, 
             }, 
         dense_geo_params={
-            'subsample_pcd_rate': 100, # change this according to how sparse the points you would like to be (also according to num of frame_ids)
+            'subsample_pcd_rate': 100, # change this according to how sparse the points you would like to be (also according to num of frame_id_list)
             'if_ceiling': False, # remove ceiling points to better see the furniture 
             'if_walls': True, # remove wall points to better see the furniture 
             'if_normal': False, # turn off normals to avoid clusters

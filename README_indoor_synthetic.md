@@ -1,3 +1,23 @@
+<!--Generate the TOC via: -->
+<!-- (bash) ../gh-md-toc --insert README_indoor_synthetic.md-->
+<!--See https://github.com/ekalinin/github-markdown-toc#readme-->
+
+<!--ts-->
+- [Generating Indoor Synthetic dataset from scratch](#generating-indoor-synthetic-dataset-from-scratch)
+  - [Firstly](#firstly)
+  - [Prepare scnee files](#prepare-scnee-files)
+  - [Generate poses](#generate-poses)
+  - [Render all modalities](#render-all-modalities)
+    - [Other modalities with Blender](#other-modalities-with-blender)
+- [Other datasets](#other-datasets)
+    - [i2-sdf](#i2-sdf)
+- [TODO](#todo)
+
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+<!-- Added by: jerrypiglet, at: Mon Apr 10 01:32:14 PDT 2023 -->
+
+<!--te-->
+
 # Generating Indoor Synthetic dataset from scratch
 
 ## Firstly
@@ -166,6 +186,28 @@ python load_mitsubaScene3D.py --scene kitchen_mi --vis_2d_plt
 ```
 
 To visualize other modalities ([demo](https://i.imgur.com/24i0yjA.png)), set `mitsubaScene3D(modality_list` and `visualizer_scene_2D(modality_list_vis` to desired modalities, then run the same command.
+
+# Other datasets
+### i2-sdf
+Synthetic dataset from [I^2-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets can be downloaded from the project page (currently only 2 scenes; convention is explained [here](https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)). [demo](images/demo_i2sdf.png)
+
+- data/i2-sdf-dataset
+  - scan332_bedroom_relight_0/
+    - depth
+    - normal
+    - material
+      - %04d_kd.exr # diffuse albedo
+      - %04d_ks.exr # specular albedo
+      - %04d_roughness.exr # roughness
+    - image
+    - hdr
+    - mask
+    - light_mask
+    - cameras.npz # similar format to propossed MonoSDF poses
+
+``` bash
+python load_i2sdfScene3D.py --vis_3d_o3d True --vis_2d_plt False
+```
 
 # TODO
 - [ ] Blender: how to NOT render HDR images?

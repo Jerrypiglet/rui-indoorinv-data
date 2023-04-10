@@ -1,3 +1,23 @@
+<!--Generate the TOC via: -->
+<!-- (bash) ../gh-md-toc --insert README_real.md-->
+<!--See https://github.com/ekalinin/github-markdown-toc#readme-->
+
+<!--ts-->
+- [Real scenes: capture, process and load](#real-scenes-capture-process-and-load)
+  - [Load preprocessed scenes](#load-preprocessed-scenes)
+  - [Dump to Monosdf format](#dump-to-monosdf-format)
+    - [Additional notes on getting axis-aligned geometry](#additional-notes-on-getting-axis-aligned-geometry)
+  - [Dump to FIPT format](#dump-to-fipt-format)
+  - [Capturing guide](#capturing-guide)
+    - [RAW data](#raw-data)
+    - [environment](#environment)
+    - [run the pipeline](#run-the-pipeline)
+
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+<!-- Added by: jerrypiglet, at: Mon Apr 10 01:29:36 PDT 2023 -->
+
+<!--te-->
+
 # Real scenes: capture, process and load
 
 ## Load preprocessed scenes

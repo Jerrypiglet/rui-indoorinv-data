@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up_yUP
+from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up_opencv
 from lib.utils_io import load_img, load_matrix
 # from collections import defaultdict
 # import trimesh
@@ -88,12 +88,12 @@ class replicaScene3D(mitsubaBase, scene2DBase):
         self.pose_format, pose_file, if_abs_path = scene_params_dict['pose_file']
         assert self.pose_format in ['OpenRooms'], 'Unsupported pose file: '+pose_file
         if if_abs_path:
-            self.pose_file = Path(pose_file)
+            self.pose_file_path = Path(pose_file)
         else:
-            self.pose_file = self.scene_path / 'cameras' / pose_file
+            self.pose_file_path = self.scene_path / 'cameras' / pose_file
 
         if not cam_params_dict.get('if_sample_poses', False):
-            self.frame_num_all = len(read_cam_params_OR(self.pose_file))
+            self.frame_num_all = len(read_cam_params_OR(self.pose_file_path))
 
         self.shape_file = self.scene_path / 'mesh_geo.ply' # export with Meshlab this new mesh, to remove colors
         self.shape_params_dict = shape_params_dict
@@ -277,26 +277,26 @@ class replicaScene3D(mitsubaBase, scene2DBase):
             # assert False, 'disabled; use '
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. RESAMPLE POSE? [y/n]"))
-            if self.pose_file.exists():
+            if self.pose_file_path.exists():
                 # assert self.pose_format in ['json']
                 try:
-                    _num_poses = len(self.load_meta_json_pose(self.pose_file)[1])
+                    _num_poses = len(self.load_meta_json_pose(self.pose_file_path)[1])
                 except: 
                     _num_poses = -1
-                # if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(str(self.pose_file), len(self.load_meta_json_pose(self.pose_file)[1]))))
-                if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(str(self.pose_file), _num_poses)))
+                # if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(str(self.pose_file_path), len(self.load_meta_json_pose(self.pose_file_path)[1]))))
+                if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(str(self.pose_file_path), _num_poses)))
             if not if_resample in ['N', 'n']:
                 self.sample_poses(cam_params_dict.get('sample_pose_num'), self.extra_transform_inv, invalid_normal_thres=0.01)
                 return
 
-        print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file))))
+        print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file_path))))
 
         self.pose_list = []
         self.K_list = []
         self.origin_lookatvector_up_list = []
 
         if self.pose_format == 'OpenRooms':
-            cam_params = read_cam_params_OR(self.pose_file)
+            cam_params = read_cam_params_OR(self.pose_file_path)
             if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
             assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
 
