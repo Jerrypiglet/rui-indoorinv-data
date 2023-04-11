@@ -8,14 +8,14 @@ from tqdm import tqdm
 import scipy
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_yUP, origin_lookat_up_to_R_t, read_cam_params_OR
+from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_opencv, origin_lookat_up_to_R_t, read_cam_params_OR
 from lib.utils_io import load_matrix, load_img
 import imageio
 import string
 # Import the library using the alias "mi"
 import mitsuba as mi
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
+from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red, get_device
 from lib.utils_io import load_matrix, resize_intrinsics
 from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
 
@@ -38,9 +38,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         CONF: pyhocon.config_tree.ConfigTree,  
         root_path_dict: dict, 
         modality_list: list, 
+        if_debug_info: bool=False, 
         host: str='', 
         device_id: int=-1, 
-        if_debug_info: bool=False, 
     ):
         
         self.CONF = CONF
@@ -59,7 +59,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             device_id=device_id, 
         )
 
-
         '''
         scene params and frames
         '''
@@ -72,13 +71,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.invalid_frame_id_list = self.CONF.scene_params_dict.get('invalid_frame_id_list', [])
         self.frame_id_list = [_ for _ in self.frame_id_list if _ not in self.invalid_frame_id_list]
         
-        self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_dict, ['mitsuba_version'], [str])[0]
-        self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
+        self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_diset_variantct, ['mitsuba_version'], [str])[0]
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
+        self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
         
-        self.if_autoscale_scene = False
-
-        self.scene_name, self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_dict, ['scene_name', 'mitsuba_version'], [str, str])
+        self.scene_name = get_list_of_keys(self.CONF.scene_params_dict, ['scene_name'], [str])[0]
         self.scene_path = self.dataset_root / self.scene_name
         self.scene_rendering_path = self.dataset_root / self.scene_name / self.split
         self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
@@ -96,11 +93,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         # self.monosdf_shape_dict = self.CONF.scene_params_dict.get('monosdf_shape_dict', {})
         # if '_shape_normalized' in self.monosdf_shape_dict:
         #     assert self.monosdf_shape_dict['_shape_normalized'] in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%self.monosdf_shape_dict['_shape_normalized']
-        if self.CONF.scene.shape_file != '':
-            if len(str(self.CONF.scene.shape_file).split('/')) == 1:
-                self.shape_file_path = self.scene_path / self.CONF.scene.shape_file
+        if self.CONF.scene_params_dict.shape_file != '':
+            if len(str(self.CONF.scene_params_dict.shape_file).split('/')) == 1:
+                self.shape_file_path = self.scene_path / self.CONF.scene_params_dict.shape_file
             else:
-                self.shape_file_path = self.dataset_root / self.CONF.scene.shape_file
+                self.shape_file_path = self.dataset_root / self.CONF.scene_params_dict.shape_file
             assert self.shape_file_path.exists(), 'shape file does not exist: %s'%str(self.shape_file_path)
 
         self.near = self.CONF.cam_params_dict.get('near', 0.1)
@@ -117,13 +114,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if 'poses' in self.modality_list:
             self.load_poses() # attempt to generate poses indicated in self.CONF.cam_params_dict
 
-        self.load_modalities()
-
         if hasattr(self, 'pose_list'): 
             self.get_cam_rays()
         if self.CONF.mi_params_dict.get('process_mi_scene', True):
             self.process_mi_scene(if_postprocess_mi_frames=hasattr(self, 'pose_list'))
-
+            
+        self.load_modalities()
+            
     @property
     def frame_num(self):
         return len(self.frame_id_list)
@@ -148,11 +145,8 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             'emission', 
             'layout', 'shapes', 
             'lighting_envmap', 
+            'tsdf', 
             ]
-
-    @property
-    def if_has_poses(self):
-        return hasattr(self, 'pose_list')
 
     @property
     def if_has_emission(self):
@@ -167,29 +161,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         return all([_ in self.modality_list for _ in ['shapes']])
 
     @property
-    def if_has_mitsuba_scene(self):
-        return True
-
-    @property
-    def if_has_mitsuba_rays_pts(self):
-        return self.CONF.mi_params_dict['if_sample_rays_pts']
-
-    @property
-    def if_has_mitsuba_segs(self):
-        return self.CONF.mi_params_dict['if_get_segs']
-
-    @property
     def if_has_seg(self):
         return False, 'Segs not saved to labels. Use mi_seg_area, mi_seg_env, mi_seg_obj instead.'
         # return all([_ in self.modality_list for _ in ['seg']])
-
-    @property
-    def if_has_mitsuba_all(self):
-        return all([self.if_has_mitsuba_scene, self.if_has_mitsuba_rays_pts, self.if_has_mitsuba_segs, ])
-
-    @property
-    def if_has_colors(self): # no semantic label colors
-        return False
 
     def load_modalities(self):
         for _ in self.modality_list:
@@ -200,6 +174,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
             if _ == 'emission': self.load_emission()
             if _ == 'layout': self.load_layout()
             if _ == 'shapes': self.load_shapes() # shapes of 1(i.e. furniture) + emitters
+            if _ == 'tsdf': self.load_tsdf()
             if _ == 'depth': raise NotImplementedError
 
     def get_modality(self, modality, source: str='GT'):
@@ -227,17 +202,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        # if self.monosdf_shape_dict != {}:
-        #     self.load_monosdf_scene()
-        #     assert self.extra_transform is None, 'not suported yet'
         if self.shape_file_path is not None:
             print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
             self.shape_id_dict = {
                 'type': self.shape_file_path.suffix[1:],
                 'filename': str(self.shape_file_path), 
                 }
-            if self.extra_transform is not None:
-                self.shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
+            # if self.extra_transform is not None:
+            #     self.shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
             self.mi_scene = mi.load_dict({
                 'type': 'scene',
                 'shape_id': self.shape_id_dict, 
@@ -245,47 +217,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         else:
             # xml file always exists for Mitsuba scenes
             self.mi_scene = mi.load_file(str(self.xml_file_path))
-
-    def process_mi_scene(self, if_postprocess_mi_frames=True, force=False):
-        '''
-        debug_render_test_image: render test image
-        debug_dump_mesh: dump all shapes into meshes
-        if_postprocess_mi_frames: for each frame, sample rays and generate segmentation maps
-        '''
-        
-        debug_render_test_image = self.CONF.mi_params_dict.get('debug_render_test_image', False)
-        if debug_render_test_image:
-            '''
-            images/demo_mitsuba_render.png
-            '''
-            test_rendering_path = self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'
-            print(blue_text('Rendering... test frame by Mitsuba: %s')%str(test_rendering_path))
-            if self.mi_scene.integrator() is None:
-                print(yellow('No integrator found in the scene. Skipped: debug_render_test_image'))
-            else:
-                image = mi.render(self.mi_scene, spp=16)
-                mi.util.write_bitmap(str(test_rendering_path), image)
-                print(blue_text('DONE.'))
-
-        debug_dump_mesh = self.CONF.mi_params_dict.get('debug_dump_mesh', False)
-        if debug_dump_mesh:
-            '''
-            images/demo_mitsuba_dump_meshes.png
-            '''
-            mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
-            self.dump_mi_meshes(self.mi_scene, mesh_dump_root)
-
-        if if_postprocess_mi_frames:
-            if_sample_rays_pts = self.CONF.mi_params_dict.get('if_sample_rays_pts', True)
-            if if_sample_rays_pts:
-                self.mi_sample_rays_pts(self.cam_rays_list, if_force=force)
-                self.pts_from['mi'] = True
-            
-            if_get_segs = self.CONF.mi_params_dict.get('if_get_segs', True)
-            if if_get_segs:
-                assert if_sample_rays_pts
-                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
-                self.seg_from['mi'] = True
 
     def load_intrinsics(self):
         '''
@@ -329,7 +260,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 _num_poses = self.get_pose_num_from_file()
                 if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(' + '.join([str(pose_file) for pose_file in self.pose_file_path_list]), _num_poses)))
             if not if_resample in ['N', 'n']:
-                self.sample_poses(self.CONF.cam_params_dict.get('sample_pose_num'), self.extra_transform_inv, if_dump=self.CONF.cam_params_dict.get('sample_pose_if_dump', True))
+                self.sample_poses(self.CONF.cam_params_dict.get('sample_pose_num'), if_dump=self.CONF.cam_params_dict.get('sample_pose_if_dump', True))
                 self.scene_rendering_path_list = [self.scene_rendering_path.parent / self.split] * len(self.frame_id_list)
                 return
             
@@ -343,7 +274,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.scene_rendering_path_list = []
         
         for pose_file, split in zip(self.pose_file_path_list, self.splits):
-            print(white_blue('[%s] load_poses from %s'%(self.__class__.__name__, str(pose_file))))
+            print(white_blue('[%s] load_poses from '%(self.__class__.__name__)) + str(pose_file))
             
             pose_list = []
             origin_lookatvector_up_list = []
@@ -363,7 +294,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                 for idx in frame_id_list:
                     cam_param = cam_params[idx]
                     origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-                    assert self.extra_transform is None, 'not suported yet'
+                    # assert self.extra_transform is None, 'not suported yet'
                     (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
                     pose_list.append(np.hstack((R, t)))
                     origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
@@ -393,14 +324,14 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         R_c2w_b_list.append(R_.as_matrix())
                         assert np.allclose(R_.as_euler('xyz'), cam_params[idx][1])
                         t_c2w_b_list.append(cam_params[idx][0].reshape((3, 1)).astype(np.float32))
-                        assert self.extra_transform is None, 'not suported yet'
+                        # assert self.extra_transform is None, 'not suported yet'
                         
                     T_blender_left = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]], dtype=np.float32) # left mul: row-wise
                     T_blender_right = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # right mul: col-wise
                     for R_c2w_b, t_c2w_b in zip(R_c2w_b_list, t_c2w_b_list):
                         R = T_blender_left @ R_c2w_b @ T_blender_right
                         t = T_blender_left @ t_c2w_b
-                        (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t) # only works for y+ [!!!]
+                        (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_opencv(R, t) # only works for y+ [!!!]
                         pose_list.append(np.hstack((R, t)))
                         origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
                 
@@ -431,17 +362,17 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         R = R_c2w_b @ T_opengl_opencv # right mul: column-wise nagated
                         t = t_c2w_b
 
-                        (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t) # only works for y+ [!!!]
+                        (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_opencv(R, t) # only works for y+ [!!!] [TODO] GET RID OF THIS by using the script from real scene
                         
-                        if self.extra_transform is not None:
-                            # R = R @ (self.extra_transform_inv.T)
-                            R = self.extra_transform @ R
-                            t = self.extra_transform @ t
-                            origin = self.extra_transform @ origin
-                            lookatvector = self.extra_transform @ lookatvector
-                            up = self.extra_transform @ up
+                        # if self.extra_transform is not None:
+                        #     # R = R @ (self.extra_transform_inv.T)
+                        #     R = self.extra_transform @ R
+                        #     t = self.extra_transform @ t
+                        #     origin = self.extra_transform @ origin
+                        #     lookatvector = self.extra_transform @ lookatvector
+                        #     up = self.extra_transform @ up
                             
-                            # (origin_, lookatvector_, up_) = R_t_to_origin_lookatvector_up_yUP(R, t)
+                            # (origin_, lookatvector_, up_) = R_t_to_origin_lookatvector_up_opencv(R, t)
                             # assert np.allclose(self.extra_transform @ origin, origin_)
                             # assert np.allclose(self.extra_transform @ (lookatvector-origin), lookatvector_-origin_)
                             # assert np.allclose(self.extra_transform @ up, up_)
@@ -625,7 +556,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         if self.shape_file_path is not None:
             # load single shape from self.shape_file_path
             print(yellow('[%s] load_shapes from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
-            self.load_single_shape(self.CONF.shape_params_dict, extra_transform=self.extra_transform, force=force)
+            self.load_single_shape(self.CONF.shape_params_dict, force=force)
         else:
             # load collection of shapes from Mitsuba XML file
             print(white_blue('[%s] load_shapes from [XML file]'%self.__class__.__name__) + str(self.xml_file_path))
@@ -669,7 +600,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                         _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
                         transform_m = np.array(_transform).reshape(4, 4).astype(np.float32) @ transform_m # [[R,t], [0,0,0,1]]
                         
-                    (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4], extra_transform=self.extra_transform)
+                    (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4])
                     _id = 'rectangle_'+random_id
                     emitters = shape.findall('emitter')
                     if len(emitters) > 0:
@@ -724,9 +655,9 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
                     if N_triangles != faces.shape[0]:
                         print('[%s] Mesh simplified to %d->%d triangles (target: %d).'%(_id, N_triangles, faces.shape[0], target_number_of_triangles))
                 
-                if self.extra_transform is not None:
-                    vertices = (self.extra_transform @ vertices.T).T
-                    bverts = (self.extra_transform @ bverts.T).T
+                # if self.extra_transform is not None:
+                #     vertices = (self.extra_transform @ vertices.T).T
+                #     bverts = (self.extra_transform @ bverts.T).T
 
                 self.vertices_list.append(vertices)
                 self.faces_list.append(faces)
@@ -759,7 +690,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
                 self.xyz_max = np.maximum(np.amax(vertices, axis=0), self.xyz_max)
                 self.xyz_min = np.minimum(np.amin(vertices, axis=0), self.xyz_min)
-
 
             self.if_loaded_shapes = True
             

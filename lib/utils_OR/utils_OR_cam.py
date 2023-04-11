@@ -259,17 +259,24 @@ def origin_lookat_up_to_R_t(origin, lookat, up):
 
     return (R, t), lookatvector
     
-def R_t_to_origin_lookatvector_up_yUP(R, t):
-    '''
-    only works for y+ [!!!]
-    '''
-    _, __, lookatvector = np.split(R, 3, axis=-1)
-    lookatvector = normalize_v(lookatvector)
-    up = normalize_v(-__) # (3, 1)
-    assert np.abs(np.sum(lookatvector * up)) < 1e-3
-    origin = t
+# def R_t_to_origin_lookatvector_up_opencv(R, t):
+#     '''
+#     only works for y+ [!!!]
+#     '''
+#     _, __, lookatvector = np.split(R, 3, axis=-1)
+#     lookatvector = normalize_v(lookatvector)
+#     up = normalize_v(-__) # (3, 1)
+#     assert np.abs(np.sum(lookatvector * up)) < 1e-3
+#     origin = t
 
+#     return (origin, lookatvector, up)
+
+def R_t_to_origin_lookatvector_up_opencv(R, t):
+    origin = t
+    lookatvector = R @ np.array([[0.], [0.], [1.]], dtype=np.float32)
+    up = R @ np.array([[0.], [-1.], [0.]], dtype=np.float32)
     return (origin, lookatvector, up)
+
 
 # def project_v_homo(v, cam_transformation4x4, cam_K):
 #     # https://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/img30.gif

@@ -13,9 +13,9 @@ sys.path.insert(0, str(PATH_HOME))
 
 import numpy as np
 np.set_printoptions(suppress=True)
-from lib.utils_misc import str2bool, white_magenta, check_exists
 import argparse
 from pyhocon import ConfigFactory, ConfigTree
+from lib.utils_misc import str2bool, white_magenta, check_exists
 
 from lib.class_mitsubaScene3D import mitsubaScene3D
 
@@ -75,8 +75,8 @@ parser.add_argument('--export_format', type=str, default='monosdf', help='')
 parser.add_argument('--export_appendix', type=str, default='', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
-# === refactor
-parser.add_argument('--scene', type=str, default='kitchen', help='load conf file: confs/\{opt.scene\}.conf')
+# === after refactorization
+parser.add_argument('--scene', type=str, default='kitchen', help='load conf file: confs/indoor_synthetic/\{opt.scene\}.conf')
 
 opt = parser.parse_args()
 
@@ -89,21 +89,18 @@ CONF = ConfigTree.merge_configs(CONF, conf_scene)
 
 dataset_root = Path(PATH_HOME) / CONF.data.dataset_root
 xml_root = Path(PATH_HOME) / CONF.data.xml_root
-# xml_file_path = xml_root / CONF.data.xml_file
-# shape_file_path = dataset_root / CONF.scene.shape_file
 
-frame_id_list = CONF.scene.frame_id_list
-invalid_frame_id_list = CONF.scene.invalid_frame_id_list
+frame_id_list = CONF.scene_params_dict.frame_id_list
+invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-frame_id_list = [0]
+# frame_id_list = [0]
 
 '''
 modify confs
 '''
 
 CONF.scene_params_dict.update({
-    'scene_name': CONF.scene.scene_name, 
     'split': opt.split, # train, val, train+val
     'frame_id_list': frame_id_list, 
     # 'extra_transform': np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
@@ -129,7 +126,8 @@ CONF.im_params_dict.update({
 
 CONF.shape_params_dict.update({
     'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
-    'if_load_emitter_mesh': True,  # default True: to load emitter meshes, because not too many emitters
+    'if_load_emitter_mesh': True, # default True: to load emitter meshes, because not too many emitters
+    'tsdf_path': 'fused_tsdf.ply', # 'test_files/tmp_tsdf.ply', 
     })
 
 '''
@@ -141,15 +139,16 @@ scene_obj = mitsubaScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
-        'im_hdr', 
+        # 'im_hdr', 
         'im_sdr', 
         'poses', 
         # 'lighting_envmap', 
-        'albedo', 'roughness', 
-        'emission', 
-        'depth', 'normal', 
-        # 'layout', 
+        # 'albedo', 'roughness', 
+        # 'emission', 
+        # 'depth', 'normal', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties``
+        # 'layout', 
+        'tsdf', 
         ], 
 )
 
@@ -277,8 +276,8 @@ if opt.export:
             ], 
             split=opt.split, 
             assert_shape=(240, 320),
-            window_area_emitter_id_list=CONF.scene.window_area_emitter_id_list, # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-            merge_lamp_id_list=CONF.scene.merge_lamp_id_list,  # need to manually specify in XML
+            window_area_emitter_id_list=CONF.scene_params_dict.window_area_emitter_id_list, # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+            merge_lamp_id_list=CONF.scene_params_dict.merge_lamp_id_list,  # need to manually specify in XML
             BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000', # transfer this back once get BRDF results
             # center_crop_HW=(240, 320), 
             if_no_gt_appendix=True, # do not append '_gt' to the end of the file name
@@ -294,11 +293,11 @@ if opt.vis_2d_plt:
             'im', 
             # 'layout', 
             # 'shapes', 
-            'albedo', 
-            'roughness', 
-            'emission', 
-            'depth', 
-            'normal', 
+            # 'albedo', 
+            # 'roughness', 
+            # 'emission', 
+            # 'depth', 
+            # 'normal', 
             'mi_depth', 
             'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
@@ -333,9 +332,10 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             'poses', 
-            'layout', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            # 'layout', 
             'mi', # mitsuba sampled rays, pts
+            'tsdf', 
             # 'dense_geo', # fused from 2D
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
@@ -415,7 +415,7 @@ if opt.vis_3d_o3d:
             # 'if_half_envmap': False, # [OPTIONAL] if show half envmap as a hemisphere for window emitters (False: only show bboxes)
             # 'scale_SG_length': 2., 
             'if_sampling_emitter': True, 
-            'scene_radiance_scale': CONF.scene.scene_radiance_scale, 
+            'scene_radiance_scale': CONF.scene_params_dict.scene_radiance_scale, 
             'max_plate': 32, 
         },
         mi_params={

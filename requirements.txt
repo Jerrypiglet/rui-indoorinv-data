@@ -36,6 +36,5 @@ imageio
 imagecodecs # if fails, try: conda install -c conda-forge imagecodecs
 rawpy # https://github.com/letmaik/rawpy#installation-from-source-on-linuxmacos
 termcolor
-
 # === Also:
 # conda install -c conda-forge ninja

@@ -64,7 +64,7 @@ python test_class_freeviewpointScene3D.py --export_scene True --eval_scene True
 
 - `--export_scene True` to dump poses, K_list (intrinsics and image H W could vary between frames), im_hdr, im_sdr, im_mask (for valid area from provided mask, and area with valid depth from Mitsuba)
 - `--eval_scene True` to count in how many frames each vertex is observed; will be visualized with open3d ([demo](images/)).
-- # 'frame_id_list': frame_ids, # comment out to use all frames
+- # 'frame_id_list': frame_id_list, # comment out to use all frames
 - indicate modalities to export in: `scene_obj.export_scene(modality_list = [...`
 
 ## Free-viewpoint (fvp)

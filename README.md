@@ -258,6 +258,7 @@ Use ``--vis_3d_o3d True`` to use the Open3D visualizer. The result is something 
 **Supported modalities:** 
 
 - dense_geo # point clouds, normals, and RGB, fused from OptixRenderer renderings
+- tsdf # TSDF volume, fused from depth maps
 - cameras # frustums
 - lighting_SG # as arrows emitted from surface points
 - layout # as bbox
@@ -269,6 +270,9 @@ Examples:
 
 **dense_geo**:
 ![](images/demo_pcd_color.png)
+
+**tsdf**:
+![](images/demo_tsdf.png)
 
 **lighting_SG**:
 ![](images/demo_lighting_SG_o3d.png)
@@ -491,7 +495,7 @@ Val:
 python utils_class_mitsubaScene3D_sample_pose.py --if_sample_poses True --vis_2d_plt False --vis_3d_o3d True [--eval_scene True]
 ```
 
-Set `--if_sample_poses True`. Set desired num of frames and split in two locations: `split = #SPLIT; frame_ids = list(range(#N_FRAMES))` and `'sample_pose_num': N_FRAMES`.
+Set `--if_sample_poses True`. Set desired num of frames and split in two locations: `split = #SPLIT; frame_id_list = list(range(#N_FRAMES))` and `'sample_pose_num': N_FRAMES`.
 
 Set `cam_loc_bbox` to add additional bbox for valid camera locations.
 

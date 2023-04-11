@@ -9,7 +9,7 @@ import shutil
 from lib.global_vars import mi_variant_dict
 import random
 random.seed(0)
-from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up_yUP
+from lib.utils_OR.utils_OR_cam import dump_cam_params_OR, origin_lookat_up_to_R_t, read_K_list_OR, read_cam_params_OR, normalize_v, R_t_to_origin_lookatvector_up_opencv
 from lib.utils_io import load_img, load_matrix
 # from collections import defaultdict
 # import trimesh
@@ -88,7 +88,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
 
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['OpenRooms', 'bundle'], 'Unsupported pose file: '+pose_file
-        self.pose_file = self.scene_path / 'cameras' / pose_file
+        self.pose_file_path = self.scene_path / 'cameras' / pose_file
 
         self.shape_file = self.scene_path / 'meshes' / 'recon.ply'
         self.shape_params_dict = shape_params_dict
@@ -293,14 +293,14 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         bundle.out format: https://www.cs.cornell.edu/~snavely/bundler/bundler-v0.3-manual.html#S6
         '''
 
-        print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file))))
+        print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file_path))))
 
         self.pose_list = []
         self.K_list = []
         self.origin_lookatvector_up_list = []
 
         if self.pose_format == 'OpenRooms':
-            cam_params = read_cam_params_OR(self.pose_file)
+            cam_params = read_cam_params_OR(self.pose_file_path)
             if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
             assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
 
@@ -311,11 +311,11 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
                 self.pose_list.append(np.hstack((R, t)))
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
-            self.K_list = read_K_list_OR(str(self.pose_file.parent / 'K_list.txt'))
+            self.K_list = read_K_list_OR(str(self.pose_file_path.parent / 'K_list.txt'))
             assert len(self.K_list) == len(self.pose_list)
 
         elif self.pose_format in ['bundle']:
-            with open(str(self.pose_file), 'r') as camIn:
+            with open(str(self.pose_file_path), 'r') as camIn:
                 cam_data = camIn.read().splitlines()
 
             self.frame_num_all = int(cam_data[1].split(' ')[0])
@@ -342,7 +342,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
                 R = R @ np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]], dtype=np.float32) # OpenGL -> OpenCV
                 self.pose_list.append(np.hstack((R, t)))
 
-                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_yUP(R, t)
+                (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_opencv(R, t)
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 
                 K = np.array([[float(f), 0, self._W(frame_idx)/2.], [0, float(f), self._H(frame_idx)/2.], [0, 0, 1]], dtype=np.float32)
@@ -354,7 +354,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
             print(blue_text('[%s] DONE. load_poses (%d poses)'%(self.parent_class_name, len(self.pose_list))))
 
             if cam_params_dict.get('if_convert_poses', False):
-                self.export_poses_cam_txt(self.pose_file.parent, cam_params_dict=cam_params_dict, frame_num_all=self.frame_num_all)
+                self.export_poses_cam_txt(self.pose_file_path.parent, cam_params_dict=cam_params_dict, frame_num_all=self.frame_num_all)
 
     def load_im_mask(self):
         '''

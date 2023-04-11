@@ -91,7 +91,7 @@ class openroomsScene2D(scene2DBase):
         self.scene_rendering_path = self.rendering_root / self.meta_split / self.scene_name
         self.scene_xml_root = self.xml_scene_root / (self.meta_split.split('_')[1]) / self.scene_name
         self.intrinsics_path = self.xml_scene_root / 'intrinsic.txt'
-        self.pose_file = self.scene_xml_root / 'cam.txt'
+        self.pose_file_path = self.scene_xml_root / 'cam.txt'
 
         '''
         im properties
@@ -276,12 +276,12 @@ class openroomsScene2D(scene2DBase):
         if not hasattr(self, 'transforms'):
             self.load_transforms()
 
-        if not self.pose_file.exists():
-            print(yellow('[%s] cam file not found, skipped load poses. %s'%(str(self.__class__.__name__), str(self.pose_file))))
+        if not self.pose_file_path.exists():
+            print(yellow('[%s] cam file not found, skipped load poses. %s'%(str(self.__class__.__name__), str(self.pose_file_path))))
             return
         
-        print(blue_text('[%s] loading poses from %s'%(str(self.__class__.__name__), self.pose_file)))
-        cam_params = read_cam_params_OR(str(self.pose_file))
+        print(blue_text('[%s] loading poses from %s'%(str(self.__class__.__name__), self.pose_file_path)))
+        cam_params = read_cam_params_OR(str(self.pose_file_path))
         if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
 
         self.pose_list, self.origin_lookatvector_up_list = load_OR_public_poses_to_Rt(cam_params, self.frame_id_list, False, if_1_based=self.indexing_based==1)

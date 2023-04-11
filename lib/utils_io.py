@@ -43,8 +43,11 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     elif ext in ['exr']:
         assert Path(path).exists(), f"File not found: {path}"
-        # print(path)
-        im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)[:, :, :3]
+        im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+        # if len(im.shape) > 2:
+        #     im = im[:, :, :3]
+        if len(im.shape) == 2:
+            im = im[..., np.newaxis]
     elif ext in ['hdr']:
         im = cv2.imread(str(path), -1)
     elif ext in ['npy']:
@@ -72,7 +75,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
     if expected_shape != () and len(expected_shape) != 1: # not empty, or channel only e.g. (3,)
-        if tuple(im.shape) != expected_shape:
+        if tuple(im.shape[:2]) != expected_shape[:2]:
             if if_attempt_load:
                 return None
             elif if_allow_crop:
@@ -84,7 +87,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
     if target_HW != ():
         im = resize_img(im, target_HW, resize_method)
 
-    return im
+    return im.astype(np.float32)
 
 def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if_mask=True, im_hdr=None):
     # Read HDR image
@@ -149,7 +152,7 @@ def load_HDR(path: Path, expected_shape: tuple=(), target_HW: Tuple[int, int]=()
     if target_HW != ():
         im = resize_img(im, target_HW, 'area') # fixed to be 'area' for HDR images
 
-    return im
+    return im.astype(np.float32)
 
 def to_nonHDR(im, extra_scale=1.):
     total_scale = 1.

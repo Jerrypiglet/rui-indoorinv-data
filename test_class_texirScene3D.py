@@ -76,11 +76,11 @@ dataset_root = Path(PATH_HOME) / 'data/TexIR/texir_to_fipt'
 xml_root = Path(PATH_HOME) / 'data/TexIR/texir_to_fipt'
 
 shape_file = ''
-frame_ids = []
+frame_id_list = []
 invalid_frame_id_list = []
 
 scene_name = 'Scene1'; shape_file = 'scene_fixed.obj'; hdr_radiance_scale = 0.2
-# frame_ids = [0, 5]
+# frame_id_list = [0, 5]
 
 '''
 default
@@ -96,7 +96,7 @@ scene_obj = texirScene3D(
     scene_params_dict={
         'scene_name': scene_name, 
         # 'split': 'train', # train, val, train+val
-        'frame_id_list': frame_ids, 
+        'frame_id_list': frame_id_list, 
         'axis_up': 'y-', 
         'extra_transform': np.array([[1., 0., 0.], [0, -1, 0], [0, 0, -1]], dtype=np.float32), # z=y, y=x, x=z # convert from y+ (native to indoor synthetic) to z+
         'invalid_frame_id_list': invalid_frame_id_list, 
@@ -310,7 +310,7 @@ if opt.vis_3d_o3d:
     lighting_params_vis={
         'if_use_mi_geometry': True, 
         'if_use_loaded_envmap_position': True, # assuming lighting envmap endpoint position dumped by Blender renderer
-        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_id_list)
         'subsample_lighting_wi_rate': 500, # subsample on lighting directions: too many directions (e.g. 128x256)
         # 'lighting_keep_ratio': 0.05, 
         # 'lighting_further_clip_ratio': 0.1, 

@@ -88,16 +88,16 @@ xml_filename = 'test.xml'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 shape_file = ''
 
-frame_ids = []
+frame_id_list = []
 invalid_frame_id_list = []
 
 # scene_name = 'kitchen'; 
 # shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
 # shape_file = 'data/indoor_synthetic/kitchen_new/scene_subdiv.obj'
 # shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230226-021300-mm3-EVAL-20230225-135237kitchen_NEW_HDR_grids_trainval'
-# frame_ids = [204, 205, 206, 207, 208]
-# frame_ids = [210, 211, 212, 213, 214]
-# frame_ids = [215, 216, 217, 218, 209]
+# frame_id_list = [204, 205, 206, 207, 208]
+# frame_id_list = [210, 211, 212, 213, 214]
+# frame_id_list = [215, 216, 217, 218, 209]
 
 scene_name = 'bedroom'
 # shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
@@ -109,7 +109,7 @@ shape_file = 'data/indoor_synthetic/bedroom/scene_suubdiv.obj'
 
 # scene_name = 'bathroom'
 # scene_name = 'livingroom'
-# frame_ids = [0]
+# frame_id_list = [0]
 
 # shape_file = 'data/indoor_synthetic/EXPORT_fvp/kitchen_new_small/val/meshes/recon.obj'
 
@@ -127,7 +127,7 @@ shape_file = 'data/indoor_synthetic/bedroom/scene_suubdiv.obj'
 # window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
 # merge_lamp_id_list=['lamp`_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
 
-# frame_ids = [3]
+# frame_id_list = [3]
 
 # scene_name = 'kitchen'
 # invalid_frame_id_list = [197]
@@ -137,17 +137,17 @@ shape_file = 'data/indoor_synthetic/bedroom/scene_suubdiv.obj'
 # scene_name = 'livingroom-test'
 
 # ZQ
-# frame_ids = [21]
-# frame_ids = [64]
-# frame_ids = [197]
+# frame_id_list = [21]
+# frame_id_list = [64]
+# frame_id_list = [197]
 
-# frame_ids = list(range(202))
-# frame_ids = list(range(10))
-# frame_ids = list(range(0, 202, 40))
-# frame_ids = list(range(0, 4, 1))
-# frame_ids = list(range(197))
-# frame_ids = [0]
-# frame_ids = list(range(189))
+# frame_id_list = list(range(202))
+# frame_id_list = list(range(10))
+# frame_id_list = list(range(0, 202, 40))
+# frame_id_list = list(range(0, 4, 1))
+# frame_id_list = list(range(197))
+# frame_id_list = [0]
+# frame_id_list = list(range(189))
 
 '''
 default
@@ -179,7 +179,7 @@ scene_obj = mitsubaScene3D(
         'xml_filename': xml_filename, 
         'scene_name': scene_name, 
         'split': opt.split, # train, val, train+val
-        'frame_id_list': frame_ids, 
+        'frame_id_list': frame_id_list, 
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': dataset_root / scene_name / 'intrinsic_mitsubaScene.txt', 
         'axis_up': 'y+', 
@@ -620,7 +620,7 @@ if opt.vis_3d_o3d:
     lighting_params_vis={
         'if_use_mi_geometry': True, 
         'if_use_loaded_envmap_position': True, # assuming lighting envmap endpoint position dumped by Blender renderer
-        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_id_list)
         'subsample_lighting_wi_rate': 500, # subsample on lighting directions: too many directions (e.g. 128x256)
         # 'lighting_keep_ratio': 0.05, 
         # 'lighting_further_clip_ratio': 0.1, 

@@ -106,6 +106,14 @@ class scene2DBase():
         return hasattr(self, 'im_H') and hasattr(self, 'im_W')
     
     @property
+    def if_has_poses(self):
+        return hasattr(self, 'pose_list')
+    
+    @property
+    def if_has_colors(self): # no semantic label colors
+        return False
+    
+    @property
     def pose_file_root(self):
         return self.pose_file_path.parent if hasattr(self, 'pose_file') else self.pose_file_path_list[0].parent
 
@@ -131,6 +139,8 @@ class scene2DBase():
             return self.depth_list
         elif modality == 'normal': 
             return self.normal_list
+        elif modality == 'im_mask': 
+            return self.im_mask_list
         elif modality == 'lighting_envmap': 
             return self.lighting_envmap_list if source=='GT' else self.est[modality]
         else:
@@ -145,6 +155,7 @@ class scene2DBase():
         if modality == 'roughness': self.load_roughness(); return True
         if modality == 'depth': self.load_depth(); return True
         if modality == 'normal': self.load_normal(); return True
+        if modality == 'im_mask': self.load_im_mask(); return True
         if modality == 'lighting_envmap': self.load_lighting_envmap(); return True
 
         return False
@@ -183,7 +194,7 @@ class scene2DBase():
 
     @property
     def if_has_BRDF(self):
-        return all([_ in self.modality_list for _ in ['albedo', 'roughness']])
+        return all([_ in self.modality_list for _ in ['albedo', 'roughness']]) or all([_ in self.modality_list for _ in ['kd', 'ks', 'roughness']])
 
     def load_im_sdr(self):
         '''
@@ -202,9 +213,7 @@ class scene2DBase():
         else:
             expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in list(range(self.frame_num))] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.im_sdr_list = [load_img(_, expected_shape=__, ext=self.modality_ext_dict['im_sdr'], target_HW=self.im_HW_target, if_allow_crop=if_allow_crop)/255. for _, __ in zip(self.modality_file_list_dict['im_sdr'], expected_shape_list)]
-
-        # print(self.modality_file_list_dict['im_sdr'])
-
+        
         print(blue_text('[%s] DONE. load_im_sdr')%self.parent_class_name)
 
     def load_im_hdr(self):
@@ -260,6 +269,43 @@ class scene2DBase():
                 convert_write_png(hdr_image_path=str(im_hdr_file), png_image_path=str(im_sdr_file), if_mask=False, scale=sdr_radiance_scale)
 
         print(blue_text('[%s] DONE. load_im_hdr'%self.parent_class_name))
+
+    def load_roughness(self):
+        '''
+        roughness; smaller, the more specular;
+        (H, W, 1), [0., 1.]
+        '''
+        if hasattr(self, 'roughness_list'): return
+
+        print(white_blue('[%s] load_roughness for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
+        
+        modality_filename = self.CONF.modality_filename_dict['roughness']
+        modality_filename_ext = modality_filename.split('.')[-1]
+
+        self.roughness_file_list = [self.scene_rendering_path_list[frame_idx] / (modality_filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
+        expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
+        self.roughness_list = [load_img(roughness_file, expected_shape=__, ext=modality_filename_ext, target_HW=self.im_HW_target)[:, :, 0:1].astype(np.float32) for roughness_file, __ in zip(self.roughness_file_list, expected_shape_list)]
+
+        print(blue_text('[%s] DONE. load_roughness'%self.__class__.__name__))
+        
+    def load_im_mask(self):
+        '''
+        load im_mask (H, W), bool
+        '''
+        if hasattr(self, 'im_mask_list'): return
+
+        print(white_blue('[%s] load_im_mask for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
+
+        modality_filename = self.CONF.modality_filename_dict['im_mask']
+        modality_filename_ext = modality_filename.split('.')[-1]
+
+        self.im_mask_file_list = [self.scene_rendering_path_list[frame_idx] / (modality_filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
+        expected_shape_list = [self.im_HW_load_list[_] for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load]*self.frame_num
+        self.im_mask_list = [load_img(_, expected_shape=__, ext=modality_filename_ext, target_HW=self.im_HW_target)/255. for _, __ in zip(self.im_mask_file_list, expected_shape_list)]
+        self.im_mask_list = [_.astype(bool) for _ in self.im_mask_list]
+
+        print(blue_text('[%s] DONE. load_im_mask')%self.parent_class_name)
+
 
     def load_layout(self):
         '''

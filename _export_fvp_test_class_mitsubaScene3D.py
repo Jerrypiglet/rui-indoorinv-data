@@ -89,7 +89,7 @@ xml_filename = 'test-relight.xml'
 emitter_type_index_list = [('lamp', 0)]; radiance_scale = 0.1; 
 shape_file = ''
 
-frame_ids = []
+frame_id_list = []
 invalid_frame_id_list = []
 
 # scene_name = 'kitchen_new'; 
@@ -121,17 +121,17 @@ shape_file = 'data/indoor_synthetic/RESULTS_monosdf/20230225-135959-mm1-EVAL-202
 # scene_name = 'livingroom-test'
 
 # ZQ
-# frame_ids = [21]
-# frame_ids = [64]
-# frame_ids = [197]
+# frame_id_list = [21]
+# frame_id_list = [64]
+# frame_id_list = [197]
 
-# frame_ids = list(range(202))
-# frame_ids = list(range(10))
-# frame_ids = list(range(0, 202, 40))
-# frame_ids = list(range(0, 4, 1))
-# frame_ids = list(range(197))
-# frame_ids = [0]
-# frame_ids = list(range(189))
+# frame_id_list = list(range(202))
+# frame_id_list = list(range(10))
+# frame_id_list = list(range(0, 202, 40))
+# frame_id_list = list(range(0, 4, 1))
+# frame_id_list = list(range(197))
+# frame_id_list = [0]
+# frame_id_list = list(range(189))
 
 '''
 default
@@ -163,7 +163,7 @@ scene_obj = mitsubaScene3D(
         'xml_filename': xml_filename, 
         'scene_name': scene_name, 
         'split': opt.split, # train, val, train+val
-        # 'frame_id_list': frame_ids, 
+        # 'frame_id_list': frame_id_list, 
         'mitsuba_version': '3.0.0', 
         'intrinsics_path': Path(PATH_HOME) / 'data/indoor_synthetic' / scene_name / 'intrinsic_mitsubaScene.txt', 
         'axis_up': 'y+', 
@@ -603,7 +603,7 @@ if opt.vis_3d_o3d:
     lighting_params_vis={
         'if_use_mi_geometry': True, 
         'if_use_loaded_envmap_position': True, # assuming lighting envmap endpoint position dumped by Blender renderer
-        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_ids)
+        'subsample_lighting_pts_rate': 1, # change this according to how sparse the lighting arrows you would like to be (also according to num of frame_id_list)
         'subsample_lighting_wi_rate': 500, # subsample on lighting directions: too many directions (e.g. 128x256)
         # 'lighting_keep_ratio': 0.05, 
         # 'lighting_further_clip_ratio': 0.1, 

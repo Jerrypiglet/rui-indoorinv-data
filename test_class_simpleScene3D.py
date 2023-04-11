@@ -78,7 +78,7 @@ default
 eval_models_dict = {}
 # monosdf_shape_dict = {}
 shape_file = ''
-frame_ids = []
+frame_id_list = []
 invalid_frame_id_list = []
 hdr_radiance_scale = 1.
 
@@ -92,7 +92,7 @@ scene_obj = simpleScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     scene_params_dict={
         'scene_name': scene_name, 
-        'frame_id_list': frame_ids, 
+        'frame_id_list': frame_id_list, 
         'axis_up': 'y+', # WILL REORIENT TO y+
         'invalid_frame_id_list': invalid_frame_id_list, 
         'pose_file': pose_file, 
