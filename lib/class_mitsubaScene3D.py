@@ -71,7 +71,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         self.invalid_frame_id_list = self.CONF.scene_params_dict.get('invalid_frame_id_list', [])
         self.frame_id_list = [_ for _ in self.frame_id_list if _ not in self.invalid_frame_id_list]
         
-        self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_diset_variantct, ['mitsuba_version'], [str])[0]
+        self.mitsuba_version = get_list_of_keys(self.CONF.scene_params_dict, ['mitsuba_version'], [str])[0]
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
         self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
         

@@ -530,7 +530,7 @@ class mitsubaBase():
             Rt_c2w_b_list.append((R_, t_))
         return meta, Rt_c2w_b_list
 
-    def load_tsdf(self, if_use_mi_geometry: True, force=False):
+    def load_tsdf(self, if_use_mi_geometry: bool=True, force=False):
         '''
         get scene geometry in tsdf volume via fusing from depth maps: 
             images/demo_tsdf.png
@@ -867,16 +867,8 @@ class mitsubaBase():
     def export_poses_cam_txt(self, export_folder: Path, cam_params_dict={}, frame_num_all=-1):
         print(white_blue('[%s] convert poses to OpenRooms format')%self.parent_class_name)
         T_list_ = [(None, '')]
-        if self.extra_transform is not None:
-            T_list_.append((self.extra_transform_inv, '_extra_transform'))
-            # R = R_.T
-            # t = -R_.T @ t_
-
-            # RR = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1]])
-            # tt = np.zeros((3, 1))
-            # from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_opencv
-            # (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_opencv(RR, tt)
-            # print((origin, lookatvector, up))
+        # if self.extra_transform is not None:
+        #     T_list_.append((self.extra_transform_inv, '_extra_transform'))
 
         for T_, appendix in T_list_:
             if T_ is not None:

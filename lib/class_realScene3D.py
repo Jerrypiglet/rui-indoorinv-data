@@ -232,7 +232,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             return
                 
     def load_poses(self):
-        print(white_blue('[%s] load_poses from %s '%self.__class__.name) + str(self.pose_file_path))
+        print(white_blue('[%s] load_poses from '%self.__class__.__name__) + str(self.pose_file_path))
 
         self.pose_list = []
         self.K_list = []

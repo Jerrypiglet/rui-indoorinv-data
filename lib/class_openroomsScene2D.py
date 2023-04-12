@@ -215,7 +215,7 @@ class openroomsScene2D(scene2DBase):
         -> K: (3, 3)
         '''
         self.K = load_matrix(self.intrinsics_path)
-        # self.K = load_matrix('/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader/data/public_re_3/main_xml/scene0008_00_more/intrinsic.txt')
+        # self.K = load_matrix('/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data/data/public_re_3/main_xml/scene0008_00_more/intrinsic.txt')
         assert self.K.shape == (3, 3)
         assert self.K[0][2] == float(self.im_W_load) / 2.
         assert self.K[1][2] == float(self.im_H_load) / 2.
