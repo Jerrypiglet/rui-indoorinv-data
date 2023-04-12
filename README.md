@@ -5,7 +5,7 @@
 ## Overview
 This repo (branch: `fipt`) contains the code for generating customized data for [FIPT](), from scratch. 
 
-The repo is also useful for loading/generating data for other indoor inverse rendering pipelines, by adding `load_{DATASET}Scene3D.py` and `lib/class_{DATASET}Scene3D.py` for loading, and  customized formats to `lib/class_exporter.py` for export.
+The repo is also useful for loading/generating data for **other indoor inverse rendering pipelines/datasets**, by adding `load_{DATASET}Scene3D.py` and `lib/class_{DATASET}Scene3D.py` for loading other data formats, and customized formats to `lib/class_exporter.py` for export from existing datasets to those new formats.
 
 Currently supported datasets include:
 

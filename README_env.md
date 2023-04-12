@@ -1,6 +1,6 @@
 # Configuring the environment
 
-The code is tested with Pytorch==1.13. Not tested with other versions.
+The code is tested with Pytorch=1.13 on a M1 Mac and a Ubuntu machine with CUDA. Not tested with other versions or platforms.
 
 ``` bash
 conda create --name py310 python=3.10 pip
