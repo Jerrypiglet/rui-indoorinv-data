@@ -9,20 +9,21 @@ The repo is also useful for loading/generating data for other indoor inverse ren
 
 Currently supported datasets include:
 
-1. indoor_synthetic
+1. **indoor_synthetic**
    - See [**README_indoor_synthetic.md**](README_indoor_synthetic.md) for details.
-   - Based on [Mitsuba XML files by Benedikt Bitterli](https://benedikt-bitterli.me/resources/)
+   - Based on [Mitsuba XML files by Benedikt Bitterli](https://benedikt-bitterli.me/resources/).
    - Scripts support: sampling poses, rendering numerous modalities, visualization and export to FIPT/Monosdf/FVP/Li22.
-2. real
+
+2. **real**
    - See [**README_real.md**](README_real.md) for details.
-   - Captured for FIPT
+   - Captured for FIPT.
    - Scripts support: visualization and export to FIPT/Monosdf/FVP/Li22.
 
 See [## Related Works](#related-works) for a brief overview of aforementioned methods.
 
 ## Installation
 
-Please refer to **README_env.md** for instructions for installing the environment.
+Please refer to [**README_env.md**](README_env.md) for instructions for installing the environment.
 ## Related Works
 - [**FIPT**](https://jerrypiglet.github.io/fipt-ucsd/)
   - Wu and Zhu et al. 2023, *FIPT: Factorized Inverse Path Tracing*

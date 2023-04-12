@@ -3,13 +3,12 @@
 <!--See https://github.com/ekalinin/github-markdown-toc#readme-->
 
 <!--ts-->
-- [Indoor Synthetic scenes for multi-view inverse rendering: rendering, load, visualize, and convert](#indoor-synthetic-scenes-for-multi-view-inverse-rendering-rendering-load-visualize-and-convert)
-  - [Load preprocessed scenes](#load-preprocessed-scenes)
-  - [From scratch🪄: scene rendering guide](#from-scratch-scene-rendering-guide)
-    - [Firstly](#firstly)
-    - [Prepare scene files](#prepare-scene-files)
-    - [Generate poses via sampling in 3D](#generate-poses-via-sampling-in-3d)
-    - [Render all modalities](#render-all-modalities)
+- [Generating Indoor Synthetic dataset from scratch](#generating-indoor-synthetic-dataset-from-scratch)
+  - [Firstly](#firstly)
+  - [Prepare scnee files](#prepare-scnee-files)
+  - [Generate poses](#generate-poses)
+  - [Render all modalities](#render-all-modalities)
+    - [Other modalities with Blender](#other-modalities-with-blender)
 - [Other datasets](#other-datasets)
     - [i2-sdf](#i2-sdf)
 - [TODO](#todo)
@@ -19,56 +18,16 @@
 
 <!--te-->
 
-# Indoor Synthetic scenes for multi-view inverse rendering: rendering, load, visualize, and convert
+# Generating Indoor Synthetic dataset from scratch
 
-This repo contains the code to:
-
-- generate data (synthetic) for indoor inverse rendering from scratch (i.e. synthetic scenes from [Mitsuba XML files by Benedikt Bitterli](https://benedikt-bitterli.me/resources/));
-- access tools to visualize/convert data to multiple formats (e.g [FIPT](https://jerrypiglet.github.io/fipt-ucsd/), [MonoSDF](https://niujinshuchong.github.io/monosdf/), [FVP](https://repo-sam.inria.fr/fungraph/deep-indoor-relight), [Li22](https://vilab-ucsd.github.io/ucsd-IndoorLightEditing/)).
-
-## Load preprocessed scenes
-
-We include one scene for demo: `kitchen_mi` from [Benedikt Bitterli](https://benedikt-bitterli.me/resources/)->'Country Kitchen'. They are preprocessed and ready to use. Download [here](https://drive.google.com/drive/folders/1FP2oO2nScm57RTH9hwUzObnJOynD3UDO?usp=share_link) (faster to download .zip files and unzip), and organize as below:
-
-<!-- https://tree.nathanfriend.io -->
-
-<!-- - data/
-  - real/
-    - kitchen
-      - Image            # HDR images in .exr, SDR images in .png
-      - albedo           # material reflectance $\mathbf{a}'$ (See FIPT->Sec. 5.1)
-      - DiffCol          # diffuse reflectance $\mathbf{k}_d$ (See FIPT->Equ.1)
-      - IndexMA          # part segmentation
-      - Emit             # emission radiance
-      - Roughness        # roughness
-      - segmentation     # semantic segmentation
-      - train.npy        # Blender poses
-      - transforms.json  # poses in another format for FIPT -->
-
-```
-.
-└── data/
-    └── real/
-        └── kitchen/
-            ├── Image            # HDR images in .exr, SDR images in .png
-            ├── albedo           # material reflectance $\mathbf{a}'$ (See FIPT->Sec. 5.1)
-            ├── DiffCol          # diffuse reflectance $\mathbf{k}_d$ (See FIPT->Equ.1)
-            ├── IndexMA          # part segmentation
-            ├── Emit             # emission radiance
-            ├── Roughness        # roughness
-            ├── segmentation     # semantic segmentation
-            ├── train.npy        # Blender poses
-            └── transforms.json  # poses in another format for FIPT
-```
-
-## From scratch🪄: scene rendering guide
-
-### Firstly
+## Firstly
 Add/modify a entry in `lib/global_vars.py` for your device. By default there are two devices, named `apple` for a M1 Macbook and `mm1` for a Ubuntu machine with CUDA-capable GPU.
 
-Then specify your desired device in the start of `load_mitsubaScene3D.py` (e.g. `host = 'apple'`). As a result, Mitsuba rendering variant will be `mi_variant_dict[host]`. For Blender rendering device, you may need to add/modify `cycles_device` and `compute_device_type` in *lib/class_renderer_blender_mitsubaScene_3D.py*.
+Then specify your desired device in the start of `load_mitsubaScene3D.py` (e.g. `host = 'apple'`). As a result, Mitsuba rendering variant will be `mi_variant_dict[host]`. For Blender rendering device, you may need to add/modify `        cycles_device = {∫
+        compute_device_type = {
 
-### Prepare scene files
+
+## Prepare scnee files
 Start with a scene downloaded from https://benedikt-bitterli.me/resources/, organized as below:
 
 <!-- - data
@@ -109,7 +68,7 @@ Preview the scene in 3D with (you should see [this](https://i.imgur.com/PWg0xCU.
 ``` bash
 python load_mitsubaScene3D.py
 ```
-### Generate poses via sampling in 3D
+## Generate poses
 
 Use `modality_list = ['shapes', 'poses', 'layout']` in `scene_obj = mitsubaScene3D()` constructor.
 
@@ -156,7 +115,7 @@ New files generated:
 ```
 
 
-### Render all modalities
+## Render all modalities
 Adjust `spp` properly (e.g. 32 for fast rendering, 4096).
 
 Set `mitsubaScene3D(modality_list=['poses'])` in *load_mitsubaScene3D.py*.
@@ -185,7 +144,7 @@ New files generated:
         └── %03d_0001.png # SDR images (gamma=2.2)
 ```
 
-Next we render **other modalities** with Blender.
+### Other modalities with Blender
 
 First create a Blender scene file (`test.blend`) from the Mitsuba scene file (`test.xml`). See notes at the beginning of `class renderer_blender_mitsubaScene_3D`.
 

@@ -5,9 +5,9 @@
 <!--ts-->
 - [Real world indoor scenes for multi-view inverse rendering: capture, process, load, visualize, and convert](#real-world-indoor-scenes-for-multi-view-inverse-rendering-capture-process-load-visualize-and-convert)
   - [Load preprocessed scenes](#load-preprocessed-scenes)
-  - [Dump to Monosdf format](#dump-to-monosdf-format)
-    - [Additional notes on getting axis-aligned geometry](#additional-notes-on-getting-axis-aligned-geometry)
-  - [Dump to FIPT format](#dump-to-fipt-format)
+    - [Dump to Monosdf format](#dump-to-monosdf-format)
+    - [Additional notes on getting axis-aligned geometry in training MonoSDF](#additional-notes-on-getting-axis-aligned-geometry-in-training-monosdf)
+    - [Dump to FIPT format](#dump-to-fipt-format)
   - [From scratch🛠️: scene capturing guide](#from-scratch️-scene-capturing-guide)
     - [The RAW capture](#the-raw-capture)
     - [Environment](#environment)
@@ -73,7 +73,7 @@ python load_realScene3D.py --scene ClassRoom
 
 To visualize 2D modalities, run with `--vis_2d_plt` ([demo: ConferenceRoom](https://i.imgur.com/gi4gTdd.png)).
 
-## Dump to Monosdf format
+### Dump to Monosdf format
 
 Export to the format of [adapted MonoSDF for FIPT](https://github.com/Jerrypiglet/monosdf) project, for training geometry on indoor_synthetic dataset and real-world scenes for FIPT.
 
@@ -87,7 +87,7 @@ Then in [MonoSDF for FIPT](https://github.com/Jerrypiglet/monosdf) project path 
 python training/exp_runner.py --conf confs/real.conf --conf_add confs/real_ConferenceRoomV2_final_supergloo_SDR.conf --exps_folder {$MONOSDF/exps/} --prefix DATE-’
 ```
 
-### Additional notes on getting axis-aligned geometry
+### Additional notes on getting axis-aligned geometry in training MonoSDF
 
 You may have noticed that parameter `reorient_blender_angles` is provided for the ConferenceRoom scene. The parameters are intended to re-orient the original scene poses (acquired from Colmap or Superglue) so that the scene geometry is axis-aligned (for improved results with MonoSDF by reducing aliasing in its feature grid). However it is not possible to acquire those angles beforehand if started with only poses but no corresponding geometry. 
 
@@ -99,7 +99,7 @@ Our solution is two-step training with MonoSDF:
 
 To validate the re-oriented poses and rough shape, check the images under *data/real/EXPORT_monosdf/ConferenceRoomV2_final_supergloo/MiNormalGlobal_OVERLAY*, which overlays the normal map (acquired from the re-oriented rough shape and poses, to original RGB image) should look like [this](https://i.imgur.com/lmA7fU4.png).
 
-## Dump to FIPT format
+### Dump to FIPT format
 
 ``` bash
 python load_realScene3D.py --scene ConferenceRoomV2_final_supergloo --export --export_format mitsuba
@@ -108,7 +108,8 @@ python load_realScene3D.py --scene ConferenceRoomV2_final_supergloo --export --e
 Please refer to the [FITP paper-Sec.B.1](https://jerrypiglet.github.io/fipt-ucsd/) for details on capturing with a DSLA camera mounted on a tripod.
 
 ### The RAW capture
-The RAW capture consists of $S$*$N$ RAW images, where $N$ is the number of poses, and $S$ is the number of exposures within a bracket (e.g. 9 for ConferenceRoom, and 5 for ClassRoom). Organize the data as below:
+The RAW capture consists of $S$*$N$ RAW images, where $N$ is the number of poses, and $S$ is the number of exposures within a bracket (e.g. 9 for ConferenceRoom, and 5 for ClassRoom). Download [here](https://drive.google.com/drive/folders/1X3xAUgBPEtyzqcBjoD8k153G8nYpJbC_?usp=share_link) (faster to download .zip files and unzip), and organize as below:
+
 <!-- 
 - data/
   - real/
