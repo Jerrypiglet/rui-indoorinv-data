@@ -12,7 +12,7 @@ from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_opencv
 from lib.utils_io import load_matrix, load_img
 import mitsuba as mi
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, magenta, red, get_device, check_nd_array_list_identical
+from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, magenta, red, get_device, check_nd_array_list_identical, white_red
 from lib.utils_io import load_matrix, resize_intrinsics
 from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
 
@@ -41,34 +41,25 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
         device_id: int=-1, 
     ):
         
-        self.CONF = CONF
-        
-        scene2DBase.__init__(
+        mitsubaBase.__init__(
             self, 
+            CONF=CONF, 
+            host=host, 
+            device_id=device_id, 
             parent_class_name=str(self.__class__.__name__), 
             root_path_dict=root_path_dict, 
             modality_list=modality_list, 
             if_debug_info=if_debug_info, 
-            )
-        
-        mitsubaBase.__init__(
-            self, 
-            host=host, 
-            device_id=device_id, 
         )
 
         '''
         scene params and frames
         '''
         
-        self.split, self.frame_id_list_input = get_list_of_keys(self.CONF.scene_params_dict, ['split', 'frame_id_list'], [str, list])
+        self.frame_id_list_input = get_list_of_keys(self.CONF.scene_params_dict, ['frame_id_list'], [list])[0]
         assert self.split in ['train', 'val']
         self.invalid_frame_id_list = self.CONF.scene_params_dict.get('invalid_frame_id_list', [])
         self.frame_id_list_input = [_ for _ in self.frame_id_list_input if _ not in self.invalid_frame_id_list]
-        
-        self.scene_name = get_list_of_keys(self.CONF.scene_params_dict, ['scene_name'], [str])[0]
-        self.scene_path = self.dataset_root / self.scene_name if self.split == 'train' else self.dataset_root / self.scene_name / 'val'
-        assert self.scene_path.exists(), 'scene path does not exist: %s'%str(self.scene_path)
         
         self.near = self.CONF.cam_params_dict.get('near', 0.1)
         self.far = self.CONF.cam_params_dict.get('far', 3.)
@@ -79,21 +70,20 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
         self.pose_format, pose_file = self.CONF.scene_params_dict['pose_file'].split('-')
         assert self.pose_format in ['npz'], 'Unsupported pose file: '+pose_file
         self.pose_file_path = self.scene_path / pose_file
-        if self.CONF.scene_params_dict.shape_file != '':
-            if len(str(self.CONF.scene_params_dict.shape_file).split('/')) == 1:
-                self.shape_file_path = self.scene_path / self.CONF.scene_params_dict.shape_file
-            else:
-                self.shape_file_path = self.dataset_root / self.CONF.scene_params_dict.shape_file
-            assert self.shape_file_path.exists(), 'shape file does not exist: %s'%str(self.shape_file_path)
 
         '''
         load everything
         '''
 
+        self.load_mi_scene()
+
         if 'poses' in self.modality_list:
             self.load_poses() # attempt to generate poses indicated in self.CONF.cam_params_dict
             
-        self.get_cam_rays()
+        if hasattr(self, 'pose_list'): 
+            self.get_cam_rays()
+        if hasattr(self, 'mi_scene'):
+            self.process_mi_scene(if_postprocess_mi_frames=hasattr(self, 'pose_list'))
 
         self.load_modalities()
 
@@ -102,13 +92,25 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
         return len(self.frame_id_list)
     
     @property
-    def scene_rendering_path_list(self):
-        return [self.scene_path] * self.frame_num
+    def scene_path(self):
+        scene_path = self.dataset_root / self.scene_name if self.split == 'train' else self.dataset_root / self.scene_name / 'val'
+        assert scene_path.exists(), 'scene path does not exist: %s'%str(self.scene_path)
+        return scene_path
 
     @property
     def scene_rendering_path(self):
         return self.scene_path
     
+    @property
+    def scene_rendering_path_list(self):
+        return [self.scene_path] * self.frame_num
+    
+    @property
+    def if_has_pcd(self):
+        # return 'shapes' in self.modality_list and self.CONF.scene_params_dict.get('pcd_file', '') != ''
+        # [TODO] coming up once provided
+        return False
+
     @property
     def valid_modalities(self):
         return [
@@ -121,8 +123,9 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
             'normal', 
             'im_mask', 
             'tsdf', 
+            'shapes', # from tsdf shape
+            'layout', # from tsdf shape
             # 'emission', 
-            # 'layout', 'shapes', 
             ]
 
 
@@ -141,7 +144,9 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
             if _ == 'ks': self.load_albedo('ks')
             if _ == 'kd': self.load_albedo('kd')
             if _ == 'roughness': self.load_roughness()
+            if _ == 'shapes': self.load_shapes()
             if _ == 'tsdf': self.load_tsdf(if_use_mi_geometry=False)
+            if _ == 'layout': self.load_layout()
 
     def get_modality(self, modality, source: str='GT'):
 
@@ -238,6 +243,78 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
             self.origin_lookatvector_up_list = [(self._R @ origin, self.apply_T(lookatvector.T, ['R', 't', 's']).T, self._R @ up) \
                 for (origin, lookatvector, up) in self.origin_lookatvector_up_list]
             
+    def load_mi_scene(self, input_extra_transform_homo=None, prioritize_load_tsdf_shape: bool=True):
+        '''
+        load scene representation into Mitsuba 3
+        '''
+        
+        shape_file_path = ''
+        if prioritize_load_tsdf_shape and self.tsdf_file_path.exists():
+            shape_file_path = self.tsdf_file_path
+        elif self.has_shape_file:
+            shape_file_path = self.shape_file_path
+
+        if shape_file_path != '':
+            print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(shape_file_path))
+            self.shape_id_dict = {
+                'type': shape_file_path.suffix[1:],
+                'filename': str(shape_file_path), 
+                }
+            
+            _T = np.eye(4, dtype=np.float32)
+            if input_extra_transform_homo is not None:
+                _T = input_extra_transform_homo @ _T
+                
+            if self._if_T and not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+                _T = self._T_homo @ _T
+                    
+            if not np.allclose(_T, np.eye(4, dtype=np.float32)):
+                self.shape_id_dict['to_world'] = mi.ScalarTransform4f(_T)        
+            
+            self.mi_scene = mi.load_dict({
+                'type': 'scene',
+                'shape_id': self.shape_id_dict, 
+            })
+        else:
+            # xml file always exists for Mitsuba scenes
+            # self.mi_scene = mi.load_file(str(self.xml_file_path))
+            print(white_red('No shape file specified/found (e.g. if you have just dumped the TSDF shape, simply run again). Skip loading MI scene.'))
+            return
+
+    def load_shapes(self, prioritize_load_tsdf_shape: bool=True):
+        '''
+        load and visualize shapes (from MonoSDF optimized shapes, or from TSDF shape fused from depth images)
+        '''
+        
+        print(white_blue('[%s] load_shapes for scene...')%self.__class__.__name__)
+        
+        if self.if_loaded_shapes: 
+            print('already loaded shapes. skip.')
+            return
+        
+        shape_file_path = ''
+        if prioritize_load_tsdf_shape and self.tsdf_file_path.exists():
+            shape_file_path = self.tsdf_file_path
+        else:
+            assert self.has_shape_file
+            shape_file_path = self.shape_file_path
+            
+        mitsubaBase._init_shape_vars(self)
+        self.load_single_shape(shape_file_path, shape_params_dict=self.CONF.shape_params_dict)
+            
+        self.if_loaded_shapes = True
+        print(blue_text('[%s] DONE. load_shapes'%(self.__class__.__name__)))
+        
+        if prioritize_load_tsdf_shape: # manually turn off loaded tsdf to avoid duplicates
+            self.if_loaded_tsdf = False
+            self.tsdf_fused_dict = {}
+
+        if self._if_T: # reorient
+            if not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+                self.vertices_list = [self.apply_T(vertices, ['R', 't', 's']) for vertices in self.vertices_list]
+                # self.vertices_list = [(self.reorient_transform @ vertices.T).T for vertices in self.vertices_list]
+                self.bverts_list = [computeBox(vertices)[0] for vertices in self.vertices_list] # recompute bounding boxes
+
     def get_cam_rays(self):
         if hasattr(self, 'cam_rays_list'):  return
         self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')

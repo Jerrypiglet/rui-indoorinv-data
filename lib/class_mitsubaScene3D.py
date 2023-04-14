@@ -10,7 +10,6 @@ import random
 random.seed(0)
 from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_opencv, origin_lookat_up_to_R_t, read_cam_params_OR
 from lib.utils_io import load_matrix, load_img
-import imageio
 import string
 # Import the library using the alias "mi"
 import mitsuba as mi
@@ -21,15 +20,12 @@ from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
 
 # from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
-from .class_scene2DBase import scene2DBase
 
 from lib.utils_OR.utils_OR_mesh import sample_mesh, simplify_mesh
 from lib.utils_OR.utils_OR_xml import get_XML_root
 from lib.utils_OR.utils_OR_mesh import computeBox, get_rectangle_mesh
 
-from .class_scene2DBase import scene2DBase
-
-class mitsubaScene3D(mitsubaBase, scene2DBase):
+class mitsubaScene3D(mitsubaBase):
     '''
     A class used to visualize/render Mitsuba scene in XML format
     '''
@@ -43,26 +39,21 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         device_id: int=-1, 
     ):
         
-        self.CONF = CONF
-        
-        scene2DBase.__init__(
+        mitsubaBase.__init__(
             self, 
+            CONF=CONF, 
+            host=host, 
+            device_id=device_id, 
             parent_class_name=str(self.__class__.__name__), 
             root_path_dict=root_path_dict, 
             modality_list=modality_list, 
             if_debug_info=if_debug_info, 
-            )
-        
-        mitsubaBase.__init__(
-            self, 
-            host=host, 
-            device_id=device_id, 
         )
 
         '''
         scene params and frames
         '''
-        self.split, self.frame_id_list = get_list_of_keys(self.CONF.scene_params_dict, ['split', 'frame_id_list'], [str, list])
+        self.frame_id_list = get_list_of_keys(self.CONF.scene_params_dict, ['frame_id_list'], [list])[0]
         self.splits = self.split.split('+')
         assert all([_.split('_')[0] in ['train', 'val', 'train+val'] for _ in self.splits])
         if len(self.splits) > 1:
@@ -75,15 +66,11 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
         self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
         
-        self.scene_name = get_list_of_keys(self.CONF.scene_params_dict, ['scene_name'], [str])[0]
-        self.scene_path = self.dataset_root / self.scene_name
-        self.scene_rendering_path = self.dataset_root / self.scene_name / self.split
-        self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
-        self.scene_name_full = self.scene_name # e.g. 'main_xml_scene0008_00_more'
         
         '''
         paths for: intrinsics, xml, pose, shape
         '''
+        self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
         self.intrinsics_path = self.scene_path / 'intrinsic_mitsubaScene.txt'
         self.xml_root = get_list_of_keys(self.root_path_dict, ['xml_root'], [PosixPath])[0]
         self.xml_file_path = self.xml_root / self.scene_name / self.CONF.data.xml_file
@@ -93,12 +80,6 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         # self.monosdf_shape_dict = self.CONF.scene_params_dict.get('monosdf_shape_dict', {})
         # if '_shape_normalized' in self.monosdf_shape_dict:
         #     assert self.monosdf_shape_dict['_shape_normalized'] in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%self.monosdf_shape_dict['_shape_normalized']
-        if self.CONF.scene_params_dict.shape_file != '':
-            if len(str(self.CONF.scene_params_dict.shape_file).split('/')) == 1:
-                self.shape_file_path = self.scene_path / self.CONF.scene_params_dict.shape_file
-            else:
-                self.shape_file_path = self.dataset_root / self.CONF.scene_params_dict.shape_file
-            assert self.shape_file_path.exists(), 'shape file does not exist: %s'%str(self.shape_file_path)
 
         self.near = self.CONF.cam_params_dict.get('near', 0.1)
         self.far = self.CONF.cam_params_dict.get('far', 10.)
@@ -130,6 +111,10 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
     #     return len(self.frame_id_list)
     
     @property
+    def scene_rendering_path(self):
+        return self.dataset_root / self.scene_name / self.split
+
+    @property
     def K_list(self):
         return [self.K] * self.frame_num
 
@@ -153,21 +138,13 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         return hasattr(self, 'emission_list')
 
     @property
-    def if_has_layout(self):
-        return all([_ in self.modality_list for _ in ['layout']])
-
-    @property
-    def if_has_shapes(self): # objs + emitters
-        return all([_ in self.modality_list for _ in ['shapes']])
-
-    @property
     def if_has_seg(self):
         return False, 'Segs not saved to labels. Use mi_seg_area, mi_seg_env, mi_seg_obj instead.'
         # return all([_ in self.modality_list for _ in ['seg']])
 
     def load_modalities(self):
         for _ in self.modality_list:
-            result_ = scene2DBase.load_modality_(self, _)
+            result_ = mitsubaBase.load_modality_(self, _)
             if not (result_ == False):
                 continue
 
@@ -179,7 +156,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
 
     def get_modality(self, modality, source: str='GT'):
 
-        _ = scene2DBase.get_modality_(self, modality, source)
+        _ = mitsubaBase.get_modality_(self, modality, source)
         if _ is not None:
             return _
 
@@ -202,7 +179,7 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        if self.shape_file_path is not None:
+        if self.has_shape_file:
             print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
             self.shape_id_dict = {
                 'type': self.shape_file_path.suffix[1:],
@@ -548,15 +525,15 @@ class mitsubaScene3D(mitsubaBase, scene2DBase):
         '''
         if self.if_loaded_shapes and not force: return
         
-        mitsubaBase._prepare_shapes(self)
+        mitsubaBase._init_shape_vars(self)
         
         # if self.monosdf_shape_dict != {}:
         #     self.load_monosdf_shape(shape_params_dict=shape_params_dict)
         #     assert self.extra_transform is None, 'not suported yet'
-        if self.shape_file_path is not None:
+        if self.has_shape_file:
             # load single shape from self.shape_file_path
             print(yellow('[%s] load_shapes from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
-            self.load_single_shape(self.CONF.shape_params_dict, force=force)
+            self.load_single_shape(shape_params_dict=self.CONF.shape_params_dict, force=force)
         else:
             # load collection of shapes from Mitsuba XML file
             print(white_blue('[%s] load_shapes from [XML file]'%self.__class__.__name__) + str(self.xml_file_path))

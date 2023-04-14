@@ -82,15 +82,11 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         self.host = host
         self.device = get_device(self.host, device_id)
 
-        self.scene_path = self.dataset_root / self.scene_name
-        self.scene_rendering_path = self.scene_path
-        self.scene_name_full = self.scene_name # e.g.'asianRoom1'
-
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['OpenRooms', 'bundle'], 'Unsupported pose file: '+pose_file
         self.pose_file_path = self.scene_path / 'cameras' / pose_file
 
-        self.shape_file = self.scene_path / 'meshes' / 'recon.ply'
+        self.shape_file_path = self.scene_path / 'meshes' / 'recon.ply'
         self.shape_params_dict = shape_params_dict
         self.mi_params_dict = mi_params_dict
         variant = mi_params_dict.get('variant', '')
@@ -219,7 +215,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         for _ in self.modality_list:
             result_ = scene2DBase.load_modality_(self, _)
             if not (result_ == False): continue
-            if _ == 'shapes': self.load_single_shape(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
+            if _ == 'shapes': self.load_single_shape(shape_params_dict=self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
             if _ == 'im_mask': self.load_im_mask()
 
     def get_modality(self, modality, source: str='GT'):

@@ -81,10 +81,6 @@ class replicaScene3D(mitsubaBase, scene2DBase):
         self.host = host
         self.device = get_device(self.host, device_id)
 
-        self.scene_path = self.dataset_root / self.scene_name
-        self.scene_rendering_path = self.scene_path / 'rendering'
-        self.scene_name_full = self.scene_name # e.g.'asianRoom1'
-
         self.pose_format, pose_file, if_abs_path = scene_params_dict['pose_file']
         assert self.pose_format in ['OpenRooms'], 'Unsupported pose file: '+pose_file
         if if_abs_path:
@@ -95,7 +91,7 @@ class replicaScene3D(mitsubaBase, scene2DBase):
         if not cam_params_dict.get('if_sample_poses', False):
             self.frame_num_all = len(read_cam_params_OR(self.pose_file_path))
 
-        self.shape_file = self.scene_path / 'mesh_geo.ply' # export with Meshlab this new mesh, to remove colors
+        self.shape_file_path = self.scene_path / 'mesh_geo.ply' # export with Meshlab this new mesh, to remove colors
         self.shape_params_dict = shape_params_dict
         self.mi_params_dict = mi_params_dict
         variant = mi_params_dict.get('variant', '')
@@ -139,6 +135,9 @@ class replicaScene3D(mitsubaBase, scene2DBase):
     def frame_num(self):
         return len(self.frame_id_list)
             
+    def scene_rendering_path(self):
+        return self.scene_path / 'rendering'
+
     @property
     def valid_modalities(self):
         return [
@@ -340,7 +339,7 @@ class replicaScene3D(mitsubaBase, scene2DBase):
         
         print(white_blue('[%s] load_shapes for scene...'%self.parent_class_name))
 
-        mitsubaBase._prepare_shapes(self)
+        mitsubaBase._init_shape_vars(self)
 
         scale_offset = ()
         #  if not self.if_scale_scene else (self.scene_scale, 0.)

@@ -70,8 +70,6 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         self.device = get_device(self.host, device_id)
 
         self.scene_path = self.dataset_root / 'v1/scans' / self.scene_name
-        self.scene_rendering_path = self.scene_path
-        self.scene_name_full = self.scene_name # e.g.'asianRoom1'
         
         self.if_need_undist = self.im_params_dict.get('if_need_undist', False)
         self.if_need_manual_undist_flags = {_: True for _ in self.modality_list}
@@ -624,7 +622,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         '''
         if self.if_loaded_shapes: return
         
-        mitsubaBase._prepare_shapes(self)
+        mitsubaBase._init_shape_vars(self)
 
         scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)
         shape_dict = load_shape_dict_from_shape_file(self.shape_file_list, shape_params_dict=shape_params_dict, scale_offset=scale_offset)

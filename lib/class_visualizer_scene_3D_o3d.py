@@ -690,7 +690,10 @@ class visualizer_scene_3D_o3d(object):
         '''
         images/demo_layout_o3d.png
         '''
-        assert self.os.if_has_layout
+        if not self.os.if_has_layout:
+            print(white_red('[%s] Layout not loaded! Skipped visualization.'%self.__class__.__name__))
+            return []
+
         return_list = []
 
         if hasattr(self.os, 'layout_mesh_transformed'):
@@ -729,7 +732,9 @@ class visualizer_scene_3D_o3d(object):
         if (not self.os.if_has_shapes) and self.os.if_has_pcd:
             return self.collect_pcd(shape_params=shapes_params)
         
-        assert self.os.if_has_shapes
+        if not self.os.if_has_shapes:
+            print(white_red('[%s] Shape not loaded! Skipped visualization.'%self.__class__.__name__))
+            return []
 
         if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_obj_mesh', True)
         if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_emitter_mesh', False)
@@ -1145,7 +1150,10 @@ class visualizer_scene_3D_o3d(object):
         '''
         load fuse TSDF volume
         '''
-        assert self.os.if_loaded_tsdf
+        if not self.os.if_loaded_tsdf:
+            print(white_red('[%s] TSDF volume not loaded (or disabled after loading shape also from TSDF)! Skipped visualization.'%self.__class__.__name__))
+            return []
+            
         if 'tsdf_mesh_o3d' in self.os.tsdf_fused_dict:
             tsdf_mesh_o3d = self.os.tsdf_fused_dict['tsdf_mesh_o3d']
         else:

@@ -54,7 +54,7 @@ class evaluator_scene_scene():
         args:
         - shape_params
         '''
-        assert self.os.if_loaded_shapes
+        assert self.os.if_loaded_shapes, 'Shape not loaded! Required to evaluate properties of vertexs or faces.'
         assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal']
 
         return_dict = {}

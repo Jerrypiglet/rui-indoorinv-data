@@ -72,7 +72,6 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
 
         self.scene_path = self.dataset_root / self.scene_name
         self.scene_rendering_path = self.scene_path
-        assert self.scene_rendering_path.exists()
         # self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
         # self.xml_file = self.xml_root / self.scene_name / self.xml_filename
 
@@ -80,7 +79,7 @@ class monosdfScene3D(mitsubaBase, scene2DBase):
         assert self.pose_format in ['npz'], 'Unsupported pose file: '+pose_file
         self.pose_file_path = self.scene_path / pose_file
         
-        self.shape_file = self.dataset_root / shape_file
+        # self.shape_file_path= self.dataset_root / shape_file
         assert self.shape_file.exists(), 'Shape file not exist: %s'%str(self.shape_file)
         assert _shape_normalized in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%_shape_normalized
         self.shape_if_normalized = _shape_normalized=='normalized'

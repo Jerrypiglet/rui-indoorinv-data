@@ -90,19 +90,10 @@ class texirScene3D(mitsubaBase, scene2DBase):
             
         self.if_autoscale_scene = False
 
-        self.scene_path = self.dataset_root / self.scene_name
-        self.scene_rendering_path = self.dataset_root / self.scene_name
-        self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
-        self.scene_name_full = self.scene_name # e.g. 'main_xml_scene0008_00_more'
-
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['json', 'bundle'], 'Unsupported pose file: '+self.pose_file_path
         self.pose_file_path = self.scene_path / pose_file
         
-        self.shape_file = ''
-        if 'shape_file' in scene_params_dict:
-            self.shape_file = self.scene_path / scene_params_dict['shape_file']
-
         self.shape_params_dict = shape_params_dict
         self.mi_params_dict = mi_params_dict
         variant = mi_params_dict.get('variant', '')
@@ -154,7 +145,7 @@ class texirScene3D(mitsubaBase, scene2DBase):
 
     @property
     def if_has_shapes(self): # objs + emitters
-        return 'shapes' in self.modality_list and self.scene_params_dict.get('shape_file', '') != ''
+        return 'shapes' in self.modality_list and self.has_shape_file
 
     @property
     def if_has_pcd(self):
@@ -214,8 +205,8 @@ class texirScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        if self.shape_file == '':
-            print(yellow('No shape file specified. Skip loading MI scene.'))
+        if not self.has_shape_file:
+            print(yellow('No shape file specified/found. Skip loading MI scene.'))
             return
         print(yellow('Loading MI scene from shape file: ' + str(self.shape_file)))
         shape_file = Path(self.shape_file)
@@ -366,9 +357,9 @@ class texirScene3D(mitsubaBase, scene2DBase):
         if self.if_loaded_shapes: 
             print('already loaded shapes. skip.')
             return
-        mitsubaBase._prepare_shapes(self)
+        mitsubaBase._init_shape_vars(self)
         assert self.shape_file.exists(), 'No shape file found: ' + str(self.shape_file)
-        self.load_single_shape(shape_params_dict, extra_transform=self.extra_transform)
+        self.load_single_shape(shape_params_dict=shape_params_dict, extra_transform=self.extra_transform)
             
         self.if_loaded_shapes = True
         print(blue_text('[%s] DONE. load_shapes'%(self.__class__.__name__)))

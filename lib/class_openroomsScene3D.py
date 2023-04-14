@@ -112,10 +112,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         return all([_ in self.modality_list for _ in ['layout']])
 
     @property
-    def if_has_shapes(self): # objs + emitters
-        return all([_ in self.modality_list for _ in ['shapes']])
-
-    @property
     def if_has_mitsuba_scene(self):
         return all([_ in self.modality_list for _ in ['mi']])
 
@@ -281,7 +277,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         if self.if_loaded_shapes: return
         if not self.if_loaded_layout: self.load_layout()
 
-        mitsubaBase._prepare_shapes(self)
+        mitsubaBase._init_shape_vars(self)
 
         if self.monosdf_shape_dict != {}:
             self.load_monosdf_shape(shape_params_dict=shape_params_dict)

@@ -57,7 +57,7 @@ class openroomsScene2D(scene2DBase):
         - frame_id_list are integers as seen in frame file names (e.g. im_1.png -> 1)
         '''
 
-        self.meta_split, self.scene_name = get_list_of_keys(scene_params_dict, ['meta_split', 'scene_name'])
+        self.meta_split = get_list_of_keys(scene_params_dict, ['meta_split'])[0]
         assert self.meta_split in ['main_xml', 'mainDiffMat_xml', 'mainDiffLight_xml', 'main_xml1', 'mainDiffMat_xml1', 'mainDiffLight_xml1']
         assert self.scene_name.startswith('scene')
         self.scene_name_short = '_'.join(self.scene_name.split('_')[:2]) # e.g. scene_name: scene0552_00, scene_name_short: scene0552_00
