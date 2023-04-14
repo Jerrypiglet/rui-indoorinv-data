@@ -230,7 +230,7 @@ To visualize other modalities ([demo](https://i.imgur.com/24i0yjA.png)), set `mi
 
 # Other datasets
 ### i2-sdf
-Synthetic dataset from [I^2-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets can be downloaded from the project page (currently only 2 scenes; convention is explained [here](https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)). [demo](images/demo_i2sdf.png)
+Synthetic dataset from [I^2-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets can be downloaded from the project page (2 scenes by 04/12/2023; the convention is explained [here](https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)). [demo](images/demo_i2sdf.png)
 
 - data/i2-sdf-dataset
   - scan332_bedroom_relight_0/
@@ -249,6 +249,8 @@ Synthetic dataset from [I^2-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets
 ``` bash
 python load_i2sdfScene3D.py --vis_3d_o3d True --vis_2d_plt False
 ```
+
+With additional `--eval_scene`, you can visualize [view coverage map](images/demo_i2sdf_viewcount.png).
 
 # TODO
 - [ ] Blender: how to NOT render HDR images?

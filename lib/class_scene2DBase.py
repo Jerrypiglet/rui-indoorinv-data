@@ -1,6 +1,7 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from pathlib import PosixPath
 import matplotlib.pyplot as plt
+import pyhocon
 import numpy as np
 np.set_printoptions(suppress=True)
 from lib.utils_io import load_img
@@ -8,18 +9,21 @@ from lib.utils_misc import blue_text, get_list_of_keys, green, yellow, white_blu
 from lib.utils_io import load_img, convert_write_png
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle
 
-class scene2DBase():
+class scene2DBase(ABC):
     '''
     Base class used to load 2D per-pixel modalities
     '''
     def __init__(
         self, 
+        CONF: pyhocon.config_tree.ConfigTree,  
         parent_class_name: str, # e.g. mitsubaScene3D, openroomsScene3D
         root_path_dict: dict, 
         modality_list: list, 
         if_debug_info: bool=False, 
         # host: str='', 
     ):
+        
+        self.CONF = CONF
 
         # if 'frame_id_list' not in self.CONF.scene_params_dict:
         #     self.CONF.scene_params_dict['frame_id_list'] = []
@@ -28,11 +32,11 @@ class scene2DBase():
         self.parent_class_name = parent_class_name
 
         self.if_loaded_colors = False
-        # self.if_loaded_shapes = False
-        # self.if_loaded_layout = False
 
         self.root_path_dict = root_path_dict
         self.PATH_HOME, self.dataset_root = get_list_of_keys(self.root_path_dict, ['PATH_HOME', 'dataset_root'], [PosixPath, PosixPath])
+        self.scene_name = self.CONF.scene_params_dict.scene_name
+        self.split = self.CONF.scene_params_dict.get('split', '')
 
         # im params
 
@@ -63,6 +67,8 @@ class scene2DBase():
             self.modality_ext_dict[modality] = filename.split('.')[-1] if isinstance(filename, str) else filename[-1]
             self.modality_folder_dict[modality] = filename.split('/')[0] if isinstance(filename, str) else filename[0]
         self.modality_file_list_dict = {}
+        
+        # self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
 
     @property
     @abstractmethod
@@ -70,8 +76,35 @@ class scene2DBase():
         ...
 
     @property
+    def scene_name_full(self):
+        return self.scene_name
+
+    @property
     @abstractmethod
     def frame_num(self):
+        ...
+
+    @property
+    def scene_path(self):
+        '''
+        path for basic/provided scene files
+        '''
+        return self.dataset_root / self.scene_name
+
+    @property
+    @abstractmethod
+    def scene_rendering_path(self):
+        '''
+        path for rendering new modalities
+        '''
+        return self.scene_path
+
+    @property
+    @abstractmethod
+    def scene_rendering_path_list(self):
+        '''
+        useful when frames come from different rendering_path
+        '''
         ...
 
     def _K(self, frame_idx: int=None):

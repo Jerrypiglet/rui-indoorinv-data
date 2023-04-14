@@ -76,7 +76,7 @@ parser.add_argument('--export_appendix', type=str, default='', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
 # === after refactorization
-parser.add_argument('--scene', type=str, default='kitchen_mi', help='load conf file: confs/indoor_synthetic/\{opt.scene\}.conf')
+parser.add_argument('--scene', type=str, default='kitchen', help='load conf file: confs/indoor_synthetic/\{opt.scene\}.conf')
 
 opt = parser.parse_args()
 
@@ -127,7 +127,6 @@ CONF.im_params_dict.update({
 CONF.shape_params_dict.update({
     'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
     'if_load_emitter_mesh': True, # default True: to load emitter meshes, because not too many emitters
-    'tsdf_path': 'fused_tsdf.ply', # 'test_files/tmp_tsdf.ply', 
     })
 
 '''

@@ -84,8 +84,6 @@ class simpleScene3D(mitsubaBase, scene2DBase):
 
         self.scene_path = self.rendering_root / self.scene_name
         self.scene_rendering_path = self.rendering_root / self.scene_name
-        self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
-        self.scene_name_full = self.scene_name # e.g. 'main_xml_scene0008_00_more'
 
         self.pose_format, pose_file = scene_params_dict['pose_file']
         assert self.pose_format in ['OpenRooms'], 'Unsupported pose file: '+self.pose_file
@@ -143,7 +141,7 @@ class simpleScene3D(mitsubaBase, scene2DBase):
 
     @property
     def if_has_shapes(self): # objs + emitters
-        return 'shapes' in self.modality_list and self.scene_params_dict.get('shape_file', '') != ''
+        return 'shapes' in self.modality_list and self.has_shape_file
 
     @property
     def if_has_pcd(self):
@@ -204,7 +202,7 @@ class simpleScene3D(mitsubaBase, scene2DBase):
         load scene representation into Mitsuba 3
         '''
         if self.scene_params_dict.get('shape_file', '') == '':
-            print(yellow('No shape file specified. Skip loading MI scene.'))
+            print(yellow('No shape file specified/found. Skip loading MI scene.'))
             return
         print(yellow('Loading MI scene from shape file: ' + str(self.scene_params_dict['shape_file'])))
         shape_file = Path(self.scene_params_dict['shape_file'])
@@ -321,13 +319,13 @@ class simpleScene3D(mitsubaBase, scene2DBase):
         
         print(white_blue('[%s] load_shapes for scene...')%self.__class__.__name__)
         
-        if self.scene_params_dict.get('shape_file', '') != '':
+        if self.has_shape_file:
             if self.if_loaded_shapes: 
                 print('already loaded shapes. skip.')
                 return
-            mitsubaBase._prepare_shapes(self)
-            self.shape_file = self.scene_params_dict['shape_file']
-            self.load_single_shape(shape_params_dict)
+            mitsubaBase._init_shape_vars(self)
+            self.shape_file_path= self.scene_params_dict['shape_file']
+            self.load_single_shape(shape_params_dict=shape_params_dict)
                 
             self.if_loaded_shapes = True
             print(blue_text('[%s] DONE. load_shapes'%(self.__class__.__name__)))

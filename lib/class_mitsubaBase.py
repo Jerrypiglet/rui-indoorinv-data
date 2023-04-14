@@ -1,6 +1,6 @@
 import numpy as np
 np.set_printoptions(suppress=True)
-
+import pyhocon
 from tqdm import tqdm
 from collections import defaultdict
 import torch
@@ -23,17 +23,32 @@ from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 
 from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_dict_from_shape_file, load_monosdf_scale_offset
 
-class mitsubaBase():
+from .class_scene2DBase import scene2DBase
+
+class mitsubaBase(scene2DBase):
     '''
     Base class used to load/visualize/render Mitsuba scene from XML file
     '''
     def __init__(
         self, 
-        # device: str='', 
+        CONF: pyhocon.config_tree.ConfigTree,  
+        parent_class_name: str, # e.g. mitsubaScene3D, openroomsScene3D
+        root_path_dict: dict, 
+        modality_list: list, 
         host: str='', 
         device_id: int=-1, 
         if_debug_info: bool=False, 
     ): 
+        
+        scene2DBase.__init__(
+            self, 
+            CONF=CONF,
+            parent_class_name=parent_class_name, 
+            root_path_dict=root_path_dict, 
+            modality_list=modality_list, 
+            if_debug_info=if_debug_info, 
+            )
+
         self.host = host
         self.device = get_device(self.host, device_id)
         variant = self.CONF.mi_params_dict.get('variant', '')
@@ -80,6 +95,29 @@ class mitsubaBase():
         self._t = np.zeros((3, 1), dtype=np.float32)
         self._s = np.ones((3, 1), dtype=np.float32)
         
+        self.has_shape_file = False
+        if 'shape_file' in self.CONF.scene_params_dict and self.CONF.scene_params_dict.shape_file != '':
+            if len(str(self.CONF.scene_params_dict.shape_file).split('/')) == 1:
+                self.shape_file_path = self.scene_path / self.CONF.scene_params_dict.shape_file
+            else:
+                self.shape_file_path = self.dataset_root / self.CONF.scene_params_dict.shape_file
+            assert self.shape_file_path.exists(), 'shape file does not exist: %s'%str(self.shape_file_path)
+            self.has_shape_file = True
+
+        self.has_tsdf_file = False
+        if 'tsdf_file' in self.CONF.shape_params_dict and self.CONF.shape_params_dict.tsdf_file != '':
+            if len(str(self.CONF.shape_params_dict.tsdf_file).split('/')) == 1:
+                self.tsdf_file_path = self.scene_path / self.CONF.shape_params_dict.tsdf_file
+            else:
+                self.tsdf_file_path = self.dataset_root / self.CONF.shape_params_dict.tsdf_file
+            # assert self.tsdf_file_path.exists(), 'shape file does not exist: %s'%str(self.tsdf_file_path)
+            self.has_tsdf_file = True
+            
+    def to_d(self, x: np.ndarray):
+        if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
+            return x
+        return torch.from_numpy(x).to(self.device)
+    
     @property
     def _T(self):
         return (self._R, self._t, self._s) # rotation, translation, scale
@@ -139,12 +177,15 @@ class mitsubaBase():
     @property
     def if_has_tsdf(self): # objs + emitters
         return all([_ in self.modality_list for _ in ['tsdf']])
-
-    def to_d(self, x: np.ndarray):
-        if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
-            return x
-        return torch.from_numpy(x).to(self.device)
     
+    @property
+    def if_has_shapes(self): 
+        return all([_ in self.modality_list for _ in ['shapes']])
+
+    @property
+    def if_has_layout(self):
+        return all([_ in self.modality_list for _ in ['layout']])
+
     def process_mi_scene(self, if_postprocess_mi_frames=True, force=False):
         '''
         debug_render_test_image: render test image
@@ -537,16 +578,16 @@ class mitsubaBase():
             https://i.imgur.com/r6TET8K.jpg
         '''
         if self.if_loaded_tsdf and not force: return
-        tsdf_path = self.CONF.shape_params_dict['tsdf_path']
-        tsdf_path = Path(tsdf_path) if len(tsdf_path.split('/')) != 1 else self.scene_rendering_path / Path(tsdf_path)
-        if tsdf_path.exists():
-            print(white_blue('[%s] Loading tsdf from '%self.__class__.__name__)+str(tsdf_path))
-            tsdf_mesh = trimesh.load_mesh(str(tsdf_path), process=False)
+        
+        if self.has_tsdf_file and self.tsdf_file_path.exists():
+            print(white_blue('[%s] Loading tsdf from '%self.__class__.__name__)+str(self.tsdf_file_path))
+            tsdf_mesh = trimesh.load_mesh(str(self.tsdf_file_path), process=False)
             self.tsdf_fused_dict = {'vertices': np.array(tsdf_mesh.vertices), 'faces': np.array(tsdf_mesh.faces)}
             if len(tsdf_mesh.visual.vertex_colors) > 0:
                 self.tsdf_fused_dict.update({'colors': np.array(tsdf_mesh.visual.vertex_colors)[:, :3].astype(np.float32)/255.})
         else:
-            self.tsdf_fused_dict = self._fuse_tsdf(if_use_mi_geometry=if_use_mi_geometry, dump_path=tsdf_path)
+            assert hasattr(self, 'tsdf_file_path')
+            self.tsdf_fused_dict = self._fuse_tsdf(if_use_mi_geometry=if_use_mi_geometry, dump_path=self.tsdf_file_path)
         
         if self._if_T: # reorient
             if not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
@@ -825,7 +866,7 @@ class mitsubaBase():
         self.if_loaded_colors = False
         return
 
-    def _prepare_shapes(self):
+    def _init_shape_vars(self):
         '''
         base function: prepare for shape lists/dicts
         '''
@@ -841,18 +882,21 @@ class mitsubaBase():
         self.xyz_max = np.zeros(3,)-np.inf
         self.xyz_min = np.zeros(3,)+np.inf
     
-    def load_single_shape(self, shape_params_dict={}, extra_transform=None, force=False):
+    def load_single_shape(self, shape_file_path: Path=None, shape_params_dict={}, extra_transform=None, force=False):
         '''
         load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
         '''
         if self.if_loaded_shapes and not force: return
         
+        if shape_file_path is None:
+            shape_file_path = self.shape_file_path
+        
         print(white_blue('[%s] load_single_shape for scene...'%self.parent_class_name), yellow('single'))
 
-        mitsubaBase._prepare_shapes(self)
+        mitsubaBase._init_shape_vars(self)
 
         scale_offset = () if not self.if_scale_scene else (self.scene_scale, 0.)
-        shape_dict = load_shape_dict_from_shape_file(self.shape_file_path, shape_params_dict=shape_params_dict, scale_offset=scale_offset, extra_transform=extra_transform)
+        shape_dict = load_shape_dict_from_shape_file(shape_file_path, shape_params_dict=shape_params_dict, scale_offset=scale_offset, extra_transform=extra_transform)
         # , scale_offset=(9.1, 0.)) # read scale.txt and resize room to metric scale in meters
         self.append_shape(shape_dict)
 
@@ -861,8 +905,7 @@ class mitsubaBase():
         print(blue_text('[%s] DONE. load_single_shape.'%(self.parent_class_name)))
 
         if shape_params_dict.get('if_dump_shape', False):
-            dump_shape_dict_to_shape_file(shape_dict, self.shape_file_path)
-
+            dump_shape_dict_to_shape_file(shape_dict, shape_file_path)
 
     def export_poses_cam_txt(self, export_folder: Path, cam_params_dict={}, frame_num_all=-1):
         print(white_blue('[%s] convert poses to OpenRooms format')%self.parent_class_name)

@@ -132,10 +132,6 @@ CONF.mi_params_dict.update({
     'if_get_segs': False, # [depend on if_sample_rays_pts=True] True: to generate segs similar to those in openroomsScene2D.load_seg()
     })
 
-CONF.shape_params_dict.update({
-    'tsdf_path': 'fused_tsdf.ply', # 'test_files/tmp_tsdf.ply', 
-    })
-
 scene_obj = realScene3D(
     CONF = CONF, 
     if_debug_info=opt.if_debug_info, 

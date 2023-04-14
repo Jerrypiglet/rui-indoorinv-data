@@ -11,7 +11,7 @@ random.seed(0)
 import json
 import mitsuba as mi
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, magenta, check_nd_array_list_identical
+from lib.utils_misc import blue_text, yellow, white_red, get_list_of_keys, white_blue, magenta, check_nd_array_list_identical
 from lib.utils_io import load_matrix, resize_intrinsics
 
 # from .class_openroomsScene2D import openroomsScene2D
@@ -37,23 +37,18 @@ class realScene3D(mitsubaBase, scene2DBase):
         device_id: int=-1, 
     ):
 
-        self.CONF = CONF
-
-        scene2DBase.__init__(
+        mitsubaBase.__init__(
             self, 
+            CONF=CONF, 
+            host=host, 
+            device_id=device_id, 
             parent_class_name=str(self.__class__.__name__), 
             root_path_dict=root_path_dict, 
             modality_list=modality_list, 
             if_debug_info=if_debug_info, 
-            )
-        
-        mitsubaBase.__init__(
-            self, 
-            host=host, 
-            device_id=device_id, 
         )
 
-        self.scene_name, self.frame_id_list_input, self.axis_up = get_list_of_keys(self.CONF.scene_params_dict, ['scene_name', 'frame_id_list', 'axis_up'], [str, list, str])
+        self.frame_id_list_input, self.axis_up = get_list_of_keys(self.CONF.scene_params_dict, ['frame_id_list', 'axis_up'], [list, str])
         self.invalid_frame_id_list = self.CONF.scene_params_dict.get('invalid_frame_id_list', [])
         self.invalid_frame_idx_list = self.CONF.scene_params_dict.get('invalid_frame_idx_list', [])
         self.frame_id_list_input = [_ for _ in self.frame_id_list_input if _ not in self.invalid_frame_id_list]
@@ -64,21 +59,9 @@ class realScene3D(mitsubaBase, scene2DBase):
         #     self.extra_transform_homo = np.eye(4, dtype=np.float32)
         #     self.extra_transform_homo[:3, :3] = self.extra_transform
 
-        self.scene_path = self.dataset_root / self.scene_name
-        self.scene_rendering_path = self.dataset_root / self.scene_name
-        self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
-        self.scene_name_full = self.scene_name
-
         self.pose_format, pose_file = self.CONF.scene_params_dict['pose_file'].split('-')
         assert self.pose_format in ['json', 'bundle'], 'Unsupported pose file: '+self.pose_file_path
         self.pose_file_path = self.scene_path / pose_file
-
-        if self.CONF.scene_params_dict.shape_file != '':
-            if len(str(self.CONF.scene_params_dict.shape_file).split('/')) == 1:
-                self.shape_file_path = self.scene_path / self.CONF.scene_params_dict.shape_file
-            else:
-                self.shape_file_path = self.dataset_root / self.CONF.scene_params_dict.shape_file
-            assert self.shape_file_path.exists(), 'shape file does not exist (have you run Monosdf first?): %s'%str(self.shape_file_path)
 
         self.near = self.CONF.cam_params_dict.get('near', 0.1)
         self.far = self.CONF.cam_params_dict.get('far', 10.)
@@ -87,7 +70,7 @@ class realScene3D(mitsubaBase, scene2DBase):
             self.compute_reorient_T()
             
         self.load_poses()
-        self.scene_rendering_path_list = [self.scene_rendering_path] * len(self.frame_id_list)
+        # self.scene_rendering_path_list = [self.scene_rendering_path] * len(self.frame_id_list)
         
         '''
         load everything
@@ -149,6 +132,18 @@ class realScene3D(mitsubaBase, scene2DBase):
         return len(self.frame_id_list)
 
     @property
+    def scene_path(self):
+        return self.dataset_root / self.scene_name
+    
+    @property
+    def scene_rendering_path(self):
+        return self.scene_path
+
+    @property
+    def scene_rendering_path_list(self):
+        return [self.scene_path] * self.frame_num
+
+    @property
     def valid_modalities(self):
         return [
             'poses', 
@@ -159,12 +154,11 @@ class realScene3D(mitsubaBase, scene2DBase):
 
     @property
     def if_has_shapes(self): # objs + emitters
-        return 'shapes' in self.modality_list and self.CONF.scene_params_dict.get('shape_file', '') != ''
+        return 'shapes' in self.modality_list and self.has_shape_file
 
     @property
     def if_has_pcd(self):
         return 'shapes' in self.modality_list and self.CONF.scene_params_dict.get('pcd_file', '') != ''
-
 
     @property
     def if_has_seg(self):
@@ -202,7 +196,7 @@ class realScene3D(mitsubaBase, scene2DBase):
         load scene representation into Mitsuba 3
         '''
 
-        if self.shape_file_path is not None:
+        if self.has_shape_file:
             print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
             self.shape_id_dict = {
                 'type': self.shape_file_path.suffix[1:],
@@ -210,8 +204,6 @@ class realScene3D(mitsubaBase, scene2DBase):
                 }
             
             _T = np.eye(4, dtype=np.float32)
-            # if self.extra_transform is not None:
-            #     _T = self.extra_transform_homo @ _T
             if input_extra_transform_homo is not None:
                 _T = input_extra_transform_homo @ _T
                 
@@ -228,7 +220,7 @@ class realScene3D(mitsubaBase, scene2DBase):
         else:
             # xml file always exists for Mitsuba scenes
             # self.mi_scene = mi.load_file(str(self.xml_file_path))
-            print(yellow('No shape file specified. Skip loading MI scene.'))
+            print(white_red('No shape file specified/found. Skip loading MI scene.'))
             return
                 
     def load_poses(self):
@@ -389,13 +381,13 @@ class realScene3D(mitsubaBase, scene2DBase):
         
         print(white_blue('[%s] load_shapes for scene...')%self.__class__.__name__)
         
-        if self.CONF.scene_params_dict.get('shape_file', '') != '':
+        if self.has_shape_file:
             if self.if_loaded_shapes: 
                 print('already loaded shapes. skip.')
                 return
-            mitsubaBase._prepare_shapes(self)
-            self.shape_file = self.CONF.scene_params_dict['shape_file']
-            self.load_single_shape(self.CONF.shape_params_dict)
+            mitsubaBase._init_shape_vars(self)
+            # self.shape_file_path= self.CONF.scene_params_dict['shape_file']
+            self.load_single_shape(shape_params_dict=self.CONF.shape_params_dict)
                 
             self.if_loaded_shapes = True
             print(blue_text('[%s] DONE. load_shapes'%(self.__class__.__name__)))
