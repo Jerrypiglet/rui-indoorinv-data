@@ -24,9 +24,6 @@ from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
 
 from lib.class_eval_scene import evaluator_scene_scene
 
-from lib.class_renderer_mi_mitsubaScene_3D import renderer_mi_mitsubaScene_3D
-from lib.class_renderer_blender_mitsubaScene_3D import renderer_blender_mitsubaScene_3D
-
 parser = argparse.ArgumentParser()
 # visualizers
 parser.add_argument('--vis_3d_plt', type=str2bool, nargs='?', const=True, default=False, help='whether to visualize 3D with plt for debugging')
@@ -85,7 +82,9 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-# frame_id_list = [0, 1, 2, 3, 4]
+# frame_id_list = [12]
+# frame_id_list = list(range(2))
+# frame_id_list = list(np.arange(25, 50, 1))
 
 '''
 modify confs
@@ -96,10 +95,6 @@ CONF.scene_params_dict.update({
     'frame_id_list': frame_id_list, 
     })
 
-CONF.shape_params_dict.update({
-    'tsdf_path': 'fused_tsdf.ply', # 'test_files/tmp_tsdf.ply', 
-    })
-    
 '''
 create scene obj
 '''
@@ -118,13 +113,41 @@ scene_obj = i2sdfScene3D(
         'im_mask', 
         'tsdf', 
         
+        'shapes', # load from tsdf shape
+        'layout', # load from tsdf shape
+        
         # 'layout', 
         # 'emission', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties``
         ], 
 )
 
 eval_return_dict = {}
+'''
+Evaluator for scene
+'''
+if opt.eval_scene:
+    evaluator_scene = evaluator_scene_scene(
+        host=host, 
+        scene_object=scene_obj, 
+    )
+
+    '''
+    sample visivility to camera centers on vertices
+    [!!!] set 'mesh_color_type': 'eval-vis_count'
+    '''
+    _ = evaluator_scene.sample_shapes(
+        sample_type='vis_count', # ['']
+        # sample_type='t', # ['']
+        # sample_type='face_normal', # ['']
+        shape_params={
+        }
+    )
+    for k, v in _.items():
+        if k in eval_return_dict:
+            eval_return_dict[k].update(_[k])
+        else:
+            eval_return_dict[k] = _[k]
+
 
 if opt.export:
     from lib.class_exporter import exporter_scene
@@ -223,8 +246,9 @@ if opt.vis_3d_o3d:
         modality_list_vis=[
             'poses', 
             'tsdf',
-            # 'layout', 
-            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            'shapes', # tsdf shape
+            'layout', # from tsdf shape
+            
             # 'mi', # mitsuba sampled rays, pts
             # 'dense_geo', # fused from 2D
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
@@ -291,10 +315,10 @@ if opt.vis_3d_o3d:
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
 
-            # 'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            # 'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            'if_ceiling': False, 
-            'if_walls': False, 
+            'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            # 'if_ceiling': False, 
+            # 'if_walls': False, 
             # 'if_ceiling': True, 
             # 'if_walls': True, 
 

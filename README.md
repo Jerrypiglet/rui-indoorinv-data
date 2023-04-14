@@ -73,4 +73,12 @@ See Related Works section by the end of [FIPT website](https://jerrypiglet.githu
 If you find our work is useful, please consider cite:
 
 ```
+@misc{fipt2023,
+      title={Factorized Inverse Path Tracing for Efficient and Accurate Material-Lighting Estimation}, 
+      author={Liwen Wu and Rui Zhu and Mustafa B. Yaldiz and Yinhao Zhu and Hong Cai and Janarbek Matai and Fatih Porikli and Tzu-Mao Li and Manmohan Chandraker and Ravi Ramamoorthi},
+      year={2023},
+      eprint={2304.05669},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
 ```

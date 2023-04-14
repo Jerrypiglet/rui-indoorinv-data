@@ -11,7 +11,7 @@
     - [Generate poses via sampling in 3D](#generate-poses-via-sampling-in-3d)
     - [Render all modalities](#render-all-modalities)
 - [Other datasets](#other-datasets)
-    - [i2-sdf](#i2-sdf)
+    - [$I^2$-SDF](#i2-sdf)
 - [TODO](#todo)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
@@ -229,8 +229,9 @@ python load_mitsubaScene3D.py --scene kitchen_mi --vis_2d_plt
 To visualize other modalities ([demo](https://i.imgur.com/24i0yjA.png)), set `mitsubaScene3D(modality_list` and `visualizer_scene_2D(modality_list_vis` to desired modalities, then run the same command.
 
 # Other datasets
-### i2-sdf
-Synthetic dataset from [I^2-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets can be downloaded from the project page (currently only 2 scenes; convention is explained [here](https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)). [demo](images/demo_i2sdf.png)
+
+### $I^2$-SDF
+Synthetic dataset from [$I^2$-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets can be downloaded from the project page (2 scenes by 04/12/2023; the convention is explained [here](https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)). [demo](images/demo_i2sdf.png)
 
 - data/i2-sdf-dataset
   - scan332_bedroom_relight_0/
@@ -249,6 +250,8 @@ Synthetic dataset from [I^2-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets
 ``` bash
 python load_i2sdfScene3D.py --vis_3d_o3d True --vis_2d_plt False
 ```
+
+With additional `--eval_scene`, you can visualize [view coverage map](images/demo_i2sdf_viewcount.png).
 
 # TODO
 - [ ] Blender: how to NOT render HDR images?
