@@ -66,7 +66,6 @@ class mitsubaScene3D(mitsubaBase):
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
         self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
         
-        
         '''
         paths for: intrinsics, xml, pose, shape
         '''

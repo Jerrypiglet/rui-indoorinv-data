@@ -87,7 +87,7 @@ invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 # frame_id_list = list(np.arange(25, 50, 1))
 
 '''
-modify confs
+update confs
 '''
 
 CONF.scene_params_dict.update({

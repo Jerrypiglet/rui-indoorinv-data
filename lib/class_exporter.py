@@ -62,7 +62,7 @@ class exporter_scene():
             
     @property
     def valid_modalities(self):
-        return ['im_hdr', 'im_sdr', 'poses', 'im_mask', 'shapes', 'mi_normal', 'mi_depth', 'lighting']
+        return ['im_hdr', 'im_sdr', 'poses', 'im_mask', 'shapes', 'mi_normal', 'mi_depth', 'lighting', 'matseg']
     
     def prepare_check_export(self, scene_export_path: Path):
         if scene_export_path.exists():
@@ -94,8 +94,8 @@ class exporter_scene():
         ''' 
         
         assert format in ['monosdf', 'fvp', 'mitsuba'], 'format %s not supported'%format
-        
-        scene_export_path = self.os.dataset_root / ('EXPORT_%s'%format) / (self.os.scene_name + appendix)
+        scene_name = self.os.scene_name_full if hasattr(self.os, 'scene_name_full') else self.os.scene_name
+        scene_export_path = self.os.dataset_root / ('EXPORT_%s'%format) / (scene_name + appendix)
         if split != '':
             scene_export_path = scene_export_path / split
             
@@ -244,6 +244,35 @@ class exporter_scene():
                     print(blue_text('SDR image %d exported to: %s'%(frame_id, str(im_sdr_export_path))))
                     # print(self.os.modality_file_list_dict['im_sdr'][frame_idx])
             
+            if modality == 'albedo': # HDR
+                assert hasattr(self.os, 'albedo_list')
+                file_str = 'DiffCol/%03d.exr'
+                (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
+                for frame_idx, frame_id in enumerate(self.os.frame_id_list):
+                    albedo_export_path = scene_export_path / (file_str%frame_idx)
+                    cv2.imwrite(str(albedo_export_path), (np.clip(self.os.albedo_list[frame_idx][:, :, [2, 1, 0]], 0., 1.)).astype(np.float32))
+                    print(blue_text('Albedo HDR image %d exported to: %s'%(frame_id, str(albedo_export_path))))
+
+            if modality == 'roughness': # [0., 1.]
+                assert hasattr(self.os, 'roughness_list')
+                file_str = 'Roughness/%03d.exr'
+                (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
+                for frame_idx, frame_id in enumerate(self.os.frame_id_list):
+                    roughness_export_path = scene_export_path / (file_str%frame_idx)
+                    cv2.imwrite(str(roughness_export_path), (np.clip(self.os.roughness_list[frame_idx], 0., 1.)).astype(np.float32))
+                    print(blue_text('Roughness image %d exported to: %s'%(frame_id, str(roughness_export_path))))
+            
+            if 'mi_seg' in modality:
+                _mod = modality.split('_')[-1]
+                assert _mod in ['env', 'obj', 'area']
+                assert self.os.seg_from['mi']
+                file_str = 'MiSeg' + {'env': 'Env', 'obj': 'Obj', 'area': 'Area'}[_mod] + '/%03d.png'
+                (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
+                for frame_idx, frame_id in enumerate(self.os.frame_id_list):
+                    mi_seg_mod_export_path = scene_export_path / (file_str%frame_idx)
+                    cv2.imwrite(str(mi_seg_mod_export_path), (self.os.mi_seg_dict_of_lists[_mod][frame_idx]*255).astype(np.uint8))
+                    print(blue_text('mi_seg_%s image %d exported to: %s'%(_mod, frame_id, str(mi_seg_mod_export_path))))
+
             if modality == 'mi_normal':
                 assert format in ['monosdf', 'mitsuba']
                 (scene_export_path / 'MiNormalGlobal').mkdir(parents=True, exist_ok=True)
@@ -313,6 +342,17 @@ class exporter_scene():
                     print('Exporting im_mask from %s'%(' && '.join(mask_source_list)))
                     cv2.imwrite(str(im_mask_export_path), (im_mask_export*255).astype(np.uint8))
                     print(blue_text('Mask image (for valid depths) %s exported to: %s'%(frame_id, str(im_mask_export_path))))
+
+            if modality == 'matseg':
+                assert hasattr(self.os, 'matseg_list')
+                file_str = {'monosdf': 'MatSeg/%03d.npy', 'mitsuba': 'MatSeg/%03d.npy', 'fvp': 'MatSeg/%03d.npy'}[format]
+                (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
+                for frame_idx, frame_id in enumerate(self.os.frame_id_list):
+                    matseg_export_path = scene_export_path / (file_str%frame_idx)
+                    matseg = self.os.matseg_list[frame_idx]['mat_aggre_map'] # (H, W), int32; [0, 1, ..., num_mat_masks], 0 for invalid region
+                    assert np.amax(matseg) < 255 # otherwise uint8 does not work
+                    np.save(str(matseg_export_path), matseg.astype(np.uint8))
+                    print(blue_text('MatSeg %d exported to: %s'%(frame_id, str(matseg_export_path))))
             
             if modality == 'lighting': 
                 outLight_file_list = [_ for _ in self.os.scene_path.iterdir() if _.stem.startswith('outLight')]

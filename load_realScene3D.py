@@ -103,7 +103,7 @@ invalid_frame_idx_list = CONF.scene_params_dict.invalid_frame_idx_list
 # frame_id_list = [0]
 
 '''
-modify confs
+update confs
 '''
 
 if opt.export:

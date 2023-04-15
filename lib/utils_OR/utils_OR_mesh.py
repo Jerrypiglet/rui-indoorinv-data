@@ -211,6 +211,7 @@ def computeTransform(vertices, t, q, s):
 
 # mesh operations by Rui
 def load_trimesh(layout_obj_file):
+    assert Path(layout_obj_file).exists(), f"File {layout_obj_file} does not exist"
     mesh = trimesh.load_mesh(str(layout_obj_file))
     mesh = as_trimesh(mesh)
     return mesh

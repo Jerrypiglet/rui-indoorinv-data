@@ -21,7 +21,6 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
-from lib.class_visualizer_scene_3D_plt import visualizer_scene_3D_plt
 
 # from lib.class_eval_rad import evaluator_scene_rad
 # from lib.class_eval_monosdf import evaluator_scene_monosdf
@@ -97,7 +96,7 @@ invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 # frame_id_list = [0]
 
 '''
-modify confs
+update confs
 '''
 
 CONF.scene_params_dict.update({

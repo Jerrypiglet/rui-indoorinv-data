@@ -11,7 +11,8 @@
     - [Generate poses via sampling in 3D](#generate-poses-via-sampling-in-3d)
     - [Render all modalities](#render-all-modalities)
 - [Other datasets](#other-datasets)
-    - [i2-sdf](#i2-sdf)
+    - [$I^2$-SDF](#i2-sdf)
+    - [OpenRooms](#openrooms)
 - [TODO](#todo)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
@@ -229,17 +230,17 @@ python load_mitsubaScene3D.py --scene kitchen_mi --vis_2d_plt
 To visualize other modalities ([demo](https://i.imgur.com/24i0yjA.png)), set `mitsubaScene3D(modality_list` and `visualizer_scene_2D(modality_list_vis` to desired modalities, then run the same command.
 
 # Other datasets
-### i2-sdf
-Synthetic dataset from [I^2-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets can be downloaded from the project page (2 scenes by 04/12/2023; the convention is explained [here](https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)). [demo](images/demo_i2sdf.png)
+### $I^2$-SDF
+Synthetic dataset from [$I^2$-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets can be downloaded from the project page (2 scenes by 04/12/2023; the convention is explained [here](https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)). [demo](images/demo_i2sdf.png)
 
 - data/i2-sdf-dataset
   - scan332_bedroom_relight_0/
     - depth
     - normal
     - material
-      - %04d_kd.exr # diffuse albedo
-      - %04d_ks.exr # specular albedo
-      - %04d_roughness.exr # roughness
+      - %04d_kd.exr         # diffuse albedo
+      - %04d_ks.exr         # specular albedo
+      - %04d_roughness.exr  # roughness
     - image
     - hdr
     - mask
@@ -247,10 +248,46 @@ Synthetic dataset from [I^2-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets
     - cameras.npz # similar format to propossed MonoSDF poses
 
 ``` bash
-python load_i2sdfScene3D.py --vis_3d_o3d True --vis_2d_plt False
+python load_i2sdfScene3D.py --vis_3d_o3d True --vis_2d_plt True
 ```
 
 With additional `--eval_scene`, you can visualize [view coverage map](images/demo_i2sdf_viewcount.png).
+
+### OpenRooms
+[OpenRooms] scenes re-rendered with multi-view poses per-scene (original dataset is only intended for single view invese rendering). Current generated version is `public_re_0203`, which can be downloaded at [here](https://drive.google.com/drive/folders/1VBSRTSREzYUSd1DLiLJ4VFJSnnUh04uv?usp=share_link). 
+
+- data/public_re_0203
+  - scenes                  # scene files
+    - intrinsic.txt         # camera intrinsics
+    - xml1 | xml
+      - scene0552_00_more
+        - transform.dat     # scene geometry transformation file
+        - cam.txt           # sampled camera poses
+        - main.xml | mainDiffLight.xml | mainDiffMat.xml # Scene files for OptixRenderer
+        - 
+  - mainDiffLight_xml1 | mainDiffLight_xml | mainDiffMat_xml1 | mainDiffMat_xml | main_xml1 | main_xml
+    - scene0552_00_more
+      - im_*.hdr, im_*.png  # HDR and SDR images
+      - imBaseColor_*.png   # diffuse albedo
+      - imcadmatobj_*.dat   # material segmentation and object segmentation
+      - imdepth_*.dat       # depth
+      - immask_*.dat        # mask for valid geometry
+      - imnormal_*.png      # normal (camera coordinates; OpenGL convention)
+      - imroughness_*.png   # roughness
+
+To load 2D modalities ([demo](images/demo_openrooms_2D_plt.png)):
+
+``` bash
+python load_openroomsScene2D.py
+```
+
+To load 3D modalities ([demo](images/demo_openrooms_3D_o3d.png)):
+
+``` bash
+python load_openroomsScene3D.py
+```
+
+Similarly, use `--eval_scene` or `--export` as with other datasets.
 
 # TODO
 - [ ] Blender: how to NOT render HDR images?
