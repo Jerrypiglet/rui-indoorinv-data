@@ -1,5 +1,5 @@
 '''
-work with Mitsuba/Blender scenes
+Works with Mitsuba/Blender scenes
 '''
 import sys
 from lib.class_renderer_blender_mitsubaScene_3D import renderer_blender_mitsubaScene_3D

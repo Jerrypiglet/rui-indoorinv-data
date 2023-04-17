@@ -1,5 +1,5 @@
 '''
-work with multi-view OpenRooms scene, with 2D modalities
+Load and visualize re-rendered OpenRooms scenes with multi-view poses, 3D modalities
 '''
 
 import sys

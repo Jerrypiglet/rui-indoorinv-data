@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 # ])
 
 '''
-work with Mitsuba/Blender scenes
+Works with Mitsuba/Blender scenes
 '''
 import sys
 # host = 'mm1'

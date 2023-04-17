@@ -13,6 +13,8 @@
 - [Other datasets](#other-datasets)
     - [$I^2$-SDF](#i2-sdf)
     - [OpenRooms](#openrooms)
+  - [Tools](#tools)
+    - [MonoSDF scene loader](#monosdf-scene-loader)
 - [TODO](#todo)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
@@ -288,6 +290,40 @@ python load_openroomsScene3D.py
 ```
 
 Similarly, use `--eval_scene` or `--export` as with other datasets.
+
+## Tools
+### MonoSDF scene loader
+
+To validate exported scenes in [MonoSDF](https://github.com/Jerrypiglet/monosdf) format (from all the datasets mentioned above), run:
+
+``` bash
+python load_monosdfScene3D.py
+```
+
+Noteably, set `if_normalize_shape_depth_from_pose` to `True` to normalize the shape into MonoSDF scene space, using center/scale loaded from the dump file *scale_mat.npy* (demo of the bedroom scene from $I^2$-SDF: [3D]](images/demo_monosdf_normalize_3D_o3d.png), [2D](images/demo_monosdf_normalize_2D_plt.png); note that dumped depth and shape are NOT normalized; need to manually normalize with `scale_mat_dict['scale'], scale_mat_dict['center']` to MonoSDF normalized space).
+
+Dumped scenes for MonoSDF look like:
+
+- .../EXPORT_monosdf/{scene_name}
+  - scene.obj # scene geometry exported from loaded shape(s)
+  - Image
+    - %04d_0001.exr | %04d_0001.png # HDR and SDR images
+  - ImMask
+    - %04d_0001.png # mask for valid geometry
+  - cameras.npz # camera poses for MonoSDF
+  - scale_mat.npy # scale and center for MonoSDF normalization
+  - K_list.txt # camera intrinsics
+  - depth
+    - %04d_0001.npy # un-normalized depth from self.mi scene
+  - normal
+    - %04d_0001.npy # normals from self.mi scene; (3, H, W), [0., 1.] in camera-coordinates (OpenCV convention)
+  - MiDepth
+    - %04d_0001.npy # un-normalized loaded depth
+  - _MiNormalOpenCV | _MiNormalOpenCV_OVERLAY
+    - %04d_0001.png # visualization of normal maps rendered from self.mi scene, in camera-coordinates (OpenCV convention)
+  - _normal_OVERLAY
+    - %04d_0001.png # visualization of loaded normal maps, in camera-coordinates (OpenCV convention)
+
 
 # TODO
 - [ ] Blender: how to NOT render HDR images?

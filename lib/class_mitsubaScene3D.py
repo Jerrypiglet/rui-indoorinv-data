@@ -179,17 +179,7 @@ class mitsubaScene3D(mitsubaBase):
         load scene representation into Mitsuba 3
         '''
         if self.has_shape_file:
-            print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
-            self.shape_id_dict = {
-                'type': self.shape_file_path.suffix[1:],
-                'filename': str(self.shape_file_path), 
-                }
-            # if self.extra_transform is not None:
-            #     self.shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
-            self.mi_scene = mi.load_dict({
-                'type': 'scene',
-                'shape_id': self.shape_id_dict, 
-            })
+            self.load_mi_scene_from_shape()
         else:
             # xml file always exists for Mitsuba scenes
             self.mi_scene = mi.load_file(str(self.xml_file_path))

@@ -1,5 +1,5 @@
 '''
-work with Mitsuba/Blender scenes
+Works with real-world scenes captured in FIPT paper
 '''
 import sys
 
@@ -24,7 +24,6 @@ from lib.class_realScene3D import realScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
-from lib.class_visualizer_scene_3D_plt import visualizer_scene_3D_plt
 
 # from lib.class_eval_rad import evaluator_scene_rad
 # from lib.class_eval_monosdf import evaluator_scene_monosdf

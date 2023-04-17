@@ -1,3 +1,6 @@
+'''
+Load and visualize re-rendered OpenRooms scenes with multi-view poses, 3D modalities
+'''
 import sys
 
 # host = 'mm1'

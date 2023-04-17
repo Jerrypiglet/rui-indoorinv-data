@@ -1,5 +1,5 @@
 '''
-work with Mitsuba/Blender scenes
+Works with I^2-SDF scenes
 '''
 import sys
 from pathlib import Path
@@ -83,7 +83,7 @@ invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
 # frame_id_list = [12]
-# frame_id_list = list(range(2))
+frame_id_list = list(range(12))
 # frame_id_list = list(np.arange(25, 50, 1))
 
 '''
@@ -104,11 +104,11 @@ scene_obj = i2sdfScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root}, 
     modality_list = [
-        'im_hdr', 
+        # 'im_hdr', 
         'im_sdr', 
         'poses', 
-        'ks', 'kd',  
-        'roughness', 
+        # 'ks', 'kd',  
+        # 'roughness', 
         'depth', 'normal', 
         'im_mask', 
         'tsdf', 
@@ -154,29 +154,28 @@ if opt.export:
     exporter = exporter_scene(
         scene_object=scene_obj,
         format=opt.export_format, 
-        modality_list = [
-            'poses', 
-            'im_hdr', 
-            'im_sdr', 
-            'im_mask', 
-            'shapes', 
-            'mi_normal', 
-            'mi_depth', 
-            ], 
         if_force=opt.force, 
-        # convert from y+ (native to indoor synthetic) to z+
-        # extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32),  # y=z, z=x, x=y
-        # extra_transform = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=np.float32),  # z=y, y=x, x=z
         
     )
     if opt.export_format == 'monosdf':
         exporter.export_monosdf_fvp_mitsuba(
-            split=opt.split, 
+            # split=opt.split, 
             format='monosdf',
+            modality_list = [
+                # 'poses', 
+                # 'im_hdr', 
+                # 'im_sdr', 
+                # 'im_mask', 
+                # 'shapes', 
+                'normal', 
+                # 'depth', 
+                'mi_normal', 
+                # 'mi_depth', 
+                ], 
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp_mitsuba(
-            split=opt.split, 
+            # split=opt.split, 
             format='fvp',
             modality_list = [
                 'poses', 
@@ -212,17 +211,15 @@ if opt.vis_2d_plt:
         scene_obj, 
         modality_list_vis=[
             'im', 
-            'ks', 
-            'kd', 
-            'roughness', 
+            # 'ks', 
+            # 'kd', 
+            # 'roughness', 
+            # 'im_mask', 
             'depth', 
             'normal', 
-            'im_mask', 
+            'mi_depth', 
+            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             
-            # 'layout', 
-            # 'shapes', 
-            # 'mi_depth', 
-            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'emission', 
             # 'seg_area', 'seg_env', 'seg_obj', 
             ], 
@@ -230,11 +227,11 @@ if opt.vis_2d_plt:
     )
 
     visualizer_2D.vis_2d_with_plt(
-        # other_params={
-        #     # 'mi_normal_vis_coords': 'world-blender', 
-        #     'mi_normal_vis_coords': 'opencv', 
-        #     'mi_depth_if_sync_scale': False, 
-            # }, 
+        other_params={
+            # 'mi_normal_vis_coords': 'world-blender', 
+            'mi_normal_vis_coords': 'opencv', 
+            'mi_depth_if_sync_scale': False, 
+            }, 
     )
 
 '''

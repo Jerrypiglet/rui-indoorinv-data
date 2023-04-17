@@ -201,6 +201,7 @@ class simpleScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
+        assert False, '[TODO] already exists in b mitsubaBase; check if anything is new here; otherwise remove this class'
         if self.scene_params_dict.get('shape_file', '') == '':
             print(yellow('No shape file specified/found. Skip loading MI scene.'))
             return
@@ -216,6 +217,7 @@ class simpleScene3D(mitsubaBase, scene2DBase):
         })
 
     def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True, force=False):
+        assert False, '[TODO] already exists in b mitsubaBase; check if anything is new here; otherwise remove this class'
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
             '''
@@ -247,7 +249,7 @@ class simpleScene3D(mitsubaBase, scene2DBase):
             if_get_segs = mi_params_dict.get('if_get_segs', True)
             if if_get_segs:
                 assert if_sample_rays_pts
-                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
+                self.mi_get_segs()
                 self.seg_from['mi'] = True
                 
     def load_poses(self):

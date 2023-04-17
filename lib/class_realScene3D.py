@@ -12,18 +12,15 @@ import json
 import mitsuba as mi
 
 from lib.utils_misc import blue_text, yellow, white_red, get_list_of_keys, white_blue, magenta, check_nd_array_list_identical
-from lib.utils_io import load_matrix, resize_intrinsics
+from lib.utils_io import resize_intrinsics
 
 # from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
-from .class_scene2DBase import scene2DBase
+# from .class_scene2DBase import scene2DBase
 
 from lib.utils_OR.utils_OR_mesh import computeBox
-from lib.utils_misc import get_device
 
-from .class_scene2DBase import scene2DBase
-
-class realScene3D(mitsubaBase, scene2DBase):
+class realScene3D(mitsubaBase):
     '''
     A class used to visualize/render real scenes captured by Mustafa
     '''
@@ -167,14 +164,14 @@ class realScene3D(mitsubaBase, scene2DBase):
 
     def load_modalities(self):
         for _ in self.modality_list:
-            result_ = scene2DBase.load_modality_(self, _)
+            result_ = mitsubaBase.load_modality_(self, _)
             if not (result_ == False):
                 continue
             if _ == 'shapes': self.load_shapes() # shapes of 1(i.e. furniture) + emitters
             if _ == 'tsdf': self.load_tsdf()
 
     def get_modality(self, modality, source: str='GT'):
-        _ = scene2DBase.get_modality_(self, modality, source)
+        _ = mitsubaBase.get_modality_(self, modality, source)
         if _ is not None:
             return _
 
@@ -197,26 +194,7 @@ class realScene3D(mitsubaBase, scene2DBase):
         '''
 
         if self.has_shape_file:
-            print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
-            self.shape_id_dict = {
-                'type': self.shape_file_path.suffix[1:],
-                'filename': str(self.shape_file_path), 
-                }
-            
-            _T = np.eye(4, dtype=np.float32)
-            if input_extra_transform_homo is not None:
-                _T = input_extra_transform_homo @ _T
-                
-            if self._if_T and not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
-                _T = self._T_homo @ _T
-                    
-            if not np.allclose(_T, np.eye(4, dtype=np.float32)):
-                self.shape_id_dict['to_world'] = mi.ScalarTransform4f(_T)        
-            
-            self.mi_scene = mi.load_dict({
-                'type': 'scene',
-                'shape_id': self.shape_id_dict, 
-            })
+            self.load_mi_scene_from_shape(input_extra_transform_homo=input_extra_transform_homo)
         else:
             # xml file always exists for Mitsuba scenes
             # self.mi_scene = mi.load_file(str(self.xml_file_path))

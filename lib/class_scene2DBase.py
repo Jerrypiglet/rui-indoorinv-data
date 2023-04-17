@@ -239,7 +239,7 @@ class scene2DBase(ABC):
         '''
         load im in SDR; RGB, (H, W, 3), [0., 1.]
         '''
-        print(white_blue('[%s] load_im_sdr')%self.parent_class_name)
+        print(white_blue('[%s] load_im_sdr for %d frames'%(self.parent_class_name, len(self.frame_id_list))))
 
         if_allow_crop = self.CONF.im_params_dict.get('if_allow_crop', False)
         if not 'im_sdr' in self.modality_file_list_dict:
@@ -259,7 +259,7 @@ class scene2DBase(ABC):
         '''
         load im in HDR; RGB, (H, W, 3), [0., 1.]
         '''
-        print(white_blue('[%s] load_im_hdr'%self.parent_class_name))
+        print(white_blue('[%s] load_im_hdr for %d frames'%(self.parent_class_name, len(self.frame_id_list))))
 
         if_allow_crop = self.CONF.im_params_dict.get('if_allow_crop', False)
         if not 'im_hdr' in self.modality_file_list_dict:

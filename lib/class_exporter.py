@@ -25,6 +25,7 @@ from lib.class_matterportScene3D import matterportScene3D
 from lib.class_realScene3D import realScene3D
 from lib.class_replicaScene3D import replicaScene3D
 from lib.class_texirScene3D import texirScene3D
+from lib.class_i2sdfScene3D import i2sdfScene3D
 
 class exporter_scene():
     '''
@@ -42,7 +43,7 @@ class exporter_scene():
         if_debug_info: bool=False, 
     ):
         
-        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D]
+        valid_scene_object_classes = [openroomsScene2D, openroomsScene3D, mitsubaScene3D, monosdfScene3D, freeviewpointScene3D, matterportScene3D, replicaScene3D, realScene3D, texirScene3D, i2sdfScene3D]
         assert type(scene_object) in valid_scene_object_classes, '[%s] has to take an object of %s!'%(self.__class__.__name__, ' ,'.join([str(_.__name__) for _ in valid_scene_object_classes]))
 
         self.os = scene_object
@@ -274,21 +275,32 @@ class exporter_scene():
                     print(blue_text('mi_seg_%s image %d exported to: %s'%(_mod, frame_id, str(mi_seg_mod_export_path))))
 
             if modality == 'mi_normal':
+                '''
+                -> normal: npy [0, 1], [3, H, W], CAMERA coords: OpenCV
+                '''
                 assert format in ['monosdf', 'mitsuba']
-                (scene_export_path / 'MiNormalGlobal').mkdir(parents=True, exist_ok=True)
-                (scene_export_path / 'MiNormalGlobal_OVERLAY').mkdir(parents=True, exist_ok=True)
+                (scene_export_path / '_MiNormalOpenCV').mkdir(parents=True, exist_ok=True)
+                (scene_export_path / '_MiNormalOpenCV_OVERLAY').mkdir(parents=True, exist_ok=True)
                 assert self.os.pts_from['mi']
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
-                    mi_normal_export_path = scene_export_path / 'MiNormalGlobal' / ('%03d_0001.png'%frame_idx)
-                    _mi_normal = self.os.mi_normal_global_list[frame_idx][:, :, [2, 1, 0]]/2.+0.5
-                    cv2.imwrite(str(mi_normal_export_path), (np.clip(_mi_normal, 0., 1.)*255.).astype(np.uint8))
-                    print(blue_text('Mitsuba normal (global) %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
-                    mi_normal_overlay = self.os.im_sdr_list[frame_idx][:, :, [2, 1, 0]].copy()
-                    mi_normal_overlay = mi_normal_overlay * 0.5 + _mi_normal * 0.5
-                    mi_normal_overlay_export_path = scene_export_path / 'MiNormalGlobal_OVERLAY' / ('%03d_0001.png'%frame_idx)
-                    cv2.imwrite(str(mi_normal_overlay_export_path), (np.clip(mi_normal_overlay, 0., 1.)*255.).astype(np.uint8))
+                    mi_normal_export_path = scene_export_path / '_MiNormalOpenCV' / ('%03d_0001.png'%frame_idx)
+                    _mi_normal = self.os.mi_normal_opencv_list[frame_idx]/2.+0.5
+                    assert _mi_normal.shape == (self.os._H(frame_idx), self.os._W(frame_idx), 3)
+                    cv2.imwrite(str(mi_normal_export_path), (np.clip(_mi_normal[:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
+                    print(blue_text('Mitsuba normal (vis) (global) %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
+                    
+                    _mi_normal_overlay = self.os.im_sdr_list[frame_idx].copy()
+                    _mi_normal = self.os.mi_normal_opencv_list[frame_idx]/2.+0.5
+                    _mi_normal_overlay = _mi_normal_overlay * 0.5 + _mi_normal * 0.5
+                    assert _mi_normal_overlay.shape == (self.os._H(frame_idx), self.os._W(frame_idx), 3)
+                    _mi_normal_overlay_export_path = scene_export_path / '_MiNormalOpenCV_OVERLAY' / ('%03d_0001.png'%frame_idx)
+                    cv2.imwrite(str(_mi_normal_overlay_export_path), (np.clip(_mi_normal_overlay[:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
             
             if modality == 'mi_depth':
+                '''
+                In un-normalized space!!
+                Multiply by scale_mat_dict['scale'] -> monosdf depth
+                '''
                 assert format in ['monosdf', 'mitsuba']
                 (scene_export_path / 'MiDepth').mkdir(parents=True, exist_ok=True)
                 assert self.os.pts_from['mi']
@@ -304,6 +316,53 @@ class exporter_scene():
                     mi_depth_npy_export_path = scene_export_path / 'MiDepth' / ('%03d_0001.npy'%frame_idx)
                     np.save(str(mi_depth_npy_export_path), mi_depth)
                     print(blue_text('depth (npy) %d exported to: %s'%(frame_id, str(mi_depth_npy_export_path))))
+
+            if modality == 'normal':
+                '''
+                -> normal: npy [0, 1], [3, H, W], CAMERA coords: OpenCV
+                '''
+                assert hasattr(self.os, 'normal_list')
+                (scene_export_path / 'normal').mkdir(parents=True, exist_ok=True)
+                (scene_export_path / '_normal_OVERLAY').mkdir(parents=True, exist_ok=True)
+                for frame_idx, frame_id in enumerate(self.os.frame_id_list):
+                    normal_export_path = scene_export_path / 'normal' / ('%03d_0001.npy'%frame_idx)
+                    normal = (self.os.normal_list[frame_idx].transpose(2, 0, 1))/2.+0.5
+                    assert normal.shape == (3, self.os._H(frame_idx), self.os._W(frame_idx))
+                    np.save(str(normal_export_path), normal)
+                    print(blue_text('Normal %d exported to: %s'%(frame_id, str(normal_export_path))))
+                    
+                    _normal = self.os.normal_list[frame_idx]/2.+0.5
+                    assert _normal.shape == (self.os._H(frame_idx), self.os._W(frame_idx), 3)
+                    normal_vis_export_path = scene_export_path / 'normal' / ('%03d_0001.png'%frame_idx)
+                    cv2.imwrite(str(normal_vis_export_path), (np.clip(_normal[:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
+                    
+                    _normal_overlay = self.os.im_sdr_list[frame_idx].copy()
+                    _normal_overlay = _normal_overlay * 0.5 + _normal * 0.5
+                    assert _normal_overlay.shape == (self.os._H(frame_idx), self.os._W(frame_idx), 3)
+                    _normal_overlay_export_path = scene_export_path / '_normal_OVERLAY' / ('%03d_0001.png'%frame_idx)
+                    cv2.imwrite(str(_normal_overlay_export_path), (np.clip(_normal_overlay[:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
+            
+            if modality == 'depth':
+                '''
+                In un-normalized space!!
+                Multiply by scale_mat_dict['scale'] -> monosdf depth
+                '''
+                assert hasattr(self.os, 'depth_list')
+                (scene_export_path / 'depth').mkdir(parents=True, exist_ok=True)
+                for frame_idx, frame_id in enumerate(self.os.frame_id_list):
+                    depth_vis_export_path = scene_export_path / 'Depth' / ('%03d_0001.png'%frame_idx)
+                    depth = self.os.depth_list[frame_idx].squeeze()
+                    if hasattr(self.os, 'im_mask_list'):
+                        valid_mask = self.os.im_mask_list[frame_idx].squeeze()
+                    else:
+                        valid_mask = None
+                    depth_normalized, depth_min_and_scale = vis_disp_colormap(depth, normalize=True, valid_mask=valid_mask)
+                    cv2.imwrite(str(depth_vis_export_path), depth_normalized)
+                    print(blue_text('depth (vis) %d exported to: %s'%(frame_id, str(depth_vis_export_path))))
+                    
+                    depth_npy_export_path = scene_export_path / 'depth' / ('%03d_0001.npy'%frame_idx)
+                    np.save(str(depth_npy_export_path), depth)
+                    print(blue_text('depth (npy) %d exported to: %s'%(frame_id, str(depth_npy_export_path))))
 
             if modality == 'im_mask':
                 file_str = {'monosdf': 'ImMask/%03d_0001.png', 'mitsuba': 'ImMask/%03d_0001.png', 'fvp': 'images/%08d_mask.png'}[format]
@@ -321,6 +380,7 @@ class exporter_scene():
                         assert hasattr(self.os, 'im_undist_mask_list')
                         assert len(self.os.im_undist_mask_list) == len(self.os.mi_invalid_depth_mask_list)
                         if_undist_mask = True
+                        
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
                     im_mask_export_path = scene_export_path / (file_str%frame_idx)
                     mi_invalid_depth_mask = self.os.mi_invalid_depth_mask_list[frame_idx]
@@ -452,24 +512,12 @@ class exporter_scene():
                 if not self.os.if_loaded_shapes:
                     print(yellow('Skipping shapes export since shapes not loaded.'))
                     continue
-                # T_list_ = [(None, '')]
-                # if self.extra_transform is not None: # [TODO] clean this up with below
-                #     T_list_ = [(self.extra_transform, '')]
-                # if self.os.extra_transform is not None:
-                #     print(red('extra_transform is not None'))
-                #     T_list_.append((self.os.extra_transform_inv, '_extra_transform'))
-
-                # for T_, appendix in T_list_:
                 shape_list = []
-                # shape_export_path = scene_export_path / ('scene%s.obj'%appendix)
                 file_str = {'monosdf': 'scene%s.obj'%appendix, 'mitsuba': 'scene%s.obj'%appendix, 'fvp': 'meshes/recon.ply'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 shape_export_path = scene_export_path / file_str
                 
                 for vertices, faces in zip(self.os.vertices_list, self.os.faces_list):
-                    # if T_ is not None:
-                    #     shape_list.append(trimesh.Trimesh((T_ @ vertices.T).T, faces-1, process=False, maintain_order=True))
-                    # else:
                     shape_list.append(trimesh.Trimesh(vertices, faces-1, process=True, maintain_order=True))
                 shape_tri_mesh = trimesh.util.concatenate(shape_list)
                 
@@ -493,11 +541,11 @@ class exporter_scene():
                     if_fixed_water_tight = False
                     
                     if format in ['monosdf']:
-                        # shape_tri_mesh_fixed.export(str(shape_export_path.parent / ('%s_fixed%s.obj'%(shape_export_path.stem, appendix))))
+                        shape_tri_mesh.export(str(shape_export_path))
                         
-                        if_fixed_water_tight = True
-                        print(red('Overwriting with mesh + hull: %s'%str(shape_export_path)))
-                        shape_tri_mesh_fixed.export(str(shape_export_path))
+                        # if_fixed_water_tight = True
+                        # print(red('Overwriting with mesh + hull: %s'%str(shape_export_path)))
+                        # shape_tri_mesh_fixed.export(str(shape_export_path))
 
                     elif format == 'fvp': 
                         # scale.txt

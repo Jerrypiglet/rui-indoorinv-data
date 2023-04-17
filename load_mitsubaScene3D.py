@@ -1,5 +1,5 @@
 '''
-work with Mitsuba/Blender scenes
+Works with Indoor Synthetic scenes
 '''
 import sys
 from pathlib import Path
