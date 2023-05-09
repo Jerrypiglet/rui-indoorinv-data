@@ -1,5 +1,10 @@
 '''
-Works with Indoor Synthetic scenes
+Works with Indoor Synthetic scenes.
+
+Export train and val to MonoSDF format:
+    
+
+
 '''
 import sys
 from pathlib import Path
@@ -137,16 +142,17 @@ scene_obj = mitsubaScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
-        # 'im_hdr', 
+        'im_hdr', 
         'im_sdr', 
         'poses', 
-        # 'lighting_envmap', 
+        'shapes', # objs + emitters, geometry shapes + emitter properties``
+        'layout', 
+        'tsdf', 
         # 'albedo', 'roughness', 
         # 'emission', 
+        
         # 'depth', 'normal', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties``
-        # 'layout', 
-        'tsdf', 
+        # 'lighting_envmap', 
         ], 
 )
 
@@ -231,15 +237,6 @@ if opt.export:
     exporter = exporter_scene(
         scene_object=scene_obj,
         format=opt.export_format, 
-        modality_list = [
-            'poses', 
-            'im_hdr', 
-            'im_sdr', 
-            'im_mask', 
-            'shapes', 
-            'mi_normal', 
-            'mi_depth', 
-            ], 
         if_force=opt.force, 
         # convert from y+ (native to indoor synthetic) to z+
         # extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32),  # y=z, z=x, x=y
@@ -249,7 +246,18 @@ if opt.export:
     if opt.export_format == 'monosdf':
         exporter.export_monosdf_fvp_mitsuba(
             split=opt.split, 
+            if_mask_from_mi=True, 
             format='monosdf',
+            modality_list = [
+                'poses', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
+                'shapes', 
+                'mi_normal', 
+                'mi_depth', 
+                ], 
+            appendix=opt.export_appendix, 
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp_mitsuba(

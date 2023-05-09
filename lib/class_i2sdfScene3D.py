@@ -347,6 +347,7 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
         '''
         normal, in camera coordinates (OpenGL convention: right-up-backward);
         (H, W, 3), [-1., 1.]
+        [!!!] provided normals are not acrually fully normalized... see pics below
         '''
         if hasattr(self, 'normal_list'): return
 
@@ -355,6 +356,14 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
         self.normal_file_list = [self.scene_rendering_path_list[frame_idx] / (self.CONF.modality_filename_dict['normal']%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.normal_list = [load_img(normal_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for normal_file, __ in zip(self.normal_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
-        self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
+        
+        '''
+        mask out areas with invalid normals: e.g. normal norm map (61 from bedroom): ![](https://i.imgur.com/hVhluye.png), ![](https://i.imgur.com/Uk9RvaQ.png)
+        '''
+        self.im_mask_list_extra = [np.abs(np.linalg.norm(normal, axis=-1)-1)<1e-3 for normal in self.normal_list]
+        if hasattr(self, 'im_mask_list'):
+            self.im_mask_list  = [np.logical_and(mask, mask_extra) for mask, mask_extra in zip(self.im_mask_list, self.im_mask_list_extra)]
+            
+        self.normal_list = [normal / (np.linalg.norm(normal, axis=-1, keepdims=True)+1e-6) for normal in self.normal_list]
         
         print(blue_text('[%s] DONE. load_normal'%self.__class__.__name__))

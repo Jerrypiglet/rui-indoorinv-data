@@ -82,8 +82,8 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-# frame_id_list = [12]
-frame_id_list = list(range(12))
+# frame_id_list = [61]
+# frame_id_list = list(range(12))
 # frame_id_list = list(np.arange(25, 50, 1))
 
 '''
@@ -165,13 +165,14 @@ if opt.export:
                 # 'poses', 
                 # 'im_hdr', 
                 # 'im_sdr', 
-                # 'im_mask', 
+                'im_mask', 
                 # 'shapes', 
                 'normal', 
                 # 'depth', 
-                'mi_normal', 
+                # 'mi_normal', 
                 # 'mi_depth', 
                 ], 
+            if_mask_from_mi = False, 
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp_mitsuba(

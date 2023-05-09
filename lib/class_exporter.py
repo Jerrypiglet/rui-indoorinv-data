@@ -88,10 +88,12 @@ class exporter_scene():
         
         return True
         
-    def export_monosdf_fvp_mitsuba(self, modality_list={}, appendix='', split='', format='monosdf'):
+    def export_monosdf_fvp_mitsuba(self, modality_list={}, appendix='', split='', format='monosdf', if_mask_from_mi: bool=False):
         '''
         export scene to mitsubaScene data structure + monosdf inputs
         and fvp: free viewpoint dataset https://gitlab.inria.fr/sibr/projects/indoor_relighting
+        
+        - if_mask_from_mi: if True, logical_and loaded im_mask with mask from Mitsuba; if False, use loaded im_mask
         ''' 
         
         assert format in ['monosdf', 'fvp', 'mitsuba'], 'format %s not supported'%format
@@ -279,15 +281,21 @@ class exporter_scene():
                 -> normal: npy [0, 1], [3, H, W], CAMERA coords: OpenCV
                 '''
                 assert format in ['monosdf', 'mitsuba']
-                (scene_export_path / '_MiNormalOpenCV').mkdir(parents=True, exist_ok=True)
+                (scene_export_path / 'MiNormal').mkdir(parents=True, exist_ok=True)
                 (scene_export_path / '_MiNormalOpenCV_OVERLAY').mkdir(parents=True, exist_ok=True)
                 assert self.os.pts_from['mi']
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
-                    mi_normal_export_path = scene_export_path / '_MiNormalOpenCV' / ('%03d_0001.png'%frame_idx)
-                    _mi_normal = self.os.mi_normal_opencv_list[frame_idx]/2.+0.5
+                    _mi_normal_export_path = scene_export_path / 'MiNormal' / ('%03d_0001.png'%frame_idx)
+                    _mi_normal = self.os.mi_normal_opencv_list[frame_idx]/2.+0.5 # [-1, 1] -> [0, 1]
                     assert _mi_normal.shape == (self.os._H(frame_idx), self.os._W(frame_idx), 3)
-                    cv2.imwrite(str(mi_normal_export_path), (np.clip(_mi_normal[:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
-                    print(blue_text('Mitsuba normal (vis) (global) %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
+                    cv2.imwrite(str(_mi_normal_export_path), (np.clip(_mi_normal[:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
+                    print(blue_text('Mitsuba mi_normal (vis) (OpenCV) %d exported to: %s'%(frame_id, str(_mi_normal_export_path))))
+                    
+                    mi_normal_export_path = scene_export_path / 'MiNormal' / ('%03d_0001.npy'%frame_idx)
+                    mi_normal = np.clip(_mi_normal.transpose(2, 0, 1), 0., 1.)
+                    assert mi_normal.shape == (3, self.os._H(frame_idx), self.os._W(frame_idx))
+                    np.save(str(mi_normal_export_path), mi_normal)
+                    print(blue_text('Mitsuba mi_normal %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
                     
                     _mi_normal_overlay = self.os.im_sdr_list[frame_idx].copy()
                     _mi_normal = self.os.mi_normal_opencv_list[frame_idx]/2.+0.5
@@ -368,41 +376,50 @@ class exporter_scene():
                 file_str = {'monosdf': 'ImMask/%03d_0001.png', 'mitsuba': 'ImMask/%03d_0001.png', 'fvp': 'images/%08d_mask.png'}[format]
                 (scene_export_path / file_str).parent.mkdir(parents=True, exist_ok=True)
                 
-                if not self.os.pts_from['mi']:
-                    print(yellow('Skipped exporting im_mask because mi_depth is not available.'))
-                    continue
-                
-                if hasattr(self.os, 'im_mask_list'):
-                    assert len(self.os.im_mask_list) == len(self.os.mi_invalid_depth_mask_list)
                 if_undist_mask = False
-                if hasattr(self.os, 'if_undist'):
-                    if self.os.if_undist:
-                        assert hasattr(self.os, 'im_undist_mask_list')
-                        assert len(self.os.im_undist_mask_list) == len(self.os.mi_invalid_depth_mask_list)
-                        if_undist_mask = True
+                if if_mask_from_mi:
+                    if not self.os.pts_from['mi']:
+                        print(yellow('Skipped exporting im_mask because mi_depth is not available.'))
+                        continue
+                    if hasattr(self.os, 'im_mask_list'):
+                        assert len(self.os.im_mask_list) == len(self.os.mi_invalid_depth_mask_list)
+                    if hasattr(self.os, 'if_undist'):
+                        if self.os.if_undist:
+                            assert hasattr(self.os, 'im_undist_mask_list')
+                            assert len(self.os.im_undist_mask_list) == len(self.os.mi_invalid_depth_mask_list)
+                            if_undist_mask = True
                         
                 for frame_idx, frame_id in enumerate(self.os.frame_id_list):
                     im_mask_export_path = scene_export_path / (file_str%frame_idx)
-                    mi_invalid_depth_mask = self.os.mi_invalid_depth_mask_list[frame_idx]
-                    assert mi_invalid_depth_mask.dtype == bool
-                    im_mask_export = ~mi_invalid_depth_mask
-                    mask_source_list = ['mi']
+                    mask_source_list = []
+                    if if_mask_from_mi:
+                        mi_invalid_depth_mask = self.os.mi_invalid_depth_mask_list[frame_idx]
+                        assert mi_invalid_depth_mask.dtype == bool
+                        im_mask_export = ~mi_invalid_depth_mask
+                        mask_source_list += ['mi']
+                    else:
+                        mask_source_list += []
+                        im_mask_export = np.ones((self.os._H(frame_idx), self.os._W(frame_idx)), dtype=bool)
+                        assert hasattr(self.os, 'im_mask_list')
+                        
                     if hasattr(self.os, 'im_mask_list'):
                         im_mask_ = self.os.im_mask_list[frame_idx]
                         assert im_mask_.dtype == bool
                         assert im_mask_export.shape == im_mask_.shape, 'invalid depth mask shape %s not equal to im_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask_.shape)
                         im_mask_export = np.logical_and(im_mask_export, im_mask_)
                         mask_source_list.append('im_mask')
+                        
                     if if_undist_mask:
                         im_mask_ = self.os.im_undist_mask_list[frame_idx]
                         assert im_mask_.dtype == bool
                         assert im_mask_export.shape == im_mask_.shape, 'invalid depth mask shape %s not equal to im_undist_mask shape %s'%(mi_invalid_depth_mask.shape, im_mask_.shape)
                         im_mask_export = np.logical_and(im_mask_export, im_mask_)
                         mask_source_list.append('im_undist_mask')
+                        
                     print('Exporting im_mask from %s'%(' && '.join(mask_source_list)))
                     cv2.imwrite(str(im_mask_export_path), (im_mask_export*255).astype(np.uint8))
                     print(blue_text('Mask image (for valid depths) %s exported to: %s'%(frame_id, str(im_mask_export_path))))
-
+                    
             if modality == 'matseg':
                 assert hasattr(self.os, 'matseg_list')
                 file_str = {'monosdf': 'MatSeg/%03d.npy', 'mitsuba': 'MatSeg/%03d.npy', 'fvp': 'MatSeg/%03d.npy'}[format]

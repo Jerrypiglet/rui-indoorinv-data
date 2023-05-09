@@ -69,7 +69,8 @@ class mitsubaScene3D(mitsubaBase):
         '''
         paths for: intrinsics, xml, pose, shape
         '''
-        self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
+        if self.scene_rendering_path is not None:
+            self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
         self.intrinsics_path = self.scene_path / 'intrinsic_mitsubaScene.txt'
         self.xml_root = get_list_of_keys(self.root_path_dict, ['xml_root'], [PosixPath])[0]
         self.xml_file_path = self.xml_root / self.scene_name / self.CONF.data.xml_file
@@ -105,14 +106,22 @@ class mitsubaScene3D(mitsubaBase):
     def frame_num(self):
         return len(self.frame_id_list)
 
-    # @property
-    # def frame_num_all(self):
-    #     return len(self.frame_id_list)
+    @property
+    def frame_num_all(self):
+        return len(self.frame_id_list)
     
     @property
     def scene_rendering_path(self):
-        return self.dataset_root / self.scene_name / self.split
+        if len(self.splits) == 1:
+            return self.dataset_root / self.scene_name / self.split
+        else:
+            # 'Multiple splits: %s; please use self.scene_rendering_path_list'%str(self.split)
+            return None
 
+    # @property
+    # def scene_rendering_path_list(self):
+    #     [self.dataset_root / self.scene_name / split] * len(frame_id_list)
+    
     @property
     def K_list(self):
         return [self.K] * self.frame_num
@@ -227,7 +236,7 @@ class mitsubaScene3D(mitsubaBase):
                 if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(' + '.join([str(pose_file) for pose_file in self.pose_file_path_list]), _num_poses)))
             if not if_resample in ['N', 'n']:
                 self.sample_poses(self.CONF.cam_params_dict.get('sample_pose_num'), if_dump=self.CONF.cam_params_dict.get('sample_pose_if_dump', True))
-                self.scene_rendering_path_list = [self.scene_rendering_path.parent / self.split] * len(self.frame_id_list)
+                self.scene_rendering_path_list = [self.dataset_root / self.scene_name / self.split] * len(self.frame_id_list)
                 return
             
         self.pose_list = []
@@ -355,7 +364,7 @@ class mitsubaScene3D(mitsubaBase):
             #     self.t_c2w_b_list += t_c2w_b_list
             #     self.R_c2w_b_list += R_c2w_b_list
             self.frame_split_list += [split] * len(frame_id_list)
-            self.scene_rendering_path_list += [self.scene_rendering_path.parent / split] * len(frame_id_list)
+            self.scene_rendering_path_list += [self.dataset_root / self.scene_name / split] * len(frame_id_list)
             
             print(yellow(split), blue_text('Loaded {} poses from {}'.format(len(frame_id_list), pose_file)))
 

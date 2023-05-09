@@ -105,13 +105,13 @@ class scene2DBase(ABC):
         '''
         return self.scene_path
 
-    @property
-    @abstractmethod
-    def scene_rendering_path_list(self):
-        '''
-        requried in case of multiple rendering paths for different frames
-        '''
-        ...
+    # @property
+    # # @abstractmethod
+    # def scene_rendering_path_list(self):
+    #     '''
+    #     requried in case of multiple rendering paths for different frames
+    #     '''
+    #     assert False
 
     def _K(self, frame_idx: int=None):
         if hasattr(self, 'K'):
@@ -342,6 +342,9 @@ class scene2DBase(ABC):
         expected_shape_list = [self.im_HW_load_list[_] for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load]*self.frame_num
         self.im_mask_list = [load_img(_, expected_shape=__, ext=modality_filename_ext, target_HW=self.im_HW_target)/255. for _, __ in zip(self.im_mask_file_list, expected_shape_list)]
         self.im_mask_list = [_.astype(bool) for _ in self.im_mask_list]
+        
+        if hasattr(self, 'im_mask_list_extra'):
+            self.im_mask_list  = [np.logical_and(mask, mask_extra) for mask, mask_extra in zip(self.im_mask_list, self.im_mask_list_extra)]
 
         print(blue_text('[%s] DONE. load_im_mask')%self.parent_class_name)
 
