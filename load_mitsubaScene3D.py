@@ -138,15 +138,15 @@ scene_obj = mitsubaScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
-        # 'im_hdr', 
+        'im_hdr', 
         'im_sdr', 
         'poses', 
         # 'lighting_envmap', 
         # 'albedo', 'roughness', 
         # 'emission', 
         # 'depth', 'normal', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties``
-        # 'layout', 
+        'shapes', # objs + emitters, geometry shapes + emitter properties``
+        'layout', 
         'tsdf', 
         ], 
 )
@@ -232,15 +232,15 @@ if opt.export:
     exporter = exporter_scene(
         scene_object=scene_obj,
         format=opt.export_format, 
-        modality_list = [
-            'poses', 
-            'im_hdr', 
-            'im_sdr', 
-            'im_mask', 
-            'shapes', 
-            'mi_normal', 
-            'mi_depth', 
-            ], 
+        # modality_list = [
+        #     'poses', 
+        #     'im_hdr', 
+        #     'im_sdr', 
+        #     'im_mask', 
+        #     'shapes', 
+        #     'mi_normal', 
+        #     'mi_depth', 
+        #     ], 
         if_force=opt.force, 
         # convert from y+ (native to indoor synthetic) to z+
         # extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32),  # y=z, z=x, x=y
@@ -251,6 +251,15 @@ if opt.export:
         exporter.export_monosdf_fvp_mitsuba(
             split=opt.split, 
             format='monosdf',
+            modality_list = [
+                'poses', 
+                'im_hdr', 
+                'im_sdr', 
+                'im_mask', 
+                'shapes', 
+                'mi_normal', 
+                'mi_depth', 
+                ], 
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp_mitsuba(
@@ -331,8 +340,8 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             'poses', 
-            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
-            # 'layout', 
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            'layout', 
             'mi', # mitsuba sampled rays, pts
             'tsdf', 
             # 'dense_geo', # fused from 2D
@@ -400,12 +409,10 @@ if opt.vis_3d_o3d:
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
 
-            # 'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            # 'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            'if_ceiling': False, 
-            'if_walls': False, 
-            # 'if_ceiling': True, 
-            # 'if_walls': True, 
+            'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            # 'if_ceiling': False, 
+            # 'if_walls': False, 
 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]
