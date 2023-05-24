@@ -66,11 +66,11 @@ class mitsubaScene3D(mitsubaBase):
         assert self.mitsuba_version in ['3.0.0', '0.6.0']
         self.indexing_based = self.CONF.scene_params_dict.get('indexing_based', 0)
         
-        
         '''
         paths for: intrinsics, xml, pose, shape
         '''
-        self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
+        if self.scene_rendering_path is not None:
+            self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
         self.intrinsics_path = self.scene_path / 'intrinsic_mitsubaScene.txt'
         self.xml_root = get_list_of_keys(self.root_path_dict, ['xml_root'], [PosixPath])[0]
         self.xml_file_path = self.xml_root / self.scene_name / self.CONF.data.xml_file
@@ -112,7 +112,11 @@ class mitsubaScene3D(mitsubaBase):
     
     @property
     def scene_rendering_path(self):
-        return self.dataset_root / self.scene_name / self.split
+        if len(self.splits) == 1:
+            return self.dataset_root / self.scene_name
+        else:
+            # 'Multiple splits: %s; please use self.scene_rendering_path_list'%str(self.split)
+            return None
     
     @property
     def scene_rendering_path_list(self):
@@ -184,17 +188,7 @@ class mitsubaScene3D(mitsubaBase):
         load scene representation into Mitsuba 3
         '''
         if self.has_shape_file:
-            print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
-            self.shape_id_dict = {
-                'type': self.shape_file_path.suffix[1:],
-                'filename': str(self.shape_file_path), 
-                }
-            # if self.extra_transform is not None:
-            #     self.shape_id_dict['to_world'] = mi.ScalarTransform4f(self.extra_transform_homo)
-            self.mi_scene = mi.load_dict({
-                'type': 'scene',
-                'shape_id': self.shape_id_dict, 
-            })
+            self.load_mi_scene_from_shape()
         else:
             # xml file always exists for Mitsuba scenes
             self.mi_scene = mi.load_file(str(self.xml_file_path))
@@ -242,7 +236,7 @@ class mitsubaScene3D(mitsubaBase):
                 if_resample = input(red('pose file exists: %s (%d poses). RESAMPLE POSE? [y/n]'%(' + '.join([str(pose_file) for pose_file in self.pose_file_path_list]), _num_poses)))
             if not if_resample in ['N', 'n']:
                 self.sample_poses(self.CONF.cam_params_dict.get('sample_pose_num'), if_dump=self.CONF.cam_params_dict.get('sample_pose_if_dump', True))
-                self.scene_rendering_path_list_ = [self.scene_rendering_path.parent / self.split] * len(self.frame_id_list)
+                self.scene_rendering_path_list_ = [self.dataset_root / self.scene_name / self.split] * len(self.frame_id_list)
                 return
             
         self.pose_list = []
@@ -259,6 +253,7 @@ class mitsubaScene3D(mitsubaBase):
             
             pose_list = []
             origin_lookatvector_up_list = []
+            frame_id_list = None
 
             if self.pose_format == 'OpenRooms':
                 '''
@@ -361,7 +356,8 @@ class mitsubaScene3D(mitsubaBase):
 
                         pose_list.append(np.hstack((R, t)))
                         origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
-                    
+            
+            assert frame_id_list is not None
             self.pose_list += pose_list
             self.origin_lookatvector_up_list += origin_lookatvector_up_list
             self.frame_offset_list += [len(frame_id_list_all)] * len(frame_id_list)
@@ -370,7 +366,7 @@ class mitsubaScene3D(mitsubaBase):
             #     self.t_c2w_b_list += t_c2w_b_list
             #     self.R_c2w_b_list += R_c2w_b_list
             self.frame_split_list += [split] * len(frame_id_list)
-            self.scene_rendering_path_list_ += [self.scene_rendering_path.parent / split] * len(frame_id_list)
+            self.scene_rendering_path_list_ += [self.scene_rendering_path / split] * len(frame_id_list)
             
             print(yellow(split), blue_text('Loaded {} poses from {}'.format(len(frame_id_list), pose_file)))
 

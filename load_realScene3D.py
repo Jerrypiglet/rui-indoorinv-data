@@ -1,5 +1,5 @@
 '''
-work with Mitsuba/Blender scenes
+Works with real-world scenes captured in FIPT paper
 '''
 import sys
 
@@ -24,7 +24,6 @@ from lib.class_realScene3D import realScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
-from lib.class_visualizer_scene_3D_plt import visualizer_scene_3D_plt
 
 # from lib.class_eval_rad import evaluator_scene_rad
 # from lib.class_eval_monosdf import evaluator_scene_monosdf
@@ -103,7 +102,7 @@ invalid_frame_idx_list = CONF.scene_params_dict.invalid_frame_idx_list
 # frame_id_list = [0]
 
 '''
-modify confs
+update confs
 '''
 
 if opt.export:
@@ -215,7 +214,7 @@ if opt.export:
                 'poses', 
                 'im_hdr', 
                 'im_sdr', 
-                'im_mask', 
+                # 'im_mask', 
                 'shapes', 
                 'mi_normal', 
                 'mi_depth', 

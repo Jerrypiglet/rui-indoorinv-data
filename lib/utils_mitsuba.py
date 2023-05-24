@@ -195,7 +195,7 @@ def dump_Indoor_area_lights_only_xml_for_mi(
 ):
     '''
         Dump xml_with_lit_area_lights_only to *_lit_up_area_lights_only.xml
-        work with the Indoor dataset (e.g. kitchen scene)
+        Works with the Indoor dataset (e.g. kitchen scene)
     '''
     xml_dump_path = str(xml_file).replace('.xml', '_lit_up_area_lights_only.xml')
     tree = et.parse(xml_file)

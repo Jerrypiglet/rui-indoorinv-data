@@ -36,6 +36,9 @@ class scene2DBase(ABC):
         self.root_path_dict = root_path_dict
         self.PATH_HOME, self.dataset_root = get_list_of_keys(self.root_path_dict, ['PATH_HOME', 'dataset_root'], [PosixPath, PosixPath])
         self.scene_name = self.CONF.scene_params_dict.scene_name
+        if '-' in self.scene_name: # for e.g. openrooms
+            self.meta_split, self.scene_name = self.scene_name.split('-')
+            print(yellow('[%s] - (dash) found in scene_name; parsing scene_name as: meta_split-scene_name (e.g. as in OpenRooms)'%self.__class__.__name__))
         self.split = self.CONF.scene_params_dict.get('split', '')
 
         # im params
@@ -78,6 +81,9 @@ class scene2DBase(ABC):
     @property
     def scene_name_full(self):
         return self.scene_name
+    
+    def update_scene_name(self, new_scene_name):
+        self.scene_name = new_scene_name
 
     @property
     @abstractmethod
@@ -103,9 +109,9 @@ class scene2DBase(ABC):
     @abstractmethod
     def scene_rendering_path_list(self):
         '''
-        useful when frames come from different rendering_path
+        requried in case of multiple rendering paths for different frames
         '''
-        ...
+        assert False
 
     def _K(self, frame_idx: int=None):
         if hasattr(self, 'K'):
@@ -233,7 +239,7 @@ class scene2DBase(ABC):
         '''
         load im in SDR; RGB, (H, W, 3), [0., 1.]
         '''
-        print(white_blue('[%s] load_im_sdr')%self.parent_class_name)
+        print(white_blue('[%s] load_im_sdr for %d frames'%(self.parent_class_name, len(self.frame_id_list))))
 
         if_allow_crop = self.CONF.im_params_dict.get('if_allow_crop', False)
         if not 'im_sdr' in self.modality_file_list_dict:
@@ -253,7 +259,7 @@ class scene2DBase(ABC):
         '''
         load im in HDR; RGB, (H, W, 3), [0., 1.]
         '''
-        print(white_blue('[%s] load_im_hdr'%self.parent_class_name))
+        print(white_blue('[%s] load_im_hdr for %d frames'%(self.parent_class_name, len(self.frame_id_list))))
 
         if_allow_crop = self.CONF.im_params_dict.get('if_allow_crop', False)
         if not 'im_hdr' in self.modality_file_list_dict:
@@ -336,9 +342,11 @@ class scene2DBase(ABC):
         expected_shape_list = [self.im_HW_load_list[_] for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load]*self.frame_num
         self.im_mask_list = [load_img(_, expected_shape=__, ext=modality_filename_ext, target_HW=self.im_HW_target)/255. for _, __ in zip(self.im_mask_file_list, expected_shape_list)]
         self.im_mask_list = [_.astype(bool) for _ in self.im_mask_list]
+        
+        if hasattr(self, 'im_mask_list_extra'):
+            self.im_mask_list  = [np.logical_and(mask, mask_extra) for mask, mask_extra in zip(self.im_mask_list, self.im_mask_list_extra)]
 
         print(blue_text('[%s] DONE. load_im_mask')%self.parent_class_name)
-
 
     def load_layout(self):
         '''

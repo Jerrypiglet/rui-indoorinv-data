@@ -1,5 +1,10 @@
 '''
-work with Mitsuba/Blender scenes
+Works with Indoor Synthetic scenes.
+
+Export train and val to MonoSDF format:
+    
+
+
 '''
 import sys
 from pathlib import Path
@@ -21,7 +26,6 @@ from lib.class_mitsubaScene3D import mitsubaScene3D
 
 from lib.class_visualizer_scene_2D import visualizer_scene_2D
 from lib.class_visualizer_scene_3D_o3d import visualizer_scene_3D_o3d
-from lib.class_visualizer_scene_3D_plt import visualizer_scene_3D_plt
 
 # from lib.class_eval_rad import evaluator_scene_rad
 # from lib.class_eval_monosdf import evaluator_scene_monosdf
@@ -97,7 +101,7 @@ invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 # frame_id_list = [0]
 
 '''
-modify confs
+update confs
 '''
 
 CONF.scene_params_dict.update({
@@ -232,15 +236,6 @@ if opt.export:
     exporter = exporter_scene(
         scene_object=scene_obj,
         format=opt.export_format, 
-        # modality_list = [
-        #     'poses', 
-        #     'im_hdr', 
-        #     'im_sdr', 
-        #     'im_mask', 
-        #     'shapes', 
-        #     'mi_normal', 
-        #     'mi_depth', 
-        #     ], 
         if_force=opt.force, 
         # convert from y+ (native to indoor synthetic) to z+
         # extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32),  # y=z, z=x, x=y
@@ -250,6 +245,7 @@ if opt.export:
     if opt.export_format == 'monosdf':
         exporter.export_monosdf_fvp_mitsuba(
             split=opt.split, 
+            if_mask_from_mi=True, 
             format='monosdf',
             modality_list = [
                 'poses', 
@@ -260,6 +256,7 @@ if opt.export:
                 'mi_normal', 
                 'mi_depth', 
                 ], 
+            appendix=opt.export_appendix, 
             )
     if opt.export_format == 'fvp':
         exporter.export_monosdf_fvp_mitsuba(

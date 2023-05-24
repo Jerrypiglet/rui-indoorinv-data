@@ -2,7 +2,7 @@ from pathlib import Path, PosixPath
 import matplotlib.pyplot as plt
 import numpy as np
 np.set_printoptions(suppress=True)
-
+import pyhocon
 from tqdm import tqdm
 import pickle
 import trimesh
@@ -38,70 +38,72 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
     '''
     def __init__(
         self, 
+        CONF: pyhocon.config_tree.ConfigTree,  
         root_path_dict: dict, 
-        scene_params_dict: dict, 
         modality_list: list, 
-        modality_filename_dict: dict, 
-        im_params_dict: dict={'im_H_load': 480, 'im_W_load': 640, 'im_H_resize': 480, 'im_W_resize': 640}, 
-        cam_params_dict: dict={'near': 0.1, 'far': 10.}, 
-        BRDF_params_dict: dict={}, 
-        lighting_params_dict: dict={'env_row': 120, 'env_col': 160, 'SG_num': 12, 'env_height': 16, 'env_width': 32}, # params to load & convert lighting SG & envmap to 
-        shape_params_dict: dict={'if_load_mesh': True}, 
-        emitter_params_dict: dict={'N_ambient_rep': '3SG-SkyGrd'},
-        mi_params_dict: dict={'if_sample_rays_pts': True}, 
         if_debug_info: bool=False, 
         host: str='', 
+        device_id: int=-1, 
     ):
+        mitsubaBase.__init__(
+            self, 
+            CONF=CONF, 
+            host=host, 
+            device_id=device_id, 
+            parent_class_name=str(self.__class__.__name__), 
+            root_path_dict=root_path_dict, 
+            modality_list=modality_list, 
+            if_debug_info=if_debug_info, 
+        )
+        
         openroomsScene2D.__init__(
             self, 
-            if_debug_info = if_debug_info, 
-            root_path_dict = root_path_dict, 
-            scene_params_dict = scene_params_dict, 
-            cam_params_dict = cam_params_dict, 
-            modality_list = list(set(modality_list)), 
-            modality_filename_dict=modality_filename_dict, 
-            im_params_dict = im_params_dict, 
-            BRDF_params_dict = BRDF_params_dict, 
-            lighting_params_dict = lighting_params_dict, 
+            CONF=CONF, 
+            root_path_dict=root_path_dict, 
+            modality_list=list(set(modality_list)), 
+            if_debug_info=if_debug_info, 
+            host=host, 
+            device_id=device_id, 
+            if_not_load_modalities=True, 
         )
+        
+        
         self.host = host
         self.device = get_device(self.host)
 
-        self.shape_params_dict = shape_params_dict
-        self.emitter_params_dict = emitter_params_dict
-        self.mi_params_dict = mi_params_dict
-        variant = mi_params_dict.get('variant', '')
-        mi.set_variant(variant if variant != '' else mi_variant_dict[self.host])
-
-        if self.cam_params_dict.get('if_sample_poses', False): 
-            self.modality_list.append('mi') # need mi scene to sample poses
+        if self.CONF.cam_params_dict.get('if_sample_poses', False): 
+            # self.modality_list.append('mi') # need mi scene to sample poses
             self.modality_list.append('poses')
         self.modality_list = self.check_and_sort_modalities(list(set(self.modality_list)))
         self.shapes_root, self.layout_root, self.envmaps_root = get_list_of_keys(self.root_path_dict, ['shapes_root', 'layout_root', 'envmaps_root'], [PosixPath, PosixPath, PosixPath])
         self.xml_file = self.scene_xml_root / ('%s.xml'%self.meta_split.split('_')[0]) # load from one of [main, mainDiffLight, mainDiffMat]
-        self.monosdf_shape_dict = scene_params_dict.get('monosdf_shape_dict', {})
-        if '_shape_normalized' in self.monosdf_shape_dict:
-            assert self.monosdf_shape_dict['_shape_normalized'] in ['normalized', 'not-normalized'], 'Unsupported _shape_normalized indicator: %s'%_shape_normalized
 
         self.pcd_color = None
+        self.if_loaded_shapes = False
+        self.if_loaded_layout = False
+
+        self.near = self.CONF.cam_params_dict.get('near', 0.1)
+        self.far = self.CONF.cam_params_dict.get('far', 10.)
 
         '''
         load everything
         '''
         if 'poses' in self.modality_list:
-            self.load_poses(self.cam_params_dict) # attempt to generate poses indicated in cam_params_dict
+            self.load_poses() # attempt to generate poses indicated in cam_params_dict
         if hasattr(self, 'pose_list'): 
-            self.load_cam_rays(self.cam_params_dict)
-        if 'mi' in self.modality_list:
-            mitsubaBase.__init__(
-                self, 
-                device = self.device, 
-            )
+            self.get_cam_rays()
+
+        self.load_mi_scene()
+
+        if self.CONF.mi_params_dict.get('process_mi_scene', True):
+            self.process_mi_scene(if_postprocess_mi_frames=hasattr(self, 'pose_list'))
+        
+        openroomsScene2D.load_modalities(self)
         self.load_modalities_3D()
 
     @property
     def valid_modalities_3D(self):
-        return ['layout', 'shapes', 'mi']
+        return ['layout', 'shapes', 'tsdf']
 
     @property
     def valid_modalities(self):
@@ -113,19 +115,12 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
     @property
     def if_has_mitsuba_scene(self):
-        return all([_ in self.modality_list for _ in ['mi']])
-
-    @property
-    def if_has_mitsuba_rays_pts(self):
-        return 'mi' in self.modality_list and self.mi_params_dict['if_sample_rays_pts']
-
-    @property
-    def if_has_mitsuba_segs(self):
-        return 'mi' in self.modality_list and self.mi_params_dict['if_get_segs']
+        # return all([_ in self.modality_list for _ in ['mi']])
+        return True
 
     @property
     def if_has_mitsuba_all(self):
-        return all([self.if_has_mitsuba_scene, self.if_has_mitsuba_rays_pts, self.if_has_mitsuba_segs, ])
+        return all([self.if_has_mitsuba_scene, self.if_has_mitsuba_rays_pts, self.if_has_mitsuba_segs])
 
     @property
     def if_has_colors(self):
@@ -134,8 +129,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
     def load_modalities_3D(self):
         for _ in self.modality_list:
             if _ == 'layout': self.load_layout()
-            if _ == 'shapes': self.load_shapes(self.shape_params_dict) # shapes of 1(i.e. furniture) + emitters
-            if _ == 'mi': self.load_mi(self.mi_params_dict)
+            if _ == 'shapes': self.load_shapes() # shapes of 1(i.e. furniture) + emitters
+            if _ == 'tsdf': self.load_tsdf()
+            if _ == 'mi': self.load_mi_scene()
 
     def get_modality(self, modality, source: str='GT'):
         if modality in super().valid_modalities:
@@ -154,7 +150,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         else:
             assert False, 'Unsupported modality: ' + modality
 
-    def load_mi(self, mi_params_dict={}, if_postprocess_mi_frames=True):
+    def load_mi_scene(self, if_postprocess_mi_frames=True):
         '''
         load scene representation into Mitsuba 3
         '''
@@ -162,111 +158,52 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         if_also_dump_xml_with_lit_area_lights_only = False
 
-        if hasattr(self, 'mi_scene'): 
-            pass
-        else:
-            if self.monosdf_shape_dict != {}:
-                self.load_monosdf_scene()
-            else:
-                # if_also_dump_xml_with_lit_area_lights_only = mi_params_dict.get('if_also_dump_xml_with_lit_area_lights_only', True)
-                self.mi_xml_dump_path = dump_OR_xml_for_mi(
-                    str(self.xml_file), 
-                    shapes_root=self.shapes_root, 
-                    layout_root=self.layout_root, 
-                    envmaps_root=self.envmaps_root, 
-                    xml_dump_dir=xml_dump_dir, 
-                    if_no_emitter_shape=False, 
-                    if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only, 
-                    )
-                print(blue_text('[%s][load_mi] XML for Mitsuba dumped to: %s')%(str(self.__class__.__name__), str(self.mi_xml_dump_path)))
-                
-                '''
-                tools for fixing broken meshes
-                '''
-                # for _, shape in enumerate(self.shape_list_ori):
-                #     shape_file = Path(shape['filename'])
-                #     print(_, shape_file)
-                #     shape_scene_dict = {
-                #         'type': 'scene',
-                #         'shape_id': {
-                #             'type': shape_file.suffix[1:],
-                #             'filename': str(shape_file), 
-                #         }
-                #     }
-                #     _ = mi.load_dict(shape_scene_dict)
-                # ff = '/Users/jerrypiglet/Documents/Projects/data/uv_mapped/03211117/d0959256c79f60872a9c9a7e9520eea/alignedNew.obj'
-                # mesh = load_trimesh(ff)
-                # trimesh.repair.fix_normals(mesh)
-                # mesh.export(ff)
+        self.mi_xml_dump_path = dump_OR_xml_for_mi(
+            str(self.xml_file), 
+            shapes_root=self.shapes_root, 
+            layout_root=self.layout_root, 
+            envmaps_root=self.envmaps_root, 
+            xml_dump_dir=xml_dump_dir, 
+            if_no_emitter_shape=False, 
+            if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only, 
+            )
+        print(blue_text('[%s][load_mi] XML for Mitsuba dumped to: %s')%(str(self.__class__.__name__), str(self.mi_xml_dump_path)))
+        
+        '''
+        tools for fixing broken meshes
+        '''
+        self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
 
-                self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
-                # if if_also_dump_xml_with_lit_area_lights_only:
-                #     self.mi_scene_lit_up_area_lights_only = mi.load_file(str(self.mi_xml_dump_path).replace('.xml', '_lit_up_area_lights_only.xml'))
-
-                debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
-                if debug_dump_mesh:
-                    '''
-                    images/demo_mitsuba_dump_meshes.png
-                    '''
-                    mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
-                    self.dump_mi_meshes(self.mi_scene, mesh_dump_root=mesh_dump_root)
-
-                debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
-                if debug_render_test_image:
-                    '''
-                    images/demo_mitsuba_render.png
-                    '''
-                    print(blue_text('Rendering... test frame by Mitsuba: %s')%str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'))
-                    image = mi.render(self.mi_scene, spp=64)
-                    mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.png'), image)
-                    mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'), image)
-                    # if if_also_dump_xml_with_lit_area_lights_only:
-                    #     image = mi.render(self.mi_scene_lit_up_area_lights_only, spp=64)
-                    #     mi.util.write_bitmap(str(self.PATH_HOME / 'mitsuba' / 'tmp_render_lit_up_area_lights_only.exr'), image)
-
-                    print(blue_text('DONE.'))
-
-        if if_postprocess_mi_frames:
-            if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
-            if if_sample_rays_pts and not self.pts_from['mi'] and hasattr(self, 'cam_rays_list'):
-                self.mi_sample_rays_pts(self.cam_rays_list)
-                self.pts_from['mi'] = True
-
-            if_get_segs = mi_params_dict.get('if_get_segs', True)
-            if if_get_segs and not self.seg_from['mi']:
-                assert if_sample_rays_pts
-                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only)
-                self.seg_from['mi'] = True
-
-    def load_poses(self, cam_params_dict={}):
+    def load_poses(self):
         '''
         pose_list: list of pose matrices (**camera-to-world** transformation), each (3, 4): [R|t] (OpenCV convention: right-down-forward)
         '''
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
-        if not self.if_loaded_shapes: self.load_shapes(self.shape_params_dict)
-        if not hasattr(self, 'mi_scene'): self.load_mi(self.mi_params_dict, if_postprocess_mi_frames=False)
+        if not self.if_loaded_shapes: self.load_shapes()
+        if not hasattr(self, 'mi_scene'): self.load_mi_scene(if_postprocess_mi_frames=False)
 
         if_resample = 'n'
-        if cam_params_dict.get('if_sample_poses', False):
+        if self.CONF.cam_params_dict.get('if_sample_poses', False):
             if_resample = 'y'
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. Resample pose? [y/n]"))
             if self.pose_file.exists():
                 if_resample = input(red('pose file exists: %s (%d poses). Resample pose? [y/n]'%(str(self.pose_file), len(read_cam_params_OR(self.pose_file)))))
             if not if_resample in ['N', 'n']:
-                self.sample_poses(cam_params_dict.get('sample_pose_num'))
+                self.sample_poses(self.CONF.cam_params_dict.get('sample_pose_num'))
                 return
         
         if if_resample in ['N', 'n']:
-            openroomsScene2D.load_poses(self, cam_params_dict)
+            openroomsScene2D.load_poses(self, self.CONF.cam_params_dict)
 
-    def load_cam_rays(self, cam_params_dict={}):
-        self.near = cam_params_dict.get('near', 0.1)
-        self.far = cam_params_dict.get('far', 7.)
+    def get_cam_rays(self):
+        # self.near = self.CONF.cam_params_dict.get('near', 0.1)
+        # self.far = self.CONF.cam_params_dict.get('far', 7.)
+        if hasattr(self, 'cam_rays_list'):  return
         self.cam_rays_list = self.get_cam_rays_list(self.H, self.W, [self.K]*len(self.pose_list), self.pose_list, convention='opencv')
 
-    def load_shapes(self, shape_params_dict={}):
+    def load_shapes(self, force: bool=False):
         '''
         load and visualize shapes (objs/furniture **& emitters**) in 3D & 2D: 
 
@@ -279,29 +216,34 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         mitsubaBase._init_shape_vars(self)
 
-        if self.monosdf_shape_dict != {}:
-            self.load_monosdf_shape(shape_params_dict=shape_params_dict)
-            self.shape_name_full = self.scene_name_full + '--' + Path(self.monosdf_shape_dict['shape_file']).stem
+        # if self.monosdf_shape_dict != {}:
+        #     self.load_monosdf_shape(shape_params_dict=shape_params_dict)
+        #     self.shape_name_full = self.scene_name_full + '--' + Path(self.monosdf_shape_dict['shape_file']).stem
+        # else:
+        if self.has_shape_file:
+            # load single shape from self.shape_file_path
+            print(yellow('[%s] load_shapes from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
+            self.load_single_shape(shape_params_dict=self.CONF.shape_params_dict, force=force)
         else:
-            self.shape_name_full = self.scene_name_full
-            if_load_obj_mesh = shape_params_dict.get('if_load_obj_mesh', True)
-            if_load_emitter_mesh = shape_params_dict.get('if_load_emitter_mesh', False)
+
+            if_load_obj_mesh = self.CONF.shape_params_dict.get('if_load_obj_mesh', True)
+            if_load_emitter_mesh = self.CONF.shape_params_dict.get('if_load_emitter_mesh', False)
             print(white_blue('[openroomsScene3D] load_shapes for scene...'))
 
-            if_sample_pts_on_mesh = shape_params_dict.get('if_sample_pts_on_mesh', False)
-            sample_mesh_ratio = shape_params_dict.get('sample_mesh_ratio', 1.)
-            sample_mesh_min = shape_params_dict.get('sample_mesh_min', 100)
-            sample_mesh_max = shape_params_dict.get('sample_mesh_max', 1000)
+            if_sample_pts_on_mesh = self.CONF.shape_params_dict.get('if_sample_pts_on_mesh', False)
+            sample_mesh_ratio = self.CONF.shape_params_dict.get('sample_mesh_ratio', 1.)
+            sample_mesh_min = self.CONF.shape_params_dict.get('sample_mesh_min', 100)
+            sample_mesh_max = self.CONF.shape_params_dict.get('sample_mesh_max', 1000)
 
-            if_simplify_mesh = shape_params_dict.get('if_simplify_mesh', False)
-            simplify_mesh_ratio = shape_params_dict.get('simplify_mesh_ratio', 1.)
-            simplify_mesh_min = shape_params_dict.get('simplify_mesh_min', 100)
-            simplify_mesh_max = shape_params_dict.get('simplify_mesh_max', 1000)
-            if_remesh = shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
-            remesh_max_edge = shape_params_dict.get('remesh_max_edge', 0.1)
+            if_simplify_mesh = self.CONF.shape_params_dict.get('if_simplify_mesh', False)
+            simplify_mesh_ratio = self.CONF.shape_params_dict.get('simplify_mesh_ratio', 1.)
+            simplify_mesh_min = self.CONF.shape_params_dict.get('simplify_mesh_min', 100)
+            simplify_mesh_max = self.CONF.shape_params_dict.get('simplify_mesh_max', 1000)
+            if_remesh = self.CONF.shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
+            remesh_max_edge = self.CONF.shape_params_dict.get('remesh_max_edge', 0.1)
 
             # load emitter properties from light*.dat files of **a specific N_ambient_representation**
-            self.emitter_dict_of_lists_world = load_emitter_dat_world(light_dir=self.scene_rendering_path, N_ambient_rep=self.emitter_params_dict['N_ambient_rep'], if_save_storage=self.if_save_storage)
+            self.emitter_dict_of_lists_world = load_emitter_dat_world(light_dir=self.scene_rendering_path, N_ambient_rep=self.CONF.emitter_params_dict['N_ambient_rep'], if_save_storage=self.if_save_storage)
 
             # load general shapes and emitters, and fuse with previous emitter properties
             # print(main_xml_file)
@@ -347,7 +289,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             #         obj_path = shape_dict['filename']
                 else:
                     obj_path = shape_dict['filename']
-                    
 
                 bbox_file_path = obj_path.replace('.obj', '.pickle')
                 if 'layoutMesh' in bbox_file_path:
@@ -369,6 +310,16 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                         Path(bbox_file_path).parent.mkdir(parents=True, exist_ok=True)
                         with open(bbox_file_path, "wb") as f:
                             pickle.dump(dict(bverts=bverts, bfaces=bfaces), f)
+                    
+                    '''
+                    printing shape info
+                    '''
+                    # print('---', _id, obj_path)
+                    # self.load_colors()
+                    # cat_id_str = str(obj_path).split('/')[-3]
+                    # if cat_id_str in self.OR_mapping_cat_str_to_id_name_dict:
+                    #     cat_id, cat_name = self.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
+                    #     print(cat_id, cat_name)
                     
                     # --a bunch of fixes if broken meshes; SLOW--
                     _ = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
@@ -407,7 +358,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 # if not(any(ext in shape_dict['filename'] for ext in ['window', 'door', 'lamp'])):
 
                 is_layout = 'layoutMesh' in str(obj_path) or 'uv_mapped.obj' in str(obj_path)
-                shape_dict.update({'is_wall': is_layout, 'is_ceiling': is_layout, 'is_layout': is_layout})
+                shape_dict.update({'is_wall': False, 'is_ceiling': False, 'is_layout': is_layout})
                     # 'is_wall': 'wall' in _id.lower(), 
                     # 'is_ceiling': 'ceiling' in _id.lower(), 
                     # 'is_layout': 'wall' in _id.lower() or 'ceiling' in _id.lower(), 
@@ -462,7 +413,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
         if self.if_loaded_layout: return
         print(white_blue('[openroomsScene3D] load_layout for scene...'))
-
         self.layout_obj_file = self.layout_root / self.scene_name_short / 'uv_mapped.obj'
         self.layout_mesh_ori = load_trimesh(self.layout_obj_file) # returns a Trimesh object; [!!!] 0-index faces
         # mesh = mesh.dump()[0]
@@ -501,6 +451,12 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         print(blue_text('[%s] DONE. load_layout'%self.parent_class_name))
 
         self.if_loaded_layout = True
+        
+
+        self.ceiling_loc = np.amax(self.layout_box_3d_transformed, axis=0)[1]
+        self.floor_loc = np.amin(self.layout_box_3d_transformed, axis=0)[1]
+        assert (self.ceiling_loc - self.floor_loc) - room_height < 1e-4
+        self.if_has_ceilling_floor = True
 
     def load_colors(self):
         '''

@@ -185,8 +185,34 @@ class mitsubaBase(scene2DBase):
     @property
     def if_has_layout(self):
         return all([_ in self.modality_list for _ in ['layout']])
+    
+    def load_mi_scene_from_shape(self, input_extra_transform_homo: bool=None, shape_file_path: str=''):
+        if shape_file_path == '':
+            shape_file_path = self.shape_file_path
+            
+        print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(shape_file_path))
+        self.shape_id_dict = {
+            'type': shape_file_path.suffix[1:],
+            'filename': str(shape_file_path), 
+            }
+        
+        _T = np.eye(4, dtype=np.float32)
+        if input_extra_transform_homo is not None:
+            _T = input_extra_transform_homo @ _T
+            
+        if self._if_T and not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
+            _T = self._T_homo @ _T
+                
+        if not np.allclose(_T, np.eye(4, dtype=np.float32)):
+            self.shape_id_dict['to_world'] = mi.ScalarTransform4f(_T)        
+        
+        self.mi_scene = mi.load_dict({
+            'type': 'scene',
+            'shape_id': self.shape_id_dict, 
+        })
 
-    def process_mi_scene(self, if_postprocess_mi_frames=True, force=False):
+
+    def process_mi_scene(self, if_postprocess_mi_frames=True, if_seg_emitter=False, force=False):
         '''
         debug_render_test_image: render test image
         debug_dump_mesh: dump all shapes into meshes
@@ -224,7 +250,7 @@ class mitsubaBase(scene2DBase):
             if_get_segs = self.CONF.mi_params_dict.get('if_get_segs', True)
             if if_get_segs:
                 assert if_sample_rays_pts
-                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
+                self.mi_get_segs(if_seg_emitter=if_seg_emitter)
                 self.seg_from['mi'] = True
 
     def get_cam_rays_list(self, H_list: list, W_list: list, K_list: list, pose_list: list, convention: str='opencv'):
@@ -365,7 +391,7 @@ class mitsubaBase(scene2DBase):
         self.xyz_min = np.minimum(np.amin(shape_dict['vertices'], axis=0), self.xyz_min)
 
 
-    def mi_get_segs(self, if_also_dump_xml_with_lit_area_lights_only=True, if_dump=True, if_seg_emitter=True):
+    def mi_get_segs(self, if_seg_emitter=True):
         '''
         images/demo_mitsuba_ret_seg_2D.png; 
         Update:

@@ -742,7 +742,7 @@ class visualizer_scene_3D_o3d(object):
         if not if_ceiling:
             assert self.os.if_has_ceilling_floor, 'scene object has no detected ceiling/floor; did you load_layout for XML-based scene, or detect ceiling/floor for shape-based scene?'
         if_walls = shapes_params.get('if_walls', False)
-
+        
         exclude_obj_id_list = shapes_params.get('exclude_obj_id_list', [])
 
         mesh_color_type = shapes_params.get('mesh_color_type', 'obj_color')
@@ -772,15 +772,19 @@ class visualizer_scene_3D_o3d(object):
             #     continue
             # else:
             obj_path = shape_dict['filename']
-            if 'uv_mapped.obj' in obj_path and not(if_ceiling and if_walls):
-                continue # skipping layout as an object
+            # print(obj_path)
+            # if 'uv_mapped.obj' in obj_path and not(if_ceiling and if_walls):
+            #     continue # skipping layout as an object
             # if shape_dict['random_id'] in emitters_obj_random_id_list and not if_emitter: # SKIP emitters
             #     continue # skip shape if it is also in the list as an emitter (so that we don't create two shapes for one emitters)
             # print(_id, if_walls, shape_dict.get('is_wall', False))
             if not if_walls and shape_dict.get('is_wall', False): 
-                # print('!!!!!!', _id, shape_dict['filename']); 
+                print(yellow('[%s] -> collect_shapes: skipped wall'%self.__class__.__name__), _id, shape_dict['filename']); 
                 continue
-            if not if_ceiling and shape_dict.get('is_ceiling', False): continue
+            if not if_ceiling and shape_dict.get('is_ceiling', False): 
+                print(yellow('[%s] -> collect_shapes: skipped ceiling'%self.__class__.__name__), _id, shape_dict['filename']); 
+                continue
+            
             if _id in exclude_obj_id_list: 
                 print(yellow('[%s] Skipped: %s, in exclude_obj_id_list'%(str(self.__class__.__name__), _id)))
                 continue
@@ -828,13 +832,12 @@ class visualizer_scene_3D_o3d(object):
                     import ipdb; ipdb.set_trace()
                 assert np.amax(faces-1) < vertices.shape[0]
 
-                # shape_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based # Trimesh does not support non-mesh (e.g. triangle soup) well
-                # shape_mesh = shape_mesh.as_open3d
                 if not if_ceiling:
                     axis_up = self.os.axis_up
                     vertices_valid_mask = ~remove_ceiling(vertices, self.os.ceiling_loc, self.os.floor_loc, axis_up=axis_up, if_debug_info=True, debug_info_str=_id)
-                    faces_mask = np.all(vertices_valid_mask.reshape(-1)[faces-1], axis=1) # (N_total_faces,), bool
-                    faces = faces[faces_mask] # (faces_emitters, 3), int, containing 1-based vertex indexes
+                    if np.sum(vertices_valid_mask) > 0:
+                        faces_mask = np.any(vertices_valid_mask.reshape(-1)[faces-1], axis=1) # (N_total_faces,), bool
+                        faces = faces[faces_mask] # (faces_emitters, 3), int, containing 1-based vertex indexes
 
                 shape_mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(vertices), o3d.utility.Vector3iVector(faces-1))
                 shape_mesh.compute_vertex_normals()
@@ -1089,7 +1092,7 @@ class visualizer_scene_3D_o3d(object):
         if_pts_colorize_rgb = mi_params.get('if_pts_colorize_rgb', True)
         if_ceiling = mi_params.get('if_ceiling', True)
         if_walls = mi_params.get('if_walls', True)
-
+        
         if_normal = mi_params.get('if_normal', True)
         normal_subsample = mi_params.get('normal_subsample', 10)
         normal_scale = mi_params.get('normal_scale', 0.2)

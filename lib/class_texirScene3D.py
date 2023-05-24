@@ -239,41 +239,6 @@ class texirScene3D(mitsubaBase, scene2DBase):
             'shape_id': shape_id_dict, 
         })
 
-    def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True, force=False):
-        debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
-        if debug_render_test_image:
-            '''
-            images/demo_mitsuba_render.png
-            '''
-            test_rendering_path = self.PATH_HOME / 'mitsuba' / 'tmp_render.exr'
-            print(blue_text('Rendering... test frame by Mitsuba: %s')%str(test_rendering_path))
-            if self.mi_scene.integrator() is None:
-                print(yellow('No integrator found in the scene. Skipped: debug_render_test_image'))
-            else:
-                image = mi.render(self.mi_scene, spp=16)
-                mi.util.write_bitmap(str(test_rendering_path), image)
-                print(blue_text('DONE.'))
-
-        debug_dump_mesh = mi_params_dict.get('debug_dump_mesh', False)
-        if debug_dump_mesh:
-            '''
-            images/demo_mitsuba_dump_meshes.png
-            '''
-            mesh_dump_root = self.PATH_HOME / 'mitsuba' / 'meshes_dump'
-            self.dump_mi_meshes(self.mi_scene, mesh_dump_root)
-
-        if if_postprocess_mi_frames:
-            if_sample_rays_pts = mi_params_dict.get('if_sample_rays_pts', True)
-            if if_sample_rays_pts:
-                self.mi_sample_rays_pts(self.cam_rays_list, if_force=force)
-                self.pts_from['mi'] = True
-            
-            if_get_segs = mi_params_dict.get('if_get_segs', True)
-            if if_get_segs:
-                assert if_sample_rays_pts
-                self.mi_get_segs(if_also_dump_xml_with_lit_area_lights_only=True)
-                self.seg_from['mi'] = True
-                
     def load_poses(self):
         print(white_blue('[%s] load_poses from %s'%(self.parent_class_name, str(self.pose_file_path))))
 

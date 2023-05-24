@@ -83,7 +83,7 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
         if hasattr(self, 'pose_list'): 
             self.get_cam_rays()
         if hasattr(self, 'mi_scene'):
-            self.process_mi_scene(if_postprocess_mi_frames=hasattr(self, 'pose_list'))
+            self.process_mi_scene(if_postprocess_mi_frames=hasattr(self, 'pose_list'), if_seg_emitter=False) # we have no idea of the emitter due to no XML scene file
 
         self.load_modalities()
 
@@ -92,9 +92,13 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
         return len(self.frame_id_list)
     
     @property
+    def frame_num_all(self):
+        return len(self.frame_id_list)
+    
+    @property
     def scene_path(self):
         scene_path = self.dataset_root / self.scene_name if self.split == 'train' else self.dataset_root / self.scene_name / 'val'
-        assert scene_path.exists(), 'scene path does not exist: %s'%str(self.scene_path)
+        assert scene_path.exists(), 'scene path does not exist: %s'%str(scene_path)
         return scene_path
 
     @property
@@ -158,11 +162,13 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
             return self.kd_list
         elif modality == 'ks': 
             return self.ks_list
-        # elif modality == 'mi_normal': 
-        #     return self.mi_normal_global_list
-        # elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
-        #     seg_key = modality.split('_')[-1] 
-        #     return self.mi_seg_dict_of_lists[seg_key] # Set scene_obj->self.CONF.mi_params_dict={'if_get_segs': True
+        elif modality == 'mi_depth': 
+            return self.mi_depth_list
+        elif modality == 'mi_normal': 
+            return self.mi_normal_global_list
+        elif modality in ['mi_seg_area', 'mi_seg_env', 'mi_seg_obj']:
+            seg_key = modality.split('_')[-1] 
+            return self.mi_seg_dict_of_lists[seg_key] # Set scene_obj->self.CONF.mi_params_dict={'if_get_segs': True
         else:
             assert False, 'Unsupported modality: ' + modality
 
@@ -211,8 +217,8 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
             assert abs(intrinsics[0][2]*2 - self.im_W_load) < 1., 'intrinsics->H/2. (%.2f) does not match self.im_W_load: (%d); resize intrinsics needed?'%(intrinsics[0][2]*2, self.im_W_load)
             assert abs(intrinsics[1][2]*2 - self.im_H_load) < 1., 'intrinsics->W/2. (%.2f) does not match self.im_H_load: (%d); resize intrinsics needed?'%(intrinsics[1][2]*2, self.im_H_load)
             
-            self.K_list.append(intrinsics.astype(np.float32))
-            self.pose_list.append(pose.astype(np.float32))
+            self.K_list.append(intrinsics.astype(np.float32)[:3, :3])
+            self.pose_list.append(pose.astype(np.float32)[:3, :4])
 
             R = pose[:3, :3].astype(np.float32)
             t = pose[:3, 3:4].astype(np.float32)
@@ -255,26 +261,7 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
             shape_file_path = self.shape_file_path
 
         if shape_file_path != '':
-            print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(shape_file_path))
-            self.shape_id_dict = {
-                'type': shape_file_path.suffix[1:],
-                'filename': str(shape_file_path), 
-                }
-            
-            _T = np.eye(4, dtype=np.float32)
-            if input_extra_transform_homo is not None:
-                _T = input_extra_transform_homo @ _T
-                
-            if self._if_T and not self.CONF.scene_params_dict.get('if_reorient_y_up_skip_shape', False):
-                _T = self._T_homo @ _T
-                    
-            if not np.allclose(_T, np.eye(4, dtype=np.float32)):
-                self.shape_id_dict['to_world'] = mi.ScalarTransform4f(_T)        
-            
-            self.mi_scene = mi.load_dict({
-                'type': 'scene',
-                'shape_id': self.shape_id_dict, 
-            })
+            self.load_mi_scene_from_shape(input_extra_transform_homo=input_extra_transform_homo, shape_file_path=shape_file_path)
         else:
             # xml file always exists for Mitsuba scenes
             # self.mi_scene = mi.load_file(str(self.xml_file_path))
@@ -360,6 +347,7 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
         '''
         normal, in camera coordinates (OpenGL convention: right-up-backward);
         (H, W, 3), [-1., 1.]
+        [!!!] provided normals are not acrually fully normalized... see pics below
         '''
         if hasattr(self, 'normal_list'): return
 
@@ -368,6 +356,14 @@ class i2sdfScene3D(mitsubaBase, scene2DBase):
         self.normal_file_list = [self.scene_rendering_path_list[frame_idx] / (self.CONF.modality_filename_dict['normal']%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
         expected_shape_list = [self.im_HW_load_list[_]+(3,) for _ in self.frame_id_list] if hasattr(self, 'im_HW_load_list') else [self.im_HW_load+(3,)]*self.frame_num
         self.normal_list = [load_img(normal_file, expected_shape=__, ext='exr', target_HW=self.im_HW_target).astype(np.float32) for normal_file, __ in zip(self.normal_file_list, expected_shape_list)] # -> [-1., 1.], pointing inward (i.e. notebooks/images/openrooms_normals.jpg)
-        self.normal_list = [normal / np.sqrt(np.maximum(np.sum(normal**2, axis=2, keepdims=True), 1e-5)) for normal in self.normal_list]
+        
+        '''
+        mask out areas with invalid normals: e.g. normal norm map (61 from bedroom): ![](https://i.imgur.com/hVhluye.png), ![](https://i.imgur.com/Uk9RvaQ.png)
+        '''
+        self.im_mask_list_extra = [np.abs(np.linalg.norm(normal, axis=-1)-1)<1e-3 for normal in self.normal_list]
+        if hasattr(self, 'im_mask_list'):
+            self.im_mask_list  = [np.logical_and(mask, mask_extra) for mask, mask_extra in zip(self.im_mask_list, self.im_mask_list_extra)]
+            
+        self.normal_list = [normal / (np.linalg.norm(normal, axis=-1, keepdims=True)+1e-6) for normal in self.normal_list]
         
         print(blue_text('[%s] DONE. load_normal'%self.__class__.__name__))

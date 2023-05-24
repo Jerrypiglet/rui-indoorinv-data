@@ -191,8 +191,7 @@ Adjust `spp` properly (e.g. 32 for fast rendering, 4096).
 
 Set `mitsubaScene3D(modality_list=['poses'])` in *load_mitsubaScene3D.py*.
 
-``` bash
-### HDR images with Mitsuba
+**Render HDR images with Mitsuba.**
 
 We choose to use Mitsuba to render HDR images (instead of Blender) because of some known issues with Blender rendering (@Liwen).
 
@@ -215,7 +214,7 @@ New files generated:
         └── %03d_0001.png # SDR images (gamma=2.2)
 ```
 
-Next we render **other modalities** with Blender.
+**Next we render other modalities with Blender.**
 
 First create a Blender scene file (`test.blend`) from the Mitsuba scene file (`test.xml`). See notes at the beginning of `class renderer_blender_mitsubaScene_3D`.
 
@@ -268,10 +267,10 @@ Synthetic dataset from [$I^2$-SDF](https://jingsenzhu.github.io/i2-sdf/). Datase
     - depth
     - normal
     - material
-      - %04d_kd.exr # diffuse albedo
-      - %04d_ks.exr # specular albedo
-      - %04d_roughness.exr # roughness
-    - image
+      - %04d_kd.exr         # diffuse albedo
+      - %04d_ks.exr         # specular albedo
+      - %04d_roughness.exr  # roughness
+    - imaeg
     - hdr
     - mask
     - light_mask
