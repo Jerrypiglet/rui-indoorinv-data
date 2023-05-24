@@ -5,6 +5,7 @@
 <!--ts-->
 - [Indoor Synthetic scenes for multi-view inverse rendering: rendering, load, visualize, and convert](#indoor-synthetic-scenes-for-multi-view-inverse-rendering-rendering-load-visualize-and-convert)
   - [Load preprocessed scenes](#load-preprocessed-scenes)
+  - [Export to MonoSDF format](#export-to-monosdf-format)
   - [From scratch🪄: scene rendering guide](#from-scratch-scene-rendering-guide)
     - [Firstly](#firstly)
     - [Prepare scene files](#prepare-scene-files)
@@ -36,33 +37,62 @@ We include one scene for demo: `kitchen_mi` from [Benedikt Bitterli](https://ben
 <!-- https://tree.nathanfriend.io -->
 
 <!-- - data/
-  - real/
+  - indoor_synthetic/
     - kitchen
-      - Image            # HDR images in .exr, SDR images in .png
-      - albedo           # material reflectance $\mathbf{a}'$ (See FIPT->Sec. 5.1)
-      - DiffCol          # diffuse reflectance $\mathbf{k}_d$ (See FIPT->Equ.1)
-      - IndexMA          # part segmentation
-      - Emit             # emission radiance
-      - Roughness        # roughness
-      - segmentation     # semantic segmentation
-      - train.npy        # Blender poses
-      - transforms.json  # poses in another format for FIPT -->
+      - models
+      - test.xml
+      - textures
+      - intrinsic_mitsubaScene.txt
+      - train
+        - Image            # HDR images in .exr, SDR images in .png
+        - albedo           # material reflectance $\mathbf{a}'$ (See FIPT->Sec. 5.1)
+        - DiffCol          # diffuse reflectance $\mathbf{k}_d$ (See FIPT->Equ.1)
+        - IndexMA          # part segmentation
+        - Emit             # emission radiance
+        - Roughness        # roughness
+        - segmentation     # semantic segmentation
+        - train.npy        # Blender poses
+        - transforms.json  # poses in another format for FIPT -->
 
 ```
 .
 └── data/
-    └── real/
+    └── indoor_synthetic/
         └── kitchen/
-            ├── Image            # HDR images in .exr, SDR images in .png
-            ├── albedo           # material reflectance $\mathbf{a}'$ (See FIPT->Sec. 5.1)
-            ├── DiffCol          # diffuse reflectance $\mathbf{k}_d$ (See FIPT->Equ.1)
-            ├── IndexMA          # part segmentation
-            ├── Emit             # emission radiance
-            ├── Roughness        # roughness
-            ├── segmentation     # semantic segmentation
-            ├── train.npy        # Blender poses
-            └── transforms.json  # poses in another format for FIPT
+            ├── models
+            ├── test.xml
+            ├── textures
+            ├── intrinsic_mitsubaScene.txt
+            └── train/
+                ├── Image            # HDR images in .exr, SDR images in .png
+                ├── albedo           # material reflectance $\mathbf{a}'$ (See FIPT->Sec. 5.1)
+                ├── DiffCol          # diffuse reflectance $\mathbf{k}_d$ (See FIPT->Equ.1)
+                ├── IndexMA          # part segmentation
+                ├── Emit             # emission radiance
+                ├── Roughness        # roughness
+                ├── segmentation     # semantic segmentation
+                ├── train.npy        # Blender poses
+                └── transforms.json  # poses in another format for FIPT
 ```
+
+To load the scene and view default modalities (e.g. poses, meshes from XML file, fused TSDF mesh), run:
+
+``` bash
+python load_mitsubaScene3D.py --scene kitchen_mi
+```
+
+## Export to MonoSDF format
+
+To export the scene into MonoSDF format (used in [customized MonoSDF repo (branch: fipt)](https://github.com/Jerrypiglet/monosdf/tree/fipt) for FIPT), 
+
+``` bash
+python load_mitsubaScene3D.py --scene kitchen_mi --export --export_format monosdf --export_appendix _fipt --split train --vis_3d_o3d False --force
+python load_mitsubaScene3D.py --scene kitchen_mi --export --export_format monosdf --export_appendix _fipt --split val --vis_3d_o3d False --force
+```
+
+Note that you will need to dump `train` first then `val`, so that `val` will re-use the normalization parameters from `train`.
+
+You will arrive at a folder at `indoor_synthetic/EXPORT_monosdf/kitchen_mi`. Link the folder to your customized MonoSDF repo project path (e;.g. `Projects/monosdf/data/indoor_synthetic/kitchen_mi`), and follow the scripts in the customized MonoSDF repo.
 
 ## From scratch🪄: scene rendering guide
 
@@ -232,6 +262,7 @@ python load_mitsubaScene3D.py --scene kitchen_mi --vis_2d_plt
 To visualize other modalities ([demo](https://i.imgur.com/24i0yjA.png)), set `mitsubaScene3D(modality_list` and `visualizer_scene_2D(modality_list_vis` to desired modalities, then run the same command.
 
 # Other datasets
+
 ### $I^2$-SDF
 Synthetic dataset from [$I^2$-SDF](https://jingsenzhu.github.io/i2-sdf/). Datasets can be downloaded from the project page (2 scenes by 04/12/2023; the convention is explained [here](https://github.com/jingsenzhu/i2-sdf/blob/main/DATA_CONVENTION.md)). [demo](images/demo_i2sdf.png)
 
@@ -250,7 +281,7 @@ Synthetic dataset from [$I^2$-SDF](https://jingsenzhu.github.io/i2-sdf/). Datase
     - cameras.npz # similar format to propossed MonoSDF poses
 
 ``` bash
-python load_i2sdfScene3D.py --vis_3d_o3d True --vis_2d_plt True
+python load_i2sdfScene3D.py --vis_3d_o3d True --vis_2d_plt False
 ```
 
 With additional `--eval_scene`, you can visualize [view coverage map](images/demo_i2sdf_viewcount.png).

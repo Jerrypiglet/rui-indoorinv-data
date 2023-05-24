@@ -271,7 +271,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        assert False, '[TODO] already exists in b mitsubaBase; check if anything is new here; otherwise remove this class'
+        assert False, '[TODO] already exists in mitsubaBase; check if anything is new here; otherwise remove this class'
         if hasattr(self, 'mi_scene') and not if_force:
             print('Mitsuba scene already loaded. Skip loading. (if_force=%s)'%if_force)
             return
@@ -299,7 +299,7 @@ class matterportScene3D(mitsubaBase, scene2DBase):
         self.mi_scene = mi.load_dict(scene_dict)
 
     def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True):
-        assert False, '[TODO] already exists in b mitsubaBase; check if anything is new here; otherwise remove this class'
+        assert False, '[TODO] already exists in mitsubaBase; check if anything is new here; otherwise remove this class'
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
             '''

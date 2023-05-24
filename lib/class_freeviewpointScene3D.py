@@ -240,7 +240,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        assert False, '[TODO] already exists in b mitsubaBase; check if anything is new here; otherwise remove this class'
+        assert False, '[TODO] already exists in mitsubaBase; check if anything is new here; otherwise remove this class'
         shape_id_dict = {
             'type': self.shape_file.suffix[1:],
             'filename': str(self.shape_file), 
@@ -254,7 +254,7 @@ class freeviewpointScene3D(mitsubaBase, scene2DBase):
         })
 
     def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True):
-        assert False, '[TODO] already exists in b mitsubaBase; check if anything is new here; otherwise remove this class'
+        assert False, '[TODO] already exists in mitsubaBase; check if anything is new here; otherwise remove this class'
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
             '''

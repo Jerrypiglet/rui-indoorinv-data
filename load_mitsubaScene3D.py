@@ -145,14 +145,13 @@ scene_obj = mitsubaScene3D(
         'im_hdr', 
         'im_sdr', 
         'poses', 
+        # 'lighting_envmap', 
+        # 'albedo', 'roughness', 
+        # 'emission', 
+        # 'depth', 'normal', 
         'shapes', # objs + emitters, geometry shapes + emitter properties``
         'layout', 
         'tsdf', 
-        # 'albedo', 'roughness', 
-        # 'emission', 
-        
-        # 'depth', 'normal', 
-        # 'lighting_envmap', 
         ], 
 )
 
@@ -338,8 +337,8 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             'poses', 
-            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
-            # 'layout', 
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            'layout', 
             'mi', # mitsuba sampled rays, pts
             'tsdf', 
             # 'dense_geo', # fused from 2D
@@ -407,12 +406,10 @@ if opt.vis_3d_o3d:
             'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
 
-            # 'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            # 'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            'if_ceiling': False, 
-            'if_walls': False, 
-            # 'if_ceiling': True, 
-            # 'if_walls': True, 
+            'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            # 'if_ceiling': False, 
+            # 'if_walls': False, 
 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]

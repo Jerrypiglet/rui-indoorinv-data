@@ -201,7 +201,7 @@ class simpleScene3D(mitsubaBase, scene2DBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        assert False, '[TODO] already exists in b mitsubaBase; check if anything is new here; otherwise remove this class'
+        assert False, '[TODO] already exists in mitsubaBase; check if anything is new here; otherwise remove this class'
         if self.scene_params_dict.get('shape_file', '') == '':
             print(yellow('No shape file specified/found. Skip loading MI scene.'))
             return
@@ -217,7 +217,7 @@ class simpleScene3D(mitsubaBase, scene2DBase):
         })
 
     def process_mi_scene(self, mi_params_dict={}, if_postprocess_mi_frames=True, force=False):
-        assert False, '[TODO] already exists in b mitsubaBase; check if anything is new here; otherwise remove this class'
+        assert False, '[TODO] already exists in mitsubaBase; check if anything is new here; otherwise remove this class'
         debug_render_test_image = mi_params_dict.get('debug_render_test_image', False)
         if debug_render_test_image:
             '''
