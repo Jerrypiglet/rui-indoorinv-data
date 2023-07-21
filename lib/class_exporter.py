@@ -676,9 +676,9 @@ class exporter_scene():
                     mi_depth = self.os.mi_depth_list[frame_idx].squeeze()
                     
                     prediction = mi_depth.copy()
-                    prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = 0.5
+                    prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = np.median(~prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()])
 
-                    # print(np.amax(prediction), np.amin(prediction))
+                    print('+++', np.amax(prediction), np.amin(prediction))
  
                     prediction_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                     prediction = center_crop(prediction, center_crop_HW)
