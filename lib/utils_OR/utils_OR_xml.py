@@ -256,19 +256,22 @@ def parse_XML_for_shapes_global(root, root_uv_mapped, root_layoutMesh, scene_xml
         assert len(light_dat_lists['windows']) == 0, scene_name_frame_id_str
         assert len(light_dat_lists['objs']) == 0, scene_name_frame_id_str
 
-    # ===== Post-process to merge lamp light and lamp base into a new mesh --write to-> emitter_dict['emitter_prop']['combined_filename']
+    # ===== Post-process emitters_list to merge lamp light and lamp base into a new mesh --write to-> emitter_dict['emitter_prop']['combined_filename']
     for idx, emitter_dict in enumerate(emitters_list[1:]):
         emitter_filename_abs = str(Path(root_uv_mapped) / emitter_dict['filename'].split('uv_mapped/')[1])
 
         # already using merged/single CAD model
         if 'aligned_light.obj' not in emitter_dict['filename']:
             emitter_dict['emitter_prop']['combined_filename'] = str(emitter_filename_abs)
-            emitter_dict['emitter_prop']['emitter_filename'] = str(emitter_filename_abs)
+            # emitter_dict['emitter_prop']['emitter_filename'] = str(emitter_filename_abs)
             emitter_dict['emitter_prop']['emitter_part_random_id'] = emitter_dict['random_id']
             continue
 
         if_found_emitter, if_found_base = False, False
         for shape_dict in shapes_list:  # look for the light ``base`` obj
+            '''
+            found the base obj in shapes_list
+            '''
             if emitter_dict['filename'].replace('aligned_light.obj', 'aligned_shape.obj') == shape_dict['filename']:
                 if_found_base = True
                 combined_filename_abs = Path(str(emitter_filename_abs).replace(
@@ -288,11 +291,15 @@ def parse_XML_for_shapes_global(root, root_uv_mapped, root_layoutMesh, scene_xml
                     print('NEW mesh written to %s' %
                           str(combined_filename_abs))
                 emitter_dict['emitter_prop']['combined_filename'] = str(combined_filename_abs)
+                
+            '''
+            found the emitter part (i.e. aligned_light.obj) in shapes_list
+            '''
             if emitter_dict['filename'] == shape_dict['filename']:
                 if_found_emitter = True
-                emitter_dict['emitter_prop']['emitter_filename'] = str(emitter_filename_abs)
+                # emitter_dict['emitter_prop']['emitter_filename'] = str(emitter_filename_abs)
                 emitter_dict['emitter_prop']['emitter_part_random_id'] = shape_dict['random_id']
-                emitter_dict['emitter_prop']['emitter_part_obj_dict'] = shape_dict
+                # emitter_dict['emitter_prop']['emitter_part_obj_dict'] = shape_dict
         assert if_found_emitter and if_found_base, 'Not both base and emitter are found!'
 
     # === re-order shapes_list to have 0.endswith('uv_mapped.obj'), 1.endswith('container.obj')

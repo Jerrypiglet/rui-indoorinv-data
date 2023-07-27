@@ -72,7 +72,7 @@ parser.add_argument('--export_format', type=str, default='monosdf', help='')
 parser.add_argument('--export_appendix', type=str, default='', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
-# === after refactorization
+# SPECIFY scene HERE!
 parser.add_argument('--scene', type=str, default='mainDiffLight_xml1-scene0552_00', help='load conf file: confs/openrooms/\{opt.scene\}.conf')
 
 opt = parser.parse_args()
@@ -105,6 +105,8 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 # scene_name = 'scene0552_00_more'
 # frame_id_list = [0, 11, 10, 64, 81]
 # + list(range(5, 87, 10))
+
+frame_id_list = [5]
 
 '''
 update confs
@@ -149,18 +151,19 @@ scene_obj = openroomsScene3D(
         }, 
     modality_list = [
         'im_sdr', 
-        'im_hdr', 
+        # 'im_hdr', 
         'poses', 
-        'seg', 
-        'albedo', 'roughness', 
+        # 'seg', 
+        # 'albedo', 'roughness', 
         # 'depth', 'normal',
         # 'matseg', 
+        # 'semseg', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
         
-        'layout', 
+        # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
-        'tsdf', 
+        # 'tsdf', 
         'mi', # mitsuba scene, loading from scene xml file
         ], 
 )
@@ -306,10 +309,11 @@ if opt.vis_2d_plt:
             # 'shapes', 
             # 'albedo', 
             # 'roughness', 
-            'depth', 
-            'normal', 
-            'mi_depth', 
-            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            'semseg', 
+            # 'depth', 
+            # 'normal', 
+            # 'mi_depth', 
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', 
             # 'seg_area', 'seg_env', 'seg_obj', 
@@ -363,10 +367,10 @@ if opt.vis_3d_o3d:
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
-            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             # 'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
-            'tsdf', 
+            # 'tsdf', 
             ], 
         if_debug_info=opt.if_debug_info, 
     )
@@ -466,13 +470,14 @@ if opt.vis_3d_o3d:
         shapes_params={
             'simply_mesh_ratio_vis': 0.1, # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # if show meshes for objs + emitters (False: only show bboxes)
-            'if_labels': False, # if show labels (False: only show bboxes)
+            'if_labels': True, # if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png
             'if_ceiling': False, # remove ceiling **triangles** to better see the furniture 
-            # 'if_walls': False, # remove wall **triangles** to better see the furniture 
             # 'if_ceiling': True, 
-            'if_walls': True, 
-            'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
+            'if_walls': False, # remove wall **triangles** to better see the furniture 
+            # 'if_walls': True, 
+            # 'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
+            'mesh_color_type': 'obj_color', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
         },
         emitter_params={
             'if_half_envmap': True, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)
@@ -488,7 +493,7 @@ if opt.vis_3d_o3d:
             'if_ceiling': True, # remove ceiling **points** to better see the furniture 
             'if_walls': True, # remove wall **points** to better see the furniture 
 
-            'if_cam_rays': True, 
+            'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             

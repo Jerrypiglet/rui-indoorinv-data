@@ -306,7 +306,7 @@ class visualizer_scene_3D_plt(object):
         
         note that in (2), when approxing renderer half envmaps with 3SGs, the half envmaps are renderer **with envScale -> 1.** (see [renderOpenRooms] code/utils_OR/func_render_emitter_N_ambient -> scale.set('value', str(1.)))
         '''
-        env_map_path = self.os.emitter_env['emitter_prop']['emitter_filename']
+        env_map_path = self.os.emitter_env['emitter_prop']['envMapPath']
         im_envmap_ori = load_HDR(Path(env_map_path))
         im_envmap_ori_SDR, _ = to_nonHDR(im_envmap_ori)
 

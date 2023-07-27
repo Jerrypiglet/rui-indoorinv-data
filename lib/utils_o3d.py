@@ -6,6 +6,7 @@ from pathlib import Path
 import matplotlib
 import torch
 from copy import deepcopy
+from utils_misc import yellow
 
 def text_3d(text, pos, direction=None, degree=0.0, density=10, font='/usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf', font_size=10, text_color=(0, 0, 0)):
     """
@@ -208,7 +209,7 @@ def remove_ceiling(xyz_pcd: np.ndarray, ceiling_loc: float, floor_loc: float, ax
     # xyz_pcd = xyz_pcd[pcd_mask]
     # pcd_color = pcd_color[pcd_mask]
     if if_debug_info and np.sum(pcd_mask) > 0:
-        print('[%s] Removed points close to ceiling... percentage: %.2f %%'%(debug_info_str, np.sum(pcd_mask)*100./xyz_pcd.shape[0]))
+        print(yellow('[%s] Removed points close to ceiling... percentage: %.2f %%'%(debug_info_str, np.sum(pcd_mask)*100./xyz_pcd.shape[0])))
     else:
         # print('[%s] No ceiling removed.'%debug_info_str)
         pass

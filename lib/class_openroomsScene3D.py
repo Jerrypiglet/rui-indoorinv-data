@@ -257,7 +257,10 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 root_EnvDataset=self.envmaps_root, 
                 if_return_emitters=True, 
                 light_dat_lists=self.emitter_dict_of_lists_world)
-
+            
+            for _, __ in enumerate(self.shape_list_ori):
+                print('[load_shapes - shape_list_ori]', _, __['if_emitter'], __['filename'])
+            
             assert self.shape_list_ori[0]['filename'].endswith('uv_mapped.obj')
             assert self.shape_list_ori[1]['filename'].endswith('container.obj')
             assert self.emitter_list[0]['emitter_prop']['if_env'] == True # first of emitter_list is the env
@@ -276,20 +279,54 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             assert self.emitter_env['if_emitter']
             assert self.emitter_env['emitter_prop']['emitter_type'] == 'envmap'
 
-            for shape_idx, shape_dict in tqdm(enumerate(self.shape_list_ori + self.emitter_list[1:])): # self.emitter_list[0] is the envmap
+            # for shape_idx, shape_dict in tqdm(enumerate(self.shape_list_ori + self.emitter_list[1:])): # self.emitter_list[0] is the envmap
+            
+            '''
+            process object instances
+            '''
+            
+            '''
+            merge two objects of the same emitter (e.g. lamp base and lamp bulb) into one
+            '''
+                
+            _idx_to_remove = []
+            for _, __ in enumerate(self.shape_list_ori):
+                print('[load_shapes - shape_list_valid]', _, __['if_emitter'], __['filename'])
+                if __['filename'].endswith('aligned_light.obj'):
+                    if_found_base = False
+                    for _idx, __shape in enumerate(self.shape_list_ori):
+                        if __shape['filename'].endswith('aligned_shape.obj') and Path(__shape['filename']).parent == Path(__['filename']).parent:
+                            print(blue_text('Found base shape for aligned_light.obj: idx %d'%_idx))
+                            assert not if_found_base, 'more than two based found!'
+                            filename_combined = __['filename'].replace('aligned_light.obj', 'alignedNew.obj')
+                            assert Path(filename_combined).exists()
+                            __['filename'] = str(filename_combined)
+                            _idx_to_remove.append(_idx)
+
+            if _idx_to_remove != []:
+                self.shape_list_ori = [__ for _idx, __ in enumerate(self.shape_list_ori) if _idx not in _idx_to_remove]
+                
+                for _, __ in enumerate(self.shape_list_ori):
+                    print('[load_shapes - shape_list_ori (after merging)]', _, __['if_emitter'], __['filename'])
+
+
+            for shape_idx, shape_dict in tqdm(enumerate(self.shape_list_ori)):
                 if 'container' in shape_dict['filename']:
+                    print(yellow('[%s] skipping shape_idx %d: container...'%(self.__class__.__name__, shape_idx)))
                     continue
                 
                 _id = shape_dict['id'] + '_' + shape_dict['random_id']
                 
-            #     if_emitter = shape_dict['if_emitter'] and 'combined_filename' in shape_dict['emitter_prop'] and shape_idx >= len(shape_list)
-                if_emitter = shape_dict['if_in_emitter_dict']
-                if if_emitter:
-                    obj_path = shape_dict['emitter_prop']['emitter_filename']
+                # if_emitter = shape_dict['if_emitter']
+                # and 'combined_filename' in shape_dict['emitter_prop'] and shape_idx >= len(shape_list)
+                # if_emitter = shape_dict['if_in_emitter_dict']
+            #     if if_emitter:
+            #         obj_path = shape_dict['emitter_prop']['emitter_filename']
+            # #         obj_path = shape_dict['filename']
+            #     else:
             #         obj_path = shape_dict['filename']
-                else:
-                    obj_path = shape_dict['filename']
 
+                obj_path = shape_dict['filename']
                 bbox_file_path = obj_path.replace('.obj', '.pickle')
                 if 'layoutMesh' in bbox_file_path:
                     bbox_file_path = Path('layoutMesh') / Path(bbox_file_path).relative_to(self.root_path_dict['layout_root'])
@@ -299,8 +336,9 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
 
                 #  Path(bbox_file_path).exists(), 'Rerun once first with if_load_mesh=True, to dump pickle files for shapes to %s'%bbox_file_path
                 
-                if_load_mesh = if_load_obj_mesh if not if_emitter else if_load_emitter_mesh
-
+                # if_load_mesh = if_load_obj_mesh if not if_emitter else if_load_emitter_mesh
+                if_load_mesh = if_load_obj_mesh
+                
                 if if_load_mesh: # or (not Path(bbox_file_path).exists()):
                     if_convert_to_double_sided = 'uv_mapped.obj' in str(obj_path) # convert uv_mapped.obj to double sides mesh (OpenRooms only)
                     # if_convert_to_double_sided = False
@@ -358,7 +396,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 # if not(any(ext in shape_dict['filename'] for ext in ['window', 'door', 'lamp'])):
 
                 is_layout = 'layoutMesh' in str(obj_path) or 'uv_mapped.obj' in str(obj_path)
-                shape_dict.update({'is_wall': False, 'is_ceiling': False, 'is_layout': is_layout})
+                shape_dict.update({'is_wall': is_layout, 'is_ceiling': is_layout, 'is_layout': is_layout}) # OpenRooms does not separate walls and ceilings; only one boxy mesh for the exterior shell of the room
                     # 'is_wall': 'wall' in _id.lower(), 
                     # 'is_ceiling': 'ceiling' in _id.lower(), 
                     # 'is_layout': 'wall' in _id.lower() or 'ceiling' in _id.lower(), 
@@ -379,26 +417,31 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                 self.ids_list.append(_id)
                 
                 self.shape_list_valid.append(shape_dict)
-
-                if if_emitter:
-                    # if 'obj_type' not in shape_dict['emitter_prop']:
-                    #     import ipdb; ipdb.set_trace()
-                    if shape_dict['emitter_prop']['obj_type'] == 'window':
-                        # self.window_list.append((shape_dict, vertices_transformed, faces))
-                        self.window_list.append(
-                            {'emitter_prop': shape_dict['emitter_prop'], 'vertices': vertices_transformed, 'faces': faces}
-                            )
-                    elif shape_dict['emitter_prop']['obj_type'] == 'obj':
-                        # self.lamp_list.append((shape_dict, vertices_transformed, faces))
-                        self.lamp_list.append(
-                            {'emitter_prop': shape_dict['emitter_prop'], 'vertices': vertices_transformed, 'faces': faces}
+            
+            
+            '''
+            process emitter instances
+            '''
+            
+            for emitter_idx, emitter_dict in enumerate(self.emitter_list[1:]):
+                # if 'obj_type' not in shape_dict['emitter_prop']:
+                #     import ipdb; ipdb.set_trace()
+                if shape_dict['emitter_prop']['obj_type'] == 'window':
+                    # self.window_list.append((shape_dict, vertices_transformed, faces))
+                    self.window_list.append(
+                        {'emitter_prop': shape_dict['emitter_prop'], 'vertices': vertices_transformed, 'faces': faces}
                         )
+                elif shape_dict['emitter_prop']['obj_type'] == 'obj':
+                    # self.lamp_list.append((shape_dict, vertices_transformed, faces))
+                    self.lamp_list.append(
+                        {'emitter_prop': shape_dict['emitter_prop'], 'vertices': vertices_transformed, 'faces': faces}
+                    )
 
         self.if_loaded_shapes = True
 
-        print(blue_text('[%s] DONE. load_shapes: %d total, %d/%d windows lit, %d/%d area lights lit'%(
+        print(blue_text('[%s] DONE. load_shapes: %d total objects, %d total emitters: %d/%d windows lit, %d/%d area lights lit'%(
             self.parent_class_name, 
-            len(self.shape_list_valid), 
+            len(self.shape_list_valid), len(self.emitter_list[1:]), 
             len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
             len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
             )))

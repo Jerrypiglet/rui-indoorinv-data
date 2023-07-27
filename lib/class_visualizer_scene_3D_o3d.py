@@ -239,7 +239,7 @@ class visualizer_scene_3D_o3d(object):
             o3d_geometry_list += self.collect_lighting_envmap(
                 lighting_params
             )
-
+            
         if 'layout' in modality_list:
             o3d_geometry_list += self.collect_layout(
                 layout_params
@@ -753,14 +753,14 @@ class visualizer_scene_3D_o3d(object):
         geometry_list = []
 
         # emitters_obj_random_id_list = [shape['random_id'] for shape in self.os.shape_list_valid if shape['if_in_emitter_dict']]
-
-        for shape_idx, (shape_dict, vertices, faces, bverts, _id) in tqdm(enumerate(zip(
+        
+        for shape_idx, (shape_dict, vertices, faces, bverts, _id) in enumerate(zip(
             self.os.shape_list_valid, 
             self.os.vertices_list, 
             self.os.faces_list, 
             self.os.bverts_list, 
             self.os.ids_list, 
-        ))):
+        )):
 
             if_emitter = shape_dict['if_in_emitter_dict']
             cat_name = 'N/A'; cat_id = -1
@@ -777,7 +777,8 @@ class visualizer_scene_3D_o3d(object):
             #     continue # skipping layout as an object
             # if shape_dict['random_id'] in emitters_obj_random_id_list and not if_emitter: # SKIP emitters
             #     continue # skip shape if it is also in the list as an emitter (so that we don't create two shapes for one emitters)
-            # print(_id, if_walls, shape_dict.get('is_wall', False))
+            
+            
             if not if_walls and shape_dict.get('is_wall', False): 
                 print(yellow('[%s] -> collect_shapes: skipped wall'%self.__class__.__name__), _id, shape_dict['filename']); 
                 continue
@@ -790,6 +791,7 @@ class visualizer_scene_3D_o3d(object):
                 continue
 
             if_default_color = True
+            cat_id_str = ''
             if self.os.if_loaded_colors:
                 cat_id_str = str(obj_path).split('/')[-3]
                 if cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict:
@@ -809,6 +811,8 @@ class visualizer_scene_3D_o3d(object):
                 else:
                     print(yellow('Default color for invalid cat_id_str: [%s]; %s'%(cat_id_str, obj_path)))
 
+            print('[collect_shapes] %d [%s-%d-%s]'%(shape_idx, cat_id_str, cat_id, cat_name), _id, shape_dict.get('if_emitter', False), obj_path)
+            
             if if_default_color:
                 # obj_color = [0.7, 0.7, 0.7]
                 obj_color = [0.7, 0.7, 0.] # yellow-ish as default color, for non-emitter objects
@@ -832,12 +836,12 @@ class visualizer_scene_3D_o3d(object):
                     import ipdb; ipdb.set_trace()
                 assert np.amax(faces-1) < vertices.shape[0]
 
-                if not if_ceiling:
-                    axis_up = self.os.axis_up
-                    vertices_valid_mask = ~remove_ceiling(vertices, self.os.ceiling_loc, self.os.floor_loc, axis_up=axis_up, if_debug_info=True, debug_info_str=_id)
-                    if np.sum(vertices_valid_mask) > 0:
-                        faces_mask = np.any(vertices_valid_mask.reshape(-1)[faces-1], axis=1) # (N_total_faces,), bool
-                        faces = faces[faces_mask] # (faces_emitters, 3), int, containing 1-based vertex indexes
+                # if not if_ceiling:
+                #     axis_up = self.os.axis_up
+                #     vertices_valid_mask = ~remove_ceiling(vertices, self.os.ceiling_loc, self.os.floor_loc, axis_up=axis_up, if_debug_info=True, debug_info_str=_id)
+                #     if np.sum(vertices_valid_mask) > 0:
+                #         faces_mask = np.any(vertices_valid_mask.reshape(-1)[faces-1], axis=1) # (N_total_faces,), bool
+                #         faces = faces[faces_mask] # (faces_emitters, 3), int, containing 1-based vertex indexes
 
                 shape_mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(vertices), o3d.utility.Vector3iVector(faces-1))
                 shape_mesh.compute_vertex_normals()
@@ -915,17 +919,27 @@ class visualizer_scene_3D_o3d(object):
 
             if_labels = shapes_params.get('if_labels', True)
             if if_labels:
+                # if cat_name != 'ceiling_lamp':
+                #     # import ipdb; ipdb.set_trace()
+                #     continue
+                    
+                pos = [np.mean(bverts[:, 0], axis=0), np.amax(bverts[:, 1], axis=0)+0.1*(np.amax(bverts[:, 1], axis=0)-np.amin(bverts[:, 1], axis=0)), np.mean(bverts[:, 2], axis=0)], 
+                # pos = [np.mean(bverts[:, 0], axis=0), np.amax(bverts[:, 1], axis=0), np.mean(bverts[:, 2], axis=0)], 
+                # print('-'.join([str(shape_idx), cat_name]), pos, obj_color)
+                
                 pcd_10 = text_3d(
-                    cat_name, 
+                    '-'.join([str(shape_idx), cat_name]), 
                     # pos=np.mean(bverts, axis=0).tolist(), 
                     # pos=[np.mean(bverts[:, 0], axis=0), np.amax(bverts[:, 1], axis=0)+0.2*(np.amax(bverts[:, 1], axis=0)-np.amin(bverts[:, 1], axis=0)), np.mean(bverts[:, 2], axis=0)], 
                     font='/System/Library/Fonts/Helvetica.ttc' if self.os.host=='apple' else '/usr/share/fonts/truetype/freefont/FreeMonoOblique.ttf', 
-                    pos=[np.mean(bverts[:, 0], axis=0), np.amax(bverts[:, 1], axis=0)+0.05*(np.amax(bverts[:, 1], axis=0)-np.amin(bverts[:, 1], axis=0)), np.mean(bverts[:, 2], axis=0)], 
+                    pos=pos, 
                     direction=(0., 0., 1), 
                     degree=270., 
-                    font_size=250, density=1, text_color=tuple([int(_*255) for _ in obj_color]))
+                    font_size=150, density=1, text_color=tuple([int(_*127) for _ in obj_color]))
                 # pcd_10 = text_3d(cat_name, pos=np.mean(bverts, axis=0).tolist(), font_size=100, density=10)
                 geometry_list.append(pcd_10)
+                
+                # print(bverts)
 
         if_dump_mesh = shapes_params.get('if_dump_mesh', False)
         if if_dump_mesh:
@@ -959,8 +973,8 @@ class visualizer_scene_3D_o3d(object):
             sample_pts = np.concatenate(self.os.sample_pts_list)
             self.add_extra_geometry([
                 ('pts', {'pts': sample_pts, }),
-            ]) 
-
+            ])
+            
         return geometry_list
 
     def collect_emitters(self, emitter_params: dict={}):
