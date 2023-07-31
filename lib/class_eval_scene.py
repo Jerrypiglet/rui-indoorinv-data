@@ -57,11 +57,11 @@ class evaluator_scene_scene():
         assert self.os.if_loaded_shapes or self.os.if_loaded_tsdf, 'Shape(s)/TSDF shape not loaded! Required to evaluate properties of vertexs or faces.'
         if self.os.if_loaded_shapes:
             _vertices_list, _faces_list, _shape_ids_list = self.os.vertices_list, self.os.faces_list, self.os.shape_ids_list
-            if self.os.mi_scene_from != 'shape':
-                self.os.load_mi_scene()
-                if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
-                    self.os.process_mi_scene(if_postprocess_mi_frames=True)
-            assert self.os.mi_scene_from == 'shape'
+            # if self.os.mi_scene_from != 'shape':
+            #     self.os.load_mi_scene()
+            #     if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
+            #         self.os.process_mi_scene(if_postprocess_mi_frames=True)
+            assert self.os.mi_scene_from in ['xml', 'shape']
         elif self.os.if_loaded_tsdf:
             _vertices_list, _faces_list, _shape_ids_list = [self.os.tsdf_fused_dict['vertices']], [self.os.tsdf_fused_dict['faces'] + 1], [0] # fix all faces to be 0-indexed
             if self.os.mi_scene_from != 'tsdf':

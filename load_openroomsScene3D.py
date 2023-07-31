@@ -119,7 +119,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 # frame_id_list = [0, 11, 10, 64, 81]
 # + list(range(5, 87, 10))
 
-# frame_id_list = [5]
+frame_id_list = [5]
 
 '''
 update confs
@@ -180,9 +180,9 @@ scene_obj = openroomsScene3D(
         # 'lighting_SG', 
         # 'lighting_envmap', 
         
-        # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
-        'tsdf', 
+        'layout', 
+        'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'tsdf', 
         'mi', # mitsuba scene, loading from scene xml file
         ], 
 )
@@ -386,11 +386,11 @@ if opt.vis_3d_o3d:
             'poses', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            # 'layout', 
-            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
+            'layout', 
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             # 'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
-            'tsdf', 
+            # 'tsdf', 
             ], 
         if_debug_info=opt.if_debug_info, 
     )
