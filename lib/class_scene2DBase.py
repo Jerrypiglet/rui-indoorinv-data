@@ -153,6 +153,26 @@ class scene2DBase(ABC):
         return False
     
     @property
+    def if_has_im_sdr(self):
+        return hasattr(self, 'im_sdr_list')
+
+    @property
+    def if_has_im_hdr(self):
+        return hasattr(self, 'im_hdr_list')
+
+    @property
+    def if_has_lighting_envmap(self):
+        return hasattr(self, 'lighting_envmap_list')
+
+    @property
+    def if_has_depth_normal(self):
+        return all([_ in self.modality_list for _ in ['depth', 'normal']])
+
+    @property
+    def if_has_BRDF(self):
+        return all([_ in self.modality_list for _ in ['albedo', 'roughness']]) or all([_ in self.modality_list for _ in ['kd', 'ks', 'roughness']])
+
+    @property
     def pose_file_root(self):
         return self.pose_file_path.parent if hasattr(self, 'pose_file') else self.pose_file_path_list[0].parent
 
@@ -214,26 +234,6 @@ class scene2DBase(ABC):
                 assert type(x)==type(self.get_modality(modality, 'EST'))
                 if isinstance(x, list):
                     assert len(x) == len(self.get_modality(modality, 'EST'))
-
-    @property
-    def if_has_im_sdr(self):
-        return hasattr(self, 'im_sdr_list')
-
-    @property
-    def if_has_im_hdr(self):
-        return hasattr(self, 'im_hdr_list')
-
-    @property
-    def if_has_lighting_envmap(self):
-        return hasattr(self, 'lighting_envmap_list')
-
-    @property
-    def if_has_depth_normal(self):
-        return all([_ in self.modality_list for _ in ['depth', 'normal']])
-
-    @property
-    def if_has_BRDF(self):
-        return all([_ in self.modality_list for _ in ['albedo', 'roughness']]) or all([_ in self.modality_list for _ in ['kd', 'ks', 'roughness']])
 
     def load_im_sdr(self):
         '''

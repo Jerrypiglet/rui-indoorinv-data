@@ -54,8 +54,8 @@ class evaluator_scene_scene():
         args:
         - shape_params
         '''
-        assert self.os.if_loaded_shapes, 'Shape not loaded! Required to evaluate properties of vertexs or faces.'
-        assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal']
+        assert self.os.if_loaded_shapes or self.os.if_loaded_tsdf, 'Shape(s)/TSDF shape not loaded! Required to evaluate properties of vertexs or faces.'
+        assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'semseg']
 
         return_dict = {}
         samples_v_dict = {}
@@ -63,7 +63,7 @@ class evaluator_scene_scene():
         print(white_blue('Evaluating scene for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
         if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr']:
             '''
-            get visibility frustum normals and centers
+            get viewing frustum normals and centers
             '''
             max_vis_count = 0
             vis_frustum_normals_list = []
@@ -88,6 +88,10 @@ class evaluator_scene_scene():
                     vis_count = np.zeros((vertices.shape[0]), dtype=np.int64)
                 if sample_type in ['rgb_hdr', 'rgb_sdr']:
                     # rgb_hdr_list = [[]] * vertices.shape[0]
+                    if sample_type == 'rgb_hdr':
+                        assert self.os.if_has_im_hdr
+                    if sample_type == 'rgb_sdr':
+                        assert self.os.if_has_im_sdr
                     rgb_sum = np.zeros((vertices.shape[0], 3), dtype=np.float32)
                     rgb_count = np.zeros((vertices.shape[0]), dtype=np.int64)
 
@@ -114,6 +118,10 @@ class evaluator_scene_scene():
                     
                     if sample_type == 'vis_count':
                         vis_count += visibility
+                    
+                    '''
+                    back-project intersection points to camera views; then sample from 2D inputs (e.g. images, label maps)
+                    '''
                     if sample_type in ['rgb_hdr', 'rgb_sdr']:
                         x_world = ret.p.numpy()[visibility]
                         _R, _t = self.os.pose_list[frame_idx][:3, :3], self.os.pose_list[frame_idx][:3, 3:4]

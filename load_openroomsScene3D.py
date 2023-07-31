@@ -1,5 +1,9 @@
 '''
-Load and visualize re-rendered OpenRooms scenes with multi-view poses, 3D modalities
+Load and visualize re-rendered OpenRooms scenes with multi-view poses, 3D modalities.
+
+To run on the openrooms-public (i.e. less frames per scene):
+
+
 '''
 import sys
 
@@ -17,7 +21,7 @@ from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
 from pyhocon import ConfigFactory, ConfigTree
-from lib.utils_misc import str2bool, check_exists
+from lib.utils_misc import str2bool, check_exists, yellow
 
 from lib.class_openroomsScene3D import openroomsScene3D
 
@@ -71,19 +75,27 @@ parser.add_argument('--export', type=str2bool, nargs='?', const=True, default=Fa
 parser.add_argument('--export_format', type=str, default='monosdf', help='')
 parser.add_argument('--export_appendix', type=str, default='', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
+parser.add_argument('--sample_type', type=str, default='', help='for evaluator')
 
 # SPECIFY scene HERE!
-parser.add_argument('--scene', type=str, default='mainDiffLight_xml1-scene0552_00', help='load conf file: confs/openrooms/\{opt.scene\}.conf')
+parser.add_argument('--scene', type=str, default='main_xml-scene0288_01', help='load conf file: confs/openrooms/\{opt.scene\}.conf')
+# parser.add_argument('--dataset', type=str, default='mainDiffLight_xml1-scene0552_00', help='load conf file: confs/openrooms/\{opt.scene\}.conf')
+parser.add_argument('--dataset', default='openrooms', const='all', nargs='?', choices=['openrooms', 'openrooms_public'], help='openrooms: re-rendered version, ~200 frames; openrooms_public: original version, ~10-20 frames')
 
 opt = parser.parse_args()
 
 
-DATASET = 'openrooms'
+DATASET = opt.dataset
 conf_base_path = Path('confs/%s.conf'%DATASET); check_exists(conf_base_path)
 CONF = ConfigFactory.parse_file(str(conf_base_path))
-conf_scene_path = Path('confs/%s/%s.conf'%(DATASET, opt.scene)); check_exists(conf_scene_path)
-conf_scene = ConfigFactory.parse_file(str(conf_scene_path))
-CONF = ConfigTree.merge_configs(CONF, conf_scene)
+conf_scene_path = Path('confs/%s/%s.conf'%(DATASET, opt.scene))
+if not conf_scene_path.exists():
+    print(yellow('scene conf file not found: %s; NOT merged into base conf!'%conf_scene_path))
+    CONF.scene_params_dict.scene_name = opt.scene
+else:
+    # check_exists(conf_scene_path)
+    conf_scene = ConfigFactory.parse_file(str(conf_scene_path))
+    CONF = ConfigTree.merge_configs(CONF, conf_scene)
 
 dataset_root = Path(PATH_HOME) / CONF.data.dataset_root
 xml_root = dataset_root / 'scenes'
@@ -162,8 +174,8 @@ scene_obj = openroomsScene3D(
         # 'lighting_envmap', 
         
         # 'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
-        # 'tsdf', 
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
+        'tsdf', 
         'mi', # mitsuba scene, loading from scene xml file
         ], 
 )
@@ -183,7 +195,8 @@ if opt.eval_scene:
     sample visivility to camera centers on vertices
     '''
     _ = evaluator_scene.sample_shapes(
-        sample_type='vis_count', # ['']
+        sample_type=opt.sample_type, # e.g. ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'semseg']
+        # sample_type='vis_count', # ['']
         # sample_type='t', # ['']
         shape_params={
         }
@@ -367,10 +380,10 @@ if opt.vis_3d_o3d:
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'layout', 
-            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
+            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             # 'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
-            # 'tsdf', 
+            'tsdf', 
             ], 
         if_debug_info=opt.if_debug_info, 
     )

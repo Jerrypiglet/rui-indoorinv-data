@@ -154,25 +154,32 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        xml_dump_dir = self.PATH_HOME / 'mitsuba'
+        if self.has_shape_file:
+            self.load_mi_scene_from_shape()
+            print(blue_text('[%s][load_mi] from shape file: %s')%(str(self.__class__.__name__), self.shape_file))
+        elif self.if_has_tsdf_file:
+            self.load_mi_scene_from_shape(shape_file_path=self.tsdf_file)
+            print(blue_text('[%s][load_mi] from tsdf file: %s')%(str(self.__class__.__name__), self.tsdf_file))
+        else:
+            xml_dump_dir = self.PATH_HOME / 'mitsuba'
 
-        if_also_dump_xml_with_lit_area_lights_only = False
+            if_also_dump_xml_with_lit_area_lights_only = False
 
-        self.mi_xml_dump_path = dump_OR_xml_for_mi(
-            str(self.xml_file), 
-            shapes_root=self.shapes_root, 
-            layout_root=self.layout_root, 
-            envmaps_root=self.envmaps_root, 
-            xml_dump_dir=xml_dump_dir, 
-            if_no_emitter_shape=False, 
-            if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only, 
-            )
-        print(blue_text('[%s][load_mi] XML for Mitsuba dumped to: %s')%(str(self.__class__.__name__), str(self.mi_xml_dump_path)))
-        
-        '''
-        tools for fixing broken meshes
-        '''
-        self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
+            self.mi_xml_dump_path = dump_OR_xml_for_mi(
+                str(self.xml_file), 
+                shapes_root=self.shapes_root, 
+                layout_root=self.layout_root, 
+                envmaps_root=self.envmaps_root, 
+                xml_dump_dir=xml_dump_dir, 
+                if_no_emitter_shape=False, 
+                if_also_dump_xml_with_lit_area_lights_only=if_also_dump_xml_with_lit_area_lights_only, 
+                )
+            print(blue_text('[%s][load_mi] XML for Mitsuba dumped to: %s')%(str(self.__class__.__name__), str(self.mi_xml_dump_path)))
+            
+            '''
+            tools for fixing broken meshes
+            '''
+            self.mi_scene = mi.load_file(str(self.mi_xml_dump_path))
 
     def load_poses(self):
         '''
@@ -180,7 +187,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
-        if not self.if_loaded_shapes: self.load_shapes()
+        # if not self.if_loaded_shapes: self.load_shapes()
         if not hasattr(self, 'mi_scene'): self.load_mi_scene(if_postprocess_mi_frames=False)
 
         if_resample = 'n'
@@ -213,7 +220,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         '''
         if self.if_loaded_shapes: return
         if not self.if_loaded_layout: self.load_layout()
-
+        
         mitsubaBase._init_shape_vars(self)
 
         # if self.monosdf_shape_dict != {}:
@@ -225,7 +232,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             print(yellow('[%s] load_shapes from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
             self.load_single_shape(shape_params_dict=self.CONF.shape_params_dict, force=force)
         else:
-
             if_load_obj_mesh = self.CONF.shape_params_dict.get('if_load_obj_mesh', True)
             if_load_emitter_mesh = self.CONF.shape_params_dict.get('if_load_emitter_mesh', False)
             print(white_blue('[openroomsScene3D] load_shapes for scene...'))
@@ -425,16 +431,15 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             
             for emitter_idx, emitter_dict in enumerate(self.emitter_list[1:]):
                 # if 'obj_type' not in shape_dict['emitter_prop']:
-                #     import ipdb; ipdb.set_trace()
-                if shape_dict['emitter_prop']['obj_type'] == 'window':
-                    # self.window_list.append((shape_dict, vertices_transformed, faces))
+                if emitter_dict['emitter_prop']['obj_type'] == 'window':
+                    # self.window_list.append((emitter_dict, vertices_transformed, faces))
                     self.window_list.append(
-                        {'emitter_prop': shape_dict['emitter_prop'], 'vertices': vertices_transformed, 'faces': faces}
+                        {'emitter_prop': emitter_dict['emitter_prop'], 'vertices': vertices_transformed, 'faces': faces}
                         )
-                elif shape_dict['emitter_prop']['obj_type'] == 'obj':
-                    # self.lamp_list.append((shape_dict, vertices_transformed, faces))
+                elif emitter_dict['emitter_prop']['obj_type'] == 'obj':
+                    # self.lamp_list.append((emitter_dict, vertices_transformed, faces))
                     self.lamp_list.append(
-                        {'emitter_prop': shape_dict['emitter_prop'], 'vertices': vertices_transformed, 'faces': faces}
+                        {'emitter_prop': emitter_dict['emitter_prop'], 'vertices': vertices_transformed, 'faces': faces}
                     )
 
         self.if_loaded_shapes = True

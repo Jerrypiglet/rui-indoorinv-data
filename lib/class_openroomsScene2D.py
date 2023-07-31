@@ -86,8 +86,8 @@ class openroomsScene2D(scene2DBase):
         assert self.intrinsics_path.exists(), 'intrinsics_path does not exist: %s'%str(self.intrinsics_path)
     
         pose_file = self.CONF.scene_params_dict.get('pose_file')
-        assert pose_file.split('-')[0] == "OpenRooms"
-        self.pose_file_path = self.scene_xml_root / pose_file.split('-')[1]
+        assert pose_file.split('-')[0] == "OpenRooms" or pose_file == 'cam.txt', 'Invalid pose_file: %s'%pose_file
+        self.pose_file_path = self.scene_xml_root / pose_file.split('-')[1] if len(pose_file.split('-')) > 1 else self.scene_xml_root / pose_file
         assert self.pose_file_path.exists(), 'pose_file_path does not exist: %s'%str(self.pose_file_path)
 
         '''

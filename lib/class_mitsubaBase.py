@@ -186,7 +186,7 @@ class mitsubaBase(scene2DBase):
     def if_has_layout(self):
         return all([_ in self.modality_list for _ in ['layout']])
     
-    def load_mi_scene_from_shape(self, input_extra_transform_homo: bool=None, shape_file_path: str=''):
+    def load_mi_scene_from_shape(self, input_extra_transform_homo: bool=None, shape_file_path: Path=None):
         if shape_file_path == '':
             shape_file_path = self.shape_file_path
             
