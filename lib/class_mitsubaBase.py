@@ -115,7 +115,7 @@ class mitsubaBase(scene2DBase):
             # assert self.tsdf_file_path.exists(), 'shape file does not exist: %s'%str(self.tsdf_file_path)
             self.has_tsdf_file = True
             
-        if self.CONF.shape_params_dict.get('force_regenerate_tsdf', False):
+        if self.CONF.shape_params_dict.get('force_regenerate_tsdf', False) and self.tsdf_file_path.exists():
             print(yellow('Removed existing tsdf file due to CONF.shape_params_dict[\'force_regenerate_tsdf\']=True: %s'%str(self.tsdf_file_path)))
             self.tsdf_file_path.unlink()
 
@@ -754,7 +754,12 @@ class mitsubaBase(scene2DBase):
             sdf_trunc=0.1,
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8,
             volume_unit_resolution=16,
-            depth_sampling_stride=1)
+            depth_sampling_stride=1
+        )
+            # voxel_length=5.0 / 512.0,
+            # sdf_trunc=0.2,
+            # color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
+        # )
         intrinsic = o3d.camera.PinholeCameraIntrinsic(self._W(), self._H(), self._K()[0][0], self._K()[1][1], self._K()[0][2], self._K()[1][2])
         poses = []
         T_opengl_opencv = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]], dtype=np.float32) # flip x, y: Liwen's new pose (left-up-forward) -> OpenCV (right-down-forward)

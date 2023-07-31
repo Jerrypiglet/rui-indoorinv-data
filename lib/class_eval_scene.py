@@ -131,9 +131,16 @@ class evaluator_scene_scene():
                     ret = self.os.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
                     # returned structure contains intersection location, nomral, ray step, ...
                     ts = ret.t.numpy()
-                    visibility = np.logical_not(ts < (np.linalg.norm(ds_, axis=1, keepdims=False)))
-                    visibility = np.logical_and(visibility, visibility_frustum) # (N_vertices_ALL,), bool
                     
+                    # DEBUG_TEMP_SOLU = True
+                    DEBUG_TEMP_SOLU = False
+                    
+                    if DEBUG_TEMP_SOLU:
+                        visibility = visibility_frustum
+                    else:
+                        visibility = np.logical_not(ts < (np.linalg.norm(ds_, axis=1, keepdims=False)))
+                        visibility = np.logical_and(visibility, visibility_frustum) # (N_vertices_ALL,), bool
+                        
                     if sample_type == 'vis_count':
                         vis_count += visibility
                         
@@ -141,7 +148,10 @@ class evaluator_scene_scene():
                     back-project intersection points to camera views; then sample from 2D inputs (e.g. images, label maps)
                     '''
                     if sample_type in ['rgb_hdr', 'rgb_sdr', 'semseg']:
-                        x_world = ret.p.numpy()[visibility]
+                        if DEBUG_TEMP_SOLU:
+                            x_world = vertices[visibility]
+                        else:
+                            x_world = ret.p.numpy()[visibility]
                         _R, _t = self.os.pose_list[frame_idx][:3, :3], self.os.pose_list[frame_idx][:3, 3:4]
                         x_cam = (x_world - _t.T) @ _R
                         uv_cam_homo = (self.os.K_list[frame_idx] @ x_cam.T).T
@@ -269,7 +279,7 @@ class evaluator_scene_scene():
                 (origin, _, _) = self.os.origin_lookatvector_up_list[0]
 
                 origin = np.tile(np.array(origin).reshape((1, 3)), (vertices.shape[0], 1))
-                ds = vertices - origin
+                ds = vertices+np.random.normal(scale=0.005, size=(vertices.shape[0], 3)) - origin
                 ds_norm = (np.linalg.norm(ds, axis=1, keepdims=1)+1e-6)
                 ds = ds / ds_norm
 
@@ -282,17 +292,17 @@ class evaluator_scene_scene():
                 # returned structure contains intersection location, nomral, ray step, ...
                 t = ret.t.numpy()
                 t_inf_mask = np.isinf(t)
-                import ipdb; ipdb.set_trace()
-                t[t_inf_mask] = 1
-                t_inf_mask[20000:] = False
-                t_inf_mask[:19900] = False
+                # import ipdb; ipdb.set_trace()
+                # t[t_inf_mask] = 1
+                # t_inf_mask[20000:] = False
+                # t_inf_mask[:19900] = False
                 
-                cam_rays = {
-                    'v': xs[t_inf_mask], 'd': ds[t_inf_mask], 
-                    # 'l': t[::, np.newaxis][t_inf_mask]
-                    'l': ds_norm[t_inf_mask]
-                }
-                return_dict.update({'cam_rays': cam_rays})
+                # cam_rays = {
+                #     'v': xs[t_inf_mask], 'd': ds[t_inf_mask], 
+                #     # 'l': t[::, np.newaxis][t_inf_mask]
+                #     'l': ds_norm[t_inf_mask]
+                # }
+                # return_dict.update({'cam_rays': cam_rays})
 
                 samples_v_dict[_id] = ('t', (t, np.amax(t)))
             else:

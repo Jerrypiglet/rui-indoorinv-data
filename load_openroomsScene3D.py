@@ -119,7 +119,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 # frame_id_list = [0, 11, 10, 64, 81]
 # + list(range(5, 87, 10))
 
-frame_id_list = [5]
+# frame_id_list = [5]
 
 '''
 update confs
@@ -135,9 +135,10 @@ CONF.im_params_dict.update({
     })
 
 # DEBUG
-# CONF.shape_params_dict.update({
-#     'force_regenerate_tsdf': True
-# })
+CONF.shape_params_dict.update({
+    'force_regenerate_tsdf': True
+})
+
 
 if opt.export:
     if opt.export_format == 'mitsuba':
