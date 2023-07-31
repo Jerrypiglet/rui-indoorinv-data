@@ -750,8 +750,8 @@ class mitsubaBase(scene2DBase):
             'for %d frames... H %d W %d, subsample_rate_pts: %d, subsample_HW_rates: (%d, %d)'%(len(self.frame_id_list), self._H(), self._W(), subsample_rate_pts, subsample_HW_rates[0], subsample_HW_rates[1]))
 
         volume = o3d.pipelines.integration.ScalableTSDFVolume(
-            voxel_length=5.0 / 512.0,
-            sdf_trunc=0.1,
+            voxel_length=4.0 / 512.0,
+            sdf_trunc=0.05,
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8,
             volume_unit_resolution=16,
             depth_sampling_stride=1

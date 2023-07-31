@@ -119,16 +119,19 @@ class evaluator_scene_scene():
                     # visibility = visibility_frustum
 
                     origin = np.tile(np.array(origin).reshape((1, 3)), (vertices.shape[0], 1))
-                    ds_ = vertices - origin
+                    ds_ = vertices + np.random.normal(scale=0.005, size=(vertices.shape[0], 3)) - origin
+                    # ds_ = vertices - origin
                     ds = ds_ / (np.linalg.norm(ds_, axis=1, keepdims=1)+1e-6)
                     ds = np.array(ds).astype(np.float32)
 
                     xs = np.array(origin).astype(np.float32)
-                    xs_mi = mi.Point3f(xs)
+                    xs_mi = mi.Point3f(xs+mi.math.RayEpsilon * ds)
                     ds_mi = mi.Vector3f(ds)
                     # ray origin, direction, t_max
                     rays_mi = mi.Ray3f(xs_mi, ds_mi)
-                    ret = self.os.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+                    # ret = self.os.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+                    ret = self.os.mi_scene.ray_intersect_preliminary(rays_mi)
+                    ret = ret.compute_surface_interaction(rays_mi)
                     # returned structure contains intersection location, nomral, ray step, ...
                     ts = ret.t.numpy()
                     
@@ -138,7 +141,8 @@ class evaluator_scene_scene():
                     if DEBUG_TEMP_SOLU:
                         visibility = visibility_frustum
                     else:
-                        visibility = np.logical_not(ts < (np.linalg.norm(ds_, axis=1, keepdims=False)))
+                        visibility = ts >= (np.linalg.norm(ds_, axis=1, keepdims=False)-mi.math.RayEpsilon*1000)
+                        # visibility = np.logical_not(np.isinf(ts))
                         visibility = np.logical_and(visibility, visibility_frustum) # (N_vertices_ALL,), bool
                         
                     if sample_type == 'vis_count':
@@ -273,13 +277,16 @@ class evaluator_scene_scene():
                 # samples_v_dict[_id] = ('vis_count', (vertex_vis_count, np.amax(vertex_vis_count)))
                 
             elif sample_type == 't':
+                '''
+                only for the first camera
+                '''
                 assert self.os.if_has_poses
                 assert self.os.if_has_mitsuba_scene
-                assert len(self.os.origin_lookatvector_up_list) == 1
                 (origin, _, _) = self.os.origin_lookatvector_up_list[0]
 
                 origin = np.tile(np.array(origin).reshape((1, 3)), (vertices.shape[0], 1))
-                ds = vertices+np.random.normal(scale=0.005, size=(vertices.shape[0], 3)) - origin
+                # ds = vertices+np.random.normal(scale=0.05, size=(vertices.shape[0], 3)) - origin
+                ds = vertices - origin
                 ds_norm = (np.linalg.norm(ds, axis=1, keepdims=1)+1e-6)
                 ds = ds / ds_norm
 
@@ -303,7 +310,13 @@ class evaluator_scene_scene():
                 #     'l': ds_norm[t_inf_mask]
                 # }
                 # return_dict.update({'cam_rays': cam_rays})
-
+                
+                import ipdb; ipdb.set_trace()
+                
+                # v_valid_mask = t_inf_mask[faces-1]
+                # v_any_valid_mask = np.any(v_valid_mask, axis=1)
+                # v_valid_mask = np.logical_and(v_valid_mask, v_any_valid_mask[:, np.newaxis])
+                
                 samples_v_dict[_id] = ('t', (t, np.amax(t)))
             else:
                 print(red('sample_type %s not implemented'%sample_type))
