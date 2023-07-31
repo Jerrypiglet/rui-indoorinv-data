@@ -445,16 +445,28 @@ class openroomsScene2D(scene2DBase):
     def load_semseg(self):
         '''
         semseg, image space
-        (H, W, 3), [-1., 1.]
+        (H, W)
+
+        originally, im_semseg is 0-based (0 for invalid class) 
+            -> semseg is 0-based (255 for invalid class), int32
         '''
         if hasattr(self, 'semseg_list'): return
 
         print(white_blue('[%s] load_semseg for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
         self.semseg_file_list = [self.scene_rendering_path / ('imsemLabel_%d.npy'%i) for i in self.frame_id_list]
-        self.semseg_list = [
+        semseg_list = [
             load_img(semseg_file, (self.im_H_load, self.im_W_load), ext='npy', target_HW=self.im_HW_target, resize_method='nearest')
             for semseg_file in self.semseg_file_list]
+        
+        self.semseg_list = []
+        for semseg in semseg_list: 
+            semseg = semseg.astype(np.int32)
+            # assert semseg.dtype==np.uint8
+            semseg -= 1
+            semseg[semseg==-1] = 255
+            # print(np.amax(semseg), np.amin(semseg), np.sum(semseg==255))
+            self.semseg_list.append(semseg)
         
         print(blue_text('[%s] DONE. load_semseg'%self.__class__.__name__))
 

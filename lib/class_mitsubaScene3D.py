@@ -638,7 +638,7 @@ class mitsubaScene3D(mitsubaBase):
                 self.faces_list.append(faces)
                 self.bverts_list.append(bverts)
                 self.bfaces_list.append(bfaces)
-                self.ids_list.append(_id)
+                self.shape_ids_list.append(_id)
                 
                 shape_dict = {
                     'filename': filename.get('value') if filename is not None else 'N/A', 

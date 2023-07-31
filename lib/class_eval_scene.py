@@ -55,13 +55,27 @@ class evaluator_scene_scene():
         - shape_params
         '''
         assert self.os.if_loaded_shapes or self.os.if_loaded_tsdf, 'Shape(s)/TSDF shape not loaded! Required to evaluate properties of vertexs or faces.'
+        if self.os.if_loaded_shapes:
+            _vertices_list, _faces_list, _shape_ids_list = self.os.vertices_list, self.os.faces_list, self.os.shape_ids_list
+            if self.os.mi_scene_from != 'shape':
+                self.os.load_mi_scene()
+                if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
+                    self.os.process_mi_scene(if_postprocess_mi_frames=True)
+            assert self.os.mi_scene_from == 'shape'
+        elif self.os.if_loaded_tsdf:
+            _vertices_list, _faces_list, _shape_ids_list = [self.os.tsdf_fused_dict['vertices']], [self.os.tsdf_fused_dict['faces'] + 1], [0] # fix all faces to be 0-indexed
+            if self.os.mi_scene_from != 'tsdf':
+                self.os.load_mi_scene()
+                if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
+                    self.os.process_mi_scene(if_postprocess_mi_frames=True, force=True)
+            assert self.os.mi_scene_from == 'tsdf'
         assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'semseg']
 
         return_dict = {}
         samples_v_dict = {}
 
-        print(white_blue('Evaluating scene for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
-        if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr']:
+        print(white_blue('Evaluating scene for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(_shape_ids_list))
+        if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg']:
             '''
             get viewing frustum normals and centers
             '''
@@ -78,9 +92,9 @@ class evaluator_scene_scene():
                 vis_frustum_normals_list.append(normals)
                 vis_frustum_centers_list.append(rays_o[0, 0].reshape(1, 3))
 
-        for shape_idx, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
+        for shape_idx, (vertices, faces, _id) in tqdm(enumerate(zip(_vertices_list, _faces_list, _shape_ids_list))):
             assert np.amin(faces) == 1
-            if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr']:
+            if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg']:
                 assert self.os.if_has_poses
                 assert self.os.if_has_mitsuba_scene # scene_obj->modality_list=['mi'
 
@@ -94,6 +108,10 @@ class evaluator_scene_scene():
                         assert self.os.if_has_im_sdr
                     rgb_sum = np.zeros((vertices.shape[0], 3), dtype=np.float32)
                     rgb_count = np.zeros((vertices.shape[0]), dtype=np.int64)
+                if sample_type == 'semseg':
+                    # semseg_labels = np.array([[] * vertices.shape[0]], dtype=object)
+                    semseg_labels = np.empty((vertices.shape[0],),dtype=object)
+                    semseg_labels.fill([])
 
                 print('[Shape %d] Evaluating %d frames...'%(shape_idx, self.os.frame_num))
                 for frame_idx, (origin, _, _) in tqdm(enumerate(self.os.origin_lookatvector_up_list)):
@@ -114,15 +132,15 @@ class evaluator_scene_scene():
                     # returned structure contains intersection location, nomral, ray step, ...
                     ts = ret.t.numpy()
                     visibility = np.logical_not(ts < (np.linalg.norm(ds_, axis=1, keepdims=False)))
-                    visibility = np.logical_and(visibility, visibility_frustum) # (N_vertices,)
+                    visibility = np.logical_and(visibility, visibility_frustum) # (N_vertices_ALL,), bool
                     
                     if sample_type == 'vis_count':
                         vis_count += visibility
-                    
+                        
                     '''
                     back-project intersection points to camera views; then sample from 2D inputs (e.g. images, label maps)
                     '''
-                    if sample_type in ['rgb_hdr', 'rgb_sdr']:
+                    if sample_type in ['rgb_hdr', 'rgb_sdr', 'semseg']:
                         x_world = ret.p.numpy()[visibility]
                         _R, _t = self.os.pose_list[frame_idx][:3, :3], self.os.pose_list[frame_idx][:3, 3:4]
                         x_cam = (x_world - _t.T) @ _R
@@ -136,20 +154,34 @@ class evaluator_scene_scene():
                             im_ = self.os.im_hdr_list[frame_idx]
                         elif sample_type == 'rgb_sdr':
                             im_ = self.os.im_sdr_list[frame_idx]
-                        sampled_rgb_th = torch.nn.functional.grid_sample(torch.from_numpy(im_).permute(2, 0, 1).unsqueeze(0).float(), grid, align_corners=True)
-                        sampled_rgb_valid = (sampled_rgb_th.squeeze().numpy().T)[uv_valid_mask]
+                        elif sample_type == 'semseg':
+                            im_ = self.os.semseg_list[frame_idx]
+                            
+                        if sample_type in ['rgb_hdr', 'rgb_sdr']:
+                            sampled_im_th = torch.nn.functional.grid_sample(torch.from_numpy(im_).permute(2, 0, 1).unsqueeze(0).float(), grid, align_corners=True)
+                        elif sample_type == 'semseg':
+                            sampled_im_th = torch.nn.functional.grid_sample(torch.from_numpy(im_).unsqueeze(0).unsqueeze(0).float(), grid, align_corners=True, mode='nearest').type(torch.int64)
+                        else:
+                            raise NotImplementedError
+                        
+                        sampled_im_valid = (sampled_im_th.squeeze().numpy().T)[uv_valid_mask]
                         valid_vertices_idx = np.where(visibility)[0][uv_valid_mask]
-                        assert valid_vertices_idx.shape[0] == sampled_rgb_valid.shape[0]
+                        assert valid_vertices_idx.shape[0] == sampled_im_valid.shape[0]
                         # for _idx, vertex_idx in tqdm(enumerate(valid_vertices_idx)):
-                        #     rgb_list[vertex_idx].append(sampled_rgb_valid[_idx])
-                        # [rgb_list[vertex_idx].append(sampled_rgb_valid[_idx]) for _idx, vertex_idx in tqdm(enumerate(valid_vertices_idx))]
-                        rgb_sum[valid_vertices_idx] += sampled_rgb_valid
-                        rgb_count[valid_vertices_idx] += 1
-
+                        #     rgb_list[vertex_idx].append(sampled_im_valid[_idx])
+                        # [rgb_list[vertex_idx].append(sampled_im_valid[_idx]) for _idx, vertex_idx in tqdm(enumerate(valid_vertices_idx))]
+                        if sample_type in ['rgb_hdr', 'rgb_sdr']:
+                            rgb_sum[valid_vertices_idx] += sampled_im_valid
+                            rgb_count[valid_vertices_idx] += 1
+                        elif sample_type == 'semseg':
+                            semseg_labels[valid_vertices_idx] = [_+[__] for _, __ in zip(semseg_labels[valid_vertices_idx], sampled_im_valid)]
+                        else:
+                            raise NotImplementedError
+                            
                 if sample_type == 'vis_count':
                     samples_v_dict[_id] = ('vis_count', vis_count)
                     max_vis_count = max(max_vis_count, np.amax(vis_count))
-                if sample_type == 'rgb_hdr':
+                elif sample_type == 'rgb_hdr':
                     # rgb_hdr = np.zeros((vertices.shape[0], 3), dtype=np.float32)
                     # for _idx, rgb_ in tqdm(enumerate(rgb_list)):
                     #     if len(rgb_) > 0:
@@ -157,10 +189,19 @@ class evaluator_scene_scene():
                     rgb_hdr = rgb_sum / (rgb_count.reshape((-1, 1))+1e-6) * hdr_radiance_scale
                     rgb_hdr[rgb_count==0] = np.array([[1., 1., 0.]], dtype=np.float32) # yellow for unordered vertices
                     samples_v_dict[_id] = ('rgb_hdr', rgb_hdr)
-                if sample_type == 'rgb_sdr':
+                elif sample_type == 'rgb_sdr':
                     rgb_sdr = rgb_sum / (rgb_count.reshape((-1, 1))+1e-6)
                     rgb_sdr[rgb_count==0] = np.array([[1., 1., 0.]], dtype=np.float32) # yellow for unordered vertices
                     samples_v_dict[_id] = ('rgb_sdr', rgb_sdr)
+                elif sample_type == 'semseg':
+                    semseg_labels = [np.argmax(np.bincount(_)) if len(_) > 0 else 255 for _ in semseg_labels]
+                    return_dict.update({'semseg_labels': semseg_labels})
+                    self.os.load_colors()
+                    semseg_labels_colors = np.array([self.os.OR_mapping_id_to_color_dict[_] for _ in semseg_labels])
+                    semseg_labels_colors = semseg_labels_colors.astype(np.float32) / 255.
+                    samples_v_dict[_id] = ('semseg', semseg_labels_colors)
+                else:
+                    raise NotImplementedError
 
             elif sample_type in ['face_normal']:
                 '''
@@ -229,7 +270,8 @@ class evaluator_scene_scene():
 
                 origin = np.tile(np.array(origin).reshape((1, 3)), (vertices.shape[0], 1))
                 ds = vertices - origin
-                ds = ds / (np.linalg.norm(ds, axis=1, keepdims=1)+1e-6)
+                ds_norm = (np.linalg.norm(ds, axis=1, keepdims=1)+1e-6)
+                ds = ds / ds_norm
 
                 xs = origin
                 xs_mi = mi.Point3f(xs)
@@ -239,6 +281,18 @@ class evaluator_scene_scene():
                 ret = self.os.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
                 # returned structure contains intersection location, nomral, ray step, ...
                 t = ret.t.numpy()
+                t_inf_mask = np.isinf(t)
+                import ipdb; ipdb.set_trace()
+                t[t_inf_mask] = 1
+                t_inf_mask[20000:] = False
+                t_inf_mask[:19900] = False
+                
+                cam_rays = {
+                    'v': xs[t_inf_mask], 'd': ds[t_inf_mask], 
+                    # 'l': t[::, np.newaxis][t_inf_mask]
+                    'l': ds_norm[t_inf_mask]
+                }
+                return_dict.update({'cam_rays': cam_rays})
 
                 samples_v_dict[_id] = ('t', (t, np.amax(t)))
             else:

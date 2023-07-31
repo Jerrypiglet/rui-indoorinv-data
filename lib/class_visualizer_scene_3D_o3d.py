@@ -228,6 +228,7 @@ class visualizer_scene_3D_o3d(object):
 
         if 'tsdf' in modality_list:
             o3d_geometry_list += self.collect_tsdf(
+                shapes_params
             )
         
         if 'lighting_SG' in modality_list:
@@ -730,10 +731,11 @@ class visualizer_scene_3D_o3d(object):
         images/demo_shapes_emitter_o3d.png
         '''
         if (not self.os.if_has_shapes) and self.os.if_has_pcd:
+            print(white_red('[%s] Shape not loaded BUT pcd found! Loading pcd instead, from %s.'%(self.__class__.__name__, self.os.pcd_path)))
             return self.collect_pcd(shape_params=shapes_params)
         
         if not self.os.if_has_shapes:
-            print(white_red('[%s] Shape not loaded! Skipped visualization.'%self.__class__.__name__))
+            print(white_red('[%s] Shape (from XML or from single shape file) not loaded! Skipped visualization.'%self.__class__.__name__))
             return []
 
         if_obj_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_obj_mesh', True)
@@ -759,7 +761,7 @@ class visualizer_scene_3D_o3d(object):
             self.os.vertices_list, 
             self.os.faces_list, 
             self.os.bverts_list, 
-            self.os.ids_list, 
+            self.os.shape_ids_list, 
         )):
 
             if_emitter = shape_dict['if_in_emitter_dict']
@@ -851,50 +853,7 @@ class visualizer_scene_3D_o3d(object):
 
                 if mesh_color_type.startswith('eval-'):
                     if 'samples_v_dict' in self.extra_input_dict and _id in self.extra_input_dict['samples_v_dict']:
-                        (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
-                        # print(_id, samples_v.shape[0], vertices.shape[0])
-                        # assert mesh_color_type.split('-')[1] == samples_type, 'Make sure this two match (got [%s] VS [%s]): your_evalautor->sample_type, visualizer_3D_o3d->shapes_params->mesh_color_type'%(mesh_color_type.split('-')[1], samples_type)
-                        if samples_type in ['rad', 'rgb_hdr', 'rgb_sdr']:
-                            # vertices colored with: radiance in SDR space
-                            assert samples_v.shape[0] == vertices.shape[0]
-                            if samples_type in ['rad', 'rgb_hdr']:
-                                samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
-                            else:
-                                samples_v_ = np.clip(samples_v, 0., 1.)
-                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                        elif samples_type in ['emission_mask', 'emission_mask_bin', 'roughness', 'metallic']:
-                            # vertices colored with: emission prob (non-emitter: blue; emitter: red)
-                            assert samples_v.shape[0] == vertices.shape[0]
-                            samples_v_ = np.clip(samples_v, 0., 1.).reshape(samples_v.shape[0], 1)
-                            samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
-                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                        elif samples_type == 'albedo':
-                            # vertices colored with albedo (SDR)
-                            assert samples_v.shape[0] == vertices.shape[0]
-                            samples_v_ = np.clip(samples_v, 0., 1.)
-                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                        elif samples_type == 'vertex_normal':
-                            assert samples_v.shape[0] == vertices.shape[0]
-                            samples_v_ = np.clip(samples_v/2.+0.5, 0., 1.)
-                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                        elif samples_type == 'vis_count':
-                            (samples_v_vis_count, max_vis_count) = samples_v
-                            assert samples_v_vis_count.shape[0] == vertices.shape[0]
-                            assert np.all(samples_v_vis_count <= max_vis_count)
-                            samples_v_ = (samples_v_vis_count / float(max_vis_count)).reshape(-1, 1)
-                            samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
-                            samples_v_[samples_v_vis_count==0] = np.array([[1., 1., 1.]]) # set not onserved area to white
-                            samples_v_[samples_v_vis_count==1] = np.array([[0., 1., 0.]]) # set not onserved area to green
-                            samples_v_[samples_v_vis_count==2] = np.array([[1., 1., 0.]]) # set not onserved area to yellow
-                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                        elif samples_type == 't':
-                            (samples_v_t, max_t) = samples_v
-                            assert samples_v_t.shape[0] == vertices.shape[0]
-                            samples_v_ = (samples_v_t / float(max_t)).reshape(-1, 1)
-                            samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
-                            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
-                        else:
-                            raise RuntimeError('Unsupported samples_type: %s!'%samples_type)
+                        shape_mesh = self.colorize_with_samples_v(shape_mesh=shape_mesh, _id=_id, vertices=vertices)
                 elif mesh_color_type == 'face_normal':
                     '''
                     global normals: images/demo_shapes_o3d_face_normal.png
@@ -976,6 +935,58 @@ class visualizer_scene_3D_o3d(object):
             ])
             
         return geometry_list
+    
+    def colorize_with_samples_v(self, shape_mesh, _id, vertices):
+        '''
+        colorize shape vertices with samples_v from evaluator
+        '''
+        (samples_type, samples_v) = self.extra_input_dict['samples_v_dict'][_id]
+        # print(_id, samples_v.shape[0], vertices.shape[0])
+        # assert mesh_color_type.split('-')[1] == samples_type, 'Make sure this two match (got [%s] VS [%s]): your_evalautor->sample_type, visualizer_3D_o3d->shapes_params->mesh_color_type'%(mesh_color_type.split('-')[1], samples_type)
+        if samples_type in ['rad', 'rgb_hdr', 'rgb_sdr']:
+            # vertices colored with: radiance in SDR space
+            assert samples_v.shape[0] == vertices.shape[0]
+            if samples_type in ['rad', 'rgb_hdr']:
+                samples_v_ = np.clip(samples_v ** (1./2.2), 0., 1.)
+            else:
+                samples_v_ = np.clip(samples_v, 0., 1.)
+            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+        elif samples_type in ['emission_mask', 'emission_mask_bin', 'roughness', 'metallic']:
+            # vertices colored with: emission prob (non-emitter: blue; emitter: red)
+            assert samples_v.shape[0] == vertices.shape[0]
+            samples_v_ = np.clip(samples_v, 0., 1.).reshape(samples_v.shape[0], 1)
+            samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
+            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+        elif samples_type in ['albedo', 'semseg']:
+            # vertices colored with albedo (SDR)
+            assert samples_v.shape[0] == vertices.shape[0]
+            samples_v_ = np.clip(samples_v, 0., 1.)
+            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+        elif samples_type == 'vertex_normal':
+            assert samples_v.shape[0] == vertices.shape[0]
+            samples_v_ = np.clip(samples_v/2.+0.5, 0., 1.)
+            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+        elif samples_type == 'vis_count':
+            (samples_v_vis_count, max_vis_count) = samples_v
+            assert samples_v_vis_count.shape[0] == vertices.shape[0]
+            assert np.all(samples_v_vis_count <= max_vis_count)
+            samples_v_ = (samples_v_vis_count / float(max_vis_count)).reshape(-1, 1)
+            samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
+            samples_v_[samples_v_vis_count==0] = np.array([[1., 1., 1.]]) # set not onserved area to white
+            samples_v_[samples_v_vis_count==1] = np.array([[0., 1., 0.]]) # set not onserved area to green
+            samples_v_[samples_v_vis_count==2] = np.array([[1., 1., 0.]]) # set not onserved area to yellow
+            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+        elif samples_type == 't':
+            (samples_v_t, max_t) = samples_v
+            assert samples_v_t.shape[0] == vertices.shape[0]
+            samples_v_ = (samples_v_t / float(max_t)).reshape(-1, 1)
+            samples_v_ = np.array([[1., 0., 0.]]) * samples_v_ + np.array([[0., 0., 1.]]) * (1. - samples_v_)
+            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+        else:
+            raise RuntimeError('Unsupported samples_type: %s!'%samples_type)
+        
+        return shape_mesh
+
 
     def collect_emitters(self, emitter_params: dict={}):
         '''
@@ -1163,14 +1174,14 @@ class visualizer_scene_3D_o3d(object):
 
         assert self.mi_pcd_color_list is not None
         
-    def collect_tsdf(self):
+    def collect_tsdf(self, shapes_params={}):
         '''
         load fuse TSDF volume
         '''
         if not self.os.if_loaded_tsdf:
             print(white_red('[%s] TSDF volume not loaded (or disabled after loading shape also from TSDF)! Skipped visualization.'%self.__class__.__name__))
             return []
-            
+        
         if 'tsdf_mesh_o3d' in self.os.tsdf_fused_dict:
             tsdf_mesh_o3d = self.os.tsdf_fused_dict['tsdf_mesh_o3d']
         else:
@@ -1178,5 +1189,10 @@ class visualizer_scene_3D_o3d(object):
             tsdf_mesh_o3d.compute_vertex_normals()
             tsdf_mesh_o3d.compute_triangle_normals()
             tsdf_mesh_o3d.vertex_colors = o3d.utility.Vector3dVector(self.os.tsdf_fused_dict['colors'])
-            
+        mesh_color_type = shapes_params.get('mesh_color_type', 'obj_color')
+        assert mesh_color_type in ['obj_color', 'face_normal'] or mesh_color_type.startswith('eval-')
+        if mesh_color_type.startswith('eval-'):
+            if 'samples_v_dict' in self.extra_input_dict and 0 in self.extra_input_dict['samples_v_dict']:
+                tsdf_mesh_o3d = self.colorize_with_samples_v(shape_mesh=tsdf_mesh_o3d, _id=0, vertices=self.os.tsdf_fused_dict['vertices'])
+                
         return [tsdf_mesh_o3d]

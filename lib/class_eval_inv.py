@@ -125,8 +125,8 @@ class evaluator_scene_inv():
         return_dict = {}
         samples_v_dict = {}
 
-        for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
-            print(white_blue('Evaluating inv-MLP for [%s]'%sample_type), 'sample_shapes for %d/%d shapes (%d v, %d f) ...'%(shape_index, len(self.os.ids_list), vertices.shape[0], faces.shape[0]))
+        for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.shape_ids_list))):
+            print(white_blue('Evaluating inv-MLP for [%s]'%sample_type), 'sample_shapes for %d/%d shapes (%d v, %d f) ...'%(shape_index, len(self.os.shape_ids_list), vertices.shape[0], faces.shape[0]))
             assert np.amin(faces) == 1 # [!!!] faces is 1-based!
             positions_nerf = self.or2nerf_th(torch.from_numpy(vertices).float().to(self.device)) # convert to NeRF coordinates
             if sample_type in ['emission_mask', 'emission_mask_bin']:

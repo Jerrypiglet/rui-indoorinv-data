@@ -411,9 +411,9 @@ class evaluator_scene_monosdf():
         if sample_type == 'rad':
             shape_rays_dict = {}
 
-        print(white_blue('Evaluating MonoSDF for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.ids_list))
+        print(white_blue('Evaluating MonoSDF for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(self.os.shape_ids_list))
 
-        for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.ids_list))):
+        for shape_index, (vertices, faces, _id) in tqdm(enumerate(zip(self.os.vertices_list, self.os.faces_list, self.os.shape_ids_list))):
             assert np.amin(faces) == 1
             shape_tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces-1) # [IMPORTANT] faces-1 because Trimesh faces are 0-based
 

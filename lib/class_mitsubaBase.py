@@ -76,6 +76,8 @@ class mitsubaBase(scene2DBase):
         self.if_scale_scene = False # if scale scale scene with self.scene_path / 'scale.txt'
         self.if_autoscale_scene = False # if auto-scale scene as did in MonoSDF (by translating/scaling all camera centers to fit in a unit box ([-1, 1]))
         
+        self.mi_scene_from = None
+        
         self.pcd_color = None
         self.pts_from = {'mi': False, 'depth': False}
         self.seg_from = {'mi': False, 'seg': False}
@@ -112,6 +114,11 @@ class mitsubaBase(scene2DBase):
                 self.tsdf_file_path = self.dataset_root / self.CONF.shape_params_dict.tsdf_file
             # assert self.tsdf_file_path.exists(), 'shape file does not exist: %s'%str(self.tsdf_file_path)
             self.has_tsdf_file = True
+            
+        if self.CONF.shape_params_dict.get('force_regenerate_tsdf', False):
+            print(yellow('Removed existing tsdf file due to CONF.shape_params_dict[\'force_regenerate_tsdf\']=True: %s'%str(self.tsdf_file_path)))
+            self.tsdf_file_path.unlink()
+
             
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
@@ -183,6 +190,10 @@ class mitsubaBase(scene2DBase):
         return all([_ in self.modality_list for _ in ['shapes']])
 
     @property
+    def if_has_pcd(self):
+        return 'shapes' in self.modality_list and self.scene_params_dict.get('pcd_file', '') != ''
+
+    @property
     def if_has_layout(self):
         return all([_ in self.modality_list for _ in ['layout']])
     
@@ -190,7 +201,7 @@ class mitsubaBase(scene2DBase):
         if shape_file_path == '':
             shape_file_path = self.shape_file_path
             
-        print(yellow('[%s] load_mi_scene from [shape file]'%self.__class__.__name__) + str(shape_file_path))
+        print(yellow('[%s] load_mi_scene from [file]'%self.__class__.__name__) + str(shape_file_path))
         self.shape_id_dict = {
             'type': shape_file_path.suffix[1:],
             'filename': str(shape_file_path), 
@@ -244,6 +255,7 @@ class mitsubaBase(scene2DBase):
         if if_postprocess_mi_frames:
             if_sample_rays_pts = self.CONF.mi_params_dict.get('if_sample_rays_pts', True)
             if if_sample_rays_pts:
+                print(green_text('Sampling rays...'))
                 self.mi_sample_rays_pts(self.cam_rays_list, if_force=force)
                 self.pts_from['mi'] = True
             
@@ -383,7 +395,7 @@ class mitsubaBase(scene2DBase):
         self.faces_list.append(shape_dict['faces'])
         self.bverts_list.append(shape_dict['bverts'])
         self.bfaces_list.append(shape_dict['bfaces'])
-        self.ids_list.append(shape_dict['_id'])
+        self.shape_ids_list.append(shape_dict['_id'])
         
         self.shape_list_valid.append(shape_dict['shape_dict'])
 
@@ -899,7 +911,7 @@ class mitsubaBase(scene2DBase):
         self.shape_list_valid = []
         self.vertices_list = []
         self.faces_list = []
-        self.ids_list = []
+        self.shape_ids_list = []
         self.bverts_list = []
         self.bfaces_list = []
 
@@ -927,6 +939,7 @@ class mitsubaBase(scene2DBase):
         self.append_shape(shape_dict)
 
         self.if_loaded_shapes = True
+        self.shape_ids_list = [0]
         
         print(blue_text('[%s] DONE. load_single_shape.'%(self.parent_class_name)))
 

@@ -4,6 +4,7 @@ Load and visualize re-rendered OpenRooms scenes with multi-view poses, 3D modali
 To run on the openrooms-public (i.e. less frames per scene):
 
 
+
 '''
 import sys
 
@@ -133,6 +134,11 @@ CONF.im_params_dict.update({
     'im_H_resize': 240, 'im_W_resize': 320, 
     })
 
+# DEBUG
+# CONF.shape_params_dict.update({
+#     'force_regenerate_tsdf': True
+# })
+
 if opt.export:
     if opt.export_format == 'mitsuba':
         CONF.im_params_dict.update({
@@ -169,7 +175,7 @@ scene_obj = openroomsScene3D(
         # 'albedo', 'roughness', 
         # 'depth', 'normal',
         # 'matseg', 
-        # 'semseg', 
+        'semseg', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
         
@@ -325,8 +331,8 @@ if opt.vis_2d_plt:
             'semseg', 
             # 'depth', 
             # 'normal', 
-            # 'mi_depth', 
-            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            'mi_depth', 
+            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', 
             # 'seg_area', 'seg_env', 'seg_obj', 
@@ -430,7 +436,7 @@ if opt.vis_3d_o3d:
             #     'pts': renderer_return_dict['ray_o'][_pts_idx].reshape(-1, 3)[::_sample_rate][visibility==1], 
             # }), 
             ])
-
+    
     if opt.if_add_rays_from_eval:
         if 'emitter_rays_list' in eval_return_dict:
             assert opt.eval_rad or opt.eval_inv
@@ -444,6 +450,15 @@ if opt.vis_3d_o3d:
                     }),
                 ])
                 # print('---', lpts.shape, np.amax(lpts), np.amin(lpts),np.amax(lpts_end), np.amin(lpts_end))
+
+        if 'cam_rays' in eval_return_dict:
+            lpts = eval_return_dict['cam_rays']['v']
+            lpts_end = lpts + eval_return_dict['cam_rays']['d'] * eval_return_dict['cam_rays']['l']
+            visualizer_3D_o3d.add_extra_geometry([
+                ('rays', {
+                    'ray_o': lpts, 'ray_e': lpts_end, 'ray_c': np.array([[0., 1., 0.]]*lpts.shape[0]), # GREEN for EST
+                }),
+            ])
                 
         if 'lighting_fused_list' in eval_return_dict:
             assert opt.eval_rad
@@ -490,7 +505,7 @@ if opt.vis_3d_o3d:
             'if_walls': False, # remove wall **triangles** to better see the furniture 
             # 'if_walls': True, 
             # 'mesh_color_type': 'eval-emission_mask', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
-            'mesh_color_type': 'obj_color', # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
+            'mesh_color_type': 'obj_color' if opt.sample_type == '' else 'eval-'+opt.sample_type, # ['obj_color', 'face_normal', 'eval-rad', 'eval-emission_mask']
         },
         emitter_params={
             'if_half_envmap': True, # if show half envmap as a hemisphere for window emitters (False: only show bboxes)
