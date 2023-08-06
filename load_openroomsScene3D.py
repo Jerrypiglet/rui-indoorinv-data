@@ -169,7 +169,7 @@ scene_obj = openroomsScene3D(
         'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root, # RAW scene files
         }, 
     modality_list = [
-        'im_sdr', 
+        # 'im_sdr', 
         # 'im_hdr', 
         'poses', 
         # 'seg', 
@@ -180,9 +180,9 @@ scene_obj = openroomsScene3D(
         # 'lighting_SG', 
         # 'lighting_envmap', 
         
-        # 'layout', 
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties
-        'tsdf', 
+        'layout', 
+        'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'tsdf', 
         'mi', # mitsuba scene, loading from scene xml file
         ], 
 )
@@ -383,14 +383,14 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             # 'dense_geo', 
-            'poses', 
+            # 'poses', 
             # 'lighting_SG', # images/demo_lighting_SG_o3d.png; arrows in blue
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
-            # 'layout', 
-            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
+            'layout', 
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters)
             # 'emitters', # emitter properties (e.g. SGs, half envmaps)
             'mi', # mitsuba sampled rays, pts
-            'tsdf', 
+            # 'tsdf', 
             ], 
         if_debug_info=opt.if_debug_info, 
     )

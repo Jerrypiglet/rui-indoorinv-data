@@ -57,11 +57,12 @@ class evaluator_scene_scene():
         assert self.os.if_loaded_shapes or self.os.if_loaded_tsdf, 'Shape(s)/TSDF shape not loaded! Required to evaluate properties of vertexs or faces.'
         if self.os.if_loaded_shapes:
             _vertices_list, _faces_list, _shape_ids_list = self.os.vertices_list, self.os.faces_list, self.os.shape_ids_list
-            if self.os.mi_scene_from != 'shape':
-                self.os.load_mi_scene()
-                if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
-                    self.os.process_mi_scene(if_postprocess_mi_frames=True)
-            assert self.os.mi_scene_from == 'shape'
+            if self.os.has_shape_file:
+                if self.os.mi_scene_from != 'shape':
+                    self.os.load_mi_scene()
+                    if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
+                        self.os.process_mi_scene(if_postprocess_mi_frames=True)
+                assert self.os.mi_scene_from == 'shape'
         elif self.os.if_loaded_tsdf:
             _vertices_list, _faces_list, _shape_ids_list = [self.os.tsdf_fused_dict['vertices']], [self.os.tsdf_fused_dict['faces'] + 1], [0] # fix all faces to be 0-indexed
             if self.os.mi_scene_from != 'tsdf':
@@ -175,10 +176,13 @@ class evaluator_scene_scene():
                             sampled_im_th = torch.nn.functional.grid_sample(torch.from_numpy(im_).permute(2, 0, 1).unsqueeze(0).float(), grid, align_corners=True)
                         elif sample_type == 'semseg':
                             sampled_im_th = torch.nn.functional.grid_sample(torch.from_numpy(im_).unsqueeze(0).unsqueeze(0).float(), grid, align_corners=True, mode='nearest').type(torch.int64)
+                            # print(sampled_im_th.shape)
                         else:
                             raise NotImplementedError
-                        
-                        sampled_im_valid = (sampled_im_th.squeeze().numpy().T)[uv_valid_mask]
+                        try:
+                            sampled_im_valid = (sampled_im_th.squeeze((0, 1, 3)).numpy().T)[uv_valid_mask]
+                        except IndexError:
+                            import ipdb; ipdb.set_trace()
                         valid_vertices_idx = np.where(visibility)[0][uv_valid_mask]
                         assert valid_vertices_idx.shape[0] == sampled_im_valid.shape[0]
                         # for _idx, vertex_idx in tqdm(enumerate(valid_vertices_idx)):

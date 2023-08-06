@@ -234,7 +234,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             # load single shape from self.shape_file_path
             print(yellow('[%s] load_shapes from [shape file]'%self.__class__.__name__) + str(self.shape_file_path))
             self.load_single_shape(shape_params_dict=self.CONF.shape_params_dict, force=force)
-        elif self.has_tsdf_file:
+        elif self.has_tsdf_file and 'tsdf' in self.modality_list:
             # load single shape from self.tsdf_file_path
             print(yellow('[%s] load_shapes from [tsdf file]'%self.__class__.__name__) + str(self.tsdf_file_path))
             self.load_single_shape(shape_params_dict=self.CONF.shape_params_dict, force=force, shape_file_path=self.tsdf_file_path)
