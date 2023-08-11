@@ -744,7 +744,7 @@ class mitsubaBase(scene2DBase):
             https://i.imgur.com/r6TET8K.jpg
         '''
         assert self.if_has_poses
-        assert self.if_has_im_sdr
+        assert self.if_has_im_sdr, 'Need to load im_sdr_list for TSDF fusion'
         if not if_use_mi_geometry:
             assert self.if_has_depth_normal
         

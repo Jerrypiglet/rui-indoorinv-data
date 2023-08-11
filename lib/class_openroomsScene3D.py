@@ -237,6 +237,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         elif self.has_tsdf_file and 'tsdf' in self.modality_list:
             # load single shape from self.tsdf_file_path
             print(yellow('[%s] load_shapes from [tsdf file]'%self.__class__.__name__) + str(self.tsdf_file_path))
+            if not self.if_loaded_tsdf: self.load_tsdf()
             self.load_single_shape(shape_params_dict=self.CONF.shape_params_dict, force=force, shape_file_path=self.tsdf_file_path)
         else:
             if_load_obj_mesh = self.CONF.shape_params_dict.get('if_load_obj_mesh', True)
@@ -449,14 +450,15 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                         {'emitter_prop': emitter_dict['emitter_prop'], 'vertices': vertices_transformed, 'faces': faces}
                     )
 
+            print(blue_text('[%s] DONE. load_shapes: %d total objects, %d total emitters: %d/%d windows lit, %d/%d area lights lit'%(
+                self.parent_class_name, 
+                len(self.shape_list_valid), len(self.emitter_list[1:]), 
+                len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
+                len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
+                )))
+            
         self.if_loaded_shapes = True
 
-        print(blue_text('[%s] DONE. load_shapes: %d total objects, %d total emitters: %d/%d windows lit, %d/%d area lights lit'%(
-            self.parent_class_name, 
-            len(self.shape_list_valid), len(self.emitter_list[1:]), 
-            len([_ for _ in self.window_list if _['emitter_prop']['if_lit_up']]), len(self.window_list), 
-            len([_ for _ in self.lamp_list if _['emitter_prop']['if_lit_up']]), len(self.lamp_list), 
-            )))
 
     def load_layout(self):
         '''

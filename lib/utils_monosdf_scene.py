@@ -23,6 +23,8 @@ def load_shape_dict_from_shape_file(shape_file_list: list, shape_params_dict={},
     
     if not isinstance(shape_file_list, list): shape_file_list = [shape_file_list]
     shape_file_list = [Path(shape_file) for shape_file in shape_file_list]
+    assert all(shape_file.exists() for shape_file in shape_file_list), 'Some shape files do not exist: %s'%shape_file_list
+    
     shape_tri_mesh_list = [trimesh.load_mesh(str(shape_file), process=False, maintain_order=True) for shape_file in shape_file_list]
     shape_tri_mesh = trimesh.util.concatenate(shape_tri_mesh_list)
     
