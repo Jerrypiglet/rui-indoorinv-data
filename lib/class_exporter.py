@@ -9,12 +9,14 @@ from tqdm import tqdm
 import mitsuba as mi
 import shutil
 import matplotlib.pyplot as plt
+import xml.etree.ElementTree as et
 
 from lib.utils_OR.utils_OR_mesh import get_rectangle_mesh, get_rectangle_thin_box
 from lib.utils_OR.utils_OR_xml import get_XML_root, transformToXml
 from lib.utils_io import center_crop
 from lib.utils_misc import green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
 from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
+from lib.utils_lieccv22 import x_cam_zq_2_x_cam_rui, x_cam_rui_2_x_cam_zq
 
 from lib.class_openroomsScene2D import openroomsScene2D
 from lib.class_openroomsScene3D import openroomsScene3D
@@ -616,6 +618,8 @@ class exporter_scene():
         if self.prepare_check_export(scene_export_path) == False:
             return
         
+
+        
         modality_list_export = modality_list if len(modality_list) > 0 else self.modality_list_export
         
         if assert_shape is not None:
@@ -646,14 +650,27 @@ class exporter_scene():
             frame_export_path.mkdir(parents=True, exist_ok=True)
             frame_export_path_list.append(frame_export_path)
             
-            # fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
-            # fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
-            fx = self.os._K(frame_idx)[0][0]
-            fy = self.os._K(frame_idx)[1][1]
-            fov_x = np.arctan(0.5 * self.os.W / fx) * 2. / np.pi * 180.
-            fov_y = np.arctan(0.5 * self.os.H / fy) * 2. / np.pi * 180.
+            '''
+            in case depth is normalized in ZQ's processing; in this case we need to transform the inseted lights
+            '''
+            depth_scale_mul = None
+            depth_scale_path = Path(frame_export_path) / 'depth_scale_mul.npy'
+            if depth_scale_path.exists():
+                print(yellow('Depth normalization file exists; applying normalization to [light] goemetry and location.'), str(frame_export_path))
+                depth_scale_mul = np.load(depth_scale_path)
             
-            np.save(frame_export_path / 'fov_xy.npy', {'fov_x': fov_x, 'fov_y': fov_y}) # full fov, in angles
+            '''
+            try not change ZQ's fov because his models were trained with his fixed fov, and his renderers only supports his fov (i.e. equal fx fy, and centered optical center)
+            '''
+            # fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
+            # fov_x = self.os.meta['camera_angle_x'] / np.pi * 180.
+            # fx = self.os._K(frame_idx)[0][0]
+            # fy = self.os._K(frame_idx)[1][1]
+            # fov_x = np.arctan(0.5 * self.os.W / fx) * 2. / np.pi * 180.
+            # fov_y = np.arctan(0.5 * self.os.H / fy) * 2. / np.pi * 180.
+            
+            # np.save(frame_export_path / 'fov_xy.npy', {'fov_x': fov_x, 'fov_y': fov_y}) # full fov, in angles
+            
             IF_CREATED_EDIT_FOLDER = False
             
             for modality in modality_list_export:
@@ -676,14 +693,14 @@ class exporter_scene():
                     mi_depth = self.os.mi_depth_list[frame_idx].squeeze()
                     
                     prediction = mi_depth.copy()
-                    prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = np.median(~prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()])
+                    prediction[self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()] = np.median(prediction[~self.os.mi_invalid_depth_mask_list[frame_idx].squeeze()])
 
-                    print('+++', np.amax(prediction), np.amin(prediction))
  
                     prediction_npy_export_path = frame_export_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                     prediction = center_crop(prediction, center_crop_HW)
                     np.save(str(prediction_npy_export_path), prediction)
                     print(blue_text('depth (npy) exported to: %s'%(str(prediction_npy_export_path))))
+                    print('+++ max, min', np.amax(prediction), np.amin(prediction))
                     
                     # export vis of normalized depth
                     depth_vis_normalized, depth_min_and_scale = vis_disp_colormap(mi_depth, normalize=True, valid_mask=~self.os.mi_invalid_depth_mask_list[frame_idx].squeeze())
@@ -802,36 +819,71 @@ class exporter_scene():
                     geo_mesh_file_list = [_ for _ in BRDF_results_path.iterdir() if _.suffix in ['.obj', '.ply']]
                     pose = self.os.pose_list[frame_idx]
                     _R, _t = pose[:3, :3], pose[:3, 3:4]
-                    
-                    if hasattr(self.os, 'shape_id_dict'):
-                    # assert hasattr(self.os, 'shape_id_dict') # assuming mitsuba scene loaded from dict or single/multiple shapes (not from xml)
-                        est_scene_dict = self.os.shape_id_dict.copy()
-                    else:
-                        assert self.scene_shape_file != ''
-                        est_scene_dict = {
-                            'type': 'scene',
-                            Path(self.scene_shape_file).stem: {
-                                # 'id': , 
-                                'type': Path(self.scene_shape_file).suffix[1:],
-                                'filename': str(self.scene_shape_file), 
-                            }, 
-                        }
+
+                    est_scene_dict = {
+                        'type': 'scene',
+                    } # create an empty scene; later fill with estimated emitters
+
+                    # if hasattr(self.os, 'shape_id_dict'):
+                    # # assert hasattr(self.os, 'shape_id_dict') # assuming mitsuba scene loaded from dict or single/multiple shapes (not from xml)
+                    #     est_scene_dict = {
+                    #         'type': 'scene',
+                    #         'shape_id': self.os.shape_id_dict, 
+                    #     }.copy()
+                    # else:
+                    #     assert self.scene_shape_file != ''
+                    #     est_scene_dict = {
+                    #         'type': 'scene',
+                    #         Path(self.scene_shape_file).stem: {
+                    #             # 'id': , 
+                    #             'type': Path(self.scene_shape_file).suffix[1:],
+                    #             'filename': str(self.scene_shape_file), 
+                    #         }, 
+                    #     }
 
                     geo_mesh_id_list = []
                     rad_pred_list = []
+                    
+                    
+                    '''
+                    emission debug vis _. Temp/debug_reproj_emission_est.png: ![](https://i.imgur.com/paBh87M.png)
+                    '''
+                    plt.figure(figsize=(10, 10))
+                    plt.axis('equal')
+                    ___ = self.os.im_sdr_list[frame_idx].copy()
+                    ___ = ___[:, ::-1]
+                    plt.imshow(___)
+                    
                     for geo_mesh_file in geo_mesh_file_list: # images/demo_lieccv22_brdf_light_result.png; just to make sure the new lights and room geometry matches the original GT geometry shape
-                        if 'room' in geo_mesh_file.stem:
-                            continue
+                        '''
+                        write down transformed mesh back to original space, and write debugging meshes
+                        '''
                         assert ('room_' in geo_mesh_file.stem) or ('Lamp' in geo_mesh_file.stem) or ('Win' in geo_mesh_file.stem), 'Unknown geo_mesh_file: %s'%str(geo_mesh_file)
                         _mesh = trimesh.load(str(geo_mesh_file))
                         # transform from opengl cam to opencv world
                         # _light_vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_light_vertices.T  - _t)).T # convert to oopengl camera coords
                         _vertices_cam = _mesh.vertices
-                        _vertices_cam_opencv = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _vertices_cam.T).T
+                        if depth_scale_mul is not None:
+                            _vertices_cam = _vertices_cam / depth_scale_mul
+                            
+                        _vertices_cam_rui, (xx_rui, yy_rui) = x_cam_zq_2_x_cam_rui(self.os.K, np.array(_vertices_cam))
+                        
+                        _vertices_cam_opencv = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _vertices_cam_rui.T).T
+                        # _vertices_cam_opencv = _vertices_cam_rui
                         _vertices_cam_world = (_R @ _vertices_cam_opencv.T + _t).T
                         _mesh_world = trimesh.Trimesh(vertices=_vertices_cam_world, faces=_mesh.faces if hasattr(_mesh, 'faces') else None)
                         geo_mesh_file_world = TEMP_path / geo_mesh_file.name
                         _mesh_world.export(str(geo_mesh_file_world))
+                        print('[DEBUG] geo_mesh_file_world -> : %s'%str(geo_mesh_file_world))
+                        
+                        plt.scatter(xx_rui[::-1], yy_rui[::-1], s=1) # debug
+                        
+                        if 'room' in geo_mesh_file.stem:
+                            continue
+                        
+                        '''
+                        construct mitsuba scene in original space with original poses
+                        '''
                         shape_id_dict = {
                             'id': geo_mesh_file.stem, 
                             'type': geo_mesh_file.suffix[1:],
@@ -869,6 +921,14 @@ class exporter_scene():
                             print(geo_mesh_file.name)
                             print([_.stem for _ in BRDF_results_path.iterdir() if _.suffix == '.dat'])
                             import ipdb; ipdb.set_trace()
+
+                    plt.grid()
+                    plt.xlim([0.5, self.os.W-0.5])
+                    plt.ylim([0.5, self.os.H-0.5])
+                    plt.gca().invert_yaxis()
+                    # plt.gca().invert_xaxis() 
+                    # plt.show()
+                    plt.savefig(str(TEMP_path / 'debug_reproj_emission_est.png'))
                             
                     mi_scene_BRDF_results = mi.load_dict(est_scene_dict)
                     rays_o, rays_d, ray_d_center = self.os.cam_rays_list[frame_idx]
@@ -903,7 +963,7 @@ class exporter_scene():
                         if _emitter_idx == 0: continue
                         emission[emission_id_map==_emitter_idx, :] = rad_pred_list[_emitter_idx-1].reshape((1, 3)).astype(np.float32)
                     cv2.imwrite(str(emission_mask_export_path), emission)
-
+                    
                 if modality == 'lighting':
                     outLight_file_list = [_ for _ in self.os.scene_path.iterdir() if _.stem.startswith('outLight')]
                     assert len(outLight_file_list) > 0, 'No outLight files found at %s'%str(self.os.scene_path)
@@ -922,7 +982,16 @@ class exporter_scene():
                     for _ in INPUT_edited_path.iterdir():
                         if 'lampMask' in str(_.stem):
                             _.unlink(missing_ok=True); print('-Unlinked %s'%str(_))
-                    
+                            
+                    '''
+                    debug: show the light mask overlayed on the image -> Temp/debug_reproj_new_lights.png ![](https://i.imgur.com/iMHVnlI.png)
+                    '''
+                    plt.figure(figsize=(15, 5))
+                    plt.subplot(131)
+                    plt.imshow(self.os.im_sdr_list[frame_idx])
+                    light_mask_total = np.empty((self.os.H, self.os.W), dtype=bool)
+                    light_mask_total.fill(False)
+                        
                     for outLight_file_idx, outLight_file in tqdm(enumerate(outLight_file_list)):
                         root = get_XML_root(str(outLight_file))
                         root = copy.deepcopy(root)
@@ -950,24 +1019,55 @@ class exporter_scene():
                             _transform = [_ for _ in transform_item.findall('matrix')[0].get('value').split(' ') if _ != '']
                             transform_matrix = np.array(_transform).reshape(4, 4).astype(np.float32)
                             transform_accu = transform_matrix @ transform_accu # [[R,t], [0,0,0,1]]
-                            
-                        assert self.os.extra_transform is None
-                        # transform_accu = self.os.extra_transform_homo @ transform_accu
-                        if hasattr(self.os, 'if_reorient_shape') and self.os.if_reorient_shape:
-                            assert hasattr(self.os, 'reorient_transform')
-                            transform_accu = self.os.reorient_transform @ transform_accu
                         
+                        # assert self.os.extra_transform is None
+                        # transform_accu = self.os.extra_transform_homo @ transform_accu
+                        if self.os._if_T and not self.os.CONF.scene_params_dict.if_reorient_y_up_skip_shape:
+                            # assert hasattr(self.os, 'reorient_transform')
+                            transform_accu = self.os._T_homo @ transform_accu
+                            
                         transform_item.findall('matrix')[0].set('value', ' '.join(['%.4f'%_ for _ in transform_accu.flatten().tolist()]))
                         xmlString = transformToXml(root)
                         outLight_transformed_file = scene_export_path / 'lightings' / (outLight_file.name.replace('.xml', '_transformed.xml'))
                         (scene_export_path / outLight_transformed_file).parent.mkdir(parents=True, exist_ok=True)
                         with open(str(outLight_transformed_file), 'w') as xmlOut:
                             xmlOut.write(xmlString)
+                        
+                        # '''
+                        # debug: ALTERNATIVELY, dump all lamps as obj, and load obj into xml
+                        # in this way, we can additionally directly modify the vertices, thus being able to transform the vertices from Rui to Zhengqin's, which is no longer limited to a rigid transformation
+                        # '''
+                        # root_obj = copy.deepcopy(root)
+                        # if shape.get('type') == 'rectangle':
+                        #     (_light_vertices, _light_faces) = get_rectangle_mesh(np.eye(3), np.zeros((3, 1))) # world
+                        #     _light_faces -= 1
+                        # elif shape.get('type') == 'obj':
+                        #     light_mesh_path = self.os.scene_path / shape.findall('string')[0].get('value')
+                        #     assert light_mesh_path.exists()
+                        #     light_mesh = trimesh.load_mesh(str(light_mesh_path))
+                        #     _light_vertices, _light_faces = light_mesh.vertices, light_mesh.faces
+                        # elif shape.get('type') == 'sphere':
+                        #     light_mesh = trimesh.creation.icosphere(subdivisions=3)
+                        #     _light_vertices, _light_faces = light_mesh.vertices, light_mesh.faces
+                        
+                        # assert np.min(_light_faces) == 0
+
+                        # light_trimesh = trimesh.Trimesh(vertices=_light_vertices, faces=_light_faces)
+                        # light_mesh_path = TEMP_path / (shape.get('id')+'.obj')
+                        # light_trimesh.export(str(light_mesh_path))
+                        # root_obj.findall('shape')[0].set('type', 'obj')
+                        # light_mesh_node = et.Element("string", {"name": "filename", "value": str(light_mesh_path)})
+                        # root_obj.findall('shape')[0].append(light_mesh_node)
+                        # xmlString_obj = transformToXml(root_obj)
+                        # outLight_transformed_file_obj = scene_export_path / 'lightings' / (outLight_file.name.replace('.xml', '_transformed_using_obj.xml'))
+                        # with open(str(outLight_transformed_file_obj), 'w') as xmlOut:
+                        #     xmlOut.write(xmlString_obj)
 
                         '''
-                        dump new light - mask
+                        dump new light - mask; render with Mitsuba under Rui's world coordinates
                         '''
                         mi_light_scene = mi.load_file(str(outLight_transformed_file))
+                        # mi_light_scene = mi.load_file(str(outLight_transformed_file_obj))
                         rays_o, rays_d, ray_d_center = self.os.cam_rays_list[frame_idx]
                         rays_o_flatten, rays_d_flatten = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
                         xs_mi = mi.Point3f(self.os.to_d(rays_o_flatten))
@@ -983,16 +1083,19 @@ class exporter_scene():
                         
                         if np.sum(~invalid_light_depth_mask) > 0:
                             IF_light_visible = True
-                        
+                            
                         if IF_light_visible:
                             # dump new vis lamp mask
                             light_mask_path = INPUT_edited_path / ('lampMask_%d.png'%outLight_file_count)
                             light_mask = (~invalid_light_depth_mask).astype(np.uint8) * 255
                             if len(light_mask.shape) == 3: light_mask = light_mask[:, :, 0]
                             cv2.imwrite(str(light_mask_path), light_mask)
-
+                            
+                            light_mask_total = np.logical_or(light_mask_total, light_mask)
+                            
                         '''
-                        shape or dat
+                        shape or dat; dump to EditedInput/*.obj, in ZQ's coordinates (i.e. camera coordinates and with a different perspective)
+                        Loaded together with BRDFLight_../*.obj, should see room goemetry + est lamps + new lamps, in ZQ's coordinates
                         '''
                         if shape.get('type') == 'rectangle':
                             if IF_light_visible:
@@ -1044,7 +1147,11 @@ class exporter_scene():
                                 _axes_center = np.mean(_light_vertices, axis=0).reshape((1, 3))
 
                         '''
-                        dump new light - mesh, .dat; NOT a linear transformation because normalization was done on inverse depth
+                        dump new light - .obj ∫meshes + .dat; to ZQ's coordinates; NOT a rigid transformation
+                        -> when loading room mesh + est lamp meshes from BRDFLight.../*.obj, + new lamp meshes from EditedInput/*.obj, the old and new lamps should roughly overlap:
+                        
+                        (classroom-275: one new lamp highlighted) ![](https://i.imgur.com/PiwKICQ.jpg)
+                        
                         '''
                         
                         pose = self.os.pose_list[frame_idx]
@@ -1063,8 +1170,14 @@ class exporter_scene():
                         light_edit_txt_path = INPUT_edited_path / ('light_%d_params.txt'%outLight_file_count)
                         
                         if IF_light_visible:
-                            _light_vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_light_vertices.T  - _t)).T # convert to oopengl camera coords
+                            if depth_scale_mul is not None:
+                                _light_vertices = ((_light_vertices.T  - _t) * depth_scale_mul + _t).T
 
+                            # _light_vertices_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_light_vertices.T  - _t)).T # convert to oopengl camera coords
+                            
+                            _light_vertices_cam = (_R.T @ (_light_vertices.T  - _t)).T
+                            _light_vertices_cam = x_cam_rui_2_x_cam_zq(self.os.K, _light_vertices_cam)[0]
+                            
                             light_trimesh = trimesh.Trimesh(vertices=_light_vertices_cam, faces=_light_faces)
                             light_mesh_path = INPUT_edited_path / ('visLamp_%d.obj'%outLight_file_count)
                             light_trimesh.export(str(light_mesh_path))
@@ -1081,6 +1194,9 @@ class exporter_scene():
                             given lieccv22 uses linear transformation on inverse depth, hence non-linear on metric depth, thus the scene is no longer orthographic
                             Then the best thing we can do about invisible lamps is to maintain the geometry as a box in the new scene, and offset it to the correct location
                             '''
+                            if depth_scale_mul is not None:
+                                _axes_center = ((_axes_center.T  - _t) * depth_scale_mul + _t).T
+
                             _axes_center_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_axes_center.T  - _t)).T # convert to oopengl camera coords
                             
                             _axes_cam = (np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]) @ _R.T @ (_axes.T)).T # does not shift or sheer
@@ -1195,6 +1311,9 @@ class exporter_scene():
                             prediction_npy_export_path = INPUT_edited_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                             depth = np.load(str(prediction_npy_export_path))
                             
+                            if depth_scale_mul is not None:
+                                depth *= depth_scale_mul
+                                
                             depth[light_mask==255] == mi_light_depth
                             depth_export_path = BRDF_edited_results_path / ('depth_gt.npy' if not if_no_gt_appendix else 'depth.npy')
                             np.save(str(depth_export_path), depth)
@@ -1237,6 +1356,14 @@ class exporter_scene():
                             
                             print(blue_text('lighting FILES exported to: %s'%str(BRDF_edited_results_path)))
                             
+        
+                    plt.subplot(132)
+                    plt.imshow(light_mask_total)
+                    plt.subplot(133)
+                    plt.imshow(self.os.im_sdr_list[frame_idx]*0.5+light_mask_total[:, :, np.newaxis].astype(np.float32)*np.array([1., 0., 0.]).reshape(1, 1, 3)*0.5)
+                    # plt.show()
+                    plt.savefig(str(TEMP_path / 'debug_reproj_new_lights.png'))
+
 
         frame_list_export_path = self.os.dataset_root / 'EXPORT_lieccv22' / split / ('testList_%s.txt'%self.os.scene_name)
         

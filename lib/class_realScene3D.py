@@ -192,7 +192,7 @@ class realScene3D(mitsubaBase):
         '''
         load scene representation into Mitsuba 3
         '''
-
+        
         if self.has_shape_file:
             self.load_mi_scene_from_shape(input_extra_transform_homo=input_extra_transform_homo)
         else:

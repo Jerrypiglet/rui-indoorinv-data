@@ -6,8 +6,7 @@ import cv2
 import sys
 
 import numpy as np
-ROOT_PATH = Path('/Users/jerrypiglet/Documents/Projects/OpenRooms_RAW_loader')
-# ROOT_PATH = Path('/home/ruizhu/Documents/Projects/OpenRooms_RAW_loader')
+ROOT_PATH = Path('/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data')
 assert ROOT_PATH.exists()
 sys.path.insert(0, str(ROOT_PATH))
 
@@ -40,9 +39,11 @@ test_list_path = ROOT_PATH / 'data/real/EXPORT_lieccv22' / SPLIT / 'testList_Con
 # frame_id_list = [9, 161] # BRDF
 frame_id_list = [68, 180] # synthesis/relight 
 
-# scene_name = 'real/ClassRoom'
-# # test_list_path = ROOT_PATH / 'data/real/EXPORT_lieccv22' / SPLIT / 'testList_ClassRoom.txt'
-# test_list_path = ROOT_PATH / 'data/real/EXPORT_lieccv22' / SPLIT / 'testList_ClassRoom_relight.txt'
+scene_name = 'real/ClassRoom'
+test_list_path = ROOT_PATH / 'data/real/EXPORT_lieccv22' / SPLIT / 'testList_ClassRoom.txt'
+# frame_id_list = [235, 120] # BRDF
+# frame_id_list = [27, 92] # synthesis
+frame_id_list = [278, 275] # relight
 
 scene_name_write = scene_name.split('/')[1] if '/' in scene_name else scene_name
 assert Path(test_list_path).exists(), str(test_list_path)
@@ -51,15 +52,15 @@ split = test_list_path.parent.stem
 
 TARGET_PATH = ROOT_PATH / 'data' / DATASET / 'RESULTS/$TASK/lieccv22' / scene_name_write
 
-# BRDF_result_folder = 'BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize'
-BRDF_result_folder = 'BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000'
+BRDF_result_folder = 'BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize'
 EditedBRDF_result_folder = BRDF_result_folder.replace('BRDFLight', 'EditedBRDFLight')
 
 '''
 switch between two re-rendering tasks
 '''
-RENDER_TASK = 'relight'; Lighting_result_folder = 'EditedRerendering_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000'
-# RENDER_TASK = 'viewsynthesis'; Lighting_result_folder = 'Rerendering_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000'
+# RENDER_TASK = None
+# RENDER_TASK = 'viewsynthesis'; Lighting_result_folder = 'Rendering_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize'
+RENDER_TASK = 'relight'; Lighting_result_folder = 'EditedRendering_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize'
 
 if_downsize = True # if downsize to 160x320
 
@@ -77,44 +78,48 @@ for test in tests:
    scene_name_test, frame_id = '_'.join(test_name.split('_')[:-1]), int(test_name.split('_')[-1].replace('frame', ''))
    if frame_id not in frame_id_list: continue
    
-   # if split in ['train', 'real']:
-   #    BRDF_result_path = test.parent / BRDF_result_folder
-   #    assert BRDF_result_path.exists(), str(BRDF_result_path)
+   if split in ['train', 'real']:
+      BRDF_result_path = test.parent / BRDF_result_folder
+      assert BRDF_result_path.exists(), str(BRDF_result_path)
       
-   #    Path(str(TARGET_PATH).replace('$TASK', 'brdf')).mkdir(parents=True, exist_ok=True)
+      Path(str(TARGET_PATH).replace('$TASK', 'brdf')).mkdir(parents=True, exist_ok=True)
       
-   #    albedo_vis_path = BRDF_result_path / 'albedo.png'
-   #    assert albedo_vis_path.exists(), str(albedo_vis_path)
-   #    # albedo = cv2.imread(str(albedo_vis_path), cv2.IMREAD_UNCHANGED).astype(np.float32)/255.
-   #    # albedo = (np.clip(albedo**2.2, 0, 1) * 255).astype(np.uint8)
-   #    albedo = cv2.imread(str(albedo_vis_path), cv2.IMREAD_UNCHANGED)
-   #    # albedo = center_crop(albedo, expected_shape)
-   #    albedo = cv2.resize(albedo, (expected_shape[1]*2, expected_shape[0]*2))
-   #    cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_kd.png'%frame_id)), albedo)
+      albedo_vis_path = BRDF_result_path / 'albedo.png'
+      assert albedo_vis_path.exists(), str(albedo_vis_path)
+      # albedo = cv2.imread(str(albedo_vis_path), cv2.IMREAD_UNCHANGED).astype(np.float32)/255.
+      # albedo = (np.clip(albedo**2.2, 0, 1) * 255).astype(np.uint8)
+      albedo = cv2.imread(str(albedo_vis_path), cv2.IMREAD_UNCHANGED)
+      # albedo = center_crop(albedo, expected_shape)
+      albedo = cv2.resize(albedo, (expected_shape[1]*2, expected_shape[0]*2))
+      cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_kd.png'%frame_id)), albedo)
       
-   #    rough_vis_path = BRDF_result_path / 'rough.png'
-   #    assert rough_vis_path.exists(), str(rough_vis_path)
-   #    rough = cv2.imread(str(rough_vis_path), cv2.IMREAD_UNCHANGED)
-   #    # rough = center_crop(rough, expected_shape)
-   #    rough = cv2.resize(rough, (expected_shape[1]*2, expected_shape[0]*2))
-   #    cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_roughness.png'%frame_id)), rough)
+      rough_vis_path = BRDF_result_path / 'rough.png'
+      assert rough_vis_path.exists(), str(rough_vis_path)
+      rough = cv2.imread(str(rough_vis_path), cv2.IMREAD_UNCHANGED)
+      # rough = center_crop(rough, expected_shape)
+      rough = cv2.resize(rough, (expected_shape[1]*2, expected_shape[0]*2))
+      cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_roughness.png'%frame_id)), rough)
 
-   #    INPUT_edited_path = test.parent / 'EditedInput'
-   #    assert INPUT_edited_path.exists(), str(INPUT_edited_path)
+      INPUT_edited_path = test.parent / 'EditedInput'
+      assert INPUT_edited_path.exists(), str(INPUT_edited_path)
       
-   #    emission_path = INPUT_edited_path / 'emission.exr'
-   #    assert emission_path.exists(), str(emission_path)
-   #    emission = cv2.imread(str(emission_path), cv2.IMREAD_UNCHANGED)
-   #    # emission = center_crop(emission, expected_shape)
-   #    emission = cv2.resize(emission, (expected_shape[1]*2, expected_shape[0]*2))
-   #    cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_emission.exr'%frame_id)), emission)
+      emission_path = INPUT_edited_path / 'emission.exr'
+      assert emission_path.exists(), str(emission_path)
+      emission = cv2.imread(str(emission_path), cv2.IMREAD_UNCHANGED)
+      # emission = center_crop(emission, expected_shape)
+      emission = cv2.resize(emission, (expected_shape[1]*2, expected_shape[0]*2))
+      cv2.imwrite(str(Path(str(TARGET_PATH).replace('$TASK', 'brdf')) / ('%03d_emission.exr'%frame_id)), emission)
 
-   #    print('=== BRDF results saved to %s ==='%str(Path(str(TARGET_PATH).replace('$TASK', 'brdf'))))
+      print('=== BRDF results saved to %s ==='%str(Path(str(TARGET_PATH).replace('$TASK', 'brdf'))))
    
    # continue
    '''
    relight
    '''
+   if RENDER_TASK is None: 
+      print('No rendering task specified. DONE.')
+      continue
+   
    if split in ['val', 'real']:
       Lighting_result_path = test.parent / 'input/envMask.png'
       envMask = cv2.imread(str(Lighting_result_path), cv2.IMREAD_UNCHANGED).astype(np.float32)[:, :, np.newaxis] / 255.
@@ -169,6 +174,7 @@ for test in tests:
       if emitterMask_list != []:
          for emitterMask, _rad in emitterMask_list:
             lieccv22_relight[emitterMask] = _rad
+            print('emitterMask.shape', emitterMask.shape, 'assigning _rad:', _rad)
       # lieccv22_relight = center_crop(lieccv22_relight, expected_shape)
       lieccv22_relight = cv2.resize(lieccv22_relight, (expected_shape[1]*2, expected_shape[0]*2))
       

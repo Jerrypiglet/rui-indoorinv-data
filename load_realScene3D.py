@@ -141,7 +141,7 @@ scene_obj = realScene3D(
         'im_hdr', 
         'im_sdr', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
-        'tsdf', 
+        # 'tsdf', 
         ], 
 )
 
@@ -198,7 +198,7 @@ if opt.export:
             # 'im_mask', 
             # 'shapes', 
             # 'mi_normal', 
-            # 'mi_depth', 
+            'mi_depth', 
             ], 
         if_force=opt.force, 
         # convert from y+ (native to indoor synthetic) to z+
@@ -263,9 +263,9 @@ if opt.export:
             assert_shape=(240, 320),
             window_area_emitter_id_list=[], # not available for real images
             merge_lamp_id_list=[], # not available for real images
-            emitter_thres = emitter_thres, # same as offered to fvp
-            BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000', # transfer this back once get BRDF results
-            # BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize', # transfer this back once get BRDF results
+            emitter_thres = CONF.scene_params_dict.emitter_thres, # same as offered to fvp
+            # BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000', # transfer this back once get BRDF results
+            BRDF_results_folder='BRDFLight_size0.200_int0.001_dir1.000_lam0.001_ren1.000_visWin120000_visLamp119540_invWin200000_invLamp150000_optimize', # transfer this back once get BRDF results
             # center_crop_HW=(240, 320), 
             if_no_gt_appendix=True, 
             appendix=opt.export_appendix, 
@@ -315,9 +315,9 @@ if opt.vis_3d_o3d:
         scene_obj, 
         modality_list_vis=[
             'poses', 
-            # 'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
+            'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             'mi', # mitsuba sampled rays, pts
-            'tsdf', 
+            # 'tsdf', 
             ], 
         if_debug_info=opt.if_debug_info, 
     )

@@ -10,10 +10,10 @@ import torch
 import matplotlib.pyplot as plt
 
 # export_path = Path('/Users/jerrypiglet/Library/CloudStorage/OneDrive-Personal/[Research]/Projects/FIPT/images/brdf_synthesis')
-export_path = Path('/Users/jerrypiglet/Documents/Projects/FIPT/images/brdf_real_supp')
+export_path = Path('/Users/jerrypiglet/Library/CloudStorage/OneDrive-Personal/[Research]/Projects/ICCV2023_FIPT/FIPT_arxiv/images/real_supp')
 data_root_path = Path('data/real')
 
-assert Path(export_path).parent.exists()
+assert Path(export_path).parent.exists(), 'export path does not exist: ' + str(export_path)
 Path(export_path).mkdir(parents=True, exist_ok=True)
 print('Exporting to', export_path)
 
@@ -165,6 +165,13 @@ for scene_name, frame_id_list in scene_frame_list:
                         im_ori = im_ori * emission_mask[..., None]
                 im_ori_target = export_path / ('%s-%s-%d_%s.png'%(method, scene_name, frame_idx, modality))
                 im_ori_target.parent.mkdir(parents=True, exist_ok=True)
+
+                '''
+                some cropping for the paper
+                '''                
+                im_ori = cv2.resize(im_ori, (320, 213), interpolation=cv2.INTER_AREA)
+                im_ori = im_ori[:203]
+
                 cv2.imwrite(str(im_ori_target), (im_ori * 255).astype(np.uint8))
                 print('Saving', str(im_ori_target))
                 

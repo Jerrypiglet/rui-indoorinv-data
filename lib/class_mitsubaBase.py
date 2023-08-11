@@ -198,8 +198,10 @@ class mitsubaBase(scene2DBase):
         return all([_ in self.modality_list for _ in ['layout']])
     
     def load_mi_scene_from_shape(self, input_extra_transform_homo: bool=None, shape_file_path: Path=None):
-        if shape_file_path == '':
+        if shape_file_path is None:
             shape_file_path = self.shape_file_path
+
+        assert shape_file_path.exists()
             
         print(yellow('[%s] load_mi_scene from [file]'%self.__class__.__name__) + str(shape_file_path))
         self.shape_id_dict = {

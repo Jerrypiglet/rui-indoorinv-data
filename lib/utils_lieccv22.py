@@ -7,6 +7,69 @@ import torch
 import scipy.ndimage as ndimage
 import matplotlib.pyplot as plt
 
+def x_cam_zq_2_x_cam_rui(K, _vertices_cam: np.ndarray, height = 120, width = 160):
+    '''
+    Convert the vertices from the camera coordinate system of ZQ's code, to the camera coordinate system of the Rui's camera,
+    
+    due to the different image size, and different camera intrinsics.
+    
+    ![](https://i.imgur.com/9CcHHSa.jpg)
+    '''
+    
+    assert len(_vertices_cam.shape) == 2
+    assert _vertices_cam.shape[1] == 3
+    # assert _vertices_cam.shape[0] == height * width
+    
+    xx_cam = _vertices_cam[:, 0] / _vertices_cam[:, 2]
+    yy_cam = _vertices_cam[:, 1] / _vertices_cam[:, 2]
+    
+    fov_x = 57.95
+    xRange_zq_start = -np.tan(fov_x / 180* np.pi / 2.0 ) # == W/2 / fx
+    yRange_zq_start = float(height) / float(width) * xRange_zq_start
+    xRange_rui_start = (0.5-K[0][2]) / K[0][0]
+    yRange_rui_start = (0.5-K[1][2]) / K[1][1]
+    
+    xx_rui = (xx_cam - xRange_zq_start) / (2. * (-xRange_zq_start)) * (width * 2-1) + xRange_rui_start # 0.5, ..., W-0.5, total 160x2 points
+    yy_rui = (yy_cam - yRange_zq_start) / (2. * (-yRange_zq_start)) * (height * 2-1) + yRange_rui_start # 0.5, ..., H-0.5, total 120x2 points
+    
+    xx_cam_rui = (xx_rui - K[0][2]) / K[0][0] * _vertices_cam[:, 2]
+    yy_cam_rui = (yy_rui - K[1][2]) / K[1][1] * _vertices_cam[:, 2]
+    
+    X_cam_rui = np.stack([xx_cam_rui, yy_cam_rui, _vertices_cam[:, 2]], axis=1)
+    
+    return X_cam_rui, (xx_rui, yy_rui)
+
+def x_cam_rui_2_x_cam_zq(K, _vertices_cam_rui: np.ndarray, height = 120, width = 160):
+    '''
+    doing the inverse of the function x_cam_zq_2_x_cam_rui
+    '''
+    
+    assert len(_vertices_cam_rui.shape) == 2
+    assert _vertices_cam_rui.shape[1] == 3
+    # assert _vertices_cam_rui.shape[0] == height * width
+    
+    xx_cam = _vertices_cam_rui[:, 0] / _vertices_cam_rui[:, 2]
+    yy_cam = _vertices_cam_rui[:, 1] / _vertices_cam_rui[:, 2]
+    
+    fov_x = 57.95
+    xRange_zq_start = -np.tan(fov_x / 180* np.pi / 2.0 ) # == W/2 / fx
+    yRange_zq_start = float(height) / float(width) * xRange_zq_start
+    xRange_rui_start = (0.5-K[0][2]) / K[0][0]
+    yRange_rui_start = (0.5-K[1][2]) / K[1][1]
+    xRange_rui_end = (width*2-0.5-K[0][2]) / K[0][0]
+    yRange_rui_end = (height*2-0.5-K[1][2]) / K[1][1]
+    
+    xx_zq = (xx_cam - xRange_rui_start) / (xRange_rui_end-xRange_rui_start) * (2. * - xRange_zq_start) + xRange_zq_start
+    yy_zq = (yy_cam - yRange_rui_start) / (yRange_rui_end-yRange_rui_start) * (2. * - yRange_zq_start) + yRange_zq_start
+    
+    xx_cam_zq = xx_zq * _vertices_cam_rui[:, 2]
+    yy_cam_zq = yy_zq * _vertices_cam_rui[:, 2]
+    
+    X_cam_rui = np.stack([xx_cam_zq, -yy_cam_zq, -_vertices_cam_rui[:, 2]], axis=1)
+    
+    return X_cam_rui, (xx_zq, yy_zq)
+
+    
 def srgb2rgb(srgb ):
     ret = np.zeros_like(srgb )
     idx0 = srgb <= 0.04045

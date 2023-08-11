@@ -35,5 +35,5 @@ def get_rays_np(H, W, K, c2w, inverse_y: bool=True, if_normalize_d: bool=True, i
     else:
         dir_center = np.array([0., 0., -1.]).reshape((3, 1))
     ray_d_center = c2w[:3, :3] @ dir_center
-
+    
     return rays_o, rays_d, ray_d_center

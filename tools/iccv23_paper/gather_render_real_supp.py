@@ -7,7 +7,7 @@ os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import numpy as np
 
 # export_path = Path('/Users/jerrypiglet/Library/CloudStorage/OneDrive-Personal/[Research]/Projects/FIPT/images/brdf_synthesis')
-export_path = Path('/Users/jerrypiglet/Documents/Projects/FIPT/images/render_real_supp')
+export_path = Path('/Users/jerrypiglet/Library/CloudStorage/OneDrive-Personal/[Research]/Projects/ICCV2023_FIPT/FIPT_arxiv/images/real_supp')
 assert Path(export_path).parent.exists()
 Path(export_path).mkdir(parents=True, exist_ok=True)
 print('Exporting to', export_path)
@@ -26,9 +26,11 @@ real
 '''
 HW = (360, 540)
 data_root_path = Path('data/real')
-scene_frame_list = [('ConferenceRoomV2_final_supergloo', (179, 68))] # fvp
-# scene_frame_list = [('ConferenceRoomV2_final_supergloo', (180, 68))] # lieccv22
-# scene_frame_list = [('ClassRoom', (90, 55))] # synthesis
+# scene_frame_list = [('ConferenceRoomV2_final_supergloo', (179, 68))] # fvp
+
+scene_frame_list = [('ConferenceRoomV2_final_supergloo', (180, 68))] # lieccv22-relight/synthesis
+# scene_frame_list = [('ClassRoom', (27, 92))] # lieccv22-synthesis
+# scene_frame_list = [('ClassRoom', (278, 275))] # lieccv22-relight
 
 assert Path(data_root_path).exists()
 
@@ -54,8 +56,8 @@ filename_dict = {
     'li22-synthesis': data_root_path / 'RESULTS/viewsynthesis/lieccv22' / '#SCENE_NAME' / '%03d_ori.exr', 
     'li22-relight': data_root_path / 'RESULTS/relight/lieccv22' / '#SCENE_NAME' / '%03d_ori.exr', 
     
-    'fvp-synthesis': data_root_path / 'RESULTS/viewsynthesis/fvp' / '#SCENE_NAME' / '%03d_ori.exr', 
-    'fvp-relight': data_root_path / 'RESULTS/relight/fvp' / '#SCENE_NAME' / '%03d_ori.exr', 
+    # 'fvp-synthesis': data_root_path / 'RESULTS/viewsynthesis/fvp' / '#SCENE_NAME' / '%03d_ori.exr', 
+    # 'fvp-relight': data_root_path / 'RESULTS/relight/fvp' / '#SCENE_NAME' / '%03d_ori.exr', 
 
     # 'milo-synthesis': data_root_path / 'RESULTS/viewsynthesis/milo' / '#SCENE_NAME' / '%03d.exr', 
     # 'milo-relight': data_root_path / 'RESULTS/relight/milo' / '#SCENE_NAME' / '%03d.exr', 
@@ -77,10 +79,10 @@ filename_dict = {
 
 # for method in ['GT', 'ours', 'ours-sem', 'milo', 'ipt', 'li22', 'fvp']:
 # for method in ['li22', 'fvp']:
-for method in ['fvp']:
-    # for modality in ['synthesis', 'relight']:
+for method in ['li22']:
+    for modality in ['synthesis', 'relight']:
     # for modality in ['synthesis']:
-    for modality in ['relight']:
+    # for modality in ['relight']:
         for scene_name, frame_id_list in scene_frame_list:
             for frame_idx, frame_id in enumerate(frame_id_list):
                 # frame_id = frame_id_list[0]
@@ -147,6 +149,12 @@ for method in ['fvp']:
                 #     im[_H:_H+2, (W-_W):, :] = 1.
                 #     im[0:_H, (W-_W):(W-_W+2), :] = 1.
                 #     im_inset = None
+                
+                '''
+                some cropping for the paper
+                '''                
+                im = cv2.resize(im, (320, 213), interpolation=cv2.INTER_AREA)
+                im = im[:203]
                     
                 im_target = export_path / ('%s-%s-%d_%s.png'%(method, scene_name, frame_idx, modality))
                 im_target.parent.mkdir(parents=True, exist_ok=True)
