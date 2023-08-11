@@ -752,7 +752,8 @@ class mitsubaBase(scene2DBase):
             'for %d frames... H %d W %d, subsample_rate_pts: %d, subsample_HW_rates: (%d, %d)'%(len(self.frame_id_list), self._H(), self._W(), subsample_rate_pts, subsample_HW_rates[0], subsample_HW_rates[1]))
 
         volume = o3d.pipelines.integration.ScalableTSDFVolume(
-            voxel_length=4.0 / 512.0,
+            voxel_length=8.0 / 512.0,
+            # voxel_length=20.0 / 512.0,
             sdf_trunc=0.05,
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8,
             volume_unit_resolution=16,
@@ -796,6 +797,8 @@ class mitsubaBase(scene2DBase):
         if dump_path is not None:
             o3d.io.write_triangle_mesh(str(dump_path), tsdf_mesh_o3d, False, True)
             print(f"Fused TSDF dumped mesh to {dump_path}")
+        else:
+            print(f"Dump path is None, not dumping TSDF mesh")
             
         print(blue_text('[%s] DONE. fuse_tsdf'%self.parent_class_name))
 

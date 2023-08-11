@@ -18,6 +18,8 @@ labels_txt_path = scannet_dir / 'segment_ids.txt'
 with open(str(labels_txt_path), "w") as txt_file:
     for line in xx:
         txt_file.write(str(line) + "\n") # works with any number of elements in a line
+        
+print('%d segments dumped to: '%np.unique(xx).shape[0], labels_txt_path)
 
 mesh_path = scannet_dir / 'scene0055_00_vh_clean_2.ply'
 assert mesh_path.exists()
