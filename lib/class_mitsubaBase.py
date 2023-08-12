@@ -100,19 +100,20 @@ class mitsubaBase(scene2DBase):
         self.has_shape_file = False
         if 'shape_file' in self.CONF.scene_params_dict and self.CONF.scene_params_dict.shape_file != '':
             if len(str(self.CONF.scene_params_dict.shape_file).split('/')) == 1:
-                self.shape_file_path = self.scene_path / self.CONF.scene_params_dict.shape_file
+                self.shape_file_path = self.scene_path / self.CONF.scene_params_dict.shape_file # self.CONF.scene_params_dict.shape_file is a single file name
             else:
-                self.shape_file_path = self.dataset_root / self.CONF.scene_params_dict.shape_file
+                self.shape_file_path = self.dataset_root / self.CONF.scene_params_dict.shape_file # self.CONF.scene_params_dict.shape_file is a full path
             assert self.shape_file_path.exists(), 'shape file does not exist: %s'%str(self.shape_file_path)
             self.has_shape_file = True
 
         self.has_tsdf_file = False
         if 'tsdf_file' in self.CONF.shape_params_dict and self.CONF.shape_params_dict.tsdf_file != '':
             if len(str(self.CONF.shape_params_dict.tsdf_file).split('/')) == 1:
-                self.tsdf_file_path = self.scene_path / self.CONF.shape_params_dict.tsdf_file
+                self.tsdf_file_path = self.scene_path / self.CONF.shape_params_dict.tsdf_file # self.CONF.scene_params_dict.tsdf_file is a single file name
             else:
-                self.tsdf_file_path = self.dataset_root / self.CONF.shape_params_dict.tsdf_file
+                self.tsdf_file_path = Path(self.CONF.shape_params_dict.tsdf_file) # self.CONF.scene_params_dict.tsdf_file is a full path
             # assert self.tsdf_file_path.exists(), 'shape file does not exist: %s'%str(self.tsdf_file_path)
+            self.tsdf_file_path.parent.mkdir(parents=True, exist_ok=True)
             self.has_tsdf_file = True
             
         if self.CONF.shape_params_dict.get('force_regenerate_tsdf', False) and self.tsdf_file_path.exists():

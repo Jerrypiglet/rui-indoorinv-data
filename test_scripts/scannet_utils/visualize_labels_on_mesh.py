@@ -27,6 +27,7 @@ except:
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir)
+sys.path.insert(0,currentdir)
 import util
 import util_3d
 import colorsys
@@ -38,45 +39,10 @@ parser.add_argument('--output_file', required=True, help='output .ply file')
 parser.add_argument('--if_random_colors', required=False, default=True, type=bool, help='False to use nyu40 colors, True to use random colors`')
 opt = parser.parse_args()
 
-def _get_colors(num_colors):
-    colors=[]
-    for i in np.arange(0., 360., 360. / num_colors):
-        hue = i/360.
-        lightness = (50 + np.random.rand() * 10)/100.
-        saturation = (90 + np.random.rand() * 10)/100.
-        colors.append(colorsys.hls_to_rgb(hue, lightness, saturation))
-    return colors
-
-def visualize(pred_file, mesh_file, output_file):
-    if not output_file.endswith('.ply'):
-        util.print_error('output file must be a .ply file')
-    ids = util_3d.load_ids(pred_file)
-    
-    if opt.if_random_colors:
-        colors = _get_colors(int(ids.max())+1)
-        colors = (np.array(colors) * 255).astype(np.uint8)
-    else:
-        colors = util.create_color_palette()
-    num_colors = len(colors)
-    with open(mesh_file, 'rb') as f:
-        plydata = PlyData.read(f)
-        num_verts = plydata['vertex'].count
-        if num_verts != len(ids):
-            util.print_error('#predicted labels = ' + str(len(ids)) + 'vs #mesh vertices = ' + str(num_verts))
-        # *_vh_clean_2.ply has colors already
-        for i in range(num_verts):
-            if ids[i] >= num_colors and not opt.if_random_colors:
-                util.print_error('found predicted label ' + str(ids[i]) + ' not in nyu40 label set')
-            color = colors[ids[i]]
-            plydata['vertex']['red'][i] = color[0]
-            plydata['vertex']['green'][i] = color[1]
-            plydata['vertex']['blue'][i] = color[2]
-    plydata.write(output_file)
-    print('saved to ' + output_file)
-
+from utils_visualize import visualize
 
 def main():
-    visualize(opt.pred_file, opt.mesh_file, opt.output_file)
+    visualize(opt.pred_file, opt.mesh_file, opt.output_file, if_random_colors=opt.if_random_colors)
 
 
 if __name__ == '__main__':

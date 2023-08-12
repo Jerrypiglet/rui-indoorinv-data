@@ -132,6 +132,8 @@ class openroomsScene2D(scene2DBase):
         self.pts_from = {'mi': False, 'depth': False}
         self.seg_from = {'mi': False, 'seg': False}
         
+        self.IF_SKIP = False
+        
         if 'semseg' in self.modality_list:
             self.load_colors()
 
@@ -554,10 +556,11 @@ class openroomsScene2D(scene2DBase):
         assert len(self.imcadmatobj_list) == len(self.semseg_list) == len(self.seg_dict_of_lists['obj'])
         
         self.instance_seg_list = []
+        self.instance_seg_info_list = []
         
         print(white_blue('[%s] load_instance_seg for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
         
-        for _idx, (raw_masks, im_semseg, seg_obj, seg_area) in enumerate(zip(self.imcadmatobj_list, self.semseg_list, self.seg_dict_of_lists['obj'], self.seg_dict_of_lists['area'])):
+        for _frame_idx, (raw_masks, im_semseg, seg_obj, seg_env) in enumerate(zip(self.imcadmatobj_list, self.semseg_list, self.seg_dict_of_lists['obj'], self.seg_dict_of_lists['env'])):
             obj_idx_map = raw_masks[:, :, 2] # 3rd channel: object INDEX map
             
             segments_info_list = []
@@ -568,11 +571,11 @@ class openroomsScene2D(scene2DBase):
                 obj_mask = obj_idx_map == obj_idx
                 obj_semseg = im_semseg[obj_mask]
                 im_semseg_masked = im_semseg.copy()
-                im_semseg_masked[~obj_mask] = 0
-                im_semseg_masked[~(np.logical_or(seg_obj.astype(bool), seg_area.astype(bool)))] = 0 # excluding outdoor env through windows
+                im_semseg_masked[~obj_mask] = 255
+                im_semseg_masked[seg_env.astype(bool)] = 255 # excluding outdoor env through windows
 
                 valid_obj_semseg_single_list = []
-                for obj_semseg_single in np.unique(obj_semseg):
+                for _mask_idx, obj_semseg_single in enumerate(np.unique(obj_semseg)):
                     '''
                     ideally there is only one instance in each obj_semseg; trying to get rid of other instances with very small pixels (due to aliasing) in the same obj_mask
                     '''
@@ -580,13 +583,19 @@ class openroomsScene2D(scene2DBase):
                     
                     ratio_pixels_obj = float(np.sum(mask_single)) / float(np.sum(obj_mask)) * 100.
                     if ratio_pixels_obj < 5: continue
-                    if np.sum(mask_single) < 100: continue # [!!!] ignore extremely small objects, or fantom objects due to aliasing (e.g. https://i.imgur.com/OfAAIft.png)
+                    if np.sum(mask_single) < 250: continue # [!!!] ignore extremely small objects, or fantom objects due to aliasing (e.g. https://i.imgur.com/OfAAIft.png)
                     valid_obj_semseg_single_list.append(obj_semseg_single)
                     
                     # if obj_semseg_single in [42, 43, 44]:
                     #     obj_idx = {44:254, 43:253, 42:252}[obj_semseg_single]
                         
                     area = np.sum(mask_single)  # segment area computation
+                    
+                    plt.figure(figsize=(15, 8))
+                    plt.title('obj_idx %d - %s, ratio of entire object: %.2f%%' % (obj_idx, self.OR_mapping_id45_to_name_dict[obj_semseg_single], ratio_pixels_obj))
+                    plt.imshow(mask_single)
+                    # plt.show()
+                    plt.savefig('tmp_%d_%d_%d.png'%(_frame_idx, obj_idx, _mask_idx))
                     
                     assert obj_idx < 252 # 252, 253, 254 are reserved for wall, floor, ceiling
                     segments_info_dict = {
@@ -600,18 +609,19 @@ class openroomsScene2D(scene2DBase):
                     segments_info_list.append(segments_info_dict)
                     im_pan_seg_ids[mask_single] = segments_info_dict['id']
                     
-                    print('frame %d - instance #%d - sem cat %d %s - area %d'%(_idx, segments_info_dict['id'], int(obj_semseg_single), self.OR_mapping_id45_to_name_dict[int(obj_semseg_single)], area))
+                    print('frame %d - instance #%d - sem cat %d %s - area %d'%(_frame_idx, segments_info_dict['id'], int(obj_semseg_single), self.OR_mapping_id45_to_name_dict[int(obj_semseg_single)], area))
                     
                     if len(valid_obj_semseg_single_list) > 1:
                         if not all([_ in [42, 43, 44] for _ in valid_obj_semseg_single_list]): 
-                            print(valid_obj_semseg_single_list), im_info_dict, obj_idx
-                            assert False
-                            # IF_SKIP = True
+                            # import ipdb; ipdb.set_trace()
+                            # assert False
+                            self.IF_SKIP = True
                             # excludes_scene_list.append((im_info_dict['meta_split'], im_info_dict['scene_name'], im_info_dict['frame_id'], obj_idx))
-                            # print(red('excluded:'), (im_info_dict['meta_split'], im_info_dict['scene_name'], im_info_dict['frame_id'], obj_idx))
+                            print(red('---> excluded:'), (self.meta_split, self.scene_name, _frame_idx, obj_idx), valid_obj_semseg_single_list)
 
             # print(np.unique(im_pan_seg_ids))
             self.instance_seg_list.append(im_pan_seg_ids)
+            self.instance_seg_info_list.append(segments_info_list)
             
         print(blue_text('[%s] DONE. load_instance_seg'%self.__class__.__name__))
 
@@ -668,7 +678,7 @@ class openroomsScene2D(scene2DBase):
         self.OR_mapping_id45_to_color_dict = OR4X_mapping_catInt_to_RGB_light['OR45']
         self.OR_mapping_id45_to_color_dict = {k-1: v for k, v in self.OR_mapping_id45_to_color_dict.items() if k != 0}
         self.OR_mapping_id45_to_color_dict[255] = (255, 255, 255) # unlabelled
-
+        
         '''
         '''
         

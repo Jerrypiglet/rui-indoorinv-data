@@ -9,7 +9,8 @@ To run on the openrooms-public (i.e. less frames per scene):
 import sys
 
 # host = 'mm1'
-host = 'apple'
+# host = 'apple'
+host = 'r4090'
 
 from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
 PATH_HOME = PATH_HOME_dict[host]

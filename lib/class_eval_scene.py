@@ -31,6 +31,7 @@ class evaluator_scene_scene():
         self.device = {
             'apple': 'mps', 
             'mm1': 'cuda', 
+            'r4090': 'cuda', 
         }[self.host]
         mi.set_variant(mi_variant_dict[self.host])
 
@@ -42,6 +43,7 @@ class evaluator_scene_scene():
         hdr_radiance_scale: float=1., 
         shape_params={}, 
         if_show: bool=True,
+        visibility_list_list_input: list=[], 
         ):
         '''
         sample shape surface for sample_type:
@@ -92,6 +94,8 @@ class evaluator_scene_scene():
                 normals = np.stack((normal_up, normal_down, normal_left, normal_right), axis=-1)
                 vis_frustum_normals_list.append(normals)
                 vis_frustum_centers_list.append(rays_o[0, 0].reshape(1, 3))
+                
+        visibility_list_list = []
 
         for shape_idx, (vertices, faces, _id) in tqdm(enumerate(zip(_vertices_list, _faces_list, _shape_ids_list))):
             assert np.amin(faces) == 1
@@ -120,36 +124,51 @@ class evaluator_scene_scene():
                     vertex_view_count = np.zeros((vertices.shape[0]), dtype=np.int64)
 
                 print('[Shape %d] Evaluating %d frames...'%(shape_idx, self.os.frame_num))
+                
+                visibility_list = []
+                # DEBUG_TEMP_SOLU = True
+                DEBUG_TEMP_SOLU = False
+                    
                 for frame_idx, (origin, _, _) in tqdm(enumerate(self.os.origin_lookatvector_up_list)):
-                    visibility_frustum = np.all(((vertices-vis_frustum_centers_list[frame_idx]) @ vis_frustum_normals_list[frame_idx]) > 0, axis=1)
-                    # visibility = visibility_frustum
-
-                    origin = np.tile(np.array(origin).reshape((1, 3)), (vertices.shape[0], 1))
-                    ds_ = vertices + np.random.normal(scale=0.005, size=(vertices.shape[0], 3)) - origin
-                    # ds_ = vertices - origin
-                    ds = ds_ / (np.linalg.norm(ds_, axis=1, keepdims=1)+1e-6)
-                    ds = np.array(ds).astype(np.float32)
-
-                    xs = np.array(origin).astype(np.float32)
-                    xs_mi = mi.Point3f(xs+mi.math.RayEpsilon * ds)
-                    ds_mi = mi.Vector3f(ds)
-                    # ray origin, direction, t_max
-                    rays_mi = mi.Ray3f(xs_mi, ds_mi)
-                    # ret = self.os.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
-                    ret = self.os.mi_scene.ray_intersect_preliminary(rays_mi)
-                    ret = ret.compute_surface_interaction(rays_mi)
-                    # returned structure contains intersection location, nomral, ray step, ...
-                    ts = ret.t.numpy()
                     
-                    # DEBUG_TEMP_SOLU = True
-                    DEBUG_TEMP_SOLU = False
-                    
-                    if DEBUG_TEMP_SOLU:
-                        visibility = visibility_frustum
+                    if visibility_list_list_input != []:
+                        assert len(visibility_list_list_input) == len(_vertices_list)
+                        assert len(visibility_list_list_input[shape_idx]) == self.os.frame_num
+                        (visibility, ret_p) = visibility_list_list_input[shape_idx][frame_idx]
                     else:
-                        visibility = ts >= (np.linalg.norm(ds_, axis=1, keepdims=False)-mi.math.RayEpsilon*1000)
-                        # visibility = np.logical_not(np.isinf(ts))
-                        visibility = np.logical_and(visibility, visibility_frustum) # (N_vertices_ALL,), bool
+                        '''
+                        get visibility from viewing frustum
+                        '''    
+                        visibility_frustum = np.all(((vertices-vis_frustum_centers_list[frame_idx]) @ vis_frustum_normals_list[frame_idx]) > 0, axis=1)
+                        # visibility = visibility_frustum
+
+                        origin = np.tile(np.array(origin).reshape((1, 3)), (vertices.shape[0], 1))
+                        ds_ = vertices + np.random.normal(scale=0.005, size=(vertices.shape[0], 3)) - origin
+                        # ds_ = vertices - origin
+                        ds = ds_ / (np.linalg.norm(ds_, axis=1, keepdims=1)+1e-6)
+                        ds = np.array(ds).astype(np.float32)
+
+                        xs = np.array(origin).astype(np.float32)
+                        xs_mi = mi.Point3f(xs+mi.math.RayEpsilon * ds)
+                        ds_mi = mi.Vector3f(ds)
+                        # ray origin, direction, t_max
+                        rays_mi = mi.Ray3f(xs_mi, ds_mi)
+                        # ret = self.os.mi_scene.ray_intersect(rays_mi) # https://mitsuba.readthedocs.io/en/stable/src/api_reference.html?highlight=write_ply#mitsuba.Scene.ray_intersect
+                        ret = self.os.mi_scene.ray_intersect_preliminary(rays_mi)
+                        ret = ret.compute_surface_interaction(rays_mi)
+                        # returned structure contains intersection location, nomral, ray step, ...
+                        ts = ret.t.numpy()
+                        
+                        
+                        if DEBUG_TEMP_SOLU:
+                            visibility = visibility_frustum
+                        else:
+                            visibility = ts >= (np.linalg.norm(ds_, axis=1, keepdims=False)-mi.math.RayEpsilon*1000)
+                            # visibility = np.logical_not(np.isinf(ts))
+                            visibility = np.logical_and(visibility, visibility_frustum) # (N_vertices_ALL,), bool
+
+                        ret_p = ret.p.numpy()
+                        visibility_list.append((visibility, ret_p))
                         
                     if sample_type == 'vis_count':
                         vis_count += visibility
@@ -161,7 +180,7 @@ class evaluator_scene_scene():
                         if DEBUG_TEMP_SOLU:
                             x_world = vertices[visibility]
                         else:
-                            x_world = ret.p.numpy()[visibility]
+                            x_world = ret_p[visibility]
                         _R, _t = self.os.pose_list[frame_idx][:3, :3], self.os.pose_list[frame_idx][:3, 3:4]
                         x_cam = (x_world - _t.T) @ _R
                         uv_cam_homo = (self.os.K_list[frame_idx] @ x_cam.T).T
@@ -222,13 +241,13 @@ class evaluator_scene_scene():
                     rgb_sdr = float_3_sum / (vertex_view_count.reshape((-1, 1))+1e-6)
                     rgb_sdr[vertex_view_count==0] = np.array([[1., 1., 0.]], dtype=np.float32) # yellow for unordered vertices
                     samples_v_dict[_id] = ('rgb_sdr', rgb_sdr)
-                    return_dict.update({'vertex_view_count': vertex_view_count})
+                    return_dict.update({'rgb_sdr': rgb_sdr, 'vertex_view_count': vertex_view_count})
                 elif sample_type == 'mi_normal':
                     mi_normal = np.clip(float_3_sum / (vertex_view_count.reshape((-1, 1))+1e-6), -1., 1.)
                     mi_normal = mi_normal / (np.linalg.norm(mi_normal, axis=1, keepdims=True)+1e-6)
                     mi_normal[vertex_view_count==0] = np.array([[1., 0., 0.]], dtype=np.float32)
                     samples_v_dict[_id] = ('mi_normal', mi_normal)
-                    return_dict.update({'vertex_view_count': vertex_view_count})
+                    return_dict.update({'mi_normal': mi_normal, 'vertex_view_count': vertex_view_count})
                 elif sample_type in ['semseg', 'instance_seg']:
                     seg_labels = [np.argmax(np.bincount(_)) if len(_) > 0 else 255 for _ in seg_labels]
                     return_dict.update({'seg_labels': seg_labels, 'vertex_view_count': vertex_view_count})
@@ -354,11 +373,14 @@ class evaluator_scene_scene():
             else:
                 print(red('sample_type %s not implemented'%sample_type))
                 raise NotImplementedError
+            
+            if visibility_list_list_input == []:
+                visibility_list_list.append(visibility_list)
         
         if sample_type == 'vis_count':
             assert max_vis_count > 0
             for _id, v in samples_v_dict.items():
                 samples_v_dict[_id] = ('vis_count', (samples_v_dict[_id][1], max_vis_count))
 
-        return_dict.update({'samples_v_dict': samples_v_dict})
+        return_dict.update({'samples_v_dict': samples_v_dict, 'visibility_list_list': visibility_list_list})
         return return_dict
