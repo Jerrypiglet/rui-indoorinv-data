@@ -336,7 +336,7 @@ class mitsubaBase(scene2DBase):
             normals_flip_mask = np.logical_and(np.sum(rays_d * mi_normal_global, axis=-1) > 0, np.any(mi_normal_global != np.inf, axis=-1))
             if np.sum(normals_flip_mask) > 0:
                 mi_normal_global[normals_flip_mask] = -mi_normal_global[normals_flip_mask]
-                print(yellow('[mi_sample_rays_pts] %d normals flipped!'%np.sum(normals_flip_mask)))
+                print(green_text('[mi_sample_rays_pts] %d normals flipped!'%np.sum(normals_flip_mask)))
             mi_normal_global[invalid_depth_mask, :] = 0.
             self.mi_normal_global_list.append(mi_normal_global)
 
@@ -619,7 +619,9 @@ class mitsubaBase(scene2DBase):
         '''
         if self.if_loaded_tsdf and not force: return
         
-        if self.has_tsdf_file and self.tsdf_file_path.exists():
+        force_fuse = self.CONF.shape_params_dict.get('if_force_fuse_tsdf', False)
+        
+        if self.has_tsdf_file and self.tsdf_file_path.exists() and not force_fuse:
             print(white_blue('[%s] Loading tsdf from '%self.__class__.__name__)+str(self.tsdf_file_path))
             tsdf_mesh = trimesh.load_mesh(str(self.tsdf_file_path), process=False)
             self.tsdf_fused_dict = {'vertices': np.array(tsdf_mesh.vertices), 'faces': np.array(tsdf_mesh.faces)}
@@ -627,6 +629,8 @@ class mitsubaBase(scene2DBase):
                 self.tsdf_fused_dict.update({'colors': np.array(tsdf_mesh.visual.vertex_colors)[:, :3].astype(np.float32)/255.})
         else:
             assert hasattr(self, 'tsdf_file_path')
+            if force_fuse:
+                print(yellow('[%s] force_fuse TSDF. skip loading tsdf from file.'%self.__class__.__name__))
             self.tsdf_fused_dict = self._fuse_tsdf(if_use_mi_geometry=if_use_mi_geometry, dump_path=self.tsdf_file_path)
         
         if self._if_T: # reorient

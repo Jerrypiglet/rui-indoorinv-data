@@ -150,19 +150,20 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         else:
             assert False, 'Unsupported modality: ' + modality
 
-    def load_mi_scene(self, if_postprocess_mi_frames=True):
+    def load_mi_scene(self):
         '''
         load scene representation into Mitsuba 3
         '''
-        if self.has_shape_file:
+        if self.has_shape_file and not self.CONF.mi_params_dict.if_mi_scene_from_xml:
             print(blue_text('[%s][load_mi_scene] from shape file: %s')%(str(self.__class__.__name__), self.shape_file_path))
             self.load_mi_scene_from_shape()
             self.mi_scene_from = 'shape'
-        elif self.has_tsdf_file and self.tsdf_file_path.exists():
+        elif self.has_tsdf_file and self.tsdf_file_path.exists() and not self.CONF.mi_params_dict.if_mi_scene_from_xml:
             print(blue_text('[%s][load_mi_scene] from tsdf file: %s')%(str(self.__class__.__name__), self.tsdf_file_path))
             self.load_mi_scene_from_shape(shape_file_path=self.tsdf_file_path)
             self.mi_scene_from = 'tsdf'
         else:
+            assert self.CONF.mi_params_dict.if_mi_scene_from_xml
             xml_dump_dir = self.PATH_HOME / 'mitsuba'
 
             if_also_dump_xml_with_lit_area_lights_only = False
@@ -191,7 +192,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
         # if not self.if_loaded_shapes: self.load_shapes()
-        if not hasattr(self, 'mi_scene'): self.load_mi_scene(if_postprocess_mi_frames=False)
+        # if not hasattr(self, 'mi_scene'): self.load_mi_scene()
 
         if_resample = 'n'
         if self.CONF.cam_params_dict.get('if_sample_poses', False):
@@ -369,8 +370,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
                     # print('---', _id, obj_path)
                     # self.load_colors()
                     # cat_id_str = str(obj_path).split('/')[-3]
-                    # if cat_id_str in self.OR_mapping_cat_str_to_id_name_dict:
-                    #     cat_id, cat_name = self.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
+                    # if cat_id_str in self.OR_mapping_obj_cat_str_to_id42_name_dict:
+                    #     cat_id, cat_name = self.OR_mapping_obj_cat_str_to_id42_name_dict[cat_id_str]
                     #     print(cat_id, cat_name)
                     
                     # --a bunch of fixes if broken meshes; SLOW--
@@ -515,35 +516,6 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         assert (self.ceiling_loc - self.floor_loc) - room_height < 1e-4
         self.if_has_ceilling_floor = True
 
-    def load_colors(self):
-        '''
-        load mapping from obj cat id to RGB
-        OR-public is OR42!
-        '''
-
-        if self.if_has_colors:
-            pass
-
-        OR_mapping_cat_str_to_id_file = self.semantic_labels_root / 'semanticLabelName_OR42.txt'
-        with open(str(OR_mapping_cat_str_to_id_file)) as f:
-            mylist = f.read().splitlines() 
-        
-        '''
-        {'curtain': (1, 'curtain'), '03790512': (2, 'bike'), '04554684': (3, 'washing_machine'), '04379243': (4, 'table'), '03207941': (5, 'dishwasher'), '02880940': (6, 'bowl'), '02871439': (7, 'bookshelf'), '04256520': (8, 'sofa'), '03691459': (9, 'speaker'), '02747177': (10, 'trash_bin'), '03928116': (11, 'piano'), '03467517': (12, 'guitar'), '03938244': (13, 'pillow'), '03593526': (14, 'jar'), '02818832': (15, 'bed'), '02876657': (16, 'bottle'), '03046257': (17, 'clock'), '03001627': (18, 'chair'), '03085013': (19, 'computer_keyboard'), '03211117': (20, 'monitor'), '02808440': (21, 'bathtub'), '04330267': (22, 'stove'), '03761084': (23, 'microwave'), '03337140': (24, 'file_cabinet'), '03991062': (25, 'flowerpot'), '02954340': (26, 'cap'), 'window': (27, 'window'), 'ceiling_lamp': (28, 'ceiling_lamp'), '04401088': (29, 'telephone'), '04004475': (30, 'printer'), '02801938': (31, 'basket'), '03325088': (32, 'faucet'), '02773838': (33, 'bag'), '03642806': (34, 'laptop'), '03636649': (35, 'lamp'), '02946921': (36, 'can'), '02828884': (37, 'bench'), 'door': (38, 'door'), '02933112': (39, 'cabinet'), 'wall': (40, 'wall'), 'floor': (41, 'floor'), 'ceiling': (42, 'ceiling')}
-        '''
-        self.OR_mapping_cat_str_to_id_name_dict = {x.split(' ')[0]: (int(x.split(' ')[1]), x.split(' ')[2]) for x in mylist} # cat id is 0-based (0 being unlabelled)!
-        self.OR_mapping_cat_str_to_id_name_dict = {k: (v[0]-1, v[1]) for k, v in self.OR_mapping_cat_str_to_id_name_dict.items()}
-        
-        OR_mapping_id_to_color_file = self.semantic_labels_root / 'colors/OR4X_mapping_catInt_to_RGB_light.pkl'
-        with (open(OR_mapping_id_to_color_file, "rb")) as f:
-            OR4X_mapping_catInt_to_RGB_light = pickle.load(f)
-        self.OR_mapping_id_to_color_dict = OR4X_mapping_catInt_to_RGB_light['OR42']
-        
-        self.OR_mapping_id_to_color_dict = {k-1: v for k, v in self.OR_mapping_id_to_color_dict.items() if k != 0}
-        self.OR_mapping_id_to_color_dict[255] = (255, 255, 255) # unlabelled
-        
-        self.if_loaded_colors = True
-
     # def load_colors(self):
     #     '''
     #     load mapping from obj cat id to RGB
@@ -563,8 +535,8 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
     #     assert OR_colors_file.exists()
     #     with open(str(OR_colors_file)) as f:
     #         mylist = f.read().splitlines() 
-    #     self.OR_mapping_id_to_color_dict = {_: [int(__) for __ in x.split(' ')] for _, x in enumerate(mylist[1:])} # cat id is 0-based (255 being unlabelled)!
-    #     self.OR_mapping_id_to_color_dict[255] = [0, 0, 0]
+    #     self.OR_mapping_id45_to_color_dict = {_: [int(__) for __ in x.split(' ')] for _, x in enumerate(mylist[1:])} # cat id is 0-based (255 being unlabelled)!
+    #     self.OR_mapping_id45_to_color_dict[255] = [0, 0, 0]
         
     #     self.if_loaded_colors = True
 

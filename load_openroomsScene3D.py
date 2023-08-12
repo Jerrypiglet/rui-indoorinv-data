@@ -119,7 +119,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 # frame_id_list = [0, 11, 10, 64, 81]
 # + list(range(5, 87, 10))
 
-# frame_id_list = [5]
+frame_id_list = [1]
 
 '''
 update confs
@@ -128,17 +128,26 @@ update confs
 CONF.scene_params_dict.update({
     # 'split': opt.split, # train, val, train+val
     'frame_id_list': frame_id_list, 
-    })
+})
+
 
 CONF.im_params_dict.update({
     'im_H_resize': 240, 'im_W_resize': 320, 
-    })
+})
 
 # DEBUG
 CONF.shape_params_dict.update({
     'force_regenerate_tsdf': True
 })
 
+# Mitsuba options
+CONF.mi_params_dict.update({
+    'if_mi_scene_from_xml': True, # !!!! set to False to load from shapes (single shape or tsdf fused shape (with tsdf in modality_list))
+})
+# TSDF options
+CONF.shape_params_dict.update({
+    'if_force_fuse_tsdf': True, # !!!! set to True to force replace existing tsdf shape
+})
 
 if opt.export:
     if opt.export_format == 'mitsuba':
@@ -175,15 +184,15 @@ scene_obj = openroomsScene3D(
         # 'seg', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal',
-        # 'matseg', 
         'semseg', 
+        'matseg', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
         
         # 'layout', 
         'shapes', # objs + emitters, geometry shapes + emitter properties
-        'tsdf', 
-        'mi', # mitsuba scene, loading from scene xml file
+        # 'tsdf', 
+        # 'mi', # mitsuba scene, loading from scene xml file
         ], 
 )
 
@@ -202,7 +211,7 @@ if opt.eval_scene:
     sample visivility to camera centers on vertices
     '''
     _ = evaluator_scene.sample_shapes(
-        sample_type=opt.sample_type, # e.g. ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'semseg']
+        sample_type=opt.sample_type, # e.g. ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg']
         # sample_type='vis_count', # ['']
         # sample_type='t', # ['']
         shape_params={
@@ -330,6 +339,7 @@ if opt.vis_2d_plt:
             # 'albedo', 
             # 'roughness', 
             'semseg', 
+            'matseg', 
             # 'depth', 
             # 'normal', 
             'mi_depth', 

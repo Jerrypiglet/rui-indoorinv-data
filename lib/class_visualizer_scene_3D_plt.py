@@ -182,9 +182,9 @@ class visualizer_scene_3D_plt(object):
                 # obj_color = 'r'
                 obj_path = shape['filename']
                 cat_id_str = str(obj_path).split('/')[-3]
-                assert cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
-                cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
-                obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
+                assert cat_id_str in self.os.OR_mapping_obj_cat_str_to_id42_name_dict, 'not valid cat_id_str: %s; %s'%(cat_id_str, obj_path)
+                cat_id, cat_name = self.os.OR_mapping_obj_cat_str_to_id42_name_dict[cat_id_str]
+                obj_color = self.os.OR_mapping_id45_to_color_dict[cat_id]
                 obj_color = [float(x)/255. for x in obj_color]
                 linestyle = '-'
                 linewidth = 1

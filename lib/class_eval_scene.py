@@ -50,6 +50,8 @@ class evaluator_scene_scene():
             - 'vis_count': visibility under camera views; follow implementation in class visualizer_scene_3D_o3d -> get_pcd_color_fused_geo(): elif pcd_color_mode == 'mi_visibility_emitter0'...
             - 't': distance to camera 0
             - 'rgb': back-projected color from cameras
+            - 'mi_normal': back-projected normal from mitsuba scene (intended for mitsuba scene from XML); instead of evaluating the normal from TSDF/shapes which could be noisy
+            - ...
 
         args:
         - shape_params
@@ -70,13 +72,13 @@ class evaluator_scene_scene():
                 if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
                     self.os.process_mi_scene(if_postprocess_mi_frames=True, force=True)
             assert self.os.mi_scene_from == 'tsdf'
-        assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'semseg']
+        assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg']
 
         return_dict = {}
         samples_v_dict = {}
 
         print(white_blue('Evaluating scene for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(_shape_ids_list))
-        if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg']:
+        if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg', 'mi_normal']:
             '''
             get viewing frustum normals and centers
             '''
@@ -95,24 +97,27 @@ class evaluator_scene_scene():
 
         for shape_idx, (vertices, faces, _id) in tqdm(enumerate(zip(_vertices_list, _faces_list, _shape_ids_list))):
             assert np.amin(faces) == 1
-            if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg']:
+            if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg', 'mi_normal']:
                 assert self.os.if_has_poses
                 assert self.os.if_has_mitsuba_scene # scene_obj->modality_list=['mi'
 
                 if sample_type == 'vis_count':
                     vis_count = np.zeros((vertices.shape[0]), dtype=np.int64)
-                if sample_type in ['rgb_hdr', 'rgb_sdr']:
+                if sample_type in ['rgb_hdr', 'rgb_sdr', 'mi_normal']:
                     # rgb_hdr_list = [[]] * vertices.shape[0]
                     if sample_type == 'rgb_hdr':
                         assert self.os.if_has_im_hdr
                     if sample_type == 'rgb_sdr':
                         assert self.os.if_has_im_sdr
-                    rgb_sum = np.zeros((vertices.shape[0], 3), dtype=np.float32)
-                    rgb_count = np.zeros((vertices.shape[0]), dtype=np.int64)
+                    if sample_type == 'mi_normal':
+                        assert hasattr(self.os, 'mi_normal_global_list')
+                    float_3_sum = np.zeros((vertices.shape[0], 3), dtype=np.float32)
+                    vertex_view_count = np.zeros((vertices.shape[0]), dtype=np.int64)
                 if sample_type == 'semseg':
                     # semseg_labels = np.array([[] * vertices.shape[0]], dtype=object)
                     semseg_labels = np.empty((vertices.shape[0],),dtype=object)
                     semseg_labels.fill([])
+                    vertex_view_count = np.zeros((vertices.shape[0]), dtype=np.int64)
 
                 print('[Shape %d] Evaluating %d frames...'%(shape_idx, self.os.frame_num))
                 for frame_idx, (origin, _, _) in tqdm(enumerate(self.os.origin_lookatvector_up_list)):
@@ -152,7 +157,7 @@ class evaluator_scene_scene():
                     '''
                     back-project intersection points to camera views; then sample from 2D inputs (e.g. images, label maps)
                     '''
-                    if sample_type in ['rgb_hdr', 'rgb_sdr', 'semseg']:
+                    if sample_type in ['rgb_hdr', 'rgb_sdr', 'semseg', 'mi_normal']:
                         if DEBUG_TEMP_SOLU:
                             x_world = vertices[visibility]
                         else:
@@ -171,8 +176,10 @@ class evaluator_scene_scene():
                             im_ = self.os.im_sdr_list[frame_idx]
                         elif sample_type == 'semseg':
                             im_ = self.os.semseg_list[frame_idx]
+                        elif sample_type == 'mi_normal':
+                            im_ = self.os.mi_normal_global_list[frame_idx]
                             
-                        if sample_type in ['rgb_hdr', 'rgb_sdr']:
+                        if sample_type in ['rgb_hdr', 'rgb_sdr', 'mi_normal']:
                             sampled_im_th = torch.nn.functional.grid_sample(torch.from_numpy(im_).permute(2, 0, 1).unsqueeze(0).float(), grid, align_corners=True)
                         elif sample_type == 'semseg':
                             sampled_im_th = torch.nn.functional.grid_sample(torch.from_numpy(im_).unsqueeze(0).unsqueeze(0).float(), grid, align_corners=True, mode='nearest').type(torch.int64)
@@ -188,11 +195,13 @@ class evaluator_scene_scene():
                         # for _idx, vertex_idx in tqdm(enumerate(valid_vertices_idx)):
                         #     rgb_list[vertex_idx].append(sampled_im_valid[_idx])
                         # [rgb_list[vertex_idx].append(sampled_im_valid[_idx]) for _idx, vertex_idx in tqdm(enumerate(valid_vertices_idx))]
-                        if sample_type in ['rgb_hdr', 'rgb_sdr']:
-                            rgb_sum[valid_vertices_idx] += sampled_im_valid
-                            rgb_count[valid_vertices_idx] += 1
+
+                        if sample_type in ['rgb_hdr', 'rgb_sdr', 'mi_normal']:
+                            float_3_sum[valid_vertices_idx] += sampled_im_valid
+                            vertex_view_count[valid_vertices_idx] += 1
                         elif sample_type == 'semseg':
                             semseg_labels[valid_vertices_idx] = [_+[__] for _, __ in zip(semseg_labels[valid_vertices_idx], sampled_im_valid)]
+                            vertex_view_count[valid_vertices_idx] += 1
                         else:
                             raise NotImplementedError
                             
@@ -204,18 +213,26 @@ class evaluator_scene_scene():
                     # for _idx, rgb_ in tqdm(enumerate(rgb_list)):
                     #     if len(rgb_) > 0:
                     #         rgb_hdr[_idx] = np.mean(rgb_, axis=0)
-                    rgb_hdr = rgb_sum / (rgb_count.reshape((-1, 1))+1e-6) * hdr_radiance_scale
-                    rgb_hdr[rgb_count==0] = np.array([[1., 1., 0.]], dtype=np.float32) # yellow for unordered vertices
+                    rgb_hdr = float_3_sum / (vertex_view_count.reshape((-1, 1))+1e-6) * hdr_radiance_scale
+                    rgb_hdr[vertex_view_count==0] = np.array([[1., 1., 0.]], dtype=np.float32) # yellow for unordered vertices
                     samples_v_dict[_id] = ('rgb_hdr', rgb_hdr)
+                    return_dict.update({'vertex_view_count': vertex_view_count})
                 elif sample_type == 'rgb_sdr':
-                    rgb_sdr = rgb_sum / (rgb_count.reshape((-1, 1))+1e-6)
-                    rgb_sdr[rgb_count==0] = np.array([[1., 1., 0.]], dtype=np.float32) # yellow for unordered vertices
+                    rgb_sdr = float_3_sum / (vertex_view_count.reshape((-1, 1))+1e-6)
+                    rgb_sdr[vertex_view_count==0] = np.array([[1., 1., 0.]], dtype=np.float32) # yellow for unordered vertices
                     samples_v_dict[_id] = ('rgb_sdr', rgb_sdr)
+                    return_dict.update({'vertex_view_count': vertex_view_count})
+                elif sample_type == 'mi_normal':
+                    mi_normal = np.clip(float_3_sum / (vertex_view_count.reshape((-1, 1))+1e-6), -1., 1.)
+                    mi_normal = mi_normal / (np.linalg.norm(mi_normal, axis=1, keepdims=True)+1e-6)
+                    mi_normal[vertex_view_count==0] = np.array([[1., 0., 0.]], dtype=np.float32)
+                    samples_v_dict[_id] = ('mi_normal', mi_normal)
+                    return_dict.update({'vertex_view_count': vertex_view_count})
                 elif sample_type == 'semseg':
                     semseg_labels = [np.argmax(np.bincount(_)) if len(_) > 0 else 255 for _ in semseg_labels]
-                    return_dict.update({'semseg_labels': semseg_labels})
+                    return_dict.update({'semseg_labels': semseg_labels, 'vertex_view_count': vertex_view_count})
                     self.os.load_colors()
-                    semseg_labels_colors = np.array([self.os.OR_mapping_id_to_color_dict[_] for _ in semseg_labels])
+                    semseg_labels_colors = np.array([self.os.OR_mapping_id45_to_color_dict[_] for _ in semseg_labels])
                     semseg_labels_colors = semseg_labels_colors.astype(np.float32) / 255.
                     samples_v_dict[_id] = ('semseg', semseg_labels_colors)
                 else:

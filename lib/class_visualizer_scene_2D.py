@@ -61,8 +61,8 @@ class visualizer_scene_2D(object):
             self.os.load_colors()
             self.semseg_colors = np.zeros((256, 3), dtype='uint8')
             # self.semseg_colors[:semseg_colors.shape[0]] = semseg_colors
-            ids = list(self.os.OR_mapping_id_to_color_dict.keys())
-            colors = list(self.os.OR_mapping_id_to_color_dict.values())
+            ids = list(self.os.OR_mapping_id45_to_color_dict.keys())
+            colors = list(self.os.OR_mapping_id45_to_color_dict.values())
             self.semseg_colors[ids] = np.array(colors)
             # self.semseg_colors[255] = np.array([200, 200, 200]) # background
         
@@ -199,6 +199,7 @@ class visualizer_scene_2D(object):
         # if modality in ['mi_depth', 'mi_normal', 'mi_normal_im_overlay', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']: assert self.os.if_has_mitsuba_scene
 
         _list = self.os.get_modality(modality, source=source)
+        assert len(_list) == len(self.frame_idx_list) == len(ax_list)
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
             _im = _list[frame_idx]
             H, W = self.os._H(frame_idx), self.os._W(frame_idx)
@@ -273,7 +274,6 @@ class visualizer_scene_2D(object):
             if modality == 'semseg':
                 # colormap: https://github.com/Jerrypiglet/rui-indoorinv-data/blob/7e527693ae6718381c6fab0652fd7da649c4a008/files_openrooms/colors/OR42_color_mapping_light.png
                 _im = np.array(colorize(_im, self.semseg_colors).convert('RGB'))
-
 
             if modality == 'lighting_SG':
                 axis_local, lamb, weight = np.split(_im, [3, 4], axis=3)

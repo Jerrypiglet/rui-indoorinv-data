@@ -724,6 +724,8 @@ class visualizer_scene_3D_o3d(object):
         collect shapes and bboxes for objs + emitters (shapes)
 
         to visualize emitter properties, go to collect_emitters
+        
+        semseg in OR42 colors
 
         images/demo_shapes_o3d.png
         images/demo_shapes_o3d_2_shader.png
@@ -793,12 +795,12 @@ class visualizer_scene_3D_o3d(object):
                 continue
 
             if_default_color = True
-            cat_id_str = ''
+            obj_cat_str = ''
             if self.os.if_loaded_colors:
-                cat_id_str = str(obj_path).split('/')[-3]
-                if cat_id_str in self.os.OR_mapping_cat_str_to_id_name_dict:
-                    cat_id, cat_name = self.os.OR_mapping_cat_str_to_id_name_dict[cat_id_str]
-                    obj_color = self.os.OR_mapping_id_to_color_dict[cat_id]
+                obj_cat_str = str(obj_path).split('/')[-3]
+                if obj_cat_str in self.os.OR_mapping_obj_cat_str_to_id42_name_dict:
+                    cat_id, cat_name = self.os.OR_mapping_obj_cat_str_to_id42_name_dict[obj_cat_str]
+                    obj_color = self.os.OR_mapping_id42_to_color_dict[cat_id]
                     obj_color = [float(x)/255. for x in obj_color]
                     if_default_color = False
                     linestyle = '-'
@@ -811,9 +813,9 @@ class visualizer_scene_3D_o3d(object):
                         images/OR42_color_mapping_light.png
                         '''
                 else:
-                    print(yellow('Default color for invalid cat_id_str: [%s]; %s'%(cat_id_str, obj_path)))
+                    print(yellow('Default color for invalid obj_cat_str: [%s]; %s'%(obj_cat_str, obj_path)))
 
-            print('[collect_shapes] %d [%s-%d-%s]'%(shape_idx, cat_id_str, cat_id, cat_name), _id, shape_dict.get('if_emitter', False), obj_path)
+            print('[collect_shapes] shape_idx %d [obj_cat_str %s -  cat_id %d - cat_name %s]'%(shape_idx, obj_cat_str, cat_id, cat_name), _id, shape_dict.get('if_emitter', False), obj_path)
             
             if if_default_color:
                 # obj_color = [0.7, 0.7, 0.7]
@@ -961,6 +963,10 @@ class visualizer_scene_3D_o3d(object):
             # vertices colored with albedo (SDR)
             assert samples_v.shape[0] == vertices.shape[0]
             samples_v_ = np.clip(samples_v, 0., 1.)
+            shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
+        elif samples_type in ['mi_normal']:
+            assert samples_v.shape[0] == vertices.shape[0]
+            samples_v_ = (np.clip(samples_v, -1., 1.) + 1.) / 2.
             shape_mesh.vertex_colors = o3d.utility.Vector3dVector(samples_v_) # [TODO] not sure how to set triangle colors... the Open3D documentation is pretty confusing and actually does not work... http://www.open3d.org/docs/release/python_api/open3d.t.geometry.TriangleMesh.html
         elif samples_type == 'vertex_normal':
             assert samples_v.shape[0] == vertices.shape[0]

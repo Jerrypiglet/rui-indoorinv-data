@@ -1331,7 +1331,7 @@ class exporter_scene():
                             normals_flip_mask = np.logical_and(np.sum(rays_d * mi_light_normal_global, axis=-1) > 0, np.any(mi_light_normal_global != np.inf, axis=-1))
                             if np.sum(normals_flip_mask) > 0:
                                 mi_light_normal_global[normals_flip_mask] = -mi_light_normal_global[normals_flip_mask]
-                                print(yellow('[mi_sample_rays_pts] %d normals flipped!'%np.sum(normals_flip_mask)))
+                                print(green_text('[mi_sample_rays_pts] %d normals flipped!'%np.sum(normals_flip_mask)))
                             mi_light_normal_global[invalid_light_depth_mask, :] = 0.
                             mi_light_normal_cam_opencv = mi_light_normal_global @ self.os.pose_list[frame_idx][:3, :3]
                             mi_light_normal_cam_opengl = np.stack([mi_light_normal_cam_opencv[:, :, 0], -mi_light_normal_cam_opencv[:, :, 1], -mi_light_normal_cam_opencv[:, :, 2]], axis=-1) # transform normals from OpenGL convention (right-up-backward) to OpenCV (right-down-forward)

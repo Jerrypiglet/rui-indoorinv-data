@@ -66,14 +66,6 @@ class openroomsScene2D(scene2DBase):
         self.axis_up = get_list_of_keys(self.CONF.scene_params_dict, ['axis_up'], [str])[0]
         assert self.axis_up in ['x+', 'y+', 'z+', 'x-', 'y-', 'z-']
 
-        if self.CONF.scene_params_dict.get('frame_id_list', []) != []: 
-            self.frame_id_list = self.CONF.scene_params_dict.get('frame_id_list')
-        else:
-            print(white_blue('[%s] frame_id_list was not provided; getting frame_id_list by digging into image list...')%self.__class__.__name__)
-            im_hdr_list = sorted(glob.glob(str(self.scene_rendering_path / 'im_*.hdr')))
-            assert len(im_hdr_list) > 0, 'no image with name: im_*.hdr is found at %s!'%str(self.scene_rendering_path)
-            self.frame_id_list = sorted([int(Path(_).stem.replace('im_', '')) for _ in im_hdr_list])
-            print(white_blue('... got frame_id_list: [%s]'%(', '.join([str(_) for _ in self.frame_id_list]))))
         
         '''
         paths
@@ -89,6 +81,19 @@ class openroomsScene2D(scene2DBase):
         assert pose_file.split('-')[0] == "OpenRooms" or pose_file == 'cam.txt', 'Invalid pose_file: %s'%pose_file
         self.pose_file_path = self.scene_xml_root / pose_file.split('-')[1] if len(pose_file.split('-')) > 1 else self.scene_xml_root / pose_file
         assert self.pose_file_path.exists(), 'pose_file_path does not exist: %s'%str(self.pose_file_path)
+        
+        if self.CONF.scene_params_dict.get('frame_id_list', []) != []: 
+            self.frame_id_list = self.CONF.scene_params_dict.get('frame_id_list')
+        else:
+            print(white_blue('[%s] frame_id_list was not provided; getting frame_id_list by digging into im_sdr image list...')%self.__class__.__name__)
+            self.frame_id_list = []
+            self.load_poses()
+            # _im_sdr_pattern = self.scene_rendering_path / self.CONF.modality_filename_dict['im_sdr']
+            # im_sdr_list = sorted(_im_sdr_pattern.parent.parent.glob(self.CONF.modality_filename_dict['im_sdr'].replace('%d', '*[0-9]')))
+            # assert len(im_sdr_list) > 0, 'no image with name: im_*.hdr is found at %s!'%str(_im_sdr_pattern)
+            # import ipdb; ipdb.set_trace()
+            # self.frame_id_list = sorted([int(Path(_).stem.replace('im_', '')) for _ in im_sdr_list])
+            # print(white_blue('... got frame_id_list: [%s]'%(', '.join([str(_) for _ in self.frame_id_list]))))
 
         '''
         im properties
@@ -126,6 +131,9 @@ class openroomsScene2D(scene2DBase):
         '''
         self.pts_from = {'mi': False, 'depth': False}
         self.seg_from = {'mi': False, 'seg': False}
+        
+        if 'semseg' in self.modality_list:
+            self.load_colors()
 
         '''
         load everything
@@ -168,12 +176,24 @@ class openroomsScene2D(scene2DBase):
         return self.dataset_root / self.meta_split / self.scene_name
 
     @property
+    def scene_semantic_path(self):
+        return Path(str(self.scene_path).replace('DiffMat', '').replace('DiffLight', ''))
+
+    @property
     def scene_rendering_path(self):
         return self.scene_path
 
     @property
     def scene_rendering_path_list(self):
         return [self.scene_path] * self.frame_num
+
+    @property
+    def scene_rendering_semantic_path(self):
+        return self.scene_semantic_path
+
+    @property
+    def scene_rendering_semantic_path_list(self):
+        return [self.scene_semantic_path] * self.frame_num
 
     @property
     def if_has_hdr_scale(self):
@@ -301,7 +321,7 @@ class openroomsScene2D(scene2DBase):
         
         print(blue_text('[%s] loading poses from %s'%(str(self.__class__.__name__), self.pose_file_path)))
         cam_params = read_cam_params_OR(str(self.pose_file_path))
-        if self.frame_id_list == []: self.frame_id_list = list(range(len(cam_params)))
+        if self.frame_id_list == []: self.frame_id_list = [_+self.indexing_based for _ in list(range(len(cam_params)))]
 
         self.pose_list, self.origin_lookatvector_up_list = load_OR_public_poses_to_Rt(cam_params, self.frame_id_list, False, if_1_based=self.indexing_based==1)
 
@@ -447,14 +467,15 @@ class openroomsScene2D(scene2DBase):
         semseg, image space
         (H, W)
 
-        originally, im_semseg is 0-based (0 for invalid class) 
+        openrooms_public: OR-45 (before -1: files_openrooms/colors/OR45_color_mapping_light.png)
+        originally, im_semseg is 1-based (1 for invalid class) 
             -> semseg is 0-based (255 for invalid class), int32
         '''
         if hasattr(self, 'semseg_list'): return
 
         print(white_blue('[%s] load_semseg for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
 
-        self.semseg_file_list = [self.scene_rendering_path / ('imsemLabel_%d.npy'%i) for i in self.frame_id_list]
+        self.semseg_file_list = [(self.scene_rendering_semantic_path / (self.CONF.modality_filename_dict['semseg']%i)) for i in self.frame_id_list]
         semseg_list = [
             load_img(semseg_file, (self.im_H_load, self.im_W_load), ext='npy', target_HW=self.im_HW_target, resize_method='nearest')
             for semseg_file in self.semseg_file_list]
@@ -465,9 +486,9 @@ class openroomsScene2D(scene2DBase):
             # assert semseg.dtype==np.uint8
             semseg -= 1
             semseg[semseg==-1] = 255
-            # print(np.amax(semseg), np.amin(semseg), np.sum(semseg==255))
+            print(np.unique(semseg), [self.OR_mapping_id45_to_name_dict[_] for _ in np.unique(semseg)])
             self.semseg_list.append(semseg)
-        
+            
         print(blue_text('[%s] DONE. load_semseg'%self.__class__.__name__))
 
     def load_matseg(self):
@@ -480,8 +501,8 @@ class openroomsScene2D(scene2DBase):
         if hasattr(self, 'matseg_list'): return
 
         print(white_blue('[%s] load_matseg for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
-
-        self.imcadmatobj_file_list = [self.scene_rendering_path / ('imcadmatobj_%d.dat'%i) for i in self.frame_id_list]
+        
+        self.imcadmatobj_file_list = [(self.scene_rendering_semantic_path / (self.CONF.modality_filename_dict['matseg']%i)) for i in self.frame_id_list]
         self.imcadmatobj_list = [
             load_binary(
                 imcadmatobj_file, 
@@ -514,4 +535,75 @@ class openroomsScene2D(scene2DBase):
             self.matseg_list.append(matseg_dict)
         
         print(blue_text('[%s] DONE. load_matseg'%self.__class__.__name__))
+
+    def load_colors(self):
+        '''
+        load mapping from obj cat id to RGB
+        
+        2D: OR-public_semseg is OR45!
+        3D: OR-public-xml is OR42 (+ ceiling_lamp (split from lamp) - {'pool_table', 'counter', 'whiteboard', 'unlabelled', 'desk' (merged into table)}
+        
+        - self.OR_mapping_obj_cat_str_to_id42_name_dict: string in obj filename -> (cat id, cat name)
+        - OR_mapping_id45_to_name_dict: cat id -> cat name
+        - OR_mapping_id45_to_color_dict: cat id -> RGB
+        
+        vis:
+        - files_openrooms/colors/OR42_color_mapping_light.png
+        - files_openrooms/colors/OR45_color_mapping_light.png
+        
+        Both should have the same colors for overlapped cats (e.g. chairs in green, floor in black)
+
+        '''
+
+        if self.if_has_colors:
+            pass
+
+        OR_mapping_id45_to_color_file = self.semantic_labels_root / 'colors/OR4X_mapping_catInt_to_RGB_light.pkl'
+        with (open(OR_mapping_id45_to_color_file, "rb")) as f:
+            OR4X_mapping_catInt_to_RGB_light = pickle.load(f)
+            
+        '''
+        OR42 for semseg labels
+        '''
+        OR_mapping_obj_cat_str_to_id_file = self.semantic_labels_root / 'semanticLabelName_OR42.txt'
+        with open(str(OR_mapping_obj_cat_str_to_id_file)) as f:
+            mylist = f.read().splitlines()
+        self.OR_mapping_obj_cat_str_to_id42_name_dict = {x.split(' ')[0]: (int(x.split(' ')[1]), x.split(' ')[2]) for x in mylist} # cat id is 0-based (0 being unlabelled)!
+        self.OR_mapping_obj_cat_str_to_id42_name_dict = {k: (v[0]-1, v[1]) for k, v in self.OR_mapping_obj_cat_str_to_id42_name_dict.items()}
+        
+        self.OR_mapping_id42_to_color_dict = OR4X_mapping_catInt_to_RGB_light['OR42']
+        self.OR_mapping_id42_to_color_dict = {k-1: v for k, v in self.OR_mapping_id42_to_color_dict.items() if k != 0}
+        self.OR_mapping_id42_to_color_dict[255] = (255, 255, 255) # unlabelled
+        
+        '''
+        OR45 for xml shapes (convert from obj names)
+        '''
+        OR_names45_file = self.semantic_labels_root / 'colors/openrooms_names.txt'
+        with open(str(OR_names45_file)) as f:
+            mylist = f.read().splitlines()
+        self.OR_mapping_id45_to_name_dict = {_: '_'.join(x.split('_')[:-1]) for _, x in enumerate(mylist)} # cat id is 0-based (255 being unlabelled)!
+        self.OR_mapping_id45_to_name_dict = {k-1: v for k, v in self.OR_mapping_id45_to_name_dict.items() if k != 0}
+        self.OR_mapping_id45_to_name_dict[255] = 'unlabelled'      
+        
+            
+        self.OR_mapping_id45_to_color_dict = OR4X_mapping_catInt_to_RGB_light['OR45']
+        self.OR_mapping_id45_to_color_dict = {k-1: v for k, v in self.OR_mapping_id45_to_color_dict.items() if k != 0}
+        self.OR_mapping_id45_to_color_dict[255] = (255, 255, 255) # unlabelled
+
+        '''
+        '''
+        
+        x1 = list(v[1] for k, v in self.OR_mapping_obj_cat_str_to_id42_name_dict.items())
+        x2 = list(v for k, v in self.OR_mapping_id45_to_name_dict.items())
+        print("[DEBUG] missing names in OR_mapping_obj_cat_str_to_id42_name_dict (42) but in OR_mapping_id45_to_name_dict (45)", set(x2)-set(x1))
+        print("[DEBUG] missing names in OR_mapping_id45_to_name_dict (45) but in ", set(x1)-set(x2))
+        
+        
+        # OR_mapping_str_to_color_file = self.semantic_labels_root / 'colors/OR4X_mapping_catStr_to_RGB_light.pkl'
+        # with (open(OR_mapping_str_to_color_file, "rb")) as f:
+        #     OR4X_mapping_catInt_to_RGB_light = pickle.load(f)
+        # import ipdb; ipdb.set_trace()
+
+        
+        self.if_loaded_colors = True
 
