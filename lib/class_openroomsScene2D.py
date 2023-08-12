@@ -148,7 +148,7 @@ class openroomsScene2D(scene2DBase):
             'albedo', 'roughness', 'depth', 'normal', 
             'seg', 'seg_area', 'seg_env', 'seg_obj', 
             'lighting_SG', 'lighting_envmap', 
-            'semseg', 'matseg', 
+            'semseg', 'matseg', 'instance_seg', 
             ]
 
     @property
@@ -228,6 +228,8 @@ class openroomsScene2D(scene2DBase):
             return self.semseg_list
         elif modality == 'matseg': 
             return self.matseg_list
+        elif modality == 'instance_seg': 
+            return self.instance_seg_list
         elif modality == 'seg_area': 
             return self.seg_dict_of_lists['area']
         elif modality == 'seg_env': 
@@ -248,6 +250,7 @@ class openroomsScene2D(scene2DBase):
             if _ == 'lighting_SG': self.load_lighting_SG()
             if _ == 'semseg': self.load_semseg()
             if _ == 'matseg': self.load_matseg()
+            if _ == 'instance_seg': self.load_instance_seg()
 
     def load_intrinsics(self):
         '''
@@ -263,40 +266,6 @@ class openroomsScene2D(scene2DBase):
             scale_factor = [t / s for t, s in zip((self.im_H_resize, self.im_W_resize), (self.im_H_load, self.im_W_load))]
             self.K = resize_intrinsics(self.K, scale_factor)
         
-    def load_seg(self):
-        '''
-        return 3 bool masks; (H, W), float32 0./1.
-        '''
-        if hasattr(self, 'seg_dict_of_lists'): return
-
-        print(white_blue('[%s] load_seg for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
-
-        self.seg_dict_of_lists = defaultdict(list)
-
-        for i in self.frame_id_list:
-            seg_path = self.scene_rendering_path / ('immask_%d.png'%i)
-            seg = load_img(seg_path, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_HW_target, resize_method='nearest')[:, :, 0] / 255. # [0., 1.]
-
-            seg_area = np.logical_and(seg > 0.49, seg < 0.51).astype(np.float32)
-            seg_env = (seg < 0.1).astype(np.float32)
-            seg_obj = (seg > 0.9) 
-
-            if 'lighting_SG' in self.modality_list or 'lighting_envmap' in self.modality_list:
-                seg_obj = seg_obj.squeeze()
-                seg_obj = ndimage.binary_erosion(seg_obj, structure=np.ones((7, 7)),
-                        border_value=1)
-
-            seg_obj = seg_obj.squeeze().astype(np.float32)
-
-            self.seg_dict_of_lists['ori'].append(seg)
-            self.seg_dict_of_lists['area'].append(seg_area)
-            self.seg_dict_of_lists['env'].append(seg_env)
-            self.seg_dict_of_lists['obj'].append(seg_obj)
-
-        print(blue_text('[%s] DONE. load_seg'%self.__class__.__name__))
-
-        self.seg_from['seg'] = True
-
     def load_transforms(self):
         # load transformations # writeShapeToXML.py L588
         transform_file = self.scene_xml_root / 'transform.dat'
@@ -462,6 +431,40 @@ class openroomsScene2D(scene2DBase):
         assert all([tuple(_.shape)==(env_row, env_col, 3, env_height, env_width) for _ in self.lighting_envmap_list])
         print(blue_text('[%s] DONE. load_lighting_envmap'%self.__class__.__name__))
 
+    def load_seg(self):
+        '''
+        return 3 bool masks; (H, W), float32 0./1.
+        '''
+        if hasattr(self, 'seg_dict_of_lists'): return
+
+        print(white_blue('[%s] load_seg for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
+
+        self.seg_dict_of_lists = defaultdict(list)
+
+        for i in self.frame_id_list:
+            seg_path = self.scene_rendering_semantic_path / (self.CONF.modality_filename_dict['seg']%i)
+            seg = load_img(seg_path, (self.im_H_load, self.im_W_load, 3), target_HW=self.im_HW_target, resize_method='nearest')[:, :, 0] / 255. # [0., 1.]
+
+            seg_area = np.logical_and(seg > 0.49, seg < 0.51).astype(np.float32)
+            seg_env = (seg < 0.1).astype(np.float32)
+            seg_obj = (seg > 0.9) 
+
+            if 'lighting_SG' in self.modality_list or 'lighting_envmap' in self.modality_list:
+                seg_obj = seg_obj.squeeze()
+                seg_obj = ndimage.binary_erosion(seg_obj, structure=np.ones((7, 7)),
+                        border_value=1)
+
+            seg_obj = seg_obj.squeeze().astype(np.float32)
+
+            self.seg_dict_of_lists['ori'].append(seg)
+            self.seg_dict_of_lists['area'].append(seg_area)
+            self.seg_dict_of_lists['env'].append(seg_env)
+            self.seg_dict_of_lists['obj'].append(seg_obj)
+
+        print(blue_text('[%s] DONE. load_seg'%self.__class__.__name__))
+
+        self.seg_from['seg'] = True
+
     def load_semseg(self):
         '''
         semseg, image space
@@ -529,12 +532,84 @@ class openroomsScene2D(scene2DBase):
             matseg_dict = {
                 'mat_aggre_map': mat_aggre_map, # (H, W), int32; [0, 1, ..., num_mat_masks], 0 for invalid region
                 'num_mat_masks': num_mat_masks,  
-                'instances': segmentation, # (50, 240, 320), np.uint8; instance[0:num_mat_masks] are each for one mat part; instance[num_mat_masks] is for backround/emitters (e.g. regions of lamps/windows)
+                'instances': segmentation, # (50, 240, 320), np.uint8; the last instance, i.e. instance[num_mat_masks] is for backround/emitters (e.g. regions of lamps/windows)
                 # 'semantic': 1 - torch.FloatTensor(segmentation[num_mat_masks, :, :]).unsqueeze(0), # torch.Size([50, 240, 320]) torch.Size([1, 240, 320])
             }
             self.matseg_list.append(matseg_dict)
         
         print(blue_text('[%s] DONE. load_matseg'%self.__class__.__name__))
+        
+    def load_instance_seg(self):
+        '''
+        instance_seg, semseg, matseg: ![](https://i.imgur.com/8Tkm5Ix.png)
+        '''
+        if not hasattr(self, 'seg_dict_of_lists'): self.load_seg()
+        if not hasattr(self, 'semseg_list'): self.load_semseg()
+        if not hasattr(self, 'matseg_list'): self.load_matseg()
+        
+        assert len(self.imcadmatobj_list) == len(self.semseg_list) == len(self.seg_dict_of_lists['obj'])
+        
+        self.instance_seg_list = []
+        
+        print(white_blue('[%s] load_instance_seg for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
+        
+        for _idx, (raw_masks, im_semseg, seg_obj, seg_area) in enumerate(zip(self.imcadmatobj_list, self.semseg_list, self.seg_dict_of_lists['obj'], self.seg_dict_of_lists['area'])):
+            obj_idx_map = raw_masks[:, :, 2] # 3rd channel: object INDEX map
+            
+            segments_info_list = []
+            im_pan_seg_ids = np.empty((self.H, self.W), dtype=np.int16)
+            im_pan_seg_ids.fill(255)
+            
+            for obj_idx in np.unique(obj_idx_map):
+                obj_mask = obj_idx_map == obj_idx
+                obj_semseg = im_semseg[obj_mask]
+                im_semseg_masked = im_semseg.copy()
+                im_semseg_masked[~obj_mask] = 0
+                im_semseg_masked[~(np.logical_or(seg_obj.astype(bool), seg_area.astype(bool)))] = 0 # excluding outdoor env through windows
+
+                valid_obj_semseg_single_list = []
+                for obj_semseg_single in np.unique(obj_semseg):
+                    '''
+                    ideally there is only one instance in each obj_semseg; trying to get rid of other instances with very small pixels (due to aliasing) in the same obj_mask
+                    '''
+                    mask_single = im_semseg_masked==obj_semseg_single
+                    
+                    ratio_pixels_obj = float(np.sum(mask_single)) / float(np.sum(obj_mask)) * 100.
+                    if ratio_pixels_obj < 5: continue
+                    if np.sum(mask_single) < 100: continue # [!!!] ignore extremely small objects, or fantom objects due to aliasing (e.g. https://i.imgur.com/OfAAIft.png)
+                    valid_obj_semseg_single_list.append(obj_semseg_single)
+                    
+                    # if obj_semseg_single in [42, 43, 44]:
+                    #     obj_idx = {44:254, 43:253, 42:252}[obj_semseg_single]
+                        
+                    area = np.sum(mask_single)  # segment area computation
+                    
+                    assert obj_idx < 252 # 252, 253, 254 are reserved for wall, floor, ceiling
+                    segments_info_dict = {
+                        'id': int(obj_idx) if obj_semseg_single not in [42, 43, 44] else {44:254, 43:253, 42:252}[obj_semseg_single], # remap wall(42), floor(43), ceiling(44) to 252, 253, 254; otherwise they will be merged as one instance
+                        'category_id': int(obj_semseg_single), # [!!!] now 0-44 is valid, 255 is ignored
+                        'iscrowd': 0,
+                        'isthing': obj_semseg_single not in [42, 43, 44],
+                        'isstuff': obj_semseg_single in [42, 43, 44],
+                        'area': int(area),
+                    }
+                    segments_info_list.append(segments_info_dict)
+                    im_pan_seg_ids[mask_single] = segments_info_dict['id']
+                    
+                    print('frame %d - instance #%d - sem cat %d %s - area %d'%(_idx, segments_info_dict['id'], int(obj_semseg_single), self.OR_mapping_id45_to_name_dict[int(obj_semseg_single)], area))
+                    
+                    if len(valid_obj_semseg_single_list) > 1:
+                        if not all([_ in [42, 43, 44] for _ in valid_obj_semseg_single_list]): 
+                            print(valid_obj_semseg_single_list), im_info_dict, obj_idx
+                            assert False
+                            # IF_SKIP = True
+                            # excludes_scene_list.append((im_info_dict['meta_split'], im_info_dict['scene_name'], im_info_dict['frame_id'], obj_idx))
+                            # print(red('excluded:'), (im_info_dict['meta_split'], im_info_dict['scene_name'], im_info_dict['frame_id'], obj_idx))
+
+            # print(np.unique(im_pan_seg_ids))
+            self.instance_seg_list.append(im_pan_seg_ids)
+            
+        print(blue_text('[%s] DONE. load_instance_seg'%self.__class__.__name__))
 
     def load_colors(self):
         '''

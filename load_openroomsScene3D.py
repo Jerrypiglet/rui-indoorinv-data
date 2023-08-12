@@ -119,7 +119,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 # frame_id_list = [0, 11, 10, 64, 81]
 # + list(range(5, 87, 10))
 
-frame_id_list = [1]
+frame_id_list = [1, 5, 10]
 
 '''
 update confs
@@ -185,12 +185,13 @@ scene_obj = openroomsScene3D(
         # 'albedo', 'roughness', 
         # 'depth', 'normal',
         'semseg', 
-        'matseg', 
+        # 'matseg', 
+        'instance_seg', 
         # 'lighting_SG', 
         # 'lighting_envmap', 
         
         # 'layout', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties
         # 'tsdf', 
         # 'mi', # mitsuba scene, loading from scene xml file
         ], 
@@ -339,11 +340,12 @@ if opt.vis_2d_plt:
             # 'albedo', 
             # 'roughness', 
             'semseg', 
-            'matseg', 
+            # 'matseg', 
+            'instance_seg', 
             # 'depth', 
             # 'normal', 
-            'mi_depth', 
-            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
+            # 'mi_depth', 
+            # 'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_SG', # convert to lighting_envmap and vis: images/demo_lighting_SG_envmap_2D_plt.png
             # 'lighting_envmap', 
             # 'seg_area', 'seg_env', 'seg_obj', 

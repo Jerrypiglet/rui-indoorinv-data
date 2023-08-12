@@ -14,22 +14,35 @@ def _get_colors(num_colors):
         colors.append(colorsys.hls_to_rgb(hue, lightness, saturation))
     return colors
 
-def vis_index_map(index_map, num_colors=-1):
+def vis_index_map(index_map, num_colors=-1, colors=None):
     """
     input: [H, W], np.uint8, with indexs from [0, 1, 2, 3, ...] where 0 is no object
     return: [H, W], np.float32, RGB ~ [0., 1.]
     """
-    if num_colors == -1:
-        num_colors = np.amax(index_map)
-        # num_colors = 50
-    colors = _get_colors(num_colors)
+    if colors is None:
+        if num_colors == -1:
+            num_colors = np.amax(index_map)
+            # num_colors = 50
+        colors = _get_colors(num_colors)
+
+    assert isinstance(colors, dict) or isinstance(colors, list), 'colors must be a dict or a list'
+        
     index_map_vis = np.zeros((index_map.shape[0], index_map.shape[1], 3))
-    for color_idx, color in enumerate(colors):
-        mask = index_map == color_idx
-        index_map_vis[mask] = color
+    if isinstance(colors, list):
+        for color_idx, color in enumerate(colors):
+            mask = index_map == color_idx
+            index_map_vis[mask] = color
+    elif isinstance(colors, dict):
+        for color_idx, color in colors.items():
+            mask = index_map == color_idx
+            index_map_vis[mask] = color
     return index_map_vis
 
 def reindex_output_map(index_map, invalid_index):
+    '''
+    0: invalid
+    1, 2,...: valid
+    '''
     index_map_reindex = np.zeros_like(index_map)
     index_map_reindex[index_map==invalid_index] = 0
 

@@ -16,7 +16,7 @@ from lib.class_texirScene3D import texirScene3D
 from lib.class_simpleScene3D import simpleScene3D
 from lib.class_i2sdfScene3D import i2sdfScene3D
 
-from lib.utils_vis import vis_index_map, colorize
+from lib.utils_vis import vis_index_map, colorize, reindex_output_map, _get_colors
 from lib.utils_OR.utils_OR_lighting import converter_SG_to_envmap
 from lib.utils_OR.utils_OR_cam import project_3d_line
 from lib.utils_OR.utils_OR_lighting import downsample_lighting_envmap
@@ -84,7 +84,7 @@ class visualizer_scene_2D(object):
             'lighting_envmap', 
             'seg_area', 'seg_env', 'seg_obj', 
             'emission', 
-            'semseg', 'matseg', 
+            'semseg', 'matseg', 'instance_seg', 
             'mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', 
             'mi_normal_im_overlay', 
             'layout', 'shapes', 
@@ -164,7 +164,9 @@ class visualizer_scene_2D(object):
                     if modality in ['albedo', 'kd', 'ks', 'emission']:
                         modality_title_appendix = '(in SDR space)'
                     if modality == 'matseg':
-                        modality_title_appendix = '(red for invalid areas (e.g. emitters)'
+                        modality_title_appendix = '(white for invalid areas (e.g. emitters))'
+                    if modality == 'instance_seg':
+                        modality_title_appendix = '(white for invalid areas (e.g. env))'
                     if modality in ['mi_depth', 'mi_normal', 'mi_seg']:
                         modality_title_appendix = '(from Mitsuba)'
                         if modality == 'mi_normal':
@@ -200,6 +202,24 @@ class visualizer_scene_2D(object):
 
         _list = self.os.get_modality(modality, source=source)
         assert len(_list) == len(self.frame_idx_list) == len(ax_list)
+        
+        colors_dict = {}
+        _im_invalid_list = []
+        if modality in ['matseg', 'instance_seg']:
+            '''
+            get global color
+            '''
+            _id_list = []
+            for _im in _list:
+                __im = _im['mat_aggre_map'] if modality == 'matseg' else _im
+                _im_invalid = __im == 255
+                _im_invalid_list.append(_im_invalid)
+                _id_list += np.unique(__im[~_im_invalid]).tolist()
+                
+            _id_list = list(set(_id_list))
+            assert 255 not in _id_list
+            colors_dict = {_id: _color for _id, _color in zip(_id_list, _get_colors(len(_id_list)))}
+                    
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
             _im = _list[frame_idx]
             H, W = self.os._H(frame_idx), self.os._W(frame_idx)
@@ -269,11 +289,14 @@ class visualizer_scene_2D(object):
                 # convert albedo to SDR for better vis
                _im = np.clip(_im ** (1./2.2), 0., 1.)
 
-            if modality == 'matseg':
-                _im = vis_index_map(_im['mat_aggre_map'])
             if modality == 'semseg':
                 # colormap: https://github.com/Jerrypiglet/rui-indoorinv-data/blob/7e527693ae6718381c6fab0652fd7da649c4a008/files_openrooms/colors/OR42_color_mapping_light.png
                 _im = np.array(colorize(_im, self.semseg_colors).convert('RGB'))
+            if modality in ['matseg', 'instance_seg']:
+                assert colors_dict != {}
+                __im = _im['mat_aggre_map'] if modality == 'matseg' else _im
+                _im = vis_index_map(__im, colors=colors_dict)
+                _im[_im_invalid_list[frame_idx]] = 1. # invalid areas in white
 
             if modality == 'lighting_SG':
                 axis_local, lamb, weight = np.split(_im, [3, 4], axis=3)
