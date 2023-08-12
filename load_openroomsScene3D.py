@@ -119,7 +119,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 # frame_id_list = [0, 11, 10, 64, 81]
 # + list(range(5, 87, 10))
 
-frame_id_list = [1, 5, 10]
+# frame_id_list = [1, 5, 10]
 
 '''
 update confs
@@ -144,6 +144,7 @@ CONF.shape_params_dict.update({
 CONF.mi_params_dict.update({
     'if_mi_scene_from_xml': True, # !!!! set to False to load from shapes (single shape or tsdf fused shape (with tsdf in modality_list))
 })
+
 # TSDF options
 CONF.shape_params_dict.update({
     'if_force_fuse_tsdf': True, # !!!! set to True to force replace existing tsdf shape
@@ -192,8 +193,8 @@ scene_obj = openroomsScene3D(
         
         # 'layout', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
-        # 'tsdf', 
-        # 'mi', # mitsuba scene, loading from scene xml file
+        'tsdf', 
+        'mi', # mitsuba scene, loading from scene xml file
         ], 
 )
 
@@ -212,7 +213,7 @@ if opt.eval_scene:
     sample visivility to camera centers on vertices
     '''
     _ = evaluator_scene.sample_shapes(
-        sample_type=opt.sample_type, # e.g. ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg']
+        sample_type=opt.sample_type, # e.g. ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg', 'instance_seg']
         # sample_type='vis_count', # ['']
         # sample_type='t', # ['']
         shape_params={

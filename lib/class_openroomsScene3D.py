@@ -163,7 +163,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
             self.load_mi_scene_from_shape(shape_file_path=self.tsdf_file_path)
             self.mi_scene_from = 'tsdf'
         else:
-            assert self.CONF.mi_params_dict.if_mi_scene_from_xml
+            # assert self.CONF.mi_params_dict.if_mi_scene_from_xml
             xml_dump_dir = self.PATH_HOME / 'mitsuba'
 
             if_also_dump_xml_with_lit_area_lights_only = False

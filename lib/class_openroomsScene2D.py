@@ -215,6 +215,10 @@ class openroomsScene2D(scene2DBase):
     def if_has_semseg(self):
         return all([_ in self.modality_list for _ in ['semseg']])
 
+    @property
+    def if_has_instance_seg(self):
+        return all([_ in self.modality_list for _ in ['instance_seg']])
+
     def get_modality(self, modality, source: str='GT'):
         _ = scene2DBase.get_modality_(self, modality, source)
         if _ is not None:
