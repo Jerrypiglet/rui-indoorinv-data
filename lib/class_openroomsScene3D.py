@@ -93,6 +93,7 @@ class openroomsScene3D(openroomsScene2D, mitsubaBase):
         if hasattr(self, 'pose_list'): 
             self.get_cam_rays()
 
+        # if 'mi' in self.modality_list:
         self.load_mi_scene()
 
         if self.CONF.mi_params_dict.get('process_mi_scene', True):

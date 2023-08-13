@@ -131,6 +131,17 @@ def dump_OR_xml_for_mi(
             shape_id += gen_random_str(5)
             shape.set('id', shape_id)
         shape_ids.append(shape_id)
+        
+        # fix nan rotation.... e.g. <rotate angle="180.000000" x="nan" y="nan" z="nan"/> (why this is happening at all?...)
+        for transforms in shape.findall('transform'):
+            for rotate in transforms.findall('rotate'):
+                if_invalid = False
+                for k in ['x', 'y', 'z', 'angle']:
+                    if np.isnan(float(rotate.get(k))):
+                        if_invalid = True
+                        # rotate.set(k, '0.0')
+                if if_invalid:
+                    transforms.remove(rotate)
 
         # for emitter in shape.findall('emitter'):
         #     shape.remove(emitter) # removing emitter associated with shapes for now

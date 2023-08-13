@@ -4,9 +4,6 @@ Rui Zhu
 Note: cannot multi-process this script, because mitsuba does not support it; also some operations are already using all cores
 '''
 
-
-
-
 from pathlib import Path
 '''
 set those params according to your environment
@@ -26,6 +23,7 @@ from tqdm import tqdm
 import numpy as np
 np.set_printoptions(suppress=True)
 import copy
+import pickle
 from pyhocon import ConfigFactory, ConfigTree
 from lib.utils_misc import str2bool, check_exists, yellow
 from lib.class_openroomsScene3D import openroomsScene3D
@@ -73,10 +71,19 @@ envmaps_root = Path(OR_RAW_ROOT) / 'EnvDataset'; check_exists(envmaps_root)
 '''
 go over all scenes
 '''
+black_list = [
+    ('main_xml1', 'scene0386_00'), 
+    ('main_xml', 'scene0386_00'), 
+    ('main_xml', 'scene0608_01'), 
+    ('main_xml1', 'scene0608_01'), 
+    ('main_xml1', 'scene0211_02'), 
+    ('main_xml1', 'scene0126_02'), 
+]
+
 frame_list_root = semantic_labels_root / 'public'
 assert frame_list_root.exists(), frame_list_root
 # for split in ['train', 'val']:
-for split in ['val']:
+for split in ['train']:
     exclude_scene_list_file = dump_root / ('excluded_scenes_%s.txt'%split)
     if exclude_scene_list_file.exists():
         exclude_scene_list_file.unlink()
@@ -88,9 +95,17 @@ for split in ['val']:
     excluded_scenes = []
     for (meta_split, scene_name) in tqdm(scene_list):
         print('++++', meta_split, scene_name, '++++')
-        IF_DEBUG = np.random.random() < 0.05
+        # IF_DEBUG = np.random.random() < 0.05
         # IF_DEBUG = np.random.random() <= 1.0
+        IF_DEBUG = split == 'val'
         # IF_DEBUG = True
+        
+        if (meta_split.replace('DiffMat', '').replace('DiffLight', ''), scene_name) in black_list:
+            excluded_scenes.append((meta_split, scene_name))
+            with open(str(exclude_scene_list_file), 'a') as f:
+                f.write('%s %s\n'%(meta_split, scene_name))
+                print('Excluded:', meta_split, scene_name)
+            continue
         
         CONF.scene_params_dict.scene_name = '%s-%s'%(meta_split, scene_name)
         CONF.im_params_dict.update({'im_H_resize': 240, 'im_W_resize': 320})
@@ -139,8 +154,8 @@ for split in ['val']:
         if scene_obj.IF_SKIP:
             excluded_scenes.append((meta_split, scene_name))
             with open(str(exclude_scene_list_file), 'a') as f:
-                f.write('%s %s\n'%(scene_info[0], scene_info[1]))
-                print('Excluded:', scene_info[0], scene_info[1])
+                f.write('%s %s\n'%(meta_split, scene_name))
+                print('Excluded:', meta_split, scene_name)
             continue
 
         eval_return_dict = {}
@@ -176,11 +191,13 @@ for split in ['val']:
             visibility_list_list = return_dict['visibility_list_list']
             if len(visibility_list_list) > 0:
                 print('+++++', sample_type, '++', len(visibility_list_list[0]))
+                with open(str(dump_root / meta_split / scene_name / 'visibility_list_list.pkl'), 'wb') as f:
+                    pickle.dump(visibility_list_list, f)
+                print('=== visibility_list_list dumped to:', str(dump_root / meta_split / scene_name / 'visibility_list_list.pkl'))
             else:
                 print('+++++', sample_type, '++', 0)
             
             # debug and vis
-            
 
             # if sample_type == 'rgb_sdr':
             #     rgb_sdr = np.array(return_dict['rgb_sdr'])
@@ -255,7 +272,9 @@ for split in ['val']:
                                 instance_seg_to_semseg_mapping_dict[instance_seg_id].append(instance_seg_info['category_id'])
                 
                     if instance_seg_id != 255:
-                        assert len(set(instance_seg_to_semseg_mapping_dict[instance_seg_id])) == 1
+                        if not len(set(instance_seg_to_semseg_mapping_dict[instance_seg_id])) == 1:
+                            print(instance_seg_id, set(instance_seg_to_semseg_mapping_dict[instance_seg_id]))
+                            import ipdb; ipdb.set_trace()
                     else:
                         instance_seg_to_semseg_mapping_dict[instance_seg_id] = []
                         

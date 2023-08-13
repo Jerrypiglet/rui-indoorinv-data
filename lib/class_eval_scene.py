@@ -168,7 +168,7 @@ class evaluator_scene_scene():
                             visibility = np.logical_and(visibility, visibility_frustum) # (N_vertices_ALL,), bool
 
                         ret_p = ret.p.numpy()
-                        visibility_list.append((visibility, ret_p))
+                        visibility_list.append((visibility, ret_p.astype(np.float16))) # ocnvert to float16 to save memory
                         
                     if sample_type == 'vis_count':
                         vis_count += visibility
