@@ -13,6 +13,33 @@ from pathlib import Path
 from lib.global_vars import mi_variant_dict
 hosts = mi_variant_dict.keys()
 
+import json
+import subprocess
+
+def _read_json(path):
+    with open(path) as f:
+        file = json.load(f)
+    return file
+
+def run_cmd(cmd):
+    #!/usr/bin/python
+    ## get subprocess module 
+    
+    ## call date command ##
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    
+    ## Talk with date command i.e. read data from stdout and stderr. Store this info in tuple ##
+    ## Interact with process: Send data to stdin. Read data from stdout and stderr, until end-of-file is reached.  ##
+    ## Wait for process to terminate. The optional input argument should be a string to be sent to the child process, ##
+    ## or None, if no data should be sent to the child.
+    (output, err) = p.communicate()
+    
+    ## Wait for date to terminate. Get return returncode ##
+    p_status = p.wait()
+    # print "Command output : ", output
+    # print "Command exit status/return code : ", p_status
+    return (output.decode(), err, p_status)
+
 def listify_matrix(matrix):
     matrix_list = []
     for row in matrix:

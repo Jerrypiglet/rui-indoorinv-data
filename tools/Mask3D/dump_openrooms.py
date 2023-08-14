@@ -26,28 +26,10 @@ import copy
 import pickle
 from pyhocon import ConfigFactory, ConfigTree
 from lib.utils_misc import str2bool, check_exists, yellow
+from lib.utils_openrooms import get_im_info_list
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_eval_scene import evaluator_scene_scene
 from test_scripts.scannet_utils.utils_visualize import visualize
-
-def get_im_info_list(frame_list_root, split):
-    frame_list_path = frame_list_root / ('%s.txt'%split)
-    assert frame_list_path.exists(), frame_list_path
-    scene_list = []
-    with open(frame_list_path, 'r') as f:
-        frame_list = f.read().splitlines()
-        # print(len(frame_list), frame_list[0])
-        for frame_info in tqdm(frame_list):
-            scene_name, frame_id, im_sdr_file, imsemLabel_path = frame_info.split(' ')
-            meta_split, scene_name_, im_sdr_name = im_sdr_file.split('/')
-            assert scene_name == scene_name_
-            assert im_sdr_name.split('.')[0].split('_')[1] == str(frame_id)
-            if (meta_split, scene_name) not in scene_list:
-                scene_list.append((meta_split, scene_name))
-            
-    print(yellow('Found %d scenes, %d frames in %s'%(len(scene_list), len(frame_list), split)))
-    print(scene_list[:5])
-    return scene_list
 
 '''
 global vars
@@ -85,9 +67,9 @@ assert frame_list_root.exists(), frame_list_root
 # for split in ['train', 'val']:
 for split in ['train']:
     exclude_scene_list_file = dump_root / ('excluded_scenes_%s.txt'%split)
-    if exclude_scene_list_file.exists():
-        exclude_scene_list_file.unlink()
-    scene_list = get_im_info_list(frame_list_root, split)
+    # if exclude_scene_list_file.exists():
+    #     exclude_scene_list_file.unlink()
+    scene_list = get_im_info_list(frame_list_root, split)[5443:]
     # scene_list = [('mainDiffMat_xml1', 'scene0385_01')]
 
     import time
@@ -104,7 +86,7 @@ for split in ['train']:
             excluded_scenes.append((meta_split, scene_name))
             with open(str(exclude_scene_list_file), 'a') as f:
                 f.write('%s %s\n'%(meta_split, scene_name))
-                print('Excluded:', meta_split, scene_name)
+                print('[Excluded:]', meta_split, scene_name)
             continue
         
         CONF.scene_params_dict.scene_name = '%s-%s'%(meta_split, scene_name)
@@ -155,7 +137,7 @@ for split in ['train']:
             excluded_scenes.append((meta_split, scene_name))
             with open(str(exclude_scene_list_file), 'a') as f:
                 f.write('%s %s\n'%(meta_split, scene_name))
-                print('Excluded:', meta_split, scene_name)
+                print('[Excluded:]', meta_split, scene_name)
             continue
 
         eval_return_dict = {}
@@ -274,7 +256,12 @@ for split in ['train']:
                     if instance_seg_id != 255:
                         if not len(set(instance_seg_to_semseg_mapping_dict[instance_seg_id])) == 1:
                             print(instance_seg_id, set(instance_seg_to_semseg_mapping_dict[instance_seg_id]))
-                            import ipdb; ipdb.set_trace()
+                            # import ipdb; ipdb.set_trace()
+                            excluded_scenes.append((meta_split, scene_name))
+                            with open(str(exclude_scene_list_file), 'a') as f:
+                                f.write('%s %s\n'%(meta_split, scene_name))
+                                print('[Excluded:]', meta_split, scene_name)
+                            continue
                     else:
                         instance_seg_to_semseg_mapping_dict[instance_seg_id] = []
                         
