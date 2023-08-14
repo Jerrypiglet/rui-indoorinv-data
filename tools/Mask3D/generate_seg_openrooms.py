@@ -6,6 +6,8 @@ run 'python dump_openrooms.py' first to generate tsdf files in 'dump_root'
 '''
 
 from pathlib import Path
+from multiprocessing import Pool
+import time
 
 DATASET = 'openrooms_public'
 # host = 'apple'; PATH_HOME = '/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data'
@@ -75,6 +77,60 @@ generating segmentation
 '''
 segmentor_path = '/home/ruizhu/Documents/Projects/ScanNet/Segmentator/segmentator' # https://github.com/ScanNet/ScanNet.git
 
+def process_scene(scene):
+    scene_idx, meta_split, scene_name = scene[0], scene[1], scene[2]
+    scene_dump_root = dump_root / meta_split / scene_name
+    _scene_str = '[%d]%s_%s'%(scene_idx, meta_split, scene_name)
+    print(yellow('=== Processing %s'%_scene_str))
+
+    tsdf_mesh_path = scene_dump_root / 'fused_tsdf.ply'
+    tsdf_mesh = trimesh.load_mesh(str(tsdf_mesh_path), process=False)
+    vertices = np.array(tsdf_mesh.vertices)
+    faces = np.array(tsdf_mesh.faces)
+    print('- Loaded mesh from '+str(tsdf_mesh_path), vertices.shape, faces.shape, np.amin(vertices, axis=0), np.amax(vertices, axis=0), np.amin(faces), vertices.dtype, faces.dtype)
+    
+    _tmp_trimesh = trimesh.Trimesh(vertices=vertices, faces=faces, vertex_colors=tsdf_mesh.visual.vertex_colors, process=False)
+    _tmp_tsdf_mesh_path = scene_dump_root / '_tmp_fused_tsdf.ply'
+    _tmp_trimesh.export(str(_tmp_tsdf_mesh_path))
+    
+    print('- Running segmentor...')
+    kThresh=0.2
+    segMinVerts=2000
+    cmd = '%s %s %.3f %d'%(str(segmentor_path), str(_tmp_tsdf_mesh_path), kThresh, segMinVerts) # default: kThresh=0.01 segMinVerts=20
+    # print(cmd)
+    segments_output_file = scene_dump_root / ('_tmp_fused_tsdf.%.6f.segs.json'%kThresh)
+    if Path(segments_output_file).exists():
+        Path(segments_output_file).unlink()
+    # os.system(cmd)
+    cmd_output, cmd_err, cmd_p_status = run_cmd(cmd)
+    print(cmd_output, cmd_err, cmd_p_status)
+    assert cmd_output != ''
+    assert Path(segments_output_file).exists(), segments_output_file
+
+    '''
+    generate labels txt file
+    '''
+    segments = _read_json(str(segments_output_file))
+    segments = np.array(segments["segIndices"])
+    labels_txt_path = Path(str(segments_output_file).replace('.json', '.txt'))
+    with open(str(labels_txt_path), "w") as txt_file:
+        for line in segments:
+            txt_file.write(str(line) + "\n") # works with any number of elements in a line
+    print('- labels_txt ([%d] segments) dumped to: '%(np.unique(segments).shape[0]), labels_txt_path)
+    
+    '''
+    debug: generate mesh file colored with segments
+    ![](https://i.imgur.com/v0Hx6bL.jpg) /data/Mask3D_data/openrooms_public_dump/main_xml1/scene0552_00/tmp_tsdf_segments.ply
+    '''
+    if IF_DEBUG:
+        out_path = scene_dump_root / 'tmp_tsdf_segments.ply'
+        if out_path.exists():
+            out_path.unlink()
+        cmd = 'python test_scripts/scannet_utils/visualize_labels_on_mesh.py --pred_file %s --mesh_file %s --output_file %s'%(str(labels_txt_path), str(_tmp_tsdf_mesh_path), out_path)
+        print(cmd)
+        os.system(cmd)
+        print('- Output mesh dumped to: ', green_text(out_path))
+        
 # for split in ['val']:
 for split in ['train']:
     scene_list = scene_list_dict[split]
@@ -82,56 +138,17 @@ for split in ['train']:
     
     IF_DEBUG = split == 'val'
     
-    for scene_idx, scene in enumerate(tqdm(scene_list)):
-        meta_split, scene_name = scene[0], scene[1]
-        scene_dump_root = dump_root / meta_split / scene_name
-        _scene_str = '[%d]%s_%s'%(scene_idx, meta_split, scene_name)
-        print(yellow('=== Processing %s'%_scene_str))
+    # for scene_idx, scene in enumerate(tqdm(scene_list)):
+        
+    tic = time.time()
+    # print('==== executing %d commands...'%len(cmd_list))
+    # p = Pool(processes=opt.workers_total, initializer=init, initargs=(child_env,))
+    p = Pool(processes=24)
 
-        tsdf_mesh_path = scene_dump_root / 'fused_tsdf.ply'
-        tsdf_mesh = trimesh.load_mesh(str(tsdf_mesh_path), process=False)
-        vertices = np.array(tsdf_mesh.vertices)
-        faces = np.array(tsdf_mesh.faces)
-        print('- Loaded mesh from '+str(tsdf_mesh_path), vertices.shape, faces.shape, np.amin(vertices, axis=0), np.amax(vertices, axis=0), np.amin(faces), vertices.dtype, faces.dtype)
-        
-        _tmp_trimesh = trimesh.Trimesh(vertices=vertices, faces=faces, vertex_colors=tsdf_mesh.visual.vertex_colors, process=False)
-        _tmp_tsdf_mesh_path = scene_dump_root / '_tmp_fused_tsdf.ply'
-        _tmp_trimesh.export(str(_tmp_tsdf_mesh_path))
-        
-        print('- Running segmentor...')
-        kThresh=0.2
-        segMinVerts=2000
-        cmd = '%s %s %.3f %d'%(str(segmentor_path), str(_tmp_tsdf_mesh_path), kThresh, segMinVerts) # default: kThresh=0.01 segMinVerts=20
-        # print(cmd)
-        segments_output_file = scene_dump_root / ('_tmp_fused_tsdf.%.6f.segs.json'%kThresh)
-        if Path(segments_output_file).exists():
-            Path(segments_output_file).unlink()
-        # os.system(cmd)
-        cmd_output, cmd_err, cmd_p_status = run_cmd(cmd)
-        print(cmd_output, cmd_err, cmd_p_status)
-        assert cmd_output != ''
-        assert Path(segments_output_file).exists(), segments_output_file
+    # cmd_list = [(_cmd) for _cmd in enumerate(scene_list)]
+    scene_list = [(_, scene_list[_][0], scene_list[_][1]) for _ in range(len(scene_list))]
+    list(tqdm(p.imap_unordered(process_scene, scene_list), total=len(scene_list)))
+    p.close()
+    p.join()
+    print('==== ...DONE. Took %.2f seconds'%(time.time() - tic))
 
-        '''
-        generate labels txt file
-        '''
-        segments = _read_json(str(segments_output_file))
-        segments = np.array(segments["segIndices"])
-        labels_txt_path = Path(str(segments_output_file).replace('.json', '.txt'))
-        with open(str(labels_txt_path), "w") as txt_file:
-            for line in segments:
-                txt_file.write(str(line) + "\n") # works with any number of elements in a line
-        print('- labels_txt ([%d] segments) dumped to: '%(np.unique(segments).shape[0]), labels_txt_path)
-        
-        '''
-        debug: generate mesh file colored with segments
-        ![](https://i.imgur.com/v0Hx6bL.jpg) /data/Mask3D_data/openrooms_public_dump/main_xml1/scene0552_00/tmp_tsdf_segments.ply
-        '''
-        if IF_DEBUG:
-            out_path = scene_dump_root / 'tmp_tsdf_segments.ply'
-            if out_path.exists():
-                out_path.unlink()
-            cmd = 'python test_scripts/scannet_utils/visualize_labels_on_mesh.py --pred_file %s --mesh_file %s --output_file %s'%(str(labels_txt_path), str(_tmp_tsdf_mesh_path), out_path)
-            print(cmd)
-            os.system(cmd)
-            print('- Output mesh dumped to: ', green_text(out_path))
