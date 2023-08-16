@@ -8,7 +8,6 @@ python dump_openrooms_multi.py --gpu_total 8
 Simple multi-thread testing: python test_scripts/test_cuda_multi_3.py
 '''
 
-# from tqdm import tqdm
 import numpy as np
 np.set_printoptions(suppress=True)
 import os, sys
@@ -16,7 +15,6 @@ import torch
 # import torch.multiprocessing.spawn as spawn
 import torch.multiprocessing as mp
 import time
-import subprocess
 
 PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
 sys.path.insert(0, PATH_HOME)

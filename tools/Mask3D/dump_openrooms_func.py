@@ -2,21 +2,10 @@
 funcs to call in dump_openrooms.py (one for loop) or dump_openrooms_multi.py (multiprocessing)
 '''
 
-from pathlib import Path
-'''
-set those params according to your environment
-'''
-DATASET = 'openrooms_public'
-# host = 'apple'; PATH_HOME = '/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data'
-# host = 'r4090'; PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
-host = 'mm1'; PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
-dump_root = Path('/newdata/Mask3D_data/openrooms_public_dump_v3smaller')
 
-import os, sys
-sys.path.insert(0, PATH_HOME)
+# import os, sys
+# sys.path.insert(0, PATH_HOME)
 
-from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
-assert PATH_HOME == PATH_HOME_dict[host]
 
 # from tqdm import tqdm
 from plyfile import PlyData
@@ -38,45 +27,25 @@ from test_scripts.scannet_utils.utils_visualize import visualize
 # from multiprocessing import Pool
 # import multiprocessing
 
-'''
-global vars
-'''
-
-OR_RAW_ROOT = OR_RAW_ROOT_dict[host]
-INV_NERF_ROOT = INV_NERF_ROOT_dict[host]
-MONOSDF_ROOT = MONOSDF_ROOT_dict[host]
-
-conf_base_path = Path('confs/%s.conf'%DATASET); check_exists(conf_base_path)
-CONF = ConfigFactory.parse_file(str(conf_base_path))
-
-dataset_root = Path(PATH_HOME) / CONF.data.dataset_root; check_exists(dataset_root)
-xml_root = dataset_root / 'scenes'; check_exists(xml_root)
-semantic_labels_root = Path(PATH_HOME) / 'files_openrooms'; check_exists(semantic_labels_root)
-
-layout_root = Path(OR_RAW_ROOT) / 'layoutMesh'; check_exists(layout_root)
-shapes_root = Path(OR_RAW_ROOT) / 'uv_mapped'; check_exists(shapes_root)
-envmaps_root = Path(OR_RAW_ROOT) / 'EnvDataset'; check_exists(envmaps_root)
 
 '''
 go over all scenes
 '''
-black_list = [
-    ('main_xml1', 'scene0386_00'), 
-    ('main_xml', 'scene0386_00'), 
-    ('main_xml', 'scene0608_01'), 
-    ('main_xml1', 'scene0608_01'), 
-    ('main_xml1', 'scene0211_02'), 
-    ('main_xml1', 'scene0126_02'), 
-]
+# black_list = [
+#     ('main_xml1', 'scene0386_00'), 
+#     ('main_xml', 'scene0386_00'), 
+#     ('main_xml', 'scene0608_01'), 
+#     ('main_xml1', 'scene0608_01'), 
+#     ('main_xml1', 'scene0211_02'), 
+#     ('main_xml1', 'scene0126_02'), 
+# ]
 
-frame_list_root = semantic_labels_root / 'public'
-assert frame_list_root.exists(), frame_list_root
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--gpu_id', type=int, default='', help='')
-parser.add_argument('--gpu_total', type=int, default='', help='')
-parser.add_argument('--split', type=str, default='val', help='')
+parser.add_argument('--gpu_id', type=int, default=0, help='', required=False)
+parser.add_argument('--gpu_total', type=int, default=1, help='', required=False)
+parser.add_argument('--split', type=str, default='val', help='', required=False)
 opt = parser.parse_args()
 
 def process_one_scene(CONF, dump_root, exclude_scene_list_file, meta_split, scene_name, IF_DEBUG=False):
@@ -287,6 +256,43 @@ def process_one_scene(CONF, dump_root, exclude_scene_list_file, meta_split, scen
     return True
 
 def process_one_gpu(split, gpu_id, gpu_total):
+    
+    from pathlib import Path
+    '''
+    set those params according to your environment
+    '''
+    DATASET = 'openrooms_public'
+    # host = 'apple'; PATH_HOME = '/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data'
+    # host = 'r4090'; PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
+    host = 'mm1'; PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
+    dump_root = Path('/newdata/Mask3D_data/openrooms_public_dump_v3smaller')
+
+    from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
+    assert PATH_HOME == PATH_HOME_dict[host]
+
+    '''
+    global vars
+    '''
+
+    OR_RAW_ROOT = OR_RAW_ROOT_dict[host]
+
+    conf_base_path = Path('confs/%s.conf'%DATASET); check_exists(conf_base_path)
+    CONF = ConfigFactory.parse_file(str(conf_base_path))
+
+    dataset_root = Path(PATH_HOME) / CONF.data.dataset_root; check_exists(dataset_root)
+    xml_root = dataset_root / 'scenes'; check_exists(xml_root)
+    semantic_labels_root = Path(PATH_HOME) / 'files_openrooms'; check_exists(semantic_labels_root)
+
+    layout_root = Path(OR_RAW_ROOT) / 'layoutMesh'; check_exists(layout_root)
+    shapes_root = Path(OR_RAW_ROOT) / 'uv_mapped'; check_exists(shapes_root)
+    envmaps_root = Path(OR_RAW_ROOT) / 'EnvDataset'; check_exists(envmaps_root)
+
+    frame_list_root = semantic_labels_root / 'public'
+    assert frame_list_root.exists(), frame_list_root
+
+    from openrooms_invalid_scenes import black_list
+
+
     # IF_DEBUG = np.random.random() < 0.05
     # IF_DEBUG = np.random.random() <= 1.0
     IF_DEBUG = split == 'val'
