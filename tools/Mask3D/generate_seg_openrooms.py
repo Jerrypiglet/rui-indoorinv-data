@@ -78,7 +78,7 @@ generating segmentation
 segmentor_path = '/home/ruizhu/Documents/Projects/ScanNet/Segmentator/segmentator' # https://github.com/ScanNet/ScanNet.git
 
 def process_scene(scene):
-    scene_idx, meta_split, scene_name = scene[0], scene[1], scene[2]
+    scene_idx, meta_split, scene_name, IF_DEBUG = scene[0], scene[1], scene[2], scene[3]
     scene_dump_root = dump_root / meta_split / scene_name
     _scene_str = '[%d]%s_%s'%(scene_idx, meta_split, scene_name)
     print(yellow('=== Processing %s'%_scene_str))
@@ -131,8 +131,8 @@ def process_scene(scene):
         os.system(cmd)
         print('- Output mesh dumped to: ', green_text(out_path))
         
-# for split in ['val']:
-for split in ['train']:
+for split in ['val']:
+# for split in ['train']:
     scene_list = scene_list_dict[split]
     # scene_list = [('mainDiffLight_xml1', 'scene0032_01')]
     
@@ -146,7 +146,7 @@ for split in ['train']:
     p = Pool(processes=24)
 
     # cmd_list = [(_cmd) for _cmd in enumerate(scene_list)]
-    scene_list = [(_, scene_list[_][0], scene_list[_][1]) for _ in range(len(scene_list))]
+    scene_list = [(_, scene_list[_][0], scene_list[_][1], IF_DEBUG) for _ in range(len(scene_list))]
     list(tqdm(p.imap_unordered(process_scene, scene_list), total=len(scene_list)))
     p.close()
     p.join()

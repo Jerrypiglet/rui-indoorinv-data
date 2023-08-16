@@ -203,14 +203,15 @@ def get_device(host: str, device_id: int=-1):
         if torch.backends.mps.is_built() and torch.backends.mps.is_available():
             device = 'mps'
     else:
-        if torch.cuda.is_available():
+        CUDA_FLAG = torch.cuda.is_available()
+        if CUDA_FLAG:
             if device_id == -1:
                 device = 'cuda'
             else:
                 device = 'cuda:%d'%device_id
 
     if device == 'cpu':
-        print(yellow('[WARNING] rendering could be slow because device is cpu at %s'%host))
+        print(yellow('[WARNING] rendering could be slow because device is cpu at %s'%host), CUDA_FLAG)
     return device
 
 def check_nd_array_list_identical(arrays):

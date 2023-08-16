@@ -26,6 +26,7 @@ from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_di
 from .class_scene2DBase import scene2DBase
 
 class mitsubaBase(scene2DBase):
+# class mitsubaBase():
     '''
     Base class used to load/visualize/render Mitsuba scene from XML file
     '''
@@ -124,7 +125,7 @@ class mitsubaBase(scene2DBase):
     def to_d(self, x: np.ndarray):
         if 'mps' in self.device: # Mitsuba RuntimeError: Cannot pack tensors on mps:0
             return x
-        return torch.from_numpy(x).to(self.device)
+        return torch.from_numpy(x.copy()).to(self.device)
     
     @property
     def _T(self):
@@ -757,12 +758,11 @@ class mitsubaBase(scene2DBase):
             'for %d frames... H %d W %d, subsample_rate_pts: %d, subsample_HW_rates: (%d, %d)'%(len(self.frame_id_list), self._H(), self._W(), subsample_rate_pts, subsample_HW_rates[0], subsample_HW_rates[1]))
 
         volume = o3d.pipelines.integration.ScalableTSDFVolume(
-            voxel_length=8.0 / 512.0,
-            # voxel_length=20.0 / 512.0,
-            sdf_trunc=0.05,
+            voxel_length=self.CONF.shape_params_dict.get('tsdf_voxel_length', 8.0 / 512.0),
+            sdf_trunc=self.CONF.shape_params_dict.get('tsdf_sdf_trunc', 0.05),
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8,
-            volume_unit_resolution=16,
-            depth_sampling_stride=1
+            volume_unit_resolution=self.CONF.shape_params_dict.get('tsdf_volume_unit_resolution', 16),
+            depth_sampling_stride=self.CONF.shape_params_dict.get('tsdf_depth_sampling_stride', 1), 
         )
             # voxel_length=5.0 / 512.0,
             # sdf_trunc=0.2,

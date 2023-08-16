@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-import torch
+# import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import trimesh
@@ -9,10 +9,9 @@ np.set_printoptions(suppress=True)
 
 from tqdm import tqdm
 import mitsuba as mi
+mi.set_variant('cuda_ad_rgb')
 import torch
 
-from lib.class_openroomsScene3D import openroomsScene3D
-from lib.class_mitsubaScene3D import mitsubaScene3D
 from lib.global_vars import mi_variant_dict
 
 from lib.utils_misc import get_list_of_keys, white_blue, blue_text, red, yellow

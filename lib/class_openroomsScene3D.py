@@ -1,28 +1,28 @@
 from pathlib import Path, PosixPath
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 np.set_printoptions(suppress=True)
 import pyhocon
 from tqdm import tqdm
 import pickle
 import trimesh
-import shutil
-from collections import defaultdict
-from math import prod
-from lib.global_vars import mi_variant_dict
-import torch
+# import shutil
+# from collections import defaultdict
+# from math import prod
+# from lib.global_vars import mi_variant_dict
+# import torch
 # Import the library using the alias "mi"
-import mitsuba as mi
 # Set the variant of the renderer
 # from lib.global_vars import mi_variant
 # mi.set_variant(mi_variant)
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
-from lib.utils_mitsuba import dump_OR_xml_for_mi
+import mitsuba as mi
 
 from .class_openroomsScene2D import openroomsScene2D
 from .class_mitsubaBase import mitsubaBase
 
+from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red
+from lib.utils_mitsuba import dump_OR_xml_for_mi
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle, mesh_to_contour, load_trimesh, remove_top_down_faces, mesh_to_skeleton, transform_v, sample_mesh, simplify_mesh
 from lib.utils_OR.utils_OR_xml import get_XML_root, parse_XML_for_shapes_global
 from lib.utils_OR.utils_OR_mesh import loadMesh, computeBox, flip_ceiling_normal

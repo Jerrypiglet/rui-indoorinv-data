@@ -2,10 +2,11 @@ from abc import ABC, abstractmethod
 from pathlib import PosixPath
 import matplotlib.pyplot as plt
 import pyhocon
+from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
 from lib.utils_io import load_img
-from lib.utils_misc import blue_text, get_list_of_keys, green, yellow, white_blue, red, check_list_of_tensors_size
+from lib.utils_misc import blue_text, get_list_of_keys, green, yellow, yellow_text, white_blue, red, check_list_of_tensors_size
 from lib.utils_io import load_img, convert_write_png
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle
 
@@ -38,7 +39,7 @@ class scene2DBase(ABC):
         self.scene_name = self.CONF.scene_params_dict.scene_name
         if '-' in self.scene_name: # for e.g. openrooms
             self.meta_split, self.scene_name = self.scene_name.split('-')
-            print(yellow('[%s] - (dash) found in scene_name; parsing scene_name as: meta_split-scene_name (e.g. as in OpenRooms)'%self.__class__.__name__))
+            print(yellow_text('[%s] - (dash) found in scene_name; parsing scene_name as: meta_split-scene_name (e.g. as in OpenRooms)'%self.__class__.__name__))
         self.split = self.CONF.scene_params_dict.get('split', '')
 
         # im params
@@ -67,8 +68,8 @@ class scene2DBase(ABC):
         self.modality_folder_dict = {}
         for modality, filename in self.CONF.modality_filename_dict.items():
             # assert modality in self.valid_modalities, 'Invalid key [%s] in self.CONF.modality_filename_dict: NOT in self.valid_modalities!'%modality
-            self.modality_ext_dict[modality] = filename.split('.')[-1] if isinstance(filename, str) else filename[-1]
-            self.modality_folder_dict[modality] = filename.split('/')[0] if isinstance(filename, str) else filename[0]
+            self.modality_ext_dict[modality] = filename.split('.')[-1] if isinstance(filename, str) else filename[1].split('.')[-1]
+            self.modality_folder_dict[modality] = filename.split('/')[0] if isinstance(filename, str) else filename[0].split('.')[0]
         self.modality_file_list_dict = {}
         
         # self.scene_rendering_path.mkdir(parents=True, exist_ok=True)
@@ -244,7 +245,11 @@ class scene2DBase(ABC):
         if_allow_crop = self.CONF.im_params_dict.get('if_allow_crop', False)
         if not 'im_sdr' in self.modality_file_list_dict:
             filename = self.CONF.modality_filename_dict['im_sdr']
-            self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path_list[frame_idx] / (filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
+            if isinstance(filename, list):
+                self.modality_file_list_dict['im_sdr'] = [Path(filename[0]) / self.scene_rendering_path_list[frame_idx].relative_to(self.dataset_root) / (filename[1]%frame_id) 
+                                                          for frame_idx, frame_id in enumerate(self.frame_id_list)]
+            else:
+                self.modality_file_list_dict['im_sdr'] = [self.scene_rendering_path_list[frame_idx] / (filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
 
         if 'im_H_load_sdr' in self.CONF.im_params_dict:
             # separate H, W for loading SDR images

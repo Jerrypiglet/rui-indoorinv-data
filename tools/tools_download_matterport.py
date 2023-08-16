@@ -3,7 +3,6 @@ python3 tools_download_matterport.py --output_dir /newfoundland3/ruizhu/Matterpo
 
 The script download_mp.py works with Python2. Make sure you have an available Python2 binary locally.
 '''
-import subprocess
 import multiprocessing
 from multiprocessing import Pool
 from pathlib import Path
