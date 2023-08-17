@@ -2,108 +2,111 @@
 funcs to call in dump_openrooms.py (one for loop) or dump_openrooms_multi.py (multiprocessing)
 '''
 
-
-# import os, sys
-# sys.path.insert(0, PATH_HOME)
-
-
-# from tqdm import tqdm
 from plyfile import PlyData
 import numpy as np
 np.set_printoptions(suppress=True)
 
+
+import sys
+from pathlib import Path
+# directory reach
+directory = Path(__file__).resolve()
+# setting path
+sys.path.append(str(directory.parent.parent.parent))
+
 import copy
 import pickle
-from pathlib import Path
 from tqdm import tqdm
-from pyhocon import ConfigFactory, ConfigTree
+import pickle
 from pyhocon.tool import HOCONConverter
-from lib.utils_misc import str2bool, check_exists, yellow
 from lib.utils_openrooms import get_im_info_list
+from lib.utils_misc import yellow_text, yellow, white_red
 from lib.class_openroomsScene3D import openroomsScene3D
 from lib.class_eval_scene import evaluator_scene_scene
 from test_scripts.scannet_utils.utils_visualize import visualize
-
-# from multiprocessing import Pool
-# import multiprocessing
-
-
-'''
-go over all scenes
-'''
-# black_list = [
-#     ('main_xml1', 'scene0386_00'), 
-#     ('main_xml', 'scene0386_00'), 
-#     ('main_xml', 'scene0608_01'), 
-#     ('main_xml1', 'scene0608_01'), 
-#     ('main_xml1', 'scene0211_02'), 
-#     ('main_xml1', 'scene0126_02'), 
-# ]
-
 
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--gpu_id', type=int, default=0, help='', required=False)
 parser.add_argument('--gpu_total', type=int, default=1, help='', required=False)
 parser.add_argument('--split', type=str, default='val', help='', required=False)
+parser.add_argument('--dump_root', type=str, default='', help='', required=False)
+parser.add_argument('--frame_list_root', type=str, default='', help='', required=False)
 opt = parser.parse_args()
 
-def process_one_scene(CONF, dump_root, exclude_scene_list_file, meta_split, scene_name, IF_DEBUG=False):
+def gather_missing_scenes(scene_list, dump_root, if_check_seg=False, seg_file_name=''):
+    file_list = [
+        'fused_tsdf.ply', 
+        'mi_normal.npy', 
+        'semseg.npy', 
+        'vertex_view_count.npy', 
+        'instance_seg.npy', 
+        'visibility_list_list.pkl', 
+    ]
+    if if_check_seg:
+        assert seg_file_name != ''
+        file_list = [seg_file_name]
+
+    print(yellow_text('Checking for dumped scenes...'))
+    file_missing_list = []
+    scene_missing_list = []
+    for (meta_split, scene_name) in tqdm(scene_list):
+        scene_path = dump_root / meta_split / scene_name
+        flag_missing = False
+        scene_missing_files = []
+        for file in file_list:
+            if not (scene_path / file).exists():
+                flag_missing = True
+                file_missing_list.append((meta_split, scene_name, file))
+                scene_missing_files.append(file)
+        if flag_missing:
+            scene_missing_list.append((meta_split, scene_name, len(scene_missing_files), scene_missing_files))
+    print('Checked file_list', file_list)
+    print(yellow_text('=== Missing scenes (%d/%d):'%(len(scene_missing_list), len(scene_list))), scene_missing_list[:5])
+    
+    return scene_missing_list
+
+def read_exclude_scenes_list(dump_root: Path, split: str, scene_list: list=[]):
+    exclude_scene_list_files = list(dump_root.glob('excluded_scenes_%s*.txt'%split))
+    exclude_scene_list = []
+    for exclude_scene_list_file_ in exclude_scene_list_files:
+        with open(str(exclude_scene_list_file_), 'r') as f:
+            lines = f.readlines()
+        exclude_scene_list += [tuple(line.strip().split()) for line in lines]
+    print(yellow('Excluded scenes:'), len(exclude_scene_list), exclude_scene_list[:5])
+    
+    if scene_list != []:
+        scene_list = [scene for scene in scene_list if scene not in exclude_scene_list]        
+        print(yellow('The rest of the scenes:'), len(scene_list))
+        
+    return exclude_scene_list, scene_list
+
+
+def process_one_scene(dump_root, exclude_scene_list_file, meta_split, scene_name, IF_DEBUG=False):
     scene_dump_path = dump_root / meta_split / scene_name
     scene_dump_path.mkdir(exist_ok=True, parents=True)
-        
-    CONF.scene_params_dict.scene_name = '%s-%s'%(meta_split, scene_name)
-    CONF.im_params_dict.update({'im_H_resize': 240, 'im_W_resize': 320})
-    CONF.shape_params_dict.update({'force_regenerate_tsdf': True})
-    # Mitsuba options
-    CONF.mi_params_dict.update({'if_mi_scene_from_xml': True}) # !!!! set to False to load from shapes (single shape or tsdf fused shape (with tsdf in modality_list))
-    # TSDF options
-    CONF.shape_params_dict.update({
-        'if_force_fuse_tsdf': True, 
-        'tsdf_file': scene_dump_path / 'fused_tsdf.ply',
-        # 'tsdf_voxel_length': 8.0 / 512.0,
-        # 'tsdf_sdf_trunc': 0.05,
-        'tsdf_voxel_length': 12.0 / 512.0,
-        'tsdf_sdf_trunc': 0.08,
-        }) # !!!! set to True to force replace existing tsdf shape
 
     # DEBUG
     # CONF.scene_params_dict.update({'frame_id_list': [5]})
 
-    config_json = HOCONConverter.convert(CONF, 'json')
+    with open(str(dump_root / 'params_dict.pkl'), 'rb') as f:
+        params_dict_ = pickle.load(f)
+        
+    '''
+    update scene-specific params
+    '''        
+    params_dict_['CONF'].scene_params_dict.scene_name = '%s-%s'%(meta_split, scene_name)
+    params_dict_['CONF'].shape_params_dict.update({
+        'tsdf_file': scene_dump_path / 'fused_tsdf.ply',
+        })
+    config_json = HOCONConverter.convert(params_dict_['CONF'], 'json')
     with open(str(scene_dump_path / 'config.json'), 'w') as f:
         f.write(config_json)
-
+        
     scene_obj = openroomsScene3D(
-        CONF = CONF, 
-        if_debug_info = False, 
-        host = host, 
-        root_path_dict = {
-            'PATH_HOME': Path(PATH_HOME), 
-            'dataset_root': Path(dataset_root), 
-            'xml_root': Path(xml_root), 
-            'semantic_labels_root': semantic_labels_root, 
-            'layout_root': layout_root, 'shapes_root': shapes_root, 'envmaps_root': envmaps_root, # RAW scene files
-            }, 
-        modality_list = [
-            'im_sdr', 
-            # 'im_hdr', 
-            'poses', 
-            # 'seg', 
-            # 'albedo', 'roughness', 
-            # 'depth', 'normal',
-            'semseg', 
-            'matseg', 
-            'instance_seg', 
-            # 'lighting_SG', 
-            # 'lighting_envmap', 
-            # 'layout', 
-            # 'shapes', # objs + emitters, geometry shapes + emitter properties
-            'tsdf', 
-            'mi', # mitsuba scene, loading from scene xml file
-            ], 
+        **params_dict_,
     )
-
+    
     if scene_obj.IF_SKIP:
         # excluded_scenes.append((meta_split, scene_name))
         with open(str(exclude_scene_list_file), 'a') as f:
@@ -111,10 +114,8 @@ def process_one_scene(CONF, dump_root, exclude_scene_list_file, meta_split, scen
             print('[Excluded:]', meta_split, scene_name)
         return False
 
-    eval_return_dict = {}
-
     evaluator_scene = evaluator_scene_scene(
-        host=host, 
+        # host=host, 
         scene_object=scene_obj, 
     )
 
@@ -255,70 +256,36 @@ def process_one_scene(CONF, dump_root, exclude_scene_list_file, meta_split, scen
                 
     return True
 
-def process_one_gpu(split, gpu_id, gpu_total):
+def process_one_gpu(opt, IF_FORCE=False):
     
-    from pathlib import Path
-    '''
-    set those params according to your environment
-    '''
-    DATASET = 'openrooms_public'
-    # host = 'apple'; PATH_HOME = '/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data'
-    # host = 'r4090'; PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
-    host = 'mm1'; PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
-    dump_root = Path('/newdata/Mask3D_data/openrooms_public_dump_v3smaller')
-
-    from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
-    assert PATH_HOME == PATH_HOME_dict[host]
-
-    '''
-    global vars
-    '''
-
-    OR_RAW_ROOT = OR_RAW_ROOT_dict[host]
-
-    conf_base_path = Path('confs/%s.conf'%DATASET); check_exists(conf_base_path)
-    CONF = ConfigFactory.parse_file(str(conf_base_path))
-
-    dataset_root = Path(PATH_HOME) / CONF.data.dataset_root; check_exists(dataset_root)
-    xml_root = dataset_root / 'scenes'; check_exists(xml_root)
-    semantic_labels_root = Path(PATH_HOME) / 'files_openrooms'; check_exists(semantic_labels_root)
-
-    layout_root = Path(OR_RAW_ROOT) / 'layoutMesh'; check_exists(layout_root)
-    shapes_root = Path(OR_RAW_ROOT) / 'uv_mapped'; check_exists(shapes_root)
-    envmaps_root = Path(OR_RAW_ROOT) / 'EnvDataset'; check_exists(envmaps_root)
-
-    frame_list_root = semantic_labels_root / 'public'
-    assert frame_list_root.exists(), frame_list_root
-
-    from openrooms_invalid_scenes import black_list
-
-
     # IF_DEBUG = np.random.random() < 0.05
     # IF_DEBUG = np.random.random() <= 1.0
-    IF_DEBUG = split == 'val'
+    IF_DEBUG = opt.split == 'val'
     # IF_DEBUG = True
     
-    excluded_scenes = []
-    exclude_scene_list_file = dump_root / ('excluded_scenes_%s_gpu %d.txt'%(split, gpu_id))
-    # if exclude_scene_list_file.exists():
-    #     exclude_scene_list_file.unlink()
-    scene_list = get_im_info_list(frame_list_root, split)
-    scene_list = [scene_list[_] for _ in range(len(scene_list)) if _ % gpu_total == gpu_id]
+    scene_list = get_im_info_list(Path(opt.frame_list_root), opt.split)
+    scene_list = [scene_list[_] for _ in range(len(scene_list)) if _ % opt.gpu_total == opt.gpu_id]
     
-    if (meta_split.replace('DiffMat', '').replace('DiffLight', ''), scene_name) in black_list:
-        excluded_scenes.append((meta_split, scene_name))
-        with open(str(exclude_scene_list_file), 'a') as f:
-            f.write('%s %s\n'%(meta_split, scene_name))
-            print('[Excluded:]', meta_split, scene_name)
+    _, scene_list = read_exclude_scenes_list(Path(opt.dump_root), opt.split, scene_list)
+    
+    exclude_scene_list_file = Path(opt.dump_root) / ('excluded_scenes_%s_gpu %d.txt'%(opt.split, opt.gpu_id))
+    
+    '''
+    check what is there
+    '''
+    scene_list = gather_missing_scenes(scene_list, Path(opt.dump_root))
+    if len(scene_list) == 0:
+        print(white_red('All scenes are processed! Exiting..')); sys.exit()
+    
+    # return
+    # scene_list = [('mainDiffMat_xml1', 'scene0608_01')]
             
-    scene_list = [_ for _ in scene_list if _ not in excluded_scenes]
-        
-    for meta_split, scene_name in tqdm(scene_list):
-        print('++++', gpu_id, len(scene_list), meta_split, scene_name, '++++')
-        result = process_one_scene(CONF, dump_root, exclude_scene_list_file, meta_split, scene_name, IF_DEBUG=IF_DEBUG)
+    for scene in tqdm(scene_list):
+        meta_split, scene_name = scene[0], scene[1]
+        print('++++', opt.gpu_id, len(scene_list), meta_split, scene_name, '++++')
+        result = process_one_scene(Path(opt.dump_root), exclude_scene_list_file, meta_split, scene_name, IF_DEBUG=IF_DEBUG)
         
 if __name__ == '__main__':
 # print("scene={}, torch.cuda.is_available()={}, torch.cuda.device_count={}".format(opt.scene, torch.cuda.is_available(), torch.cuda.device_count()))
 
-    process_one_gpu(opt.split, opt.gpu_id, opt.gpu_total)
-    
+    process_one_gpu(opt)

@@ -1,15 +1,6 @@
 from tqdm import tqdm
 from lib.utils_misc import str2bool, check_exists, yellow
 
-openrooms_semantics_black_list = [ # scenes whose rendered semantic labels are not consistent with XML scene (e.g. misplacement of objects; missing/adding objects)
-    ('main_xml1', 'scene0386_00'), 
-    ('main_xml', 'scene0386_00'), 
-    ('main_xml', 'scene0608_01'), 
-    ('main_xml1', 'scene0608_01'), 
-    ('main_xml1', 'scene0211_02'), 
-    ('main_xml1', 'scene0126_02'), 
-]
-
 def get_im_info_list(frame_list_root, split):
     frame_list_path = frame_list_root / ('%s.txt'%split)
     assert frame_list_path.exists(), frame_list_path

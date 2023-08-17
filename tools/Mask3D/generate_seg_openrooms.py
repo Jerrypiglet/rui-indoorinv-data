@@ -11,8 +11,11 @@ import time
 
 DATASET = 'openrooms_public'
 # host = 'apple'; PATH_HOME = '/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data'
-host = 'r4090'; PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
-dump_root = Path('/data/Mask3D_data/openrooms_public_dump')
+# host = 'r4090'; PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
+host = 'mm1'; PATH_HOME = '/home/ruizhu/Documents/Projects/rui-indoorinv-data'
+
+# dump_root = Path('/data/Mask3D_data/openrooms_public_dump')
+dump_root = Path('/newdata/Mask3D_data/openrooms_public_dump_v3smaller')
 
 import os, sys
 sys.path.insert(0, PATH_HOME)
@@ -25,7 +28,9 @@ np.set_printoptions(suppress=True)
 import trimesh
 import os
 from lib.utils_misc import str2bool, check_exists, yellow, green_text, _read_json, run_cmd
-from lib.utils_openrooms import get_im_info_list, openrooms_semantics_black_list
+from openrooms_invalid_scenes import black_list as openrooms_semantics_black_list
+from lib.utils_openrooms import get_im_info_list
+from dump_openrooms_func import read_exclude_scenes_list, gather_missing_scenes
 
 semantic_labels_root = Path(PATH_HOME) / 'files_openrooms'; check_exists(semantic_labels_root)
 
@@ -43,42 +48,28 @@ for split in ['train', 'val']:
     print('[%s] %d scenes'%(split, len(scene_list)))
     scene_list = [scene for scene in scene_list if (scene[0].replace('DiffMat', '').replace('DiffLight', ''), scene[1]) not in openrooms_semantics_black_list]
     print('[%s] after removing known invalid scenes from [openrooms_semantics_black_list]-> %d scenes'%(split, len(scene_list)))
+    
+    _, scene_list = read_exclude_scenes_list(dump_root, split, scene_list)
 
-    excluded_scenes_file = dump_root / ('excluded_scenes_%s.txt'%split)
-    if excluded_scenes_file.exists():
-        with open(str(excluded_scenes_file), 'r') as f:
-            excluded_scenes = f.read().splitlines()
-        excluded_scenes = [(scene.split(' ')[0].replace('DiffMat', '').replace('DiffLight', ''), scene.split(' ')[1]) for scene in excluded_scenes]
-        scene_list = [scene for scene in scene_list if (scene[0].replace('DiffMat', '').replace('DiffLight', ''), scene[1]) not in excluded_scenes]
-        print('[%s] after removing known invalid scenes [from %s] -> %d scenes'%(split, excluded_scenes_file.name, len(scene_list)))
+    # excluded_scenes_file = dump_root / ('excluded_scenes_%s.txt'%split)
+    # if excluded_scenes_file.exists():
+    #     with open(str(excluded_scenes_file), 'r') as f:
+    #         excluded_scenes = f.read().splitlines()
+    #     excluded_scenes = [(scene.split(' ')[0].replace('DiffMat', '').replace('DiffLight', ''), scene.split(' ')[1]) for scene in excluded_scenes]
+    #     scene_list = [scene for scene in scene_list if (scene[0].replace('DiffMat', '').replace('DiffLight', ''), scene[1]) not in excluded_scenes]
+    #     print('[%s] after removing known invalid scenes [from %s] -> %d scenes'%(split, excluded_scenes_file.name, len(scene_list)))
     
     scene_list_dict[split] = scene_list
 
 print('Overlap of train scene_list and val scene_list:', set(scene_list_dict['train']).intersection(set(scene_list_dict['val'])))
 
 '''
-check dumped data
-'''
-# for split in ['train', 'val']:
-for split in ['train']:
-# for split in ['val']:
-    scene_list = scene_list_dict[split]
-    for scene in tqdm(scene_list):
-        meta_split, scene_name = scene[0], scene[1]
-        dump_scene_root = dump_root / meta_split / scene_name
-        assert dump_scene_root.exists(), dump_scene_root
-        for file_name in ['fused_tsdf.ply', 'instance_seg.npy', 'mi_normal.npy', 'semseg.npy']:
-            dump_file = dump_scene_root / file_name
-            if not dump_file.exists():
-                print('Missing', dump_file)
-                
-'''
 generating segmentation
 '''
 segmentor_path = '/home/ruizhu/Documents/Projects/ScanNet/Segmentator/segmentator' # https://github.com/ScanNet/ScanNet.git
 
 def process_scene(scene):
-    scene_idx, meta_split, scene_name, IF_DEBUG = scene[0], scene[1], scene[2], scene[3]
+    scene_idx, meta_split, scene_name, kThresh, segMinVerts, IF_DEBUG = scene[0], scene[1], scene[2], scene[3], scene[4], scene[5]
     scene_dump_root = dump_root / meta_split / scene_name
     _scene_str = '[%d]%s_%s'%(scene_idx, meta_split, scene_name)
     print(yellow('=== Processing %s'%_scene_str))
@@ -94,8 +85,6 @@ def process_scene(scene):
     _tmp_trimesh.export(str(_tmp_tsdf_mesh_path))
     
     print('- Running segmentor...')
-    kThresh=0.2
-    segMinVerts=2000
     cmd = '%s %s %.3f %d'%(str(segmentor_path), str(_tmp_tsdf_mesh_path), kThresh, segMinVerts) # default: kThresh=0.01 segMinVerts=20
     # print(cmd)
     segments_output_file = scene_dump_root / ('_tmp_fused_tsdf.%.6f.segs.json'%kThresh)
@@ -130,11 +119,31 @@ def process_scene(scene):
         print(cmd)
         os.system(cmd)
         print('- Output mesh dumped to: ', green_text(out_path))
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--worker_total', type=int, default=32, help='total num of workers; must be dividable by gpu_total, i.e. workers_total/gpu_total jobs per GPU')
+opt = parser.parse_args()
+
+kThresh = 0.2
+segMinVerts = 2000
+
         
-for split in ['val']:
+# for split in ['train', 'val']:
 # for split in ['train']:
+for split in ['val']:
+    '''
+    check dumped data
+    '''
     scene_list = scene_list_dict[split]
-    # scene_list = [('mainDiffLight_xml1', 'scene0032_01')]
+    
+    scene_missing_list = gather_missing_scenes(scene_list, Path(dump_root))
+    assert len(scene_missing_list) == 0, scene_missing_list
+
+    '''
+    generate segs
+    '''
+    scene_list = gather_missing_scenes(scene_list, Path(dump_root), if_check_seg=True, seg_file_name='_tmp_fused_tsdf.%.6f.segs.json'%kThresh)
     
     IF_DEBUG = split == 'val'
     
@@ -143,10 +152,10 @@ for split in ['val']:
     tic = time.time()
     # print('==== executing %d commands...'%len(cmd_list))
     # p = Pool(processes=opt.workers_total, initializer=init, initargs=(child_env,))
-    p = Pool(processes=24)
+    p = Pool(processes=opt.worker_total)
 
     # cmd_list = [(_cmd) for _cmd in enumerate(scene_list)]
-    scene_list = [(_, scene_list[_][0], scene_list[_][1], IF_DEBUG) for _ in range(len(scene_list))]
+    scene_list = [(_, scene_list[_][0], scene_list[_][1], kThresh, segMinVerts, IF_DEBUG) for _ in range(len(scene_list))]
     list(tqdm(p.imap_unordered(process_scene, scene_list), total=len(scene_list)))
     p.close()
     p.join()

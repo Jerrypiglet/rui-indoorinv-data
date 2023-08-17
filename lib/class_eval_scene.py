@@ -24,9 +24,9 @@ class evaluator_scene_scene():
     def __init__(
         self, 
         scene_object, 
-        host: str, 
+        host: str='', 
     ):
-        self.host = host
+        self.host = scene_object.host if host == '' else host
         self.device = {
             'apple': 'mps', 
             'mm1': 'cuda', 
