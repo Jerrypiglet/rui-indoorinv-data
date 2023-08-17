@@ -201,7 +201,8 @@ class visualizer_scene_2D(object):
         # if modality in ['mi_depth', 'mi_normal', 'mi_normal_im_overlay', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']: assert self.os.if_has_mitsuba_scene
 
         _list = self.os.get_modality(modality, source=source)
-        assert len(_list) == len(self.frame_idx_list) == len(ax_list)
+        assert len(self.frame_idx_list) == len(ax_list)
+        assert len(_list) >= len(self.frame_idx_list)
         
         colors_dict = {}
         _im_invalid_list = []

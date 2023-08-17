@@ -9,7 +9,6 @@ np.set_printoptions(suppress=True)
 
 from tqdm import tqdm
 import mitsuba as mi
-mi.set_variant('cuda_ad_rgb')
 import torch
 
 from lib.global_vars import mi_variant_dict

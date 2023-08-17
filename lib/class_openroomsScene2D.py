@@ -233,7 +233,8 @@ class openroomsScene2D(scene2DBase):
         elif modality == 'semseg': 
             return self.semseg_list
         elif modality == 'matseg': 
-            return self.matseg_list
+            # return self.matseg_list
+            return self.matseg_remap_list
         elif modality == 'instance_seg': 
             return self.instance_seg_list
         elif modality == 'seg_area': 
@@ -522,27 +523,72 @@ class openroomsScene2D(scene2DBase):
             for imcadmatobj_file in self.imcadmatobj_file_list]
 
         self.matseg_list = []
+        self.mat_to_raw_tuple_dict_list = []
+        self.matseg_all_raw_tuple_list = []
+        
+        DEBUG_MATSEG = True
+        
         for mask in self.imcadmatobj_list:
-            mat_aggre_map, num_mat_masks = get_map_aggre_map(mask) # 0 for invalid region
+            mat_aggre_map, num_mat_masks, mat_to_raw_tuple_dict = get_map_aggre_map(mask) # 0 for invalid region
 
-            h, w = mat_aggre_map.shape
-            segmentation = np.zeros([50, h, w], dtype=np.uint8)
-            for i in range(num_mat_masks+1):
-                if i == 0:
-                    # deal with backgroud
-                    seg = mat_aggre_map == 0
-                    segmentation[num_mat_masks, :, :] = seg.reshape(h, w) # segmentation[num_mat_masks] for invalid mask
-                else:
-                    seg = mat_aggre_map == i
-                    segmentation[i-1, :, :] = seg.reshape(h, w) # segmentation[0..num_mat_masks-1] for plane instances
+            # h, w = mat_aggre_map.shape
+            # segmentation = np.zeros([50, h, w], dtype=np.uint8)
+            # for i in range(num_mat_masks+1):
+            #     if i == 0:
+            #         # deal with backgroud
+            #         seg = mat_aggre_map == 0
+            #         segmentation[num_mat_masks, :, :] = seg.reshape(h, w) # segmentation[num_mat_masks] for invalid mask
+            #     else:
+            #         seg = mat_aggre_map == i
+            #         segmentation[i-1, :, :] = seg.reshape(h, w) # segmentation[0..num_mat_masks-1] for plane instances
             matseg_dict = {
                 'mat_aggre_map': mat_aggre_map, # (H, W), int32; [0, 1, ..., num_mat_masks], 0 for invalid region
                 'num_mat_masks': num_mat_masks,  
-                'instances': segmentation, # (50, 240, 320), np.uint8; the last instance, i.e. instance[num_mat_masks] is for backround/emitters (e.g. regions of lamps/windows)
+                # 'instances': segmentation, # (50, 240, 320), np.uint8; the last instance, i.e. instance[num_mat_masks] is for backround/emitters (e.g. regions of lamps/windows)
                 # 'semantic': 1 - torch.FloatTensor(segmentation[num_mat_masks, :, :]).unsqueeze(0), # torch.Size([50, 240, 320]) torch.Size([1, 240, 320])
             }
+            assert len(np.unique(mat_aggre_map[mat_aggre_map!=0])) == num_mat_masks
+            if DEBUG_MATSEG:
+                print(np.unique(mat_aggre_map), len(np.unique(mat_aggre_map[mat_aggre_map!=0])), num_mat_masks)
             self.matseg_list.append(matseg_dict)
+            self.mat_to_raw_tuple_dict_list.append(mat_to_raw_tuple_dict)
+            if DEBUG_MATSEG:
+                print(mat_to_raw_tuple_dict)
+            
+            for _, raw_tuple in mat_to_raw_tuple_dict.items():
+                if raw_tuple not in self.matseg_all_raw_tuple_list and raw_tuple!=():
+                    # (378, 1, [3, 10]) and (378, 1, [3]) should be one material (e.g. some object may not be visible)
+                    self.matseg_all_raw_tuple_list.append(raw_tuple)
         
+        '''
+        remap mat_agree_map ids to global mat ids (255: invalid)
+        
+        ![](https://i.imgur.com/BjNwggL.jpg)
+        '''
+        self.matseg_remap_list = []
+        for matseg_dict, mat_to_raw_tuple_dict in zip(self.matseg_list, self.mat_to_raw_tuple_dict_list):
+            mat_aggre_map_global = np.zeros_like(matseg_dict['mat_aggre_map'], dtype=np.uint8) + 255
+            for mat_idx in range(matseg_dict['num_mat_masks']+1):
+                if mat_idx == 0:
+                    # deal with backgroud
+                    seg = matseg_dict['mat_aggre_map'] == 0
+                    mat_aggre_map_global[seg] = 255
+                else:
+                    raw_tuple = mat_to_raw_tuple_dict[mat_idx]
+                    assert raw_tuple in self.matseg_all_raw_tuple_list
+                    raw_tuple_global = self.matseg_all_raw_tuple_list.index(raw_tuple)
+                    mat_aggre_map_global[matseg_dict['mat_aggre_map'] == mat_idx] = raw_tuple_global
+                    if DEBUG_MATSEG:
+                        print(mat_idx, '->', raw_tuple_global, raw_tuple)
+                    
+            if DEBUG_MATSEG:
+                print(np.unique(mat_aggre_map_global), np.unique(mat_aggre_map_global[mat_aggre_map_global!=255]), len(np.unique(mat_aggre_map_global[mat_aggre_map_global!=255])), matseg_dict['num_mat_masks'])
+            assert len(np.unique(mat_aggre_map_global[mat_aggre_map_global!=255])) == matseg_dict['num_mat_masks']
+            self.matseg_remap_list.append({
+                'mat_aggre_map': mat_aggre_map_global,
+                'num_mat_masks': matseg_dict['num_mat_masks'],
+            })
+            
         print(blue_text('[%s] DONE. load_matseg'%self.__class__.__name__))
         
     def load_instance_seg(self):
@@ -623,7 +669,6 @@ class openroomsScene2D(scene2DBase):
                     
                     if len(valid_obj_semseg_single_list) > 1:
                         if not all([_ in [42, 43, 44] for _ in valid_obj_semseg_single_list]): 
-                            # import ipdb; ipdb.set_trace()
                             # assert False
                             self.IF_SKIP = True
                             # excludes_scene_list.append((im_info_dict['meta_split'], im_info_dict['scene_name'], im_info_dict['frame_id'], obj_idx))
