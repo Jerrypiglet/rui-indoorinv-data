@@ -57,14 +57,19 @@ class visualizer_scene_2D(object):
 
         # semseg_colors = np.loadtxt('data/colors/openrooms_colors.txt').astype('uint8')[1:]
         # colormap: https://github.com/Jerrypiglet/rui-indoorinv-data/blob/7e527693ae6718381c6fab0652fd7da649c4a008/files_openrooms/colors/OR42_color_mapping_light.png
-        if 'semseg' in self.modality_list_vis:
+        if 'semseg' in self.modality_list_vis or any(['-sem' in _ for _ in self.modality_list_vis]):
             self.os.load_colors()
-            self.semseg_colors = np.zeros((256, 3), dtype='uint8')
-            # self.semseg_colors[:semseg_colors.shape[0]] = semseg_colors
+
+            self.semseg_OR45_colors = np.zeros((256, 3), dtype='uint8')
+            # self.semseg_OR45_colors[:semseg_colors.shape[0]] = semseg_colors
             ids = list(self.os.OR_mapping_id45_to_color_dict.keys())
             colors = list(self.os.OR_mapping_id45_to_color_dict.values())
-            self.semseg_colors[ids] = np.array(colors)
-            # self.semseg_colors[255] = np.array([200, 200, 200]) # background
+            self.semseg_OR45_colors[ids] = np.array(colors)
+
+            self.semseg_OR42_colors = np.zeros((256, 3), dtype='uint8')
+            ids = list(self.os.OR_mapping_id42_to_color_dict.keys())
+            colors = list(self.os.OR_mapping_id42_to_color_dict.values())
+            self.semseg_OR42_colors[ids] = np.array(colors)
         
         if any([_ in ['lighting_SG'] for _ in self.modality_list_vis]):
             self.converter_SG_to_envmap = converter_SG_to_envmap(
@@ -84,7 +89,11 @@ class visualizer_scene_2D(object):
             'lighting_envmap', 
             'seg_area', 'seg_env', 'seg_obj', 
             'emission', 
-            'semseg', 'matseg', 'instance_seg', 
+            
+            'semseg', 
+            'instance_seg', 'instance_seg-sem', 
+            'matseg', 'matseg-sem', 
+            
             'mi_depth', 'mi_normal', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', 
             'mi_normal_im_overlay', 
             'layout', 'shapes', 
@@ -200,11 +209,11 @@ class visualizer_scene_2D(object):
         # if modality in ['seg_area', 'seg_env', 'seg_obj']: assert self.os.if_has_seg
         # if modality in ['mi_depth', 'mi_normal', 'mi_normal_im_overlay', 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj']: assert self.os.if_has_mitsuba_scene
 
-        _list = self.os.get_modality(modality, source=source)
+        _list = self.os.get_modality(modality.split('-')[0], source=source) # modality name is in the format of '{modality}-{modality property}', e.g. matseg-sem means visualizing modality matseg but its semantic cls labels
         assert len(self.frame_idx_list) == len(ax_list)
         assert len(_list) >= len(self.frame_idx_list)
         
-        colors_dict = {}
+        instance_colors_dict = {}
         _im_invalid_list = []
         if modality in ['matseg', 'instance_seg']:
             '''
@@ -212,15 +221,15 @@ class visualizer_scene_2D(object):
             '''
             _id_list = []
             for _im in _list:
-                __im = _im['mat_aggre_map'] if modality == 'matseg' else _im
+                __im = _im['mat_aggre_map'] if modality == 'matseg' else _im['seg_id_map']
                 _im_invalid = __im == 255
                 _im_invalid_list.append(_im_invalid)
                 _id_list += np.unique(__im[~_im_invalid]).tolist()
                 
             _id_list = list(set(_id_list))
             assert 255 not in _id_list
-            colors_dict = {_id: _color for _id, _color in zip(_id_list, _get_colors(len(_id_list)))}
-                    
+            instance_colors_dict = {_id: _color for _id, _color in zip(_id_list, _get_colors(len(_id_list)))}
+            
         for frame_idx, ax in zip(self.frame_idx_list, ax_list):
             _im = _list[frame_idx]
             H, W = self.os._H(frame_idx), self.os._W(frame_idx)
@@ -292,11 +301,34 @@ class visualizer_scene_2D(object):
 
             if modality == 'semseg':
                 # colormap: https://github.com/Jerrypiglet/rui-indoorinv-data/blob/7e527693ae6718381c6fab0652fd7da649c4a008/files_openrooms/colors/OR42_color_mapping_light.png
-                _im = np.array(colorize(_im, self.semseg_colors).convert('RGB'))
+                _im = np.array(colorize(_im, self.semseg_OR45_colors).convert('RGB'))
+
+            if modality == 'instance_seg-sem':
+                seg_id_list = [_['id'] for _ in _im['seg_info_list']]
+                seg_id_to_sem_dict = {seg_info['id']: seg_info['category_id'] for seg_info in _im['seg_info_list']}
+                assert set(np.unique(_im['seg_id_map'][_im['seg_id_map']!=255]).tolist()) == set(seg_id_list)
+                instance_seg_sem_map = np.empty(_im['seg_id_map'].shape, dtype=np.uint8)
+                instance_seg_sem_map.fill(255)
+                for seg_id in seg_id_to_sem_dict:
+                    assert seg_id in seg_id_list
+                    instance_seg_sem_map[_im['seg_id_map']==seg_id] = seg_id_to_sem_dict[seg_id]
+                _im = np.array(colorize(instance_seg_sem_map, self.semseg_OR45_colors).convert('RGB'))
+                
+            if modality == 'matseg-sem':
+                # print(set(np.unique(_im['mat_aggre_map']).tolist()), set(list(_im['matseg_sem_dict'].keys())) - {255})
+                assert set(np.unique(_im['mat_aggre_map']).tolist()) - {255} == set(list(_im['matseg_sem_dict'].keys())) - {255}
+                matseg_sem_map = np.empty(_im['mat_aggre_map'].shape, dtype=np.uint8)
+                matseg_sem_map.fill(255)
+                for seg_id in _im['matseg_sem_dict']:
+                    sem_id = _im['matseg_sem_dict'][seg_id]
+                    matseg_sem_map[_im['mat_aggre_map']==seg_id] = sem_id
+                    # print(sem_id, self.os.OR_mapping_id42_to_name_dict[sem_id])
+                _im = np.array(colorize(matseg_sem_map, self.semseg_OR42_colors).convert('RGB'))
+                
             if modality in ['matseg', 'instance_seg']:
-                assert colors_dict != {}
-                __im = _im['mat_aggre_map'] if modality == 'matseg' else _im
-                _im = vis_index_map(__im, colors=colors_dict)
+                assert instance_colors_dict != {}
+                __im = _im['mat_aggre_map'] if modality == 'matseg' else _im['seg_id_map']
+                _im = vis_index_map(__im, colors=instance_colors_dict)
                 _im[_im_invalid_list[frame_idx]] = 1. # invalid areas in white
 
             if modality == 'lighting_SG':

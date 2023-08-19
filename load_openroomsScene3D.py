@@ -187,9 +187,11 @@ scene_obj = openroomsScene3D(
         # 'seg', 
         # 'albedo', 'roughness', 
         # 'depth', 'normal',
+        
         'semseg', 
         'matseg', 
         'instance_seg', 
+        
         # 'lighting_SG', 
         # 'lighting_envmap', 
         
@@ -342,9 +344,14 @@ if opt.vis_2d_plt:
             # 'shapes', 
             # 'albedo', 
             # 'roughness', 
+            
             'semseg', 
+            
             'matseg', 
-            'instance_seg', 
+            'matseg-sem', # ![](https://i.imgur.com/jtqwMgF.png)
+            # 'instance_seg', 
+            # 'instance_seg-sem', # ![](https://i.imgur.com/ThpMRyL.png)
+            
             # 'depth', 
             # 'normal', 
             # 'mi_depth', 

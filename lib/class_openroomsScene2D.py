@@ -566,20 +566,35 @@ class openroomsScene2D(scene2DBase):
         ![](https://i.imgur.com/BjNwggL.jpg)
         '''
         self.matseg_remap_list = []
-        for matseg_dict, mat_to_raw_tuple_dict in zip(self.matseg_list, self.mat_to_raw_tuple_dict_list):
+        if not hasattr(self, 'semseg_list'):
+            self.load_semseg()
+            
+        for frame_idx, (matseg_dict, mat_to_raw_tuple_dict) in enumerate(zip(self.matseg_list, self.mat_to_raw_tuple_dict_list)):
             mat_aggre_map_global = np.zeros_like(matseg_dict['mat_aggre_map'], dtype=np.uint8) + 255
+            matseg_sem_dict = {}
             for mat_idx in range(matseg_dict['num_mat_masks']+1):
                 if mat_idx == 0:
                     # deal with backgroud
                     seg = matseg_dict['mat_aggre_map'] == 0
                     mat_aggre_map_global[seg] = 255
+                    matseg_sem_dict[255] = 255
                 else:
                     raw_tuple = mat_to_raw_tuple_dict[mat_idx]
                     assert raw_tuple in self.matseg_all_raw_tuple_list
                     raw_tuple_global = self.matseg_all_raw_tuple_list.index(raw_tuple)
-                    mat_aggre_map_global[matseg_dict['mat_aggre_map'] == mat_idx] = raw_tuple_global
+                    mat_mask = matseg_dict['mat_aggre_map'] == mat_idx
+                    mat_aggre_map_global[mat_mask] = raw_tuple_global
                     if DEBUG_MATSEG:
                         print(mat_idx, '->', raw_tuple_global, raw_tuple)
+                    if raw_tuple[0] in self.OR_mapping_modelid_to_id42_name_dict:
+                        matseg_sem_dict[raw_tuple_global] = self.OR_mapping_modelid_to_id42_name_dict[raw_tuple[0]][0]
+                    else:
+                        semseg_ = self.semseg_list[frame_idx]
+                        semseg_values, semseg_counts = np.unique(semseg_[mat_mask], return_counts=True)
+                        semseg_label = semseg_values[np.argmax(semseg_counts)]
+                        assert semseg_label in [42, 43, 44]
+                        assert float(np.max(semseg_counts)) / float(np.sum(semseg_counts)) > 0.9
+                        matseg_sem_dict[raw_tuple_global] = semseg_label - 3 # OR45 -> OR42
                     
             if DEBUG_MATSEG:
                 print(np.unique(mat_aggre_map_global), np.unique(mat_aggre_map_global[mat_aggre_map_global!=255]), len(np.unique(mat_aggre_map_global[mat_aggre_map_global!=255])), matseg_dict['num_mat_masks'])
@@ -587,6 +602,7 @@ class openroomsScene2D(scene2DBase):
             self.matseg_remap_list.append({
                 'mat_aggre_map': mat_aggre_map_global,
                 'num_mat_masks': matseg_dict['num_mat_masks'],
+                'matseg_sem_dict': matseg_sem_dict, 
             })
             
         print(blue_text('[%s] DONE. load_matseg'%self.__class__.__name__))
@@ -594,6 +610,8 @@ class openroomsScene2D(scene2DBase):
     def load_instance_seg(self):
         '''
         instance_seg, semseg, matseg: ![](https://i.imgur.com/8Tkm5Ix.png)
+        
+        sem labels in OR45
         '''
         if not hasattr(self, 'seg_dict_of_lists'): self.load_seg()
         if not hasattr(self, 'semseg_list'): self.load_semseg()
@@ -602,7 +620,7 @@ class openroomsScene2D(scene2DBase):
         assert len(self.imcadmatobj_list) == len(self.semseg_list) == len(self.seg_dict_of_lists['obj'])
         
         self.instance_seg_list = []
-        self.instance_seg_info_list = []
+        # self.instance_seg_info_list = []
         
         print(white_blue('[%s] load_instance_seg for %d frames...'%(self.__class__.__name__, len(self.frame_id_list))))
         
@@ -675,8 +693,11 @@ class openroomsScene2D(scene2DBase):
                             print(red('---> excluded:'), (self.meta_split, self.scene_name, _frame_idx, obj_idx), valid_obj_semseg_single_list)
 
             # print(np.unique(im_pan_seg_ids))
-            self.instance_seg_list.append(im_pan_seg_ids)
-            self.instance_seg_info_list.append(segments_info_list)
+            self.instance_seg_list.append({
+                'seg_id_map': im_pan_seg_ids, # (H, W)
+                'seg_info_list': segments_info_list, # list of len N
+                })
+            # self.instance_seg_info_list.append(segments_info_list)
             
         print(blue_text('[%s] DONE. load_instance_seg'%self.__class__.__name__))
 
@@ -707,20 +728,23 @@ class openroomsScene2D(scene2DBase):
             OR4X_mapping_catInt_to_RGB_light = pickle.load(f)
             
         '''
-        OR42 for semseg labels
+        OR42 for xml shapes (convert from obj names)
         '''
         OR_mapping_obj_cat_str_to_id_file = self.semantic_labels_root / 'semanticLabelName_OR42.txt'
         with open(str(OR_mapping_obj_cat_str_to_id_file)) as f:
             mylist = f.read().splitlines()
         self.OR_mapping_obj_cat_str_to_id42_name_dict = {x.split(' ')[0]: (int(x.split(' ')[1]), x.split(' ')[2]) for x in mylist} # cat id is 0-based (0 being unlabelled)!
-        self.OR_mapping_obj_cat_str_to_id42_name_dict = {k: (v[0]-1, v[1]) for k, v in self.OR_mapping_obj_cat_str_to_id42_name_dict.items()}
+        self.OR_mapping_obj_cat_str_to_id42_name_dict = {k: (v[0]-1, v[1]) for k, v in self.OR_mapping_obj_cat_str_to_id42_name_dict.items()} # {'curtain': (0, 'curtain'), '03790512': (1, 'bike'), ...}
+        
+        self.OR_mapping_id42_to_name_dict = {v[0]: v[1] for k, v in self.OR_mapping_obj_cat_str_to_id42_name_dict.items()}
+        self.OR_mapping_id42_to_name_dict[255] = 'unlabelled'
         
         self.OR_mapping_id42_to_color_dict = OR4X_mapping_catInt_to_RGB_light['OR42']
         self.OR_mapping_id42_to_color_dict = {k-1: v for k, v in self.OR_mapping_id42_to_color_dict.items() if k != 0}
         self.OR_mapping_id42_to_color_dict[255] = (255, 255, 255) # unlabelled
         
         '''
-        OR45 for xml shapes (convert from obj names)
+        OR45 for semseg labels
         '''
         OR_names45_file = self.semantic_labels_root / 'colors/openrooms_names.txt'
         with open(str(OR_names45_file)) as f:
@@ -729,18 +753,31 @@ class openroomsScene2D(scene2DBase):
         self.OR_mapping_id45_to_name_dict = {k-1: v for k, v in self.OR_mapping_id45_to_name_dict.items() if k != 0}
         self.OR_mapping_id45_to_name_dict[255] = 'unlabelled'      
         
-            
         self.OR_mapping_id45_to_color_dict = OR4X_mapping_catInt_to_RGB_light['OR45']
         self.OR_mapping_id45_to_color_dict = {k-1: v for k, v in self.OR_mapping_id45_to_color_dict.items() if k != 0}
         self.OR_mapping_id45_to_color_dict[255] = (255, 255, 255) # unlabelled
         
         '''
+        models_new.txt for parsing model id in matseg label -> OR42
+        '''
+        with open(str(self.semantic_labels_root / 'models_new.txt')) as f:
+            mylist = f.read().splitlines()
+        mylist = [x.split(' ') for x in mylist if not x.startswith('scene')][1:]
+        # print(len(np.unique([x[0] for x in mylist]))) # 39
+        # print(len(np.unique([x[1] for x in mylist]))) # 106
+        mylist = {int(x[-1]): x[0] for x in mylist}
+        for k, v in mylist.items():
+            assert v in self.OR_mapping_obj_cat_str_to_id42_name_dict.keys()
+        self.OR_mapping_modelid_to_id42_name_dict = {k: self.OR_mapping_obj_cat_str_to_id42_name_dict[v] for k, v in mylist.items()} # {0: (0, 'curtain'), 1: (0, 'curtain'), 2: (1, 'bike'), 3: (1, 'bike'), 4: (1, 'bike'), ...}
+        
+        '''
+        print the difference between OR42 and OR45
         '''
         
         x1 = list(v[1] for k, v in self.OR_mapping_obj_cat_str_to_id42_name_dict.items())
         x2 = list(v for k, v in self.OR_mapping_id45_to_name_dict.items())
-        print("[DEBUG] missing names in OR_mapping_obj_cat_str_to_id42_name_dict (42) but in OR_mapping_id45_to_name_dict (45)", set(x2)-set(x1))
-        print("[DEBUG] missing names in OR_mapping_id45_to_name_dict (45) but in ", set(x1)-set(x2))
+        print("[DEBUG] missing names in OR_mapping_obj_cat_str_to_id42_name_dict (42) but in OR_mapping_id45_to_name_dict (45)", {x2.index(_): _ for _ in list(set(x2)-set(x1))})
+        print("[DEBUG] missing names in OR_mapping_id45_to_name_dict (45) but in ", {x1.index(_): _ for _ in list(set(x1)-set(x2))})
         
         
         # OR_mapping_str_to_color_file = self.semantic_labels_root / 'colors/OR4X_mapping_catStr_to_RGB_light.pkl'
