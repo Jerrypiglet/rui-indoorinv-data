@@ -49,7 +49,8 @@ class evaluator_scene_scene():
             - 't': distance to camera 0
             - 'rgb': back-projected color from cameras
             - 'mi_normal': back-projected normal from mitsuba scene (intended for mitsuba scene from XML); instead of evaluating the normal from TSDF/shapes which could be noisy
-            - 'instance_seg': back-projected instance segmentation from cameras ![](https://i.imgur.com/f8fEh2R.png)
+            - 'instance_seg': back-projected instance segmentation ids from cameras ![](https://i.imgur.com/f8fEh2R.png)
+            - 'matseg': back-projected material seg ids from cameras ![](https://i.imgur.com/T21RCBw.png)
 
         args:
         - shape_params
@@ -70,13 +71,13 @@ class evaluator_scene_scene():
                 if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
                     self.os.process_mi_scene(if_postprocess_mi_frames=True, force=True)
             # assert self.os.mi_scene_from == 'tsdf'
-        assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg', 'instance_seg']
+        assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg', 'instance_seg', 'matseg']
 
         return_dict = {}
         samples_v_dict = {}
 
         print(white_blue('Evaluating scene for [%s]'%sample_type), 'sample_shapes for %d shapes...'%len(_shape_ids_list))
-        if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg', 'instance_seg', 'mi_normal']:
+        if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg', 'instance_seg', 'matseg', 'mi_normal']:
             '''
             get viewing frustum normals and centers
             '''
@@ -97,7 +98,7 @@ class evaluator_scene_scene():
 
         for shape_idx, (vertices, faces, _id) in tqdm(enumerate(zip(_vertices_list, _faces_list, _shape_ids_list))):
             assert np.amin(faces) == 1
-            if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg', 'instance_seg', 'mi_normal']:
+            if sample_type in ['vis_count', 'rgb_hdr', 'rgb_sdr', 'semseg', 'instance_seg', 'matseg', 'mi_normal']:
                 assert self.os.if_has_poses
                 assert self.os.if_has_mitsuba_scene # scene_obj->modality_list=['mi'
 
@@ -113,9 +114,10 @@ class evaluator_scene_scene():
                         assert hasattr(self.os, 'mi_normal_global_list')
                     float_3_sum = np.zeros((vertices.shape[0], 3), dtype=np.float32)
                     vertex_view_count = np.zeros((vertices.shape[0]), dtype=np.int64)
-                if sample_type in ['semseg', 'instance_seg']:
+                if sample_type in ['semseg', 'instance_seg', 'matseg']:
                     if sample_type == 'semseg': assert self.os.if_has_semseg
                     if sample_type == 'instance_seg': assert self.os.if_has_instance_seg
+                    if sample_type == 'matseg': assert self.os.if_has_matseg
                     # seg_labels = np.array([[] * vertices.shape[0]], dtype=object)
                     seg_labels = np.empty((vertices.shape[0],),dtype=object)
                     seg_labels.fill([])
@@ -174,7 +176,7 @@ class evaluator_scene_scene():
                     '''
                     back-project intersection points to camera views; then sample from 2D inputs (e.g. images, label maps)
                     '''
-                    if sample_type in ['rgb_hdr', 'rgb_sdr', 'semseg', 'instance_seg', 'mi_normal']:
+                    if sample_type in ['rgb_hdr', 'rgb_sdr', 'semseg', 'instance_seg', 'matseg', 'mi_normal']:
                         if DEBUG_TEMP_SOLU:
                             x_world = vertices[visibility]
                         else:
@@ -194,13 +196,15 @@ class evaluator_scene_scene():
                         elif sample_type == 'semseg':
                             im_ = self.os.semseg_list[frame_idx]
                         elif sample_type == 'instance_seg':
-                            im_ = self.os.instance_seg_list[frame_idx]
+                            im_ = self.os.instance_seg_list[frame_idx]['seg_id_map']
+                        elif sample_type == 'matseg':
+                            im_ = self.os.matseg_remap_list[frame_idx]['mat_aggre_map']
                         elif sample_type == 'mi_normal':
                             im_ = self.os.mi_normal_global_list[frame_idx]
                             
                         if sample_type in ['rgb_hdr', 'rgb_sdr', 'mi_normal']:
                             sampled_im_th = torch.nn.functional.grid_sample(torch.from_numpy(im_).permute(2, 0, 1).unsqueeze(0).float(), grid, align_corners=True)
-                        elif sample_type in ['semseg', 'instance_seg']:
+                        elif sample_type in ['semseg', 'instance_seg', 'matseg']:
                             sampled_im_th = torch.nn.functional.grid_sample(torch.from_numpy(im_).unsqueeze(0).unsqueeze(0).float(), grid, align_corners=True, mode='nearest').type(torch.int64)
                         else:
                             raise NotImplementedError
@@ -217,7 +221,7 @@ class evaluator_scene_scene():
                         if sample_type in ['rgb_hdr', 'rgb_sdr', 'mi_normal']:
                             float_3_sum[valid_vertices_idx] += sampled_im_valid
                             vertex_view_count[valid_vertices_idx] += 1
-                        elif sample_type in ['semseg', 'instance_seg']:
+                        elif sample_type in ['semseg', 'instance_seg', 'matseg']:
                             seg_labels[valid_vertices_idx] = [_+[__] for _, __ in zip(seg_labels[valid_vertices_idx], sampled_im_valid)]
                             vertex_view_count[valid_vertices_idx] += 1
                         else:
@@ -246,14 +250,14 @@ class evaluator_scene_scene():
                     mi_normal[vertex_view_count==0] = np.array([[1., 0., 0.]], dtype=np.float32)
                     samples_v_dict[_id] = ('mi_normal', mi_normal)
                     return_dict.update({'mi_normal': mi_normal, 'vertex_view_count': vertex_view_count})
-                elif sample_type in ['semseg', 'instance_seg']:
+                elif sample_type in ['semseg', 'instance_seg', 'matseg']:
                     seg_labels = [np.argmax(np.bincount(_)) if len(_) > 0 else 255 for _ in seg_labels]
                     return_dict.update({'seg_labels': seg_labels, 'vertex_view_count': vertex_view_count})
                     self.os.load_colors()
                     if sample_type == 'semseg':
                         seg_labels_colors = np.array([self.os.OR_mapping_id45_to_color_dict[_] for _ in seg_labels])
                         seg_labels_colors = seg_labels_colors.astype(np.float32) / 255.
-                    elif sample_type == 'instance_seg':
+                    elif sample_type in ['instance_seg', 'matseg']:
                         _id_list = [_ for _ in np.unique(np.array(seg_labels)) if _ != 255]
                         assert 255 not in _id_list
                         colors_dict = {_id: _color for _id, _color in zip(_id_list, _get_colors(len(_id_list)))}

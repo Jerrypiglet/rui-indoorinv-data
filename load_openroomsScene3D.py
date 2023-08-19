@@ -197,7 +197,7 @@ scene_obj = openroomsScene3D(
         
         # 'layout', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
-        # 'tsdf', 
+        'tsdf', 
         'mi', # mitsuba scene, loading from scene xml file
         ], 
 )
@@ -217,7 +217,7 @@ if opt.eval_scene:
     sample visivility to camera centers on vertices
     '''
     _ = evaluator_scene.sample_shapes(
-        sample_type=opt.sample_type, # e.g. ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg', 'instance_seg']
+        sample_type=opt.sample_type, # e.g. ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg', 'instance_seg', 'matseg']
         # sample_type='vis_count', # ['']
         # sample_type='t', # ['']
         shape_params={
