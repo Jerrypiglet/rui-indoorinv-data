@@ -42,9 +42,6 @@ def gather_missing_scenes(scene_list, dump_root, if_check_seg=False, seg_file_na
         'vertex_view_count.npy', 
         'instance_seg.npy', 
         'visibility_list_list.pkl', 
-
-        'matseg.npy', 
-        'matseg_sem.npy', 
     ]
     if if_check_seg:
         assert seg_file_name != ''
@@ -133,15 +130,8 @@ def process_one_scene(dump_root, exclude_scene_list_file, meta_split, scene_name
     sample different modalities
     '''
     visibility_list_list = []
-    # for sample_type in ['mi_normal', 'instance_seg']:
+    for sample_type in ['mi_normal', 'instance_seg']:
     # for sample_type in ['rgb_sdr']:
-    visibility_list_list_path = dump_root / meta_split / scene_name / 'visibility_list_list.pkl'
-    if visibility_list_list_path.exists():
-        with open(str(visibility_list_list_path), 'rb') as f:
-            visibility_list_list = pickle.load(f)
-        print('=== visibility_list_list loaded from:', str(visibility_list_list_path))
-        
-    for sample_type in ['matseg']:
         return_dict = evaluator_scene.sample_shapes(
             sample_type=sample_type, # e.g. ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg', 'instance_seg']
             # sample_type='vis_count', # ['']
@@ -154,10 +144,9 @@ def process_one_scene(dump_root, exclude_scene_list_file, meta_split, scene_name
         visibility_list_list = return_dict['visibility_list_list']
         if len(visibility_list_list) > 0:
             print('+++++', sample_type, '++', len(visibility_list_list[0]))
-            if not visibility_list_list_path.exists():
-                with open(str(visibility_list_list_path), 'wb') as f:
-                    pickle.dump(visibility_list_list, f)
-                print('=== visibility_list_list dumped to:', str(dump_root / meta_split / scene_name / 'visibility_list_list.pkl'))
+            with open(str(dump_root / meta_split / scene_name / 'visibility_list_list.pkl'), 'wb') as f:
+                pickle.dump(visibility_list_list, f)
+            print('=== visibility_list_list dumped to:', str(dump_root / meta_split / scene_name / 'visibility_list_list.pkl'))
         else:
             print('+++++', sample_type, '++', 0)
         
@@ -198,79 +187,6 @@ def process_one_scene(dump_root, exclude_scene_list_file, meta_split, scene_name
                     plydata_copy['vertex']['blue'][i] = color[2]
                 output_file = dump_root / meta_split / scene_name / 'tmp_tsdf_mi_normal.ply'
                 plydata_copy.write(str(output_file))
-
-        if sample_type == 'matseg':
-            
-            segments_matseg = np.array(return_dict['matseg_labels'])
-            if IF_DEBUG:
-                assert num_verts == len(segments_matseg)
-            assert np.amax(segments_matseg) <= 255
-            segments_matseg = segments_matseg.astype(np.uint8)
-            np.save(str(dump_root / meta_split / scene_name / 'matseg.npy'), segments_matseg)
-            
-            if IF_DEBUG:
-                '''
-                visualize matseg labels
-                '''
-                labels_txt_path = dump_root / meta_split / scene_name / 'tmp_matseg.txt'
-                with open(str(labels_txt_path), "w") as txt_file:
-                    for line in segments_matseg:
-                        txt_file.write(str(line) + "\n") # works with any number of elements in a line
-                print('=== labels_txt ([%d] segments_matseg) dumped to: '%(np.unique(segments_matseg).shape[0]), labels_txt_path)
-            
-                output_file = dump_root / meta_split / scene_name / 'tmp_tsdf_matseg.ply'
-                visualize(str(labels_txt_path), str(scene_obj.tsdf_file_path), str(output_file))
-                
-            '''
-            get matseg labels
-            '''
-            
-            segments_matseg_sem = np.empty(segments_matseg.shape[0], dtype=segments_matseg.dtype)
-            segments_matseg_sem.fill(255)
-            instance_seg_to_matseg_sem_mapping_dict = {}
-            for instance_seg_id in np.unique(segments_matseg):
-                instance_seg_to_matseg_sem_mapping_dict[instance_seg_id] = []
-                for matseg_remap_ in scene_obj.matseg_remap_list:
-                    matseg_sem_dict = matseg_remap_['matseg_sem_dict']
-                    if instance_seg_id in matseg_sem_dict:
-                        instance_seg_to_matseg_sem_mapping_dict[instance_seg_id].append(matseg_sem_dict[instance_seg_id])
-                    
-                # for instance_seg_info_frame in scene_obj.instance_seg_info_list:
-                    # for instance_seg_info in instance_seg_info_frame:
-                    #     if instance_seg_info['id'] == instance_seg_id:
-                    #         instance_seg_to_matseg_sem_mapping_dict[instance_seg_id].append(instance_seg_info['category_id'])
-            
-                if instance_seg_id != 255:
-                    if not len(set(instance_seg_to_matseg_sem_mapping_dict[instance_seg_id])) == 1:
-                        print(instance_seg_id, set(instance_seg_to_matseg_sem_mapping_dict[instance_seg_id]))
-                        # import ipdb; ipdb.set_trace()
-                        # excluded_scenes.append((meta_split, scene_name))
-                        with open(str(exclude_scene_list_file), 'a') as f:
-                            f.write('%s %s\n'%(meta_split, scene_name))
-                            print('[Excluded:]', meta_split, scene_name)
-                        return False
-                else:
-                    instance_seg_to_matseg_sem_mapping_dict[instance_seg_id] = []
-                    
-                segments_matseg_sem[segments_matseg==instance_seg_id] = instance_seg_to_matseg_sem_mapping_dict[instance_seg_id][0] if len(instance_seg_to_matseg_sem_mapping_dict[instance_seg_id]) > 0 else 255
-                # print('matseg-sem', instance_seg_id, instance_seg_to_matseg_sem_mapping_dict[instance_seg_id])
-                    
-            assert np.amax(segments_matseg_sem) <= 255
-            segments_matseg_sem = segments_matseg_sem.astype(np.uint8)
-            np.save(str(dump_root / meta_split / scene_name / 'matseg_sem.npy'), segments_matseg_sem)
-            
-            if IF_DEBUG:
-                '''
-                visualize matseg_sem labels
-                '''
-                labels_txt_path = dump_root / meta_split / scene_name / 'tmp_matseg_sem.txt'
-                with open(str(labels_txt_path), "w") as txt_file:
-                    for line in segments_matseg_sem:
-                        txt_file.write(str(line) + "\n") # works with any number of elements in a line
-                output_file = dump_root / meta_split / scene_name / 'tmp_tsdf_matseg_sem.ply'
-                matseg_sem_color = {k: np.array(v) for k, v in scene_obj.OR_mapping_id42_to_color_dict.items()}
-                visualize(str(labels_txt_path), str(scene_obj.tsdf_file_path), str(output_file), colors=matseg_sem_color)
-
                 
         if sample_type == 'instance_seg':
             
@@ -348,8 +264,6 @@ def process_one_gpu(opt, IF_FORCE=False):
     # IF_DEBUG = True
     
     scene_list = get_im_info_list(Path(opt.frame_list_root), opt.split)
-    import random
-    random.shuffle(scene_list)
     scene_list = [scene_list[_] for _ in range(len(scene_list)) if _ % opt.gpu_total == opt.gpu_id]
     
     _, scene_list = read_exclude_scenes_list(Path(opt.dump_root), opt.split, scene_list)

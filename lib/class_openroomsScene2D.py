@@ -563,6 +563,8 @@ class openroomsScene2D(scene2DBase):
                 if raw_tuple not in self.matseg_all_raw_tuple_list and raw_tuple!=():
                     # (378, 1, [3, 10]) and (378, 1, [3]) should be one material (e.g. some object may not be visible)
                     self.matseg_all_raw_tuple_list.append(raw_tuple)
+                    
+        print('self.matseg_all_raw_tuple_list', self.matseg_all_raw_tuple_list)
         
         '''
         remap mat_agree_map ids to global mat ids (255: invalid)
@@ -587,25 +589,52 @@ class openroomsScene2D(scene2DBase):
                     assert raw_tuple in self.matseg_all_raw_tuple_list
                     raw_tuple_global = self.matseg_all_raw_tuple_list.index(raw_tuple)
                     mat_mask = matseg_dict['mat_aggre_map'] == mat_idx
-                    mat_aggre_map_global[mat_mask] = raw_tuple_global
+                    
                     if DEBUG_MATSEG:
                         print(mat_idx, '->', raw_tuple_global, raw_tuple)
                     if raw_tuple[0] in self.OR_mapping_modelid_to_id42_name_dict:
+                        mat_aggre_map_global[mat_mask] = raw_tuple_global
                         matseg_sem_dict[raw_tuple_global] = self.OR_mapping_modelid_to_id42_name_dict[raw_tuple[0]][0]
+                        # print('--1--', matseg_sem_dict[raw_tuple_global], self.OR_mapping_id42_to_name_dict[matseg_sem_dict[raw_tuple_global]])
                     else:
+                        _if_skip_mat = False
                         semseg_ = self.semseg_list[frame_idx]
                         semseg_values, semseg_counts = np.unique(semseg_[mat_mask], return_counts=True)
                         semseg_label = semseg_values[np.argmax(semseg_counts)]
-                        assert semseg_label in [42, 43, 44]
-                        assert float(np.max(semseg_counts)) / float(np.sum(semseg_counts)) > 0.9
-                        matseg_sem_dict[raw_tuple_global] = semseg_label - 3 # OR45 -> OR42
-                    
+                        # if semseg_label not in [42, 43, 44]:
+                        
+                        assert '_'.join(self.OR_mapping_modelid_to_modelname_dict[raw_tuple[0]]) == self.scene_name
+                        
+                        # if np.sum(mat_mask) > 400: # the ratio is only meaningful for large objects
+                        #     # if not float(np.max(semseg_counts)) / float(np.sum(semseg_counts)) > 0.9:
+                        #     if not float(np.max(semseg_counts)) / float(np.sum(semseg_counts)) > 0.9 or semseg_label not in [42, 43, 44]:
+                        #         print(np.sum(mat_mask), semseg_label, self.meta_split, self.scene_name, frame_idx, float(np.max(semseg_counts)) / float(np.sum(semseg_counts)))
+                        #         print([self.OR_mapping_id45_to_name_dict[_] for _ in semseg_values])
+                        #         import matplotlib.pyplot as plt
+                        #         plt.figure()
+                        #         plt.imshow(mat_mask)
+                        #         plt.show()
+                        #         import ipdb; ipdb.set_trace()
+                        #     assert float(np.max(semseg_counts)) / float(np.sum(semseg_counts)) > 0.9
+                        #     assert semseg_label in [42, 43, 44]
+                        # else:
+                        # ignore small and aliased classes; aliasing due to querying semseg map which could be aliased, while matseg map is not
+                        if not float(np.max(semseg_counts)) / float(np.sum(semseg_counts)) > 0.8 or semseg_label not in [42, 43, 44]:
+                            _if_skip_mat = True
+                        # print('--2--', matseg_sem_dict[raw_tuple_global], self.OR_mapping_id42_to_name_dict[matseg_sem_dict[raw_tuple_global]])
+                        
+                        if not _if_skip_mat:
+                            mat_aggre_map_global[mat_mask] = raw_tuple_global
+                            matseg_sem_dict[raw_tuple_global] = semseg_label - 3 # OR45 -> OR42
+                            
+                            
             if DEBUG_MATSEG:
                 print(np.unique(mat_aggre_map_global), np.unique(mat_aggre_map_global[mat_aggre_map_global!=255]), len(np.unique(mat_aggre_map_global[mat_aggre_map_global!=255])), matseg_dict['num_mat_masks'])
-            assert len(np.unique(mat_aggre_map_global[mat_aggre_map_global!=255])) == matseg_dict['num_mat_masks']
+                print({_: self.OR_mapping_id42_to_name_dict[matseg_sem_dict[_]] for _ in matseg_sem_dict})
+            # assert len(np.unique(mat_aggre_map_global[mat_aggre_map_global!=255])) == matseg_dict['num_mat_masks']
             self.matseg_remap_list.append({
                 'mat_aggre_map': mat_aggre_map_global,
-                'num_mat_masks': matseg_dict['num_mat_masks'],
+                # 'num_mat_masks': matseg_dict['num_mat_masks'],
                 'matseg_sem_dict': matseg_sem_dict, 
             })
             
@@ -766,13 +795,22 @@ class openroomsScene2D(scene2DBase):
         '''
         with open(str(self.semantic_labels_root / 'models_new.txt')) as f:
             mylist = f.read().splitlines()
-        mylist = [x.split(' ') for x in mylist if not x.startswith('scene')][1:]
+        # mylist = [x.split(' ') for x in mylist if not x.startswith('scene')][1:]
+        mylist = [x.split(' ') for x in mylist][1:]
         # print(len(np.unique([x[0] for x in mylist]))) # 39
         # print(len(np.unique([x[1] for x in mylist]))) # 106
-        mylist = {int(x[-1]): x[0] for x in mylist}
-        for k, v in mylist.items():
-            assert v in self.OR_mapping_obj_cat_str_to_id42_name_dict.keys()
-        self.OR_mapping_modelid_to_id42_name_dict = {k: self.OR_mapping_obj_cat_str_to_id42_name_dict[v] for k, v in mylist.items()} # {0: (0, 'curtain'), 1: (0, 'curtain'), 2: (1, 'bike'), 3: (1, 'bike'), 4: (1, 'bike'), ...}
+        self.OR_mapping_modelid_to_modelname_dict = {int(x[-1]): (x[0], x[2]) for x in mylist}
+        for k, v in self.OR_mapping_modelid_to_modelname_dict.items():
+            if 'scene' not in v[0]:
+                assert v[0] in self.OR_mapping_obj_cat_str_to_id42_name_dict.keys()
+        # self.OR_mapping_modelid_to_id42_name_dict = {k: self.OR_mapping_obj_cat_str_to_id42_name_dict[v] if 'scene' in v else mylist[k] for k, v in mylist.items()} # {0: (0, 'curtain'), 1: (0, 'curtain'), 2: (1, 'bike'), 3: (1, 'bike'), 4: (1, 'bike'), ...}
+        self.OR_mapping_modelid_to_id42_name_dict = {}
+        for k, v in self.OR_mapping_modelid_to_modelname_dict.items():
+            if 'scene' in v[0]:
+                # self.OR_mapping_modelid_to_id42_name_dict[k] = v
+                pass
+            else:
+                self.OR_mapping_modelid_to_id42_name_dict[k] = self.OR_mapping_obj_cat_str_to_id42_name_dict[v[0]]
         
         '''
         print the difference between OR42 and OR45

@@ -8,8 +8,8 @@ To run on the openrooms-public (i.e. less frames per scene):
 '''
 import sys
 
-# host = 'mm1'
-host = 'apple'
+host = 'mm1'
+# host = 'apple'
 # host = 'r4090'
 
 from lib.global_vars import PATH_HOME_dict, INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict, OR_MODALITY_FRAMENAME_DICT, query_host
@@ -120,7 +120,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 # frame_id_list = [0, 11, 10, 64, 81]
 # + list(range(5, 87, 10))
 
-frame_id_list = [2, 3, 4, 5, 10]
+# frame_id_list = [8]
 
 '''
 update confs
@@ -190,14 +190,14 @@ scene_obj = openroomsScene3D(
         
         'semseg', 
         'matseg', 
-        'instance_seg', 
+        # 'instance_seg', 
         
         # 'lighting_SG', 
         # 'lighting_envmap', 
         
         # 'layout', 
         # 'shapes', # objs + emitters, geometry shapes + emitter properties
-        'tsdf', 
+        # 'tsdf', 
         'mi', # mitsuba scene, loading from scene xml file
         ], 
 )

@@ -49,7 +49,9 @@ def get_map_aggre_map(objMask):
             # assert len(obj_idxes)==1
             
             # raw_tuple_dict[mat_count] = (cad_id, mat_idx, obj_idxes)
-            raw_tuple_dict[mat_count] = (cad_id, mat_idx)
+            raw_tuple_dict[mat_count] = (cad_id-1, mat_idx)
+            assert cad_id-1 >= 0
+            assert cad_id-1 < 4580
             
             mat_count += 1
 

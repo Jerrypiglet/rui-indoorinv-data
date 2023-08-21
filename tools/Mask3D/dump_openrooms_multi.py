@@ -37,7 +37,7 @@ Note: [!!!] also CHANGE params in dump_openrooms_func -> process_one_scene
 import os, sys
 sys.path.insert(0, PATH_HOME)
 
-from lib.global_vars import PATH_HOME_dict, OR_RAW_ROOT_dict
+from lib.global_vars import PATH_HOME_dict, OR_RAW_ROOT_dict, OR_MODALITY_FRAMENAME_DICT, query_host
 assert PATH_HOME == PATH_HOME_dict[host]
 
 from pyhocon import ConfigFactory, ConfigTree
@@ -60,13 +60,17 @@ layout_root = Path(OR_RAW_ROOT) / 'layoutMesh'; check_exists(layout_root)
 shapes_root = Path(OR_RAW_ROOT) / 'uv_mapped'; check_exists(shapes_root)
 envmaps_root = Path(OR_RAW_ROOT) / 'EnvDataset'; check_exists(envmaps_root)
 
+CONF.modality_filename_dict = query_host(OR_MODALITY_FRAMENAME_DICT, host)
+
 CONF.im_params_dict.update({'im_H_resize': 240, 'im_W_resize': 320})
-CONF.shape_params_dict.update({'force_regenerate_tsdf': True})
+# CONF.shape_params_dict.update({'force_regenerate_tsdf': True})
+CONF.shape_params_dict.update({'force_regenerate_tsdf': False})
 # Mitsuba options
 CONF.mi_params_dict.update({'if_mi_scene_from_xml': True}) # !!!! set to False to load from shapes (single shape or tsdf fused shape (with tsdf in modality_list))
 # TSDF options
 CONF.shape_params_dict.update({
-    'if_force_fuse_tsdf': True, 
+    # 'if_force_fuse_tsdf': True, 
+    'if_force_fuse_tsdf': False, 
     # 'tsdf_voxel_length': 8.0 / 512.0,
     # 'tsdf_sdf_trunc': 0.05,
     'tsdf_voxel_length': 12.0 / 512.0,
@@ -139,6 +143,8 @@ if __name__ == '__main__':
     
     # for split in ['train', 'val']:
     for split in ['train']:
+    # for split in ['val']:
+    
         tic = time.time()
         
         result_queue = mp.Queue()

@@ -252,13 +252,15 @@ class evaluator_scene_scene():
                     return_dict.update({'mi_normal': mi_normal, 'vertex_view_count': vertex_view_count})
                 elif sample_type in ['semseg', 'instance_seg', 'matseg']:
                     seg_labels = [np.argmax(np.bincount(_)) if len(_) > 0 else 255 for _ in seg_labels]
-                    return_dict.update({'seg_labels': seg_labels, 'vertex_view_count': vertex_view_count})
+                    return_dict.update({'%s_labels'%sample_type: seg_labels, 'vertex_view_count': vertex_view_count})
                     self.os.load_colors()
                     if sample_type == 'semseg':
                         seg_labels_colors = np.array([self.os.OR_mapping_id45_to_color_dict[_] for _ in seg_labels])
                         seg_labels_colors = seg_labels_colors.astype(np.float32) / 255.
                     elif sample_type in ['instance_seg', 'matseg']:
                         _id_list = [_ for _ in np.unique(np.array(seg_labels)) if _ != 255]
+                        # print(_id_list)
+                        # import ipdb; ipdb.set_trace()
                         assert 255 not in _id_list
                         colors_dict = {_id: _color for _id, _color in zip(_id_list, _get_colors(len(_id_list)))}
                         seg_labels_colors = np.empty((len(seg_labels), 3), dtype=np.float32)
