@@ -546,19 +546,24 @@ class mitsubaScene3D(mitsubaBase):
             simplify_mesh_max = self.CONF.shape_params_dict.get('simplify_mesh_max', 1000)
             if_remesh = self.CONF.shape_params_dict.get('if_remesh', True) # False: images/demo_shapes_3D_NO_remesh.png; True: images/demo_shapes_3D_YES_remesh.png
             remesh_max_edge = self.CONF.shape_params_dict.get('remesh_max_edge', 0.1)
+            
+            floor_id = self.CONF.scene_params_dict.get('floor_id', None)
+            ceiling_id = self.CONF.scene_params_dict.get('ceiling_id', None)
 
             if if_sample_pts_on_mesh:
                 self.sample_pts_list = []
 
             root = get_XML_root(self.xml_file_path)
             shapes = root.findall('shape')
-            
+            print(white_blue('[%s] Parsing %d shapes...'%(self.__class__.__name__, len(shapes))))
+                  
             for shape in tqdm(shapes):
                 random_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
                 if_emitter = False; if_window = False; if_area_light = False
                 filename = None
-                if shape.get('type') != 'obj':
-                    assert shape.get('type') == 'rectangle'
+                if shape.get('type') not in ['obj', 'ply']:
+                    continue
+                    assert shape.get('type') == 'rectangle', 'Unsupported shape type: ' + shape.get('type')
                     '''
                     window as rectangle meshes: 
                         images/demo_mitsubaScene_rectangle_windows_1.png
@@ -576,6 +581,8 @@ class mitsubaScene3D(mitsubaBase):
                         transform_m = np.array(_transform).reshape(4, 4).astype(np.float32) @ transform_m # [[R,t], [0,0,0,1]]
                         
                     (vertices, faces) = get_rectangle_mesh(transform_m[:3, :3], transform_m[:3, 3:4])
+                    vertices = vertices * self.scene_scale
+                    
                     _id = 'rectangle_'+random_id
                     emitters = shape.findall('emitter')
                     if len(emitters) > 0:
@@ -584,24 +591,41 @@ class mitsubaScene3D(mitsubaBase):
                         assert emitter.get('type') == 'area'
                         rgb = emitter.findall('rgb')[0]
                         assert rgb.get('name') == 'radiance'
-                        radiance = np.array(rgb.get('value').split(',')).astype(np.float32).reshape(3,)
+                        try:
+                            rgb_ = rgb.get('value').split(',')
+                            assert isinstance(rgb_, list)
+                            if len(rgb_) == 3:
+                                pass
+                            else:
+                                assert len(rgb_) == 1
+                                rgb_ = rgb_[0].split(' ')
+                            assert len(rgb_) == 3
+                            radiance = np.array(rgb_).astype(np.float32).reshape(3,)
+                        except:
+                            import ipdb; ipdb.set_trace()
                         if_emitter = True; if_area_light = True
                         # _id = 'emitter-' + _id
                         _id = 'emitter-' + emitter.get('id') if emitter.get('id') is not None else _id
                         emitter_prop = {'intensity': radiance, 'obj_type': 'obj', 'if_lit_up': np.amax(radiance) > 1e-3}
                 else:
                     if not len(shape.findall('string')) > 0: continue
-                    _id = shape.get('id')+'_'+random_id
                     # if 'wall' in _id.lower() or 'ceiling' in _id.lower():
                     #     continue
                     filename = shape.findall('string')[0]; assert filename.get('name') == 'filename'
+                    filename_stem = Path(filename.get('value')).stem
+                    if filename_stem in self.invalid_shape_stem_list: 
+                        print(red('Discarded shape (%s) in invalid_shape_list.'%filename_stem)); continue
                     obj_path = self.scene_path / filename.get('value') # [TODO] deal with transform
                     # if if_load_obj_mesh:
                     # vertices, faces = loadMesh(obj_path) # based on L430 of adjustObjectPoseCorrectChairs.py; faces is 1-based!
                     shape_trimesh = trimesh.load_mesh(str(obj_path), process=False, maintain_order=True)
                     vertices, faces = np.array(shape_trimesh.vertices), np.array(shape_trimesh.faces)+1
+                    vertices = vertices * self.scene_scale
 
                     assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
+                    
+                    _id = shape.get('id') if shape.get('id') is not None else filename_stem
+                    _id = _id + '_' + random_id
                     
                 bverts, bfaces = computeBox(vertices)
                 if shape.get('type') == 'obj':
@@ -640,18 +664,24 @@ class mitsubaScene3D(mitsubaBase):
                 self.bfaces_list.append(bfaces)
                 self.shape_ids_list.append(_id)
                 
+                is_wall = 'wall' in _id.lower()
+                is_ceiling = 'ceiling' in _id.lower() if ceiling_id is None else _id.split('_')[0] == ceiling_id
+                is_floor = 'floor' in _id.lower() if floor_id is None else _id.split('_')[0] == floor_id
                 shape_dict = {
                     'filename': filename.get('value') if filename is not None else 'N/A', 
                     'if_in_emitter_dict': if_emitter, 
                     'id': _id, 
                     'random_id': random_id, 
                     # [IMPORTANT] currently relying on definition of walls and ceiling in XML file to identify those, becuase sometimes they can be complex meshes instead of thin rectangles
-                    'is_wall': 'wall' in _id.lower(), 
-                    'is_ceiling': 'ceiling' in _id.lower(), 
-                    'is_layout': 'wall' in _id.lower() or 'ceiling' in _id.lower() or 'floor' in _id.lower(), 
+                    'is_wall': is_wall, 
+                    'is_ceiling': is_ceiling, 
+                    'is_floor': is_floor, 
+                    'is_layout': is_wall or is_ceiling or is_floor,
                 }
-                if shape_dict['is_wall']: 
-                    print('++++ is_wall:', _id, shape_dict['filename'])
+                if is_wall: print('++++ is_wall:', _id, shape_dict['filename'])
+                if is_floor: print('++++ is_floor:', _id, shape_dict['filename'])
+                if is_ceiling: print('++++ is_ceiling:', _id, shape_dict['filename'])
+                
                 if if_emitter:
                     shape_dict.update({'emitter_prop': emitter_prop})
                     print('**** if_emitter:', _id, shape_dict['filename'], shape_dict['emitter_prop']['intensity'])

@@ -1,0 +1,2908 @@
+<scene version="3.0.0">
+	<default name="integrator" value="path" />
+	<default name="spp" value="64" />
+	<default name="resy" value="320" />
+	<default name="resx" value="640" />
+	<default name="max_depth" value="17" />
+	<integrator type="$integrator">
+		<integer name="max_depth" value="$max_depth" />
+	</integrator>
+	<sensor type="perspective">
+		<float name="fov" value="60" />
+		<transform name="to_world">
+			<matrix value="-0.89874 -0.0182716 -0.4381 1.211 0 0.999131 -0.0416703 1.80475 0.438481 -0.0374507 -0.89796 3.85239 0 0 0 1" />
+		</transform>
+		<sampler type="independent">
+			<integer name="sample_count" value="$spp" />
+		</sampler>
+		<film type="hdrfilm">
+			<integer name="width" value="$resx" />
+			<integer name="height" value="$resy" />
+			<string name="file_format" value="openexr" />
+			<string name="pixel_format" value="rgb" />
+			<rfilter type="tent" />
+		</film>
+	</sensor>
+	<bsdf type="twosided" id="ChromeHandleBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.64, 0.64, 0.64" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RadioHandleBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.389509, 0.372589, 0.293747" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RadioInsideBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.015078, 0.015078, 0.015078" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RadioKnobBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.358375, 0.300936, 0.128617" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RadioPlasticBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.64, 0.600153, 0.43449" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RadioSurroundBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.066822, 0.028495, 0.013827" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="SteelPotBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="0.578596, 0.578596, 0.578596" />
+			<rgb name="eta" value="1.65746, 0.880369, 0.521229" />
+			<rgb name="k" value="9.22387, 6.26952, 4.837" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="KettleGreenBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.0399472, 0.14198, 0.0033027" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="thindielectric" id="RadioGlassBSDF">
+		<float name="int_ior" value="1.5" />
+		<float name="ext_ior" value="1" />
+	</bsdf>
+	<bsdf type="twosided" id="UtensilsBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.05" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="0.578596, 0.578596, 0.578596" />
+			<rgb name="eta" value="4.36968, 2.9167, 1.6547" />
+			<rgb name="k" value="5.20643, 4.23136, 3.75495" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="MetalHandlesBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.075" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="0.510193, 0.510193, 0.510193" />
+			<rgb name="eta" value="4.36968, 2.9167, 1.6547" />
+			<rgb name="k" value="5.20643, 4.23136, 3.75495" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="SmallWorktopBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.04" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<texture name="diffuse_reflectance" type="bitmap">
+				<string name="filename" value="textures/Worktopt-light.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ExtractorHoodBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.08" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="0.578596, 0.578596, 0.578596" />
+			<rgb name="eta" value="4.36968, 2.9167, 1.6547" />
+			<rgb name="k" value="5.20643, 4.23136, 3.75495" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WallsBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="1, 1, 1" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="PlatesBSDF">
+		<bsdf type="plastic">
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.578596, 0.578596, 0.578596" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="TabletopBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.025" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<texture name="diffuse_reflectance" type="bitmap">
+				<string name="filename" value="textures/Tabletop-light.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ChoppingBoardBSDF">
+		<bsdf type="diffuse">
+			<texture name="reflectance" type="bitmap">
+				<string name="filename" value="textures/Chopping-Board.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CupboardUnitsBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.547857, 0.547857, 0.547857" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BookCoverBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.0805638, 0.081309, 0.0801467" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="LeftPageBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.05" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<texture name="diffuse_reflectance" type="bitmap">
+				<string name="filename" value="textures/Kitchen-book-leftpage.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BookPagesBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.05" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<texture name="diffuse_reflectance" type="bitmap">
+				<string name="filename" value="textures/Kitchen-bookpage-large.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CarrotsBSDF">
+		<bsdf type="diffuse">
+			<texture name="reflectance" type="bitmap">
+				<string name="filename" value="textures/Kitchen-carrot-uv.png" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="TomatoesBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.592438, 0, 0.00293232" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Pepper-GreenBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.0302565, 0.197516, 0" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Pepper-YellowBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="1, 0.20471, 0" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Pepper-RedBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.476177, 0, 0" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="MushroomsBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.300837, 0.281435, 0.243189" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="SlicedMushromsBSDF">
+		<bsdf type="diffuse">
+			<texture name="reflectance" type="bitmap">
+				<string name="filename" value="textures/Kitchen-mushroom-texture.png" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ChoppingKnifeBladeBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.02" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="1, 1, 1" />
+			<rgb name="eta" value="4.36968, 2.9167, 1.6547" />
+			<rgb name="k" value="5.20643, 4.23136, 3.75495" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ChoppingKnifeHandleBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.028991, 0.028991, 0.028991" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ChoppingKnifeEdgeBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="1, 1, 1" />
+			<rgb name="eta" value="1.65746, 0.880369, 0.521229" />
+			<rgb name="k" value="9.22387, 6.26952, 4.837" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WhitePotBSDF">
+		<bsdf type="plastic">
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.578596, 0.578596, 0.578596" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WorktopsBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<texture name="diffuse_reflectance" type="bitmap">
+				<string name="filename" value="textures/Worktopt-light.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="TowelBSDF">
+		<bsdf type="diffuse">
+			<texture name="reflectance" type="bitmap">
+				<string name="filename" value="textures/Tea-Towel.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="TilesBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.394083, 0.325037, 0.263175" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WallSocketBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.571765, 0.563535, 0.559972" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CookerBlackBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.08" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.015396, 0.015396, 0.015396" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CookerIronBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.02" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.001373, 0.001373, 0.001373" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="dielectric" id="CookerGlassBSDF">
+		<float name="int_ior" value="1.5" />
+		<float name="ext_ior" value="1" />
+		<rgb name="specular_transmittance" value="0, 0, 0" />
+	</bsdf>
+	<bsdf type="twosided" id="CookerChromeBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="1, 1, 1" />
+			<rgb name="eta" value="4.36968, 2.9167, 1.6547" />
+			<rgb name="k" value="5.20643, 4.23136, 3.75495" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BushLogoBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="1, 1, 1" />
+			<rgb name="eta" value="1.65746, 0.880369, 0.521229" />
+			<rgb name="k" value="9.22387, 6.26952, 4.837" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RadioMetalRingBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="1, 1, 1" />
+			<rgb name="eta" value="4.36968, 2.9167, 1.6547" />
+			<rgb name="k" value="5.20643, 4.23136, 3.75495" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RadioDialBackBSDF">
+		<bsdf type="diffuse">
+			<texture name="reflectance" type="bitmap">
+				<string name="filename" value="textures/radio-dial-idea.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RadioDialLineBSDF">
+		<bsdf type="conductor">
+			<string name="material" value="none" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="dielectric" id="MicrowaveGlassBSDF">
+		<float name="int_ior" value="1.5" />
+		<float name="ext_ior" value="1" />
+		<rgb name="specular_transmittance" value="0, 0, 0" />
+	</bsdf>
+	<bsdf type="twosided" id="MicrowaveBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="0.578596, 0.578596, 0.578596" />
+			<rgb name="eta" value="1.65746, 0.880369, 0.521229" />
+			<rgb name="k" value="9.22387, 6.26952, 4.837" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="MicrowaveBackBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="0.578596, 0.578596, 0.578596" />
+			<rgb name="eta" value="1.65746, 0.880369, 0.521229" />
+			<rgb name="k" value="9.22387, 6.26952, 4.837" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="dielectric" id="MicrowaveDigitalBSDF">
+		<float name="int_ior" value="1.5" />
+		<float name="ext_ior" value="1" />
+		<rgb name="specular_transmittance" value="0, 0, 0" />
+	</bsdf>
+	<bsdf type="twosided" id="WindowFrameBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.572423, 0.572423, 0.572423" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BlindsBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.612066, 0.499505, 0.378676" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BlindStringKnobBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.578596, 0.578596, 0.578596" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BlindStringBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.217638, 0.217638, 0.217638" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WindowLockBSDF">
+		<bsdf type="conductor">
+			<string name="material" value="none" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="TableMatsBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.047366, 0.047366, 0.047366" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CutleryBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="1, 1, 1" />
+			<rgb name="eta" value="4.36968, 2.9167, 1.6547" />
+			<rgb name="k" value="5.20643, 4.23136, 3.75495" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="HomeBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.578596, 0.578596, 0.578596" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="bumpmap">
+		<texture name="map" type="bitmap">
+			<string name="filename" value="textures/cushion-bump.jpg" />
+			<string name="filter_type" value="bilinear" />
+		</texture>
+		<bsdf type="twosided" id="Cushion1BSDF">
+			<bsdf type="diffuse">
+				<texture name="reflectance" type="bitmap">
+					<string name="filename" value="textures/cushion-red.jpg" />
+					<string name="filter_type" value="bilinear" />
+				</texture>
+			</bsdf>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="TableCrossBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.612066, 0.612066, 0.612066" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="PotHandlesBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.00631, 0.00631, 0.00631" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="KettleBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.05" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="1, 1, 1" />
+			<rgb name="eta" value="4.36968, 2.9167, 1.6547" />
+			<rgb name="k" value="5.20643, 4.23136, 3.75495" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="KettleHandleBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.00631, 0.00631, 0.00631" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BurnersBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="0.578596, 0.578596, 0.578596" />
+			<rgb name="eta" value="1.65746, 0.880369, 0.521229" />
+			<rgb name="k" value="9.22387, 6.26952, 4.837" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BurnersTopBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.00631, 0.00631, 0.00631" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BreadBinHandleBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<rgb name="specular_reflectance" value="1, 1, 1" />
+			<rgb name="eta" value="4.36968, 2.9167, 1.6547" />
+			<rgb name="k" value="5.20643, 4.23136, 3.75495" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="bumpmap">
+		<texture name="map" type="bitmap">
+			<string name="filename" value="textures/bread-bin-front-bump.png" />
+			<string name="filter_type" value="bilinear" />
+		</texture>
+		<bsdf type="twosided" id="BreadBinFrontBSDF">
+			<bsdf type="diffuse">
+				<texture name="reflectance" type="bitmap">
+					<string name="filename" value="textures/Worktopt-light.jpg" />
+					<string name="filter_type" value="bilinear" />
+				</texture>
+			</bsdf>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BreadBinSidesBSDF">
+		<bsdf type="diffuse">
+			<texture name="reflectance" type="bitmap">
+				<string name="filename" value="textures/Worktopt-light.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BreadBinTopBSDF">
+		<bsdf type="diffuse">
+			<texture name="reflectance" type="bitmap">
+				<string name="filename" value="textures/Worktopt-light.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WoodTopBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<texture name="diffuse_reflectance" type="bitmap">
+				<string name="filename" value="textures/Tabletop-light.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CushionTiesBSDF">
+		<bsdf type="diffuse">
+			<texture name="reflectance" type="bitmap">
+				<string name="filename" value="textures/cushion-red.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CableBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.612066, 0.612066, 0.612066" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CeilingLightFittingBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.578596, 0.578596, 0.578596" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="FloorBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<texture name="diffuse_reflectance" type="bitmap">
+				<string name="filename" value="textures/wood.jpg" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CeilingBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.612066, 0.612066, 0.612066" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="MushroomEndsBSDF">
+		<bsdf type="diffuse">
+			<texture name="reflectance" type="bitmap">
+				<string name="filename" value="textures/Kitchen-mushroom-texture.png" />
+				<string name="filter_type" value="bilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="PepperStemsBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.136099, 0.284452, 0.00552174" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BulbBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0, 0, 0" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="GroutBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.79311, 0.79311, 0.79311" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="LampCableBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.479179, 0.479179, 0.479179" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="LampBSDF">
+		<bsdf type="roughplastic">
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="int_ior" value="1.5" />
+			<float name="ext_ior" value="1" />
+			<boolean name="nonlinear" value="false" />
+			<rgb name="diffuse_reflectance" value="0.541798, 0.297653, 0.0528416" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="LampInsideBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.578596, 0.578596, 0.578596" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WindowBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.571765, 0.563535, 0.559972" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="SkirtingBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.578913, 0.578913, 0.578913" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BlindEndsBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.047366, 0.047366, 0.047366" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BlindWoodStripBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.578596, 0.578596, 0.578596" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RadioEdgesBSDF">
+		<bsdf type="conductor">
+			<string name="material" value="none" />
+		</bsdf>
+	</bsdf>
+	<shape type="obj" id="WallSocket_0001">
+		<string name="filename" value="models/Mesh129.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WallSocketBSDF" />
+	</shape>
+	<shape type="obj" id="WindowLock">
+		<string name="filename" value="models/Mesh165.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WindowLockBSDF" />
+	</shape>
+	<shape type="obj" id="ExtractorHood_0001">
+		<string name="filename" value="models/Mesh263.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="ExtractorHoodBSDF" />
+	</shape>
+	<shape type="obj" id="CushionTies_0001">
+		<string name="filename" value="models/Mesh126.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CushionTiesBSDF" />
+	</shape>
+	<shape type="obj" id="CushionTies_0002">
+		<string name="filename" value="models/Mesh087.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CushionTiesBSDF" />
+	</shape>
+	<shape type="obj" id="CushionTies_0003">
+		<string name="filename" value="models/Mesh130.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CushionTiesBSDF" />
+	</shape>
+	<shape type="obj" id="Cable">
+		<string name="filename" value="models/Mesh088.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CableBSDF" />
+	</shape>
+	<shape type="obj" id="Cushion1_0001">
+		<string name="filename" value="models/Mesh124.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="Cushion1BSDF" />
+	</shape>
+	<shape type="obj" id="Cushion1_0002">
+		<string name="filename" value="models/Mesh136.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="Cushion1BSDF" />
+	</shape>
+	<shape type="obj" id="Cushion1_0003">
+		<string name="filename" value="models/Mesh251.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="Cushion1BSDF" />
+	</shape>
+	<shape type="obj" id="Cushion1_0004">
+		<string name="filename" value="models/Mesh164.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="Cushion1BSDF" />
+	</shape>
+	<shape type="obj" id="CeilingLightFitting">
+		<string name="filename" value="models/Mesh147.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CeilingLightFittingBSDF" />
+	</shape>
+	<shape type="obj" id="WallSocket_0002">
+		<string name="filename" value="models/Mesh171.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WallSocketBSDF" />
+	</shape>
+	<shape type="obj" id="BreadBinTop_0001">
+		<string name="filename" value="models/Mesh140.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BreadBinTopBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0001">
+		<string name="filename" value="models/Mesh172.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0002">
+		<string name="filename" value="models/Mesh113.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0003">
+		<string name="filename" value="models/Mesh139.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0004">
+		<string name="filename" value="models/Mesh174.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0005">
+		<string name="filename" value="models/Mesh144.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0006">
+		<string name="filename" value="models/Mesh175.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0007">
+		<string name="filename" value="models/Mesh247.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0008">
+		<string name="filename" value="models/Mesh083.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0009">
+		<string name="filename" value="models/Mesh178.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0010">
+		<string name="filename" value="models/Mesh167.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0011">
+		<string name="filename" value="models/Mesh183.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0012">
+		<string name="filename" value="models/Mesh099.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0013">
+		<string name="filename" value="models/Mesh284.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0014">
+		<string name="filename" value="models/Mesh173.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0015">
+		<string name="filename" value="models/Mesh184.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0016">
+		<string name="filename" value="models/Mesh155.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0017">
+		<string name="filename" value="models/Mesh159.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0018">
+		<string name="filename" value="models/Mesh232.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0019">
+		<string name="filename" value="models/Mesh121.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0020">
+		<string name="filename" value="models/Mesh278.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0021">
+		<string name="filename" value="models/Mesh120.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0022">
+		<string name="filename" value="models/Mesh235.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0023">
+		<string name="filename" value="models/Mesh243.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0024">
+		<string name="filename" value="models/Mesh117.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0025">
+		<string name="filename" value="models/Mesh157.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0026">
+		<string name="filename" value="models/Mesh116.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0027">
+		<string name="filename" value="models/Mesh207.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0028">
+		<string name="filename" value="models/Mesh107.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0029">
+		<string name="filename" value="models/Mesh112.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0030">
+		<string name="filename" value="models/Mesh287.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0031">
+		<string name="filename" value="models/Mesh105.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0032">
+		<string name="filename" value="models/Mesh103.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0033">
+		<string name="filename" value="models/Mesh102.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0034">
+		<string name="filename" value="models/Mesh100.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0035">
+		<string name="filename" value="models/Mesh095.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0036">
+		<string name="filename" value="models/Mesh098.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0037">
+		<string name="filename" value="models/Mesh259.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0038">
+		<string name="filename" value="models/Mesh143.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0039">
+		<string name="filename" value="models/Mesh255.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0040">
+		<string name="filename" value="models/Mesh128.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0041">
+		<string name="filename" value="models/Mesh150.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0042">
+		<string name="filename" value="models/Mesh200.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0043">
+		<string name="filename" value="models/Mesh085.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0044">
+		<string name="filename" value="models/Mesh114.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0045">
+		<string name="filename" value="models/Mesh182.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0046">
+		<string name="filename" value="models/Mesh082.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0047">
+		<string name="filename" value="models/Mesh106.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0048">
+		<string name="filename" value="models/Mesh132.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="Tabletop">
+		<string name="filename" value="models/Mesh166.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TabletopBSDF" />
+	</shape>
+	<shape type="obj" id="WoodTop_0001">
+		<string name="filename" value="models/Mesh161.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WoodTopBSDF" />
+	</shape>
+	<shape type="obj" id="ExtractorHood_0002">
+		<string name="filename" value="models/Mesh137.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="ExtractorHoodBSDF" />
+	</shape>
+	<shape type="obj" id="Tiles_0001">
+		<string name="filename" value="models/Mesh145.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TilesBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0001">
+		<string name="filename" value="models/Mesh133.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0001">
+		<string name="filename" value="models/Mesh074.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0002">
+		<string name="filename" value="models/Mesh068.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0003">
+		<string name="filename" value="models/Mesh125.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0004">
+		<string name="filename" value="models/Mesh079.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0002">
+		<string name="filename" value="models/Mesh169.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0005">
+		<string name="filename" value="models/Mesh093.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0006">
+		<string name="filename" value="models/Mesh097.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0007">
+		<string name="filename" value="models/Mesh181.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0008">
+		<string name="filename" value="models/Mesh260.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0003">
+		<string name="filename" value="models/Mesh274.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0004">
+		<string name="filename" value="models/Mesh066.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0009">
+		<string name="filename" value="models/Mesh141.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CookerIron">
+		<string name="filename" value="models/Mesh238.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerIronBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0005">
+		<string name="filename" value="models/Mesh076.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="CookerBlack_0001">
+		<string name="filename" value="models/Mesh177.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerBlackBSDF" />
+	</shape>
+	<shape type="obj" id="CookerChrome_0001">
+		<string name="filename" value="models/Mesh185.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerChromeBSDF" />
+	</shape>
+	<shape type="obj" id="CookerChrome_0002">
+		<string name="filename" value="models/Mesh186.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerChromeBSDF" />
+	</shape>
+	<shape type="obj" id="CookerBlack_0002">
+		<string name="filename" value="models/Mesh188.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerBlackBSDF" />
+	</shape>
+	<shape type="obj" id="CookerChrome_0003">
+		<string name="filename" value="models/Mesh189.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerChromeBSDF" />
+	</shape>
+	<shape type="obj" id="CookerBlack_0003">
+		<string name="filename" value="models/Mesh115.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerBlackBSDF" />
+	</shape>
+	<shape type="obj" id="LeftPage">
+		<string name="filename" value="models/Mesh162.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="LeftPageBSDF" />
+	</shape>
+	<shape type="obj" id="BreadBinSides_0001">
+		<string name="filename" value="models/Mesh134.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BreadBinSidesBSDF" />
+	</shape>
+	<shape type="obj" id="BreadBinHandle">
+		<string name="filename" value="models/Mesh192.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BreadBinHandleBSDF" />
+	</shape>
+	<shape type="obj" id="BreadBinTop_0002">
+		<string name="filename" value="models/Mesh131.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BreadBinTopBSDF" />
+	</shape>
+	<shape type="obj" id="BreadBinSides_0002">
+		<string name="filename" value="models/Mesh077.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BreadBinSidesBSDF" />
+	</shape>
+	<shape type="obj" id="BreadBinFront">
+		<string name="filename" value="models/Mesh229.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BreadBinFrontBSDF" />
+	</shape>
+	<shape type="obj" id="PotHandles_0001">
+		<string name="filename" value="models/Mesh281.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="PotHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="SteelPot_0001">
+		<string name="filename" value="models/Mesh194.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SteelPotBSDF" />
+	</shape>
+	<shape type="obj" id="SlicedMushroms_0001">
+		<string name="filename" value="models/Mesh195.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SlicedMushromsBSDF" />
+	</shape>
+	<shape type="obj" id="SlicedMushroms_0002">
+		<string name="filename" value="models/Mesh104.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SlicedMushromsBSDF" />
+	</shape>
+	<shape type="obj" id="SlicedMushroms_0003">
+		<string name="filename" value="models/Mesh196.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SlicedMushromsBSDF" />
+	</shape>
+	<shape type="obj" id="SlicedMushroms_0004">
+		<string name="filename" value="models/Mesh197.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SlicedMushromsBSDF" />
+	</shape>
+	<shape type="obj" id="SlicedMushroms_0005">
+		<string name="filename" value="models/Mesh256.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SlicedMushromsBSDF" />
+	</shape>
+	<shape type="obj" id="SlicedMushroms_0006">
+		<string name="filename" value="models/Mesh081.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SlicedMushromsBSDF" />
+	</shape>
+	<shape type="obj" id="SlicedMushroms_0007">
+		<string name="filename" value="models/Mesh209.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SlicedMushromsBSDF" />
+	</shape>
+	<shape type="obj" id="SlicedMushroms_0008">
+		<string name="filename" value="models/Mesh210.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SlicedMushromsBSDF" />
+	</shape>
+	<shape type="obj" id="Carrots_0001">
+		<string name="filename" value="models/Mesh211.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CarrotsBSDF" />
+	</shape>
+	<shape type="obj" id="Carrots_0002">
+		<string name="filename" value="models/Mesh213.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CarrotsBSDF" />
+	</shape>
+	<shape type="obj" id="Carrots_0003">
+		<string name="filename" value="models/Mesh216.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CarrotsBSDF" />
+	</shape>
+	<shape type="obj" id="Carrots_0004">
+		<string name="filename" value="models/Mesh146.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CarrotsBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0049">
+		<string name="filename" value="models/Mesh219.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0050">
+		<string name="filename" value="models/Mesh220.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0051">
+		<string name="filename" value="models/Mesh221.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0052">
+		<string name="filename" value="models/Mesh268.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0053">
+		<string name="filename" value="models/Mesh223.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0054">
+		<string name="filename" value="models/Mesh227.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0055">
+		<string name="filename" value="models/Mesh199.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0056">
+		<string name="filename" value="models/Mesh271.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0057">
+		<string name="filename" value="models/Mesh233.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0058">
+		<string name="filename" value="models/Mesh202.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0059">
+		<string name="filename" value="models/Mesh230.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0060">
+		<string name="filename" value="models/Mesh240.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0061">
+		<string name="filename" value="models/Mesh176.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0062">
+		<string name="filename" value="models/Mesh234.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="TableCross_0063">
+		<string name="filename" value="models/Mesh142.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="TableCrossBSDF" />
+	</shape>
+	<shape type="obj" id="Worktops_0001">
+		<string name="filename" value="models/Mesh069.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WorktopsBSDF" />
+	</shape>
+	<shape type="obj" id="Worktops_0002">
+		<string name="filename" value="models/Mesh236.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WorktopsBSDF" />
+	</shape>
+	<shape type="obj" id="Floor">
+		<string name="filename" value="models/Mesh135.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="FloorBSDF" />
+	</shape>
+	<shape type="obj" id="Ceiling">
+		<string name="filename" value="models/Mesh153.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CeilingBSDF" />
+	</shape>
+	<shape type="obj" id="Walls_0001">
+		<string name="filename" value="models/Mesh239.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WallsBSDF" />
+	</shape>
+	<shape type="obj" id="Tomatoes">
+		<string name="filename" value="models/Mesh242.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TomatoesBSDF" />
+	</shape>
+	<shape type="obj" id="MushroomEnds_0001">
+		<string name="filename" value="models/Mesh244.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MushroomEndsBSDF" />
+	</shape>
+	<shape type="obj" id="MushroomEnds_0002">
+		<string name="filename" value="models/Mesh249.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MushroomEndsBSDF" />
+	</shape>
+	<shape type="obj" id="SlicedMushroms_0009">
+		<string name="filename" value="models/Mesh075.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SlicedMushromsBSDF" />
+	</shape>
+	<shape type="obj" id="Mushrooms">
+		<string name="filename" value="models/Mesh291.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MushroomsBSDF" />
+	</shape>
+	<shape type="obj" id="Pepper-Yellow">
+		<string name="filename" value="models/Mesh254.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="Pepper-YellowBSDF" />
+	</shape>
+	<shape type="obj" id="PepperStems_0001">
+		<string name="filename" value="models/Mesh257.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="PepperStemsBSDF" />
+	</shape>
+	<shape type="obj" id="Pepper-Green">
+		<string name="filename" value="models/Mesh258.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="Pepper-GreenBSDF" />
+	</shape>
+	<shape type="obj" id="PepperStems_0002">
+		<string name="filename" value="models/Mesh089.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="PepperStemsBSDF" />
+	</shape>
+	<shape type="obj" id="Pepper-Red">
+		<string name="filename" value="models/Mesh261.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="Pepper-RedBSDF" />
+	</shape>
+	<shape type="obj" id="PepperStems_0003">
+		<string name="filename" value="models/Mesh119.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="PepperStemsBSDF" />
+	</shape>
+	<shape type="obj" id="PepperStems_0004">
+		<string name="filename" value="models/Mesh264.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="PepperStemsBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0001">
+		<string name="filename" value="models/Mesh127.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0002">
+		<string name="filename" value="models/Mesh091.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0003">
+		<string name="filename" value="models/Mesh225.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0004">
+		<string name="filename" value="models/Mesh266.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0005">
+		<string name="filename" value="models/Mesh190.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0006">
+		<string name="filename" value="models/Mesh245.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0007">
+		<string name="filename" value="models/Mesh267.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0008">
+		<string name="filename" value="models/Mesh179.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0009">
+		<string name="filename" value="models/Mesh269.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0010">
+		<string name="filename" value="models/Mesh270.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0011">
+		<string name="filename" value="models/Mesh214.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="Cutlery_0012">
+		<string name="filename" value="models/Mesh108.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CutleryBSDF" />
+	</shape>
+	<shape type="obj" id="SteelPot_0002">
+		<string name="filename" value="models/Mesh080.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SteelPotBSDF" />
+	</shape>
+	<shape type="obj" id="PotHandles_0002">
+		<string name="filename" value="models/Mesh272.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="PotHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="KettleHandle_0001">
+		<string name="filename" value="models/Mesh273.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="KettleHandleBSDF" />
+	</shape>
+	<shape type="obj" id="KettleHandle_0002">
+		<string name="filename" value="models/Mesh275.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="KettleHandleBSDF" />
+	</shape>
+	<shape type="obj" id="KettleGreen">
+		<string name="filename" value="models/Mesh086.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="KettleGreenBSDF" />
+	</shape>
+	<shape type="obj" id="Kettle">
+		<string name="filename" value="models/Mesh241.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="KettleBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0001">
+		<string name="filename" value="models/Mesh222.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0002">
+		<string name="filename" value="models/Mesh276.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0003">
+		<string name="filename" value="models/Mesh279.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0004">
+		<string name="filename" value="models/Mesh248.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0005">
+		<string name="filename" value="models/Mesh282.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0006">
+		<string name="filename" value="models/Mesh277.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0007">
+		<string name="filename" value="models/Mesh180.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0008">
+		<string name="filename" value="models/Mesh285.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0009">
+		<string name="filename" value="models/Mesh170.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0010">
+		<string name="filename" value="models/Mesh293.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0011">
+		<string name="filename" value="models/Mesh215.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0012">
+		<string name="filename" value="models/Mesh252.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0013">
+		<string name="filename" value="models/Mesh204.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0014">
+		<string name="filename" value="models/Mesh286.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0015">
+		<string name="filename" value="models/Mesh096.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0016">
+		<string name="filename" value="models/Mesh288.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0017">
+		<string name="filename" value="models/Mesh253.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="Utensils_0018">
+		<string name="filename" value="models/Mesh109.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="UtensilsBSDF" />
+	</shape>
+	<shape type="obj" id="MicrowaveBack">
+		<string name="filename" value="models/Mesh289.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MicrowaveBackBSDF" />
+	</shape>
+	<shape type="obj" id="Microwave_0001">
+		<string name="filename" value="models/Mesh152.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MicrowaveBSDF" />
+	</shape>
+	<shape type="obj" id="Microwave_0002">
+		<string name="filename" value="models/Mesh226.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MicrowaveBSDF" />
+	</shape>
+	<shape type="obj" id="Microwave_0003">
+		<string name="filename" value="models/Mesh290.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MicrowaveBSDF" />
+	</shape>
+	<shape type="obj" id="Microwave_0004">
+		<string name="filename" value="models/Mesh292.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MicrowaveBSDF" />
+	</shape>
+	<shape type="obj" id="Microwave_0005">
+		<string name="filename" value="models/Mesh208.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MicrowaveBSDF" />
+	</shape>
+	<shape type="obj" id="MicrowaveGlass">
+		<string name="filename" value="models/Mesh191.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="MicrowaveGlassBSDF" />
+	</shape>
+	<shape type="obj" id="MicrowaveDigital">
+		<string name="filename" value="models/Mesh201.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MicrowaveDigitalBSDF" />
+	</shape>
+	<shape type="obj" id="Microwave_0006">
+		<string name="filename" value="models/Mesh294.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MicrowaveBSDF" />
+	</shape>
+
+	<shape type="obj" id="TableMats">
+		<string name="filename" value="models/Mesh064.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TableMatsBSDF" />
+	</shape>
+	<shape type="obj" id="Plates">
+		<string name="filename" value="models/Mesh094.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="PlatesBSDF" />
+	</shape>
+	<shape type="obj" id="BookPages_0001">
+		<string name="filename" value="models/Mesh063.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BookPagesBSDF" />
+	</shape>
+	<shape type="obj" id="BookCover">
+		<string name="filename" value="models/Mesh062.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BookCoverBSDF" />
+	</shape>
+	<shape type="obj" id="BookPages_0002">
+		<string name="filename" value="models/Mesh092.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BookPagesBSDF" />
+	</shape>
+	<shape type="obj" id="ChoppingKnifeBlade">
+		<string name="filename" value="models/Mesh061.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="ChoppingKnifeBladeBSDF" />
+	</shape>
+	<shape type="obj" id="ChoppingKnifeHandle">
+		<string name="filename" value="models/Mesh059.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="ChoppingKnifeHandleBSDF" />
+	</shape>
+	<shape type="obj" id="ChoppingKnifeEdge">
+		<string name="filename" value="models/Mesh058.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="ChoppingKnifeEdgeBSDF" />
+	</shape>
+	<shape type="obj" id="ChoppingBoard">
+		<string name="filename" value="models/Mesh057.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="ChoppingBoardBSDF" />
+	</shape>
+	<shape type="obj" id="WallSocket_0003">
+		<string name="filename" value="models/Mesh056.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WallSocketBSDF" />
+	</shape>
+	<shape type="obj" id="Bulb">
+		<string name="filename" value="models/Mesh055.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BulbBSDF" />
+	</shape>
+	<shape type="obj" id="Grout">
+		<string name="filename" value="models/Mesh138.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="GroutBSDF" />
+	</shape>
+	<shape type="obj" id="WoodTop_0002">
+		<string name="filename" value="models/Mesh224.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WoodTopBSDF" />
+	</shape>
+	<shape type="obj" id="Tiles_0002">
+		<string name="filename" value="models/Mesh054.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TilesBSDF" />
+	</shape>
+	<shape type="obj" id="LampCable">
+		<string name="filename" value="models/Mesh053.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="LampCableBSDF" />
+	</shape>
+	<shape type="obj" id="Lamp">
+		<string name="filename" value="models/Mesh052.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="LampBSDF" />
+	</shape>
+	<shape type="obj" id="LampInside">
+		<string name="filename" value="models/Mesh050.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="LampInsideBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0001">
+		<string name="filename" value="models/Mesh049.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="Window_0001">
+		<string name="filename" value="models/Mesh163.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WindowBSDF" />
+	</shape>
+	<shape type="obj" id="Window_0002">
+		<string name="filename" value="models/Mesh154.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WindowBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0006">
+		<string name="filename" value="models/Mesh078.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0010">
+		<string name="filename" value="models/Mesh246.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0002">
+		<string name="filename" value="models/Mesh048.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0003">
+		<string name="filename" value="models/Mesh047.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0004">
+		<string name="filename" value="models/Mesh046.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0005">
+		<string name="filename" value="models/Mesh045.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0006">
+		<string name="filename" value="models/Mesh044.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0007">
+		<string name="filename" value="models/Mesh043.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0008">
+		<string name="filename" value="models/Mesh041.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0009">
+		<string name="filename" value="models/Mesh193.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0010">
+		<string name="filename" value="models/Mesh040.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0011">
+		<string name="filename" value="models/Mesh218.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="WindowFrame_0012">
+		<string name="filename" value="models/Mesh039.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WindowFrameBSDF" />
+	</shape>
+	<shape type="obj" id="Skirting">
+		<string name="filename" value="models/Mesh187.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="SkirtingBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0007">
+		<string name="filename" value="models/Mesh073.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0008">
+		<string name="filename" value="models/Mesh042.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0009">
+		<string name="filename" value="models/Mesh037.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0010">
+		<string name="filename" value="models/Mesh035.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0011">
+		<string name="filename" value="models/Mesh034.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="MetalHandles_0012">
+		<string name="filename" value="models/Mesh033.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="MetalHandlesBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0011">
+		<string name="filename" value="models/Mesh038.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0012">
+		<string name="filename" value="models/Mesh072.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0013">
+		<string name="filename" value="models/Mesh231.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="SmallWorktop_0001">
+		<string name="filename" value="models/Mesh032.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="SmallWorktopBSDF" />
+	</shape>
+	<shape type="obj" id="SmallWorktop_0002">
+		<string name="filename" value="models/Mesh031.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="SmallWorktopBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0014">
+		<string name="filename" value="models/Mesh030.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0015">
+		<string name="filename" value="models/Mesh029.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="Burners_0001">
+		<string name="filename" value="models/Mesh028.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersBSDF" />
+	</shape>
+	<shape type="obj" id="BurnersTop_0001">
+		<string name="filename" value="models/Mesh027.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersTopBSDF" />
+	</shape>
+	<shape type="obj" id="Burners_0002">
+		<string name="filename" value="models/Mesh198.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersBSDF" />
+	</shape>
+	<shape type="obj" id="BurnersTop_0002">
+		<string name="filename" value="models/Mesh026.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersTopBSDF" />
+	</shape>
+	<shape type="obj" id="Burners_0003">
+		<string name="filename" value="models/Mesh071.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersBSDF" />
+	</shape>
+	<shape type="obj" id="BurnersTop_0003">
+		<string name="filename" value="models/Mesh149.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersTopBSDF" />
+	</shape>
+	<shape type="obj" id="Burners_0004">
+		<string name="filename" value="models/Mesh025.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersBSDF" />
+	</shape>
+	<shape type="obj" id="BurnersTop_0004">
+		<string name="filename" value="models/Mesh203.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersTopBSDF" />
+	</shape>
+	<shape type="obj" id="Burners_0005">
+		<string name="filename" value="models/Mesh024.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersBSDF" />
+	</shape>
+	<shape type="obj" id="BurnersTop_0005">
+		<string name="filename" value="models/Mesh023.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersTopBSDF" />
+	</shape>
+	<shape type="obj" id="Burners_0006">
+		<string name="filename" value="models/Mesh022.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersBSDF" />
+	</shape>
+	<shape type="obj" id="BurnersTop_0006">
+		<string name="filename" value="models/Mesh020.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BurnersTopBSDF" />
+	</shape>
+	<shape type="obj" id="CookerBlack_0004">
+		<string name="filename" value="models/Mesh084.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerBlackBSDF" />
+	</shape>
+	<shape type="obj" id="CookerChrome_0004">
+		<string name="filename" value="models/Mesh019.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerChromeBSDF" />
+	</shape>
+	<shape type="obj" id="CookerChrome_0005">
+		<string name="filename" value="models/Mesh017.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerChromeBSDF" />
+	</shape>
+	<shape type="obj" id="CookerBlack_0005">
+		<string name="filename" value="models/Mesh280.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerBlackBSDF" />
+	</shape>
+	<shape type="obj" id="CookerBlack_0006">
+		<string name="filename" value="models/Mesh015.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerBlackBSDF" />
+	</shape>
+	<shape type="obj" id="CookerChrome_0006">
+		<string name="filename" value="models/Mesh014.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerChromeBSDF" />
+	</shape>
+	<shape type="obj" id="CookerBlack_0007">
+		<string name="filename" value="models/Mesh090.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerBlackBSDF" />
+	</shape>
+	<shape type="obj" id="CookerGlass">
+		<string name="filename" value="models/Mesh206.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="CookerGlassBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0016">
+		<string name="filename" value="models/Mesh228.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0017">
+		<string name="filename" value="models/Mesh111.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="ExtractorHood_0003">
+		<string name="filename" value="models/Mesh168.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="ExtractorHoodBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0018">
+		<string name="filename" value="models/Mesh148.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0019">
+		<string name="filename" value="models/Mesh013.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0020">
+		<string name="filename" value="models/Mesh012.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="Worktops_0003">
+		<string name="filename" value="models/Mesh158.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WorktopsBSDF" />
+	</shape>
+	<shape type="obj" id="Worktops_0004">
+		<string name="filename" value="models/Mesh237.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WorktopsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0021">
+		<string name="filename" value="models/Mesh011.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="CupboardUnits_0022">
+		<string name="filename" value="models/Mesh018.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="CupboardUnitsBSDF" />
+	</shape>
+	<shape type="obj" id="Walls_0002">
+		<string name="filename" value="models/Mesh262.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WallsBSDF" />
+	</shape>
+	<shape type="obj" id="Walls_0003">
+		<string name="filename" value="models/Mesh010.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="WallsBSDF" />
+	</shape>
+	<shape type="obj" id="BlindEnds_0001">
+		<string name="filename" value="models/Mesh212.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="BlindEndsBSDF" />
+	</shape>
+	<shape type="obj" id="BlindStringKnob">
+		<string name="filename" value="models/Mesh156.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BlindStringKnobBSDF" />
+	</shape>
+	<shape type="obj" id="BlindString">
+		<string name="filename" value="models/Mesh151.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BlindStringBSDF" />
+	</shape>
+	<shape type="obj" id="BlindWoodStrip">
+		<string name="filename" value="models/Mesh009.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="BlindWoodStripBSDF" />
+	</shape>
+	<shape type="obj" id="Blinds_0001">
+		<string name="filename" value="models/Mesh110.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="BlindsBSDF" />
+	</shape>
+	<shape type="obj" id="BlindEnds_0002">
+		<string name="filename" value="models/Mesh118.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="BlindEndsBSDF" />
+	</shape>
+	<shape type="obj" id="BlindEnds_0003">
+		<string name="filename" value="models/Mesh008.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="BlindEndsBSDF" />
+	</shape>
+	<shape type="obj" id="Blinds_0002">
+		<string name="filename" value="models/Mesh007.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BlindsBSDF" />
+	</shape>
+	<shape type="obj" id="RadioHandle">
+		<string name="filename" value="models/Mesh250.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioHandleBSDF" />
+	</shape>
+	<shape type="obj" id="RadioPlastic_0001">
+		<string name="filename" value="models/Mesh021.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioPlasticBSDF" />
+	</shape>
+	<shape type="obj" id="BushLogo_0001">
+		<string name="filename" value="models/Mesh205.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="BushLogoBSDF" />
+	</shape>
+	<shape type="obj" id="BushLogo_0002">
+		<string name="filename" value="models/Mesh067.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="BushLogoBSDF" />
+	</shape>
+	<shape type="obj" id="RadioDialLine">
+		<string name="filename" value="models/Mesh283.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<boolean name="face_normals" value="true" />
+		<ref id="RadioDialLineBSDF" />
+	</shape>
+	<shape type="obj" id="RadioDialBack">
+		<string name="filename" value="models/Mesh005.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioDialBackBSDF" />
+	</shape>
+	<shape type="obj" id="RadioMetalRing">
+		<string name="filename" value="models/Mesh016.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioMetalRingBSDF" />
+	</shape>
+	<shape type="obj" id="RadioGlass">
+		<string name="filename" value="models/Mesh265.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioGlassBSDF" />
+	</shape>
+	<shape type="obj" id="RadioPlastic_0002">
+		<string name="filename" value="models/Mesh006.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioPlasticBSDF" />
+	</shape>
+	<shape type="obj" id="RadioPlastic_0003">
+		<string name="filename" value="models/Mesh004.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioPlasticBSDF" />
+	</shape>
+	<shape type="obj" id="ChromeHandle">
+		<string name="filename" value="models/Mesh060.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="ChromeHandleBSDF" />
+	</shape>
+	<shape type="obj" id="RadioPlastic_0004">
+		<string name="filename" value="models/Mesh123.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioPlasticBSDF" />
+	</shape>
+	<shape type="obj" id="RadioInside">
+		<string name="filename" value="models/Mesh160.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioInsideBSDF" />
+	</shape>
+	<shape type="obj" id="RadioKnob">
+		<string name="filename" value="models/Mesh051.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioKnobBSDF" />
+	</shape>
+	<shape type="obj" id="RadioSurround">
+		<string name="filename" value="models/Mesh003.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioSurroundBSDF" />
+	</shape>
+	<shape type="obj" id="RadioEdges_0001">
+		<string name="filename" value="models/Mesh002.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioEdgesBSDF" />
+	</shape>
+	<shape type="obj" id="RadioEdges_0002">
+		<string name="filename" value="models/Mesh001.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="RadioEdgesBSDF" />
+	</shape>
+	<shape type="obj" id="WhitePot">
+		<string name="filename" value="models/Mesh036.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WhitePotBSDF" />
+	</shape>
+	<shape type="obj" id="Towel_0001">
+		<string name="filename" value="models/Mesh070.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TowelBSDF" />
+	</shape>
+	<shape type="obj" id="Towel_0002">
+		<string name="filename" value="models/Mesh101.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="TowelBSDF" />
+	</shape>
+	<shape type="obj" id="WallSocket_0004">
+		<string name="filename" value="models/Mesh000.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="WallSocketBSDF" />
+	</shape>
+	<shape type="obj" id="Home">
+		<string name="filename" value="models/Mesh217.obj" />
+		<transform name="to_world">
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1" />
+		</transform>
+		<ref id="HomeBSDF" />
+	</shape>
+	<shape type="rectangle">
+		<transform name="to_world">
+			<matrix value="0.811764 1.25471e-014 5.48452e-022 0.060314 -9.254e-015 1.10064 6.63724e-009 1.97379 0 5.90839e-008 0.549328 -3.1173 0 0 0 1" />
+		</transform>
+		<bsdf type="twosided">
+			<bsdf type="diffuse">
+				<rgb name="reflectance" value="0, 0, 0" />
+			</bsdf>
+		</bsdf>
+		<emitter type="area" id="window_area_emitter">
+			<rgb name="radiance" value="16.032, 16.032, 16.032" />
+		</emitter>
+	</shape>
+	<shape type="rectangle">
+		<transform name="to_world">
+			<matrix value="-0.0290284 3.30012e-015 -7.54979e-008 -2.38843 4.38317e-009 2.18557e-008 -0.5 1.6129 0 -0.244301 -1.06788e-008 -1.04852 0 0 0 1" />
+		</transform>
+		<bsdf type="twosided">
+			<bsdf type="diffuse">
+				<rgb name="reflectance" value="0, 0, 0" />
+			</bsdf>
+		</bsdf>
+		<emitter type="area" id="lamp_oven_0">
+			<rgb name="radiance" value="11.2212, 11.2212, 11.2212" />
+		</emitter>
+	</shape>
+	<shape type="rectangle">
+		<transform name="to_world">
+			<matrix value="-0.0290284 3.30012e-015 -7.54979e-008 -2.38843 4.38317e-009 2.18557e-008 -0.5 1.6129 0 -0.244301 -1.06788e-008 -1.58497 0 0 0 1" />
+		</transform>
+		<bsdf type="twosided">
+			<bsdf type="diffuse">
+				<rgb name="reflectance" value="0, 0, 0" />
+			</bsdf>
+		</bsdf>
+		<emitter type="area" id="lamp_oven_1">
+			<rgb name="radiance" value="11.2212, 11.2212, 11.2212" />
+		</emitter>
+	</shape>
+	<shape type="rectangle">
+		<transform name="to_world">
+			<matrix value="-0.0290284 3.30012e-015 -7.54979e-008 -2.38843 4.38317e-009 2.18557e-008 -0.5 1.6129 0 -0.244301 -1.06788e-008 -2.14209 0 0 0 1" />
+		</transform>
+		<bsdf type="twosided">
+			<bsdf type="diffuse">
+				<rgb name="reflectance" value="0, 0, 0" />
+			</bsdf>
+		</bsdf>
+		<emitter type="area" id="lamp_oven_2">
+			<rgb name="radiance" value="11.2212, 11.2212, 11.2212" />
+		</emitter>
+	</shape>
+</scene>

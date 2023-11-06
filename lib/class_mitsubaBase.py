@@ -88,6 +88,9 @@ class mitsubaBase(scene2DBase):
         self.ceiling_loc = None
         self.floor_loc = None
         
+        self.scene_scale = self.CONF.scene_params_dict.get('scene_scale', 1.)
+        self.invalid_shape_stem_list = self.CONF.scene_params_dict.get('invalid_shape_stem_list', [])
+        
         # self.extra_transform = self.CONF.scene_params_dict.get('extra_transform', None)
         # if self.extra_transform is not None:
         #     # self.extra_transform = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=np.float32) # y=z, z=x, x=y

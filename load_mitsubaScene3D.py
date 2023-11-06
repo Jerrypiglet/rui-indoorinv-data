@@ -1,11 +1,20 @@
 '''
-Works with Indoor Synthetic scenes.
+Works with
+- Indoor Synthetic scenes;
+- Evermotion scenes exported to BlendeMitsuba format (via Blender).
 
-Export train and val to MonoSDF format:
-    
+Examples:
 
+- Export indoor_synthetic scenes train and val to MonoSDF format:
+
+> python load_mitsubaScene3D.py --scene kitchen_mi --export --export_format monosdf --export_appendix _fipt --split train --vis_3d_o3d False --force           
+
+- Load Evermotion scenes:
+
+> python load_mitsubaScene3D.py --DATASET Evermotion --scene AI55_004
 
 '''
+
 import sys
 from pathlib import Path
 
@@ -81,13 +90,13 @@ parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=Fal
 
 # === after refactorization
 parser.add_argument('--scene', type=str, default='kitchen', help='load conf file: confs/indoor_synthetic/\{opt.scene\}.conf')
+parser.add_argument('--DATASET', type=str, default='indoor_synthetic', help='load conf file: confs/\{DATASET\}')
 
 opt = parser.parse_args()
 
-DATASET = 'indoor_synthetic'
-conf_base_path = Path('confs/%s.conf'%DATASET); check_exists(conf_base_path)
+conf_base_path = Path('confs/%s.conf'%opt.DATASET); check_exists(conf_base_path)
 CONF = ConfigFactory.parse_file(str(conf_base_path))
-conf_scene_path = Path('confs/%s/%s.conf'%(DATASET, opt.scene)); check_exists(conf_scene_path)
+conf_scene_path = Path('confs/%s/%s.conf'%(opt.DATASET, opt.scene)); check_exists(conf_scene_path)
 conf_scene = ConfigFactory.parse_file(str(conf_scene_path))
 CONF = ConfigTree.merge_configs(CONF, conf_scene)
 
@@ -142,16 +151,16 @@ scene_obj = mitsubaScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
-        'im_hdr', 
-        'im_sdr', 
-        'poses', 
+        # 'im_hdr', 
+        # 'im_sdr', 
+        # 'poses', 
         # 'lighting_envmap', 
         # 'albedo', 'roughness', 
         # 'emission', 
         # 'depth', 'normal', 
         'shapes', # objs + emitters, geometry shapes + emitter properties``
         'layout', 
-        'tsdf', 
+        # 'tsdf', 
         ], 
 )
 
@@ -336,11 +345,11 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
         scene_obj, 
         modality_list_vis=[
-            'poses', 
+            # 'poses', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             'layout', 
             'mi', # mitsuba sampled rays, pts
-            'tsdf', 
+            # 'tsdf', 
             # 'dense_geo', # fused from 2D
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
@@ -403,13 +412,14 @@ if opt.vis_3d_o3d:
         shapes_params={
             # 'simply_mesh_ratio_vis': 1., # simply num of triangles to #triangles * simply_mesh_ratio_vis
             'if_meshes': True, # [OPTIONAL] if show meshes for objs + emitters (False: only show bboxes)
-            'if_labels': False, # [OPTIONAL] if show labels (False: only show bboxes)
+            'if_labels': True, # [OPTIONAL] if show labels (False: only show bboxes)
             'if_voxel_volume': False, # [OPTIONAL] if show unit size voxel grid from shape occupancy: images/demo_shapes_voxel_o3d.png; USEFUL WHEN NEED TO CHECK SCENE SCALE (1 voxel = 1 meter)
 
-            'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
-            'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
-            # 'if_ceiling': False, 
-            # 'if_walls': False, 
+            # 'if_ceiling': True if opt.eval_scene else False, # [OPTIONAL] remove ceiling meshes to better see the furniture 
+            # 'if_walls': True if opt.eval_scene else False, # [OPTIONAL] remove wall meshes to better see the furniture 
+            'if_ceiling': True, 
+            'if_walls': False, 
+            'if_floor': True, 
 
             'if_sampled_pts': False, # [OPTIONAL] is show samples pts from scene_obj.sample_pts_list if available
             'mesh_color_type': 'eval-', # ['obj_color', 'face_normal', 'eval-' ('rad', 'emission_mask', 'vis_count', 't')]

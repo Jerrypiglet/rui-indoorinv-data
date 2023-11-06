@@ -689,6 +689,7 @@ class visualizer_scene_3D_o3d(object):
 
     def collect_layout(self, layout_params: dict={}):
         '''
+        safe space for sampling poses; in BLUE
         images/demo_layout_o3d.png
         '''
         if not self.os.if_has_layout:
@@ -705,7 +706,7 @@ class visualizer_scene_3D_o3d(object):
         layout_bbox_3d = self.os.layout_box_3d_transformed
         layout_bbox_pcd = o3d.geometry.LineSet()
         layout_bbox_pcd.points = o3d.utility.Vector3dVector(layout_bbox_3d)
-        layout_bbox_pcd.colors = o3d.utility.Vector3dVector([[1,0,0] for i in range(12)]) # RED
+        layout_bbox_pcd.colors = o3d.utility.Vector3dVector([[0,0,1] for i in range(12)]) # BLUE
         layout_bbox_pcd.lines = o3d.utility.Vector2iVector([[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])
 
         return return_list + [layout_bbox_pcd]
@@ -744,8 +745,10 @@ class visualizer_scene_3D_o3d(object):
         if_emitter_meshes = shapes_params.get('if_meshes', True) and self.os.CONF.shape_params_dict.get('if_load_emitter_mesh', False)
         if_ceiling = shapes_params.get('if_ceiling', False)
         if not if_ceiling:
-            assert self.os.if_has_ceilling_floor, 'scene object has no detected ceiling/floor; did you load_layout for XML-based scene, or detect ceiling/floor for shape-based scene?'
+            if 'layout' in self.os.modality_list:
+                assert self.os.if_has_ceilling_floor, 'scene object has no detected ceiling/floor; did you load_layout for XML-based scene, or detect ceiling/floor for shape-based scene?'
         if_walls = shapes_params.get('if_walls', False)
+        if_floor = shapes_params.get('if_floor', False)
         
         exclude_obj_id_list = shapes_params.get('exclude_obj_id_list', [])
 
@@ -789,6 +792,9 @@ class visualizer_scene_3D_o3d(object):
             if not if_ceiling and shape_dict.get('is_ceiling', False): 
                 print(yellow('[%s] -> collect_shapes: skipped ceiling'%self.__class__.__name__), _id, shape_dict['filename']); 
                 continue
+            if not if_floor and shape_dict.get('is_floor', False): 
+                print(yellow('[%s] -> collect_shapes: skipped floor'%self.__class__.__name__), _id, shape_dict['filename']); 
+                continue
             
             if _id in exclude_obj_id_list: 
                 print(yellow('[%s] Skipped: %s, in exclude_obj_id_list'%(str(self.__class__.__name__), _id)))
@@ -815,7 +821,7 @@ class visualizer_scene_3D_o3d(object):
                 else:
                     print(yellow('Default color for invalid obj_cat_str: [%s]; %s'%(obj_cat_str, obj_path)))
 
-            print('[collect_shapes] shape_idx %d [obj_cat_str %s -  cat_id %d - cat_name %s]'%(shape_idx, obj_cat_str, cat_id, cat_name), _id, shape_dict.get('if_emitter', False), obj_path)
+            print('[collect_shapes: %d/%d] obj_cat_str %s -  cat_id %d - cat_name %s'%(shape_idx, len(self.os.shape_list_valid), obj_cat_str, cat_id, cat_name), _id, shape_dict.get('if_emitter', False), obj_path)
             
             if if_default_color:
                 # obj_color = [0.7, 0.7, 0.7]
@@ -848,6 +854,7 @@ class visualizer_scene_3D_o3d(object):
                 #         faces = faces[faces_mask] # (faces_emitters, 3), int, containing 1-based vertex indexes
 
                 shape_mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(vertices), o3d.utility.Vector3iVector(faces-1))
+                print(np.amax(vertices, axis=0), np.amin(vertices, axis=0), self.os.scene_scale)
                 shape_mesh.compute_vertex_normals()
                 shape_mesh.compute_triangle_normals()
                 assert np.array(shape_mesh.vertices).shape[0] == vertices.shape[0]

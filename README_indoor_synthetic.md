@@ -6,7 +6,7 @@
 - [Indoor Synthetic scenes for multi-view inverse rendering: rendering, load, visualize, and convert](#indoor-synthetic-scenes-for-multi-view-inverse-rendering-rendering-load-visualize-and-convert)
   - [Load preprocessed scenes](#load-preprocessed-scenes)
   - [Export to MonoSDF format](#export-to-monosdf-format)
-  - [From scratch🪄: scene rendering guide](#from-scratch-scene-rendering-guide)
+  - [From scratch🪄: scene preparation and rendering guide](#from-scratch-scene-preparation-and-rendering-guide)
     - [Firstly](#firstly)
     - [Prepare scene files](#prepare-scene-files)
     - [Generate poses via sampling in 3D](#generate-poses-via-sampling-in-3d)
@@ -87,14 +87,15 @@ To export the scene into MonoSDF format (used in [customized MonoSDF repo (branc
 
 ``` bash
 python load_mitsubaScene3D.py --scene kitchen_mi --export --export_format monosdf --export_appendix _fipt --split train --vis_3d_o3d False --force
+
 python load_mitsubaScene3D.py --scene kitchen_mi --export --export_format monosdf --export_appendix _fipt --split val --vis_3d_o3d False --force
 ```
 
 Note that you will need to dump `train` first then `val`, so that `val` will re-use the normalization parameters from `train`.
 
-You will arrive at a folder at `indoor_synthetic/EXPORT_monosdf/kitchen_mi`. Link the folder to your customized MonoSDF repo project path (e;.g. `Projects/monosdf/data/indoor_synthetic/kitchen_mi`), and follow the scripts in the customized MonoSDF repo.
+You will arrive at a folder at `indoor_synthetic/EXPORT_monosdf/kitchen_mi`. Link the folder to your customized MonoSDF repo project path (e.g. `Projects/monosdf/data/indoor_synthetic/kitchen_mi`), and follow the scripts in the customized MonoSDF repo.
 
-## From scratch🪄: scene rendering guide
+## From scratch🪄: scene preparation and rendering guide
 
 ### Firstly
 Add/modify a entry in `lib/global_vars.py` for your device. By default there are two devices, named `apple` for a M1 Macbook and `mm1` for a Ubuntu machine with CUDA-capable GPU.
@@ -106,7 +107,7 @@ Start with a scene downloaded from https://benedikt-bitterli.me/resources/, orga
 
 <!-- - data
   - indoor_synthetic
-    - kitchen_mi
+    - kitchen_diy
       - models
       - textures
       - test.xml -->
@@ -116,56 +117,63 @@ Start with a scene downloaded from https://benedikt-bitterli.me/resources/, orga
 .
 └── data/
     └── indoor_synthetic/
-        └── kitchen_mi/
+        └── kitchen_diy/
             ├── models
             ├── textures
             └── test.xml
 ```
 
-The original XML file is scene_v3.xml. We modified the scene a bit, including
+The original downloaed XML file is *scene_v3.xml*. We modified the scene a bit, including
 - removed transparent objects;
 - added id for all emitters (e.g. `<emitter type="area" id="lamp_oven_0">`)
 
-Then add a file at *confs/indoor_synthetic/kitchen_mi.conf*, including scene name, and optionally `merge_lamp_id_list` for grouping a set of emitters into one.
+Then create a file at [*confs/indoor_synthetic/kitchen_diy.conf*](confs/indoor_synthetic/kitchen_diy.conf), including scene name, and optionally manually specifying emitters/floor etc.:
 
-Also add a file at *data/indoor_synthetic/kitchen_mi/intrinsic_mitsubaScene.txt* with manually picked intrinsics:
+- `merge_lamp_id_list` for grouping a set of emitters into one.
+- `floor_id`, `ceiling_id` to use the corresponding shape as safe space for sampling poses; if not indicated, the method will assumes shapes of walls/ceiling/floor has 'wall', 'ceiling' or 'floor' in their `id` fields.
 
-```
+You will need to assign the `id` field in corresponding shapes/emitters in the XML file. Example of the eventual modified XML file for the kitchen scene: [*samples/test.xml*](samples/test.xml).
+
+Also add a file at *data/indoor_synthetic/kitchen_diy/intrinsic_mitsubaScene.txt* with manually picked intrinsics:
+
+``` txt
 554.2562397718481 0.000000 320.000000 # fx, 0, cx(==im_W/2)
 0.000000 554.2562397718481 160.000000 # 0, fy, cy(==im_H/2)
 0.000000 0.000000 1.000000
 ```
-Use `modality_list = ['shapes', 'layout']` in `scene_obj = mitsubaScene3D()` constructor.
+
+Use `modality_list = ['shapes', 'layout']` in `scene_obj = mitsubaScene3D()` constructor.     Set `visualizer_3D_o3d.run_o3d(shapes_params={'if_ceiling': True, 'if_walls': True, ...` to draw walls and ceiling (indicted in the `id` tag of corresponding `shape` entry in scene XML file, e.g. `<shape type="obj" id="WallSocket_0001">`).
 
 Preview the scene in 3D with (you should see [this](https://i.imgur.com/PWg0xCU.png)):
 
 ``` bash
 python load_mitsubaScene3D.py
 ```
+
 ### Generate poses via sampling in 3D
 
 Use `modality_list = ['shapes', 'poses', 'layout']` in `scene_obj = mitsubaScene3D()` constructor.
 
 ``` bash
-python load_mitsubaScene3D.py --scene kitchen_mi --if_sample_poses --split train
+python load_mitsubaScene3D.py --scene kitchen_diy --if_sample_poses --split train
 ```
 
 The number of sampled frames can be set with `'sample_pose_num'` (default: 200 for train, 20 for val). 
 You can set `'sample_pose_if_vis_plt': True` to see the sampled pose from bird's-eye view.
 
-Fine-grained hyper-parameters of the sampled cameras can be set, by copying a section `cam_params_dict = {...}` from *confs/indoor_synthetic.conf* to *kitchen_mi.conf* and modifying the entries (e.g. `heightMin/Max` for camera height, `distRays...` for controlling the distance between a camera and the closest object in the scene).
+Fine-grained hyper-parameters of the sampled cameras can be set, by copying a section `cam_params_dict = {...}` from *confs/indoor_synthetic.conf* to *kitchen_diy.conf* and modifying the entries (e.g. `heightMin/Max` for camera height, `distRays...` for controlling the distance between a camera and the closest object in the scene).
 
 Set `'if_ceiling': False, 'if_walls': False` in `visualizer_3D_o3d.run_o3d(shapes_params={...})` to hide walls and ceiling for better seeing the poses.
 
 You should get a visualization of the scene and sampled poses like [this](https://i.imgur.com/H4sT9UN.png) (press `[` key to switch to orthographic projection view).
 
-Sampled poses and params will be dumped to *data/indoor_synthetic/kitchen_mi/cam.txt* and *data/indoor_synthetic/kitchen_mi/cam_params_dict.txt*. In *cam.txt*, poses are saved in OpenRooms format (see notes starting with `OpenRooms convention` in *lib/class_mitsubaScene3D.py*).
+Sampled poses and params will be dumped to *data/indoor_synthetic/kitchen_diy/cam.txt* and *data/indoor_synthetic/kitchen_diy/cam_params_dict.txt*. In *cam.txt*, poses are saved in OpenRooms format (see notes starting with `OpenRooms convention` in *lib/class_mitsubaScene3D.py*).
 
 [Optionally], add `--eval_scene` to visualize view coverage map.
 
 New files generated:
 
-<!-- - data/indoor_synthetic/kitchen_mi/train
+<!-- - data/indoor_synthetic/kitchen_diy/train
   - cam.txt # poses in OpenRooms format
   - cam_params_dict.txt # params for generating poses
   - train.npy # poses in angles for Blender
@@ -177,7 +185,7 @@ New files generated:
 
 ```
 .
-└── data/indoor_synthetic/kitchen_mi/train
+└── data/indoor_synthetic/kitchen_diy/train
     ├── cam.txt # poses in OpenRooms format
     ├── cam_params_dict.txt # params for generating poses
     ├── train.npy # poses in angles for Blender
@@ -200,19 +208,19 @@ Set `mitsubaScene3D(modality_list=['poses'])` in *load_mitsubaScene3D.py*.
 We choose to use Mitsuba to render HDR images (instead of Blender) because of some known issues with Blender rendering (@Liwen).
 
 ``` bash
-python load_mitsubaScene3D.py --scene kitchen_mi --render_2d --renderer mi
+python load_mitsubaScene3D.py --scene kitchen_diy --render_2d --renderer mi
 ```
 
 New files generated:
 
-<!-- - data/indoor_synthetic/kitchen_mi/train
+<!-- - data/indoor_synthetic/kitchen_diy/train
   - Image
     - %03d_0001.exr # HDR images (0-based index)
     - %03d_0001.png # SDR images (gamma=2.2) -->
 
 ```
 .
-└── data/indoor_synthetic/kitchen_mi/train
+└── data/indoor_synthetic/kitchen_diy/train
     └── Image
         ├── %03d_0001.exr # HDR images (0-based index)
         └── %03d_0001.png # SDR images (gamma=2.2)
@@ -225,12 +233,12 @@ First create a Blender scene file (`test.blend`) from the Mitsuba scene file (`t
 Set desired modalities to render in `renderer_blender_mitsubaScene_3D(modality_list=[...])`.
 
 ``` bash
-python load_mitsubaScene3D.py --scene kitchen_mi --render_2d --renderer blender
+python load_mitsubaScene3D.py --scene kitchen_diy --render_2d --renderer blender
 ```
 
 New files generated:
 
-<!-- - data/indoor_synthetic/kitchen_mi/train
+<!-- - data/indoor_synthetic/kitchen_diy/train
   - Depth
   - Normal
   - DiffCol # diffuse albedo
@@ -241,7 +249,7 @@ New files generated:
 
 ```
 .
-└── data/indoor_synthetic/kitchen_mi/train
+└── data/indoor_synthetic/kitchen_diy/train
     ├── Depth
     ├── Normal
     ├── DiffCol # diffuse albedo
@@ -256,7 +264,7 @@ For envmaps, params can be set in *confs/indoor_synthetic.conf* -> `lighting_par
 To combine envmaps into a single image ([demo](https://i.imgur.com/Y5lumVu.jpg)), set `mitsubaScene3D(modality_list=['im_sdr','poses','lighting_envmap']` and `visualizer_scene_2D(modality_list_vis=['im', 'lighting_envmap']`, then run:
 
 ``` bash
-python load_mitsubaScene3D.py --scene kitchen_mi --vis_2d_plt
+python load_mitsubaScene3D.py --scene kitchen_diy --vis_2d_plt
 ```
 
 To visualize other modalities ([demo](https://i.imgur.com/24i0yjA.png)), set `mitsubaScene3D(modality_list` and `visualizer_scene_2D(modality_list_vis` to desired modalities, then run the same command.

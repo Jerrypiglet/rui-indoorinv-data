@@ -358,7 +358,7 @@ class scene2DBase(ABC):
         Load and visualize layout in 3D & 2D; assuming room axis-up direction is axis-aligned, ...
         ... by projecting all points to floor plane, and vertically grow a cuboid to form a layout box.
         
-        [!!!] Assumes that the scene is axis-aligned, and the layout box is aligned with the scene axis.
+        [!!!] Assumes that the scene is axis-aligned in vertical direction
         
         images/demo_layout_mitsubaScene_3D_1.png
         images/demo_layout_mitsubaScene_3D_1_BEV.png # red is layout bbox
@@ -368,9 +368,15 @@ class scene2DBase(ABC):
         if self.if_loaded_layout: return
         if not self.if_loaded_shapes: self.load_shapes(self.CONF.shape_params_dict)
 
+        if self.CONF.shape_params_dict.get('if_layout_as_floor_ceiling', False):
+            self.load_load_layout_floor_ceiling()
+            return
+        
         if self.CONF.shape_params_dict.get('if_layout_as_walls', False) and any([shape_dict['is_wall'] for shape_dict in self.shape_list_valid]):
+            # if layout is defined as walls, then only load wall vertices
             vertices_all = np.vstack([self.vertices_list[_] for _ in range(len(self.vertices_list)) if self.shape_list_valid[_]['is_wall']])
         else:
+            # otherwise, load all vertices and find minimum bbox (rectangle) by first projecting all points to floor plane and then finding minimum 2D bbox, then elevate to 3D
             vertices_all = np.vstack(self.vertices_list)
 
         if self.axis_up[0] == 'y':
@@ -380,25 +386,72 @@ class scene2DBase(ABC):
         elif self.axis_up[0] == 'z':
             self.v_2d = vertices_all[:, [0, 1]]
             
-        # finding minimum 2d bbox (rectangle) from contour
+        # finding minimum 2D bbox (rectangle) from contour
         self.layout_hull_2d, self.layout_hull_pts = minimum_bounding_rectangle(self.v_2d)
-        
         layout_hull_2d_2x = np.vstack((self.layout_hull_2d, self.layout_hull_2d)) # (8, 2)
+        
         if self.axis_up[0] == 'y':
             self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x[:, 0:1], np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1])), layout_hull_2d_2x[:, 1:2]))
             self.ceiling_loc = self.xyz_max[1]
             self.floor_loc = self.xyz_min[1]
         elif self.axis_up[0] == 'x':
-            self.layout_box_3d_transformed = np.hstack((np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1])), layout_hull_2d_2x))
+            self.layout_box_3d_transformed = np.hstack((np.vstack((np.zeros((4, 1))+self.xyz_min[0], np.zeros((4, 1))+self.xyz_max[0])), layout_hull_2d_2x))
             self.ceiling_loc = self.xyz_max[0]
             self.floor_loc = self.xyz_min[0]
         elif self.axis_up[0] == 'z':
             # self.layout_box_3d_transformed = np.hstack((, np.vstack((np.zeros((4, 1)), np.zeros((4, 1))+room_height))))    
-            self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x, np.vstack((np.zeros((4, 1))+self.xyz_min[1], np.zeros((4, 1))+self.xyz_max[1]))))
+            self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x, np.vstack((np.zeros((4, 1))+self.xyz_min[2], np.zeros((4, 1))+self.xyz_max[2]))))
             self.ceiling_loc = self.xyz_max[2]
             self.floor_loc = self.xyz_min[2]
 
         print(blue_text('[%s] DONE. load_layout'%self.parent_class_name))
+
+        self.if_loaded_layout = True
+        self.if_has_ceilling_floor = True
+        
+    def load_load_layout_floor_ceiling(self):
+        '''
+        assumes that the scene is axis-aligned in vertical direction; and there is only one floor and one ceiling
+        '''
+        
+        print(yellow('[mitsubaScene3D] load_layout from floor and ceiling...'))
+        floor_objs = [shape_dict for shape_dict in self.shape_list_valid if shape_dict['is_floor']]
+        assert len(floor_objs) == 1, 'len(floor_objs) != 1: found %d objects'%len(floor_objs)
+        floor_obj = floor_objs[0]
+        floor_vertices = self.vertices_list[self.shape_ids_list.index(floor_obj['id'])]
+        
+        ceiling_objs = [shape_dict for shape_dict in self.shape_list_valid if shape_dict['is_ceiling']]
+        assert len(ceiling_objs) == 1, 'len(ceiling_objs) != 1: found %d objects'%len(ceiling_objs)
+        ceiling_obj = ceiling_objs[0]
+        ceiling_vertices = self.vertices_list[self.shape_ids_list.index(ceiling_obj['id'])]
+        
+        if self.axis_up[0] == 'y':
+            self.v_2d = floor_vertices[:, [0, 2]]
+        elif self.axis_up[0] == 'x':
+            self.v_2d = floor_vertices[:, [1, 3]]
+        elif self.axis_up[0] == 'z':
+            self.v_2d = floor_vertices[:, [0, 1]]
+            
+        vertical_values_floor = floor_vertices[:, ['x', 'y', 'z'].index(self.axis_up[0])]
+        assert len(np.unique(vertical_values_floor)) in [1, 2]
+        self.floor_loc = np.amax(np.unique(vertical_values_floor))
+        vertical_values_ceiling = ceiling_vertices[:, ['x', 'y', 'z'].index(self.axis_up[0])]
+        assert len(np.unique(vertical_values_ceiling)) in [1, 2]
+        self.ceiling_loc = np.amin(np.unique(vertical_values_ceiling))
+            
+        # finding minimum 2D bbox (rectangle) from contour
+        self.layout_hull_2d, self.layout_hull_pts = minimum_bounding_rectangle(self.v_2d)
+        layout_hull_2d_2x = np.vstack((self.layout_hull_2d, self.layout_hull_2d)) # (8, 2)
+
+        if self.axis_up[0] == 'y':
+            self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x[:, 0:1], np.vstack((np.zeros((4, 1))+self.floor_loc, np.zeros((4, 1))+self.ceiling_loc)), layout_hull_2d_2x[:, 1:2]))
+        elif self.axis_up[0] == 'x':
+            self.layout_box_3d_transformed = np.hstack((np.vstack((np.zeros((4, 1))+self.floor_loc, np.zeros((4, 1))+self.ceiling_loc)), layout_hull_2d_2x))
+        elif self.axis_up[0] == 'z':
+            # self.layout_box_3d_transformed = np.hstack((, np.vstack((np.zeros((4, 1)), np.zeros((4, 1))+room_height))))    
+            self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x, np.vstack((np.zeros((4, 1))+self.floor_loc, np.zeros((4, 1))+self.ceiling_loc))))
+
+        print(blue_text('[%s] DONE. load_layout from floor and ceiling'%self.parent_class_name))
 
         self.if_loaded_layout = True
         self.if_has_ceilling_floor = True

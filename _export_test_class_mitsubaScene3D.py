@@ -517,8 +517,8 @@ if opt.export:
             ], 
             split=opt.split, 
             assert_shape=(240, 320),
-            window_area_emitter_id_list=['window_area_emitter'], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-            merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2'],  # need to manually specify in XML
+            window_area_emitter_id_list=["window_area_emitter"]], # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+            merge_lamp_id_list=["lamp_oven_0", "lamp_oven_1", "lamp_oven_2"],  # need to manually specify in XML
             # center_crop_HW=(240, 320), 
             if_no_gt_appendix=True, 
         )

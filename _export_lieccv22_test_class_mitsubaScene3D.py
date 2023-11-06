@@ -96,8 +96,8 @@ dataset_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 xml_root = Path(PATH_HOME) / 'data/indoor_synthetic_resize'
 
 scene_name = 'kitchen'
-window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
-merge_lamp_id_list=['lamp_oven_0', 'lamp_oven_1', 'lamp_oven_2']  # need to manually specify in XML
+window_area_emitter_id_list=["window_area_emitter"]] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+merge_lamp_id_list=["lamp_oven_0", "lamp_oven_1", "lamp_oven_2"]  # need to manually specify in XML
 shape_file = 'data/indoor_synthetic/kitchen_new/scene.obj'
 
 scene_name = 'bedroom'
@@ -106,7 +106,7 @@ merge_lamp_id_list=[]  # need to manually specify in XML
 shape_file = 'data/indoor_synthetic/bedroom/scene.obj'
 
 scene_name = 'bathroom'
-window_area_emitter_id_list=['window_area_emitter'] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
+window_area_emitter_id_list=["window_area_emitter"]] # need to manually specify in XML: e.g. <emitter type="area" id="lamp_oven_0">
 merge_lamp_id_list=[]  # need to manually specify in XML
 shape_file = 'data/indoor_synthetic/bathroom/scene.obj'
 
