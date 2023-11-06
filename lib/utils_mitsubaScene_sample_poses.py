@@ -12,6 +12,7 @@ from tqdm import tqdm
 import mitsuba as mi
 
 from lib.utils_io import load_matrix, resize_intrinsics
+from lib.utils_misc import blue_text
 from .utils_mitsubaScene_scene import findSupport, adjustHeight, checkPointInPolygon, moveBoxInWall
 from utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
 # from .utils_objs import loadMesh, writeMesh, computeBox
@@ -305,7 +306,7 @@ def func_mitsubaScene_sample_poses(
         # plt.title('a')
         if tmp_rendering_path is not None:
             plt.savefig(tmp_rendering_path / 'vis_sampled_poses.png')
-            print('Saved vis_sampled_poses.png to %s'%(tmp_rendering_path / 'vis_sampled_poses.png'))
+            print(blue_text('Saved vis_sampled_poses.png to %s'%(tmp_rendering_path / 'vis_sampled_poses.png')))
         plt.show()
 
     return camPoses

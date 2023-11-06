@@ -37,7 +37,7 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
             'im', 
             # 'seg', 
             # 'albedo', 'roughness', 
-            'depth', 'normal', 
+            # 'depth', 'normal', 
             # 'lighting_envmap', 
         ]
 
@@ -47,14 +47,16 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
         
     def render_im(self, if_force: bool=False):
         self.spp = self.im_params_dict.get('spp', 1024)
-        folder_name, render_folder_path = self.render_modality_check('im', if_force=if_force)
+        
+        folder_name, render_folder_path = self.render_modality_check('im', if_force=if_force, file_name_appendix='_mi')
 
         print(white_blue('[%s] Rendering RGB to... by [Mitsuba] (spp %d)): %s')%(self.__class__.__name__, self.spp, str(render_folder_path)))
         for i, (origin, lookatvector, up) in tqdm(enumerate(self.os.origin_lookatvector_up_list)):
             sensor = self.get_sensor(origin, origin+lookatvector, up)
             image = mi.render(self.os.mi_scene, spp=self.spp, sensor=sensor)
-            im_rendering_path = str(render_folder_path / ('%03d_0001.exr'%i))
+            im_rendering_path = str(render_folder_path / ('%03d_0001_mi.exr'%self.os.frame_id_list[i]))
             # im_rendering_path = str(render_folder_path / ('im_%d.rgbe'%i))
+            print('Rendering to: %s...'%im_rendering_path)
             mi.util.write_bitmap(str(im_rendering_path), image)
             '''
             load exr: https://mitsuba.readthedocs.io/en/stable/src/how_to_guides/image_io_and_manipulation.html?highlight=load%20openexr#Reading-an-image-from-disk
@@ -85,8 +87,8 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
             },
             'film': {
                 'type': 'hdrfilm',
-                'width': self.os.im_W_load,
-                'height': self.os.im_H_load,
+                'width': self.im_params_dict['im_W_load'],
+                'height': self.im_params_dict['im_H_load'],
                 'rfilter': {
                     'type': 'tent',
                 },

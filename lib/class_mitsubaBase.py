@@ -584,10 +584,11 @@ class mitsubaBase(scene2DBase):
         print(blue_text('Sampled '), white_blue(str(len(self.pose_list))), blue_text('poses.'))
 
         if if_dump:
-            dump_cam_params_OR(pose_file_root=self.pose_file_path_root, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.CONF.cam_params_dict, extra_transform=extra_transform)
+            # Dump pose file in OpenRooms convention (cam.txt)
+            dump_cam_params_OR(pose_file_root=self.scene_rendering_path, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.CONF.cam_params_dict, extra_transform=extra_transform)
             
             # Dump pose file in Blender .npy files
-            npy_path = self.pose_file_path_root / ('%s.npy'%self.split)
+            npy_path = self.scene_rendering_path / ('%s.npy'%self.split)
             print('-', self.pose_list[0])
             blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.pose_list, export_path=npy_path)
             
@@ -600,7 +601,7 @@ class mitsubaBase(scene2DBase):
             # camera_angle_y = 2 * np.arctan(0.5 * self._H() / f_y)
             # dump_blender_npy_to_json(blender_poses=blender_poses, export_path=json_path, camera_angle_x=camera_angle_x, camera_angle_y=camera_angle_y)
             
-            print(white_blue('Dumped sampled poses (cam.txt) to') + str(self.pose_file_path_root))
+            print(white_blue('Dumped sampled poses (cam.txt) to') + str(self.scene_rendering_path))
 
     def load_meta_json_pose(self, pose_file):
         assert Path(pose_file).exists(), str(pose_file)

@@ -11,6 +11,7 @@
     - [Prepare scene files](#prepare-scene-files)
     - [Generate poses via sampling in 3D](#generate-poses-via-sampling-in-3d)
     - [Render all modalities](#render-all-modalities)
+    - [HDR images with Mitsuba](#hdr-images-with-mitsuba)
 - [Other datasets](#other-datasets)
     - [$I^2$-SDF](#i2-sdf)
     - [OpenRooms](#openrooms)
@@ -159,7 +160,7 @@ python load_mitsubaScene3D.py --scene kitchen_diy --if_sample_poses --split trai
 ```
 
 The number of sampled frames can be set with `'sample_pose_num'` (default: 200 for train, 20 for val). 
-You can set `'sample_pose_if_vis_plt': True` to see the sampled pose from bird's-eye view.
+You can set `'sample_pose_if_vis_plt': True` to draw the [sampled poses from bird's-eye view](images/demo_sample_pose_living-room.png).
 
 Fine-grained hyper-parameters of the sampled cameras can be set, by copying a section `cam_params_dict = {...}` from *confs/indoor_synthetic.conf* to *kitchen_diy.conf* and modifying the entries (e.g. `heightMin/Max` for camera height, `distRays...` for controlling the distance between a camera and the closest object in the scene).
 
@@ -196,13 +197,13 @@ New files generated:
         └── valid_normal_mask_*.png # low-res mask for valid normal map (i.e. cameras which are not inside objects) for sampled poses
 ```
 
+To visualize the poses, add `'poses'` to `mitsubaScene3D(modality_list=[...` and `visualizer_scene_3D_o3d(modality_list_vis=[...`, and re-run without `--if_sample_poses`.
 
 ### Render all modalities
-Adjust `spp` properly (e.g. 32 for fast rendering, 4096).
+Adjust `spp` properly (e.g. 32 for fast rendering, 4096 for final rendering).
 
-Set `mitsubaScene3D(modality_list=['poses'])` in *load_mitsubaScene3D.py*.
+<!-- Set `mitsubaScene3D(modality_list=['poses'])` in *load_mitsubaScene3D.py*. -->
 
-``` bash
 ### HDR images with Mitsuba
 
 We choose to use Mitsuba to render HDR images (instead of Blender) because of some known issues with Blender rendering (@Liwen).

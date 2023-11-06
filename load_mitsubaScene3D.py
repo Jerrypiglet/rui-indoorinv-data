@@ -107,7 +107,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-# frame_id_list = [0]
+# frame_id_list = [1, 2]
 
 '''
 update confs
@@ -123,7 +123,7 @@ CONF.scene_params_dict.update({
 CONF.cam_params_dict.update({
     # ==> if sample poses and render images 
     'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-    'sample_pose_num': 20 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
+    'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
     'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     })
 
@@ -134,7 +134,6 @@ CONF.mi_params_dict.update({
 
 CONF.im_params_dict.update({
     'im_H_resize': 320, 'im_W_resize': 640, 
-    'spp': 32, 
     })
 
 CONF.shape_params_dict.update({
@@ -151,15 +150,15 @@ scene_obj = mitsubaScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
+        'shapes', # objs + emitters, geometry shapes + emitter properties``
+        # 'layout', 
+        'poses', 
         # 'im_hdr', 
         # 'im_sdr', 
-        # 'poses', 
         # 'lighting_envmap', 
         # 'albedo', 'roughness', 
         # 'emission', 
         # 'depth', 'normal', 
-        'shapes', # objs + emitters, geometry shapes + emitter properties``
-        'layout', 
         # 'tsdf', 
         ], 
 )
@@ -175,7 +174,12 @@ if opt.render_2d:
             modality_list=[
                 'im', # both hdr and sdr
             ], 
-            im_params_dict={}, 
+            im_params_dict=
+            {
+                'im_H_load': 640, 'im_W_load': 1280, 
+                # 'im_H_load': 480, 'im_W_load': 640, 
+                'spp': 4096, 
+            }, # override
             cam_params_dict={}, 
             mi_params_dict={},
         )
@@ -183,24 +187,33 @@ if opt.render_2d:
         renderer = renderer_blender_mitsubaScene_3D(
             scene_obj, 
             modality_list=[
-                'albedo', 
-                'roughness', 
-                'depth', 
-                'normal', 
-                'index', 
-                'emission', 
+                'im', 
+                # 'albedo', 
+                # 'roughness', 
+                # 'depth', 
+                # 'normal', 
+                # 'index', 
+                # 'emission', 
                 # 'lighting_envmap', 
                 ], 
             host=host, 
             FORMAT='OPEN_EXR', 
             # FORMAT='PNG', 
-            im_params_dict={
-                'spp': 32}, 
+            im_params_dict=
+            {
+                'im_H_load': 640, 'im_W_load': 1280, 
+                # 'im_H_load': 480, 'im_W_load': 640, 
+                # 'spp': 32, 
+                'spp': 1024, 
+            }, # override
             cam_params_dict={}, 
             mi_params_dict={},
         )
     host=host, 
     renderer.render(if_force=opt.force)
+    
+    # compare HDR images from mi/blender if both are available
+    # renderer.compare_blender_mi_Image()
 
 eval_return_dict = {}
 
@@ -345,10 +358,10 @@ if opt.vis_3d_o3d:
     visualizer_3D_o3d = visualizer_scene_3D_o3d(
         scene_obj, 
         modality_list_vis=[
-            # 'poses', 
             'shapes', # bbox and (if loaded) meshs of shapes (objs + emitters SHAPES); CTRL + 9
             'layout', 
             'mi', # mitsuba sampled rays, pts
+            'poses', 
             # 'tsdf', 
             # 'dense_geo', # fused from 2D
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink

@@ -30,6 +30,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         host, 
         FORMAT='OPEN_EXR', 
         COLOR_DEPTH=16, 
+        blender_file_name=None, 
         *args, **kwargs, 
     ):
         rendererBase.__init__(
@@ -40,7 +41,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         )
         # assert self.os.pose_format in ['Blender', 'json'], ''
 
-        self.blend_file_path = Path(str(self.os.xml_file_path).replace('.xml', '.blend'))
+        self.blend_file_path = Path(str(self.os.xml_file_path).replace('.xml', '.blend')) if blender_file_name is None else self.os.scene_path / blender_file_name
         assert self.blend_file_path.exists(), 'Blender file %s does not exist! See class documentation for export instructions.'%(self.blend_file_path.name)
         # if not self.blend_file_path.exists(): # 'Blender file %s does not exist! See class documentation for export instructions.'%(self.blend_file_path.name)
         #     bpy.ops.wm.save_as_mainfile(filepath=str(self.blend_file_path.absolute()))
@@ -148,8 +149,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         # Background
         self.scene.render.dither_intensity = 0.0
         self.scene.render.film_transparent = True
-        self.scene.render.resolution_x = self.os.im_W_load
-        self.scene.render.resolution_y = self.os.im_H_load
+        self.scene.render.resolution_x = self.im_params_dict['im_W_load']
+        self.scene.render.resolution_y = self.im_params_dict['im_H_load']
         self.scene.render.resolution_percentage = 100
 
         # self.cam = scene.objects['Camera'] # the sensor in XML has to has 'id="Camera"'
@@ -191,7 +192,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
     @property
     def valid_modalities(self):
         return [
-            # 'im', 
+            'im', 
             'albedo', 'roughness', 
             'depth', 'normal', 
             'index', 
@@ -204,9 +205,9 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         render all modalities except for 'lighting_envmap'
         '''
         if 'lighting_envmap' in self.modality_list:
-            env_height, env_width, env_row, env_col = get_list_of_keys(self.os.CONF.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
+            env_height, env_width, env_row, env_col = get_list_of_keys(self.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
             folder_name_appendix = '-%dx%dx%dx%d'%(env_row, env_col, env_height, env_width)
-            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix=folder_name_appendix, if_force=if_force) # _: 'im', folder_name: 'Image'
+            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix=folder_name_appendix, if_force=if_force, file_name_appendix='_mi') # _: 'im', folder_name: 'Image'
             self.render_lighting_envmap(render_folder_path)
             return
             
@@ -222,7 +223,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         _modality_list = list(set(self.modality_list) - set(['lighting_envmap']))
         
         for modality in _modality_list:
-            folder_name, render_folder_path = self.render_modality_check(modality, if_force=if_force) # _: 'im', folder_name: 'Image'
+            folder_name, render_folder_path = self.render_modality_check(modality, if_force=if_force, file_name_appendix='_mi') # _: 'im', folder_name: 'Image'
             modal_file_output = self.tree.nodes.new(type="CompositorNodeOutputFile")
             modal_file_output.label = folder_name
             self.links.new(self.render_layers.outputs[folder_name], modal_file_output.inputs[0]) # (self.render_layers.outputs[folder_name], bpy.data.scenes['Scene'].node_tree.nodes["File Output"].inputs[0])
@@ -283,8 +284,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         '''
         print(blue_text('Rendering lighting_envmap to... by Mitsuba: %s')%str(render_folder_path))
         lighting_global_xyz_list, lighting_global_pts_list = self.os.get_envmap_axes() # each of (env_row, env_col, 3, 3)
-        env_row, env_col = self.os.CONF.lighting_params_dict['env_row'], self.os.CONF.lighting_params_dict['env_col']
-        env_height, env_width = self.os.CONF.lighting_params_dict['env_height'], self.os.CONF.lighting_params_dict['env_width']
+        env_row, env_col = self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col']
+        env_height, env_width = self.lighting_params_dict['env_height'], self.lighting_params_dict['env_width']
         self.scene.render.resolution_x = env_width
         self.scene.render.resolution_y = env_height
         # [panoramic-cameras] https://docs.blender.org/manual/en/latest/render/cycles/object_settings/cameras.html#panoramic-cameras

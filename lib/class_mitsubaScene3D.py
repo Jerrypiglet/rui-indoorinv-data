@@ -622,7 +622,7 @@ class mitsubaScene3D(mitsubaBase):
                     vertices, faces = np.array(shape_trimesh.vertices), np.array(shape_trimesh.faces)+1
                     vertices = vertices * self.scene_scale
 
-                    assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
+                    # assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
                     
                     _id = shape.get('id') if shape.get('id') is not None else filename_stem
                     _id = _id + '_' + random_id
