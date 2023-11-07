@@ -11,6 +11,32 @@ from lib.utils_OR.utils_OR_xml import transformToXml, loadMesh, transform_with_t
 from lib.utils_OR.utils_OR_mesh import write_one_mesh_from_v_f_lists, write_mesh_list_from_v_f_lists, flip_ceiling_normal
 from lib.utils_misc import get_datetime, gen_random_str
 
+def create_camera(o, d, fov=34, fov_axis="x", s_open=1.5, s_close=5, near_clip=1.0):
+    t = [o[0] + d[0], o[1] + d[1], o[2] + d[2]]
+
+    camera_dict = {
+        "type": "perspective",
+        "near_clip": near_clip,
+        "far_clip": 35.0,
+        "focus_distance": 15.0,
+        "fov": fov,
+        "fov_axis": fov_axis,
+        "shutter_open": s_open,
+        "shutter_close": s_close,
+        "to_world": mi.ScalarTransform4f.look_at(
+            origin=o,
+            target=t,
+            up=[0, 1, 0]
+        ),
+        "film": {
+            "type": "hdrfilm",
+            "width": 512,
+            "height": 256,
+        }
+    }
+
+    return mi.load_dict(camera_dict)
+
 def replace_str_xml(filename, lookup_dict: dict={}):
     for k, path_root in lookup_dict.items():
         if k in filename.get('value'):
@@ -170,7 +196,7 @@ def dump_OR_xml_for_mi(
     # cam_param = cam_params[0]
     # if cam_param is not None:
     if origin_lookatvector_up_tuple != ():
-        # origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+        # origin, lookat, up, lookatvector = np.split(cam_param.T, 4, axis=1)
         origin, lookatvector, up = origin_lookatvector_up_tuple
         sensor_transform = et.SubElement(
             sensor,

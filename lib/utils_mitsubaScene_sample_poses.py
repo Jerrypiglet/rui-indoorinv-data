@@ -131,7 +131,7 @@ def func_mitsubaScene_sample_poses(
 
         # Determine the normal direction
         normal = np.array([direc[2], 0, -direc[0]], dtype = np.float32)
-        normal = normal / np.sqrt(np.sum(normal * normal))
+        normal = normal / (np.sqrt(np.sum(normal * normal)) + 1e-6)
 
         midPoint = np.array([0.5*(X[i] + X[j]), 0, 0.5*(Z[i] + Z[j])], dtype = np.float32)
         sp1 = midPoint + normal * 0.1
@@ -222,7 +222,7 @@ def func_mitsubaScene_sample_poses(
                         continue
 
                     validPointCount += 1
-                    camPose = np.zeros((3, 3), dtype=np.float32)
+                    camPose = np.zeros((4, 3), dtype=np.float32)
                     camPose[0, :] = pointLoc
 
                     xAxis = normal
@@ -230,6 +230,7 @@ def func_mitsubaScene_sample_poses(
                         np.sum(xAxis * xAxis)), 1e-6)
                     zAxis = np.array([0, 1, 0], dtype=np.float32) # ASSUME y+ is up
                     yAxis = np.cross(zAxis, xAxis)
+                    zAxis = np.cross(xAxis, yAxis)
 
                     Az_phi = (phiMax - phiMin) * np.random.random() + phiMin # on ground plane
                     # Az_phi = 0. # debug: camera points towards wall normal (zero yaw)
@@ -238,21 +239,27 @@ def func_mitsubaScene_sample_poses(
                     lx = np.cos(Az_phi) * np.cos(El_theta)
                     lz = np.sin(El_theta)
                     targetDirec = xAxis * lx + yAxis * ly + zAxis * lz
+                    targetDirec = targetDirec / (np.sqrt(np.sum(targetDirec * targetDirec)) + 1e-6)
                     target = pointLoc + targetDirec
+                    
                     up = zAxis - np.sum(zAxis * targetDirec) * targetDirec
-                    up = up / np.sqrt(np.sum(up *  up))
+                    up = up / (np.sqrt(np.sum(up *  up)) + 1e-6) #![](https://i.imgur.com/PdWfDYY.jpg)
 
                     # print('pitch y: %.2f'%targetDirec[1], 'targetDirec:', targetDirec, 'up:', up)
 
                     camPose[1, :] = target
                     camPose[2, :] = up
+                    camPose[3, :] = targetDirec
+                    
+                    assert np.abs(np.linalg.norm(up) - 1.) < 1e-5
+                    assert np.abs(np.linalg.norm(targetDirec) - 1.) < 1e-5
 
                     '''
                     render depth with current pose
                     '''
                     min_depth = -1.
                     if distRaysMin > 0:
-                        _origin, _lookat, _up = np.split(camPose.T, 3, axis=1)
+                        _origin, _lookat, _up = np.split(camPose[:3].T, 3, axis=1)
                         (_R, _t), _lookatvector = origin_lookat_up_to_R_t(_origin, _lookat, _up)
                         H, W = mitsubaScene.im_H_load//4, mitsubaScene.im_W_load//4
                         scale_factor = [t / s for t, s in zip((H, W), (mitsubaScene.im_H_load, mitsubaScene.im_W_load))]

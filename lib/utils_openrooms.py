@@ -91,7 +91,7 @@ def load_OR_public_poses_to_Rt(cam_params: list, frame_id_list: list, if_inverse
             cam_param = cam_params[frame_id-1]
         else:
             cam_param = cam_params[frame_id]
-        origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+        origin, lookat, up, lookatvector = np.split(cam_param.T, 4, axis=1)
         
         # origin -= trans_scene
         # lookat -= trans_scene

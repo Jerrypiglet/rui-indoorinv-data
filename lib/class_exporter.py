@@ -299,12 +299,13 @@ class exporter_scene():
                     np.save(str(mi_normal_export_path), mi_normal)
                     print(blue_text('Mitsuba mi_normal %d exported to: %s'%(frame_id, str(mi_normal_export_path))))
                     
-                    _mi_normal_overlay = self.os.im_sdr_list[frame_idx].copy()
-                    _mi_normal = self.os.mi_normal_opencv_list[frame_idx]/2.+0.5
-                    _mi_normal_overlay = _mi_normal_overlay * 0.5 + _mi_normal * 0.5
-                    assert _mi_normal_overlay.shape == (self.os._H(frame_idx), self.os._W(frame_idx), 3)
-                    _mi_normal_overlay_export_path = scene_export_path / '_MiNormalOpenCV_OVERLAY' / ('%03d_0001.png'%frame_idx)
-                    cv2.imwrite(str(_mi_normal_overlay_export_path), (np.clip(_mi_normal_overlay[:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
+                    if self.os.if_has_im_sdr:
+                        _mi_normal_overlay = self.os.im_sdr_list[frame_idx].copy()
+                        _mi_normal = self.os.mi_normal_opencv_list[frame_idx]/2.+0.5
+                        _mi_normal_overlay = _mi_normal_overlay * 0.5 + _mi_normal * 0.5
+                        assert _mi_normal_overlay.shape == (self.os._H(frame_idx), self.os._W(frame_idx), 3)
+                        _mi_normal_overlay_export_path = scene_export_path / '_MiNormalOpenCV_OVERLAY' / ('%03d_0001.png'%frame_idx)
+                        cv2.imwrite(str(_mi_normal_overlay_export_path), (np.clip(_mi_normal_overlay[:, :, [2, 1, 0]], 0., 1.)*255.).astype(np.uint8))
             
             if modality == 'mi_depth':
                 '''

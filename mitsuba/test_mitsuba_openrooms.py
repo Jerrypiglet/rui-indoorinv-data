@@ -99,7 +99,7 @@ sampler.set('type', 'independent')
 cam_file = scene_xml_dir / 'cam.txt'
 cam_params = read_cam_params_OR(cam_file)
 cam_param = cam_params[0]
-origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+origin, lookat, up, lookatvector = np.split(cam_param.T, 4, axis=1)
 sensor_transform = et.SubElement(
     sensor,
     "transform",

@@ -21,6 +21,7 @@ class rendererBase():
         self, 
         mitsuba_scene, 
         modality_list: list, 
+        if_skip_check: bool=False,
         im_params_dict: dict={}, 
         cam_params_dict: dict={}, 
         mi_params_dict: dict={}, 
@@ -28,6 +29,8 @@ class rendererBase():
     ):
         self.os = mitsuba_scene
         self.modality_list = self.check_and_sort_modalities(list(set(modality_list)))
+        
+        self.if_skip_check = if_skip_check
 
         self.scene_rendering_path = self.os.scene_rendering_path
         self.im_params_dict = {**self.os.CONF.im_params_dict, **im_params_dict}
@@ -94,18 +97,21 @@ class rendererBase():
 
         if_render = 'y'
         files = sorted(glob.glob(str(render_folder_path / filename_pattern)))
-        if if_force:
-            if_render = 'y'
-        else:
-            if len(files) > 0:
-                if_render = input(red("[%s] %d %s files found at %s. RE-RENDER? [y/n]"%(modality, len(files), filename_pattern, str(render_folder_path))))
+        if not self.if_skip_check:
+            if if_force:
+                if_render = 'y'
+            else:
+                if len(files) > 0:
+                    if_render = input(red("[%s] %d %s files found at %s. RE-RENDER? [y/n]"%(modality, len(files), filename_pattern, str(render_folder_path))))
         if if_render in ['N', 'n']:
             print(yellow('ABORTED rendering by Mitsuba'))
             return
         else:
             if render_folder_path.exists():
                 if if_force:
-                    if_remove = True
+                    if_remove = 'Y'
+                elif self.if_skip_check:
+                    if_remove = 'N'
                 else:
                     if_remove = input(red("[%s] %d %s files found at %s. REMOVE? [y/n]"%(modality, len(files), filename_pattern, str(render_folder_path))))
                 if if_remove in ['Y', 'y']:

@@ -16,10 +16,10 @@ import mitsuba as mi
 from lib.utils_io import load_img, resize_intrinsics, center_crop
 from lib.utils_OR.utils_OR_cam import R_t_to_origin_lookatvector_up_opencv, dump_cam_params_OR, convert_OR_poses_to_blender_npy, dump_blender_npy_to_json
 from lib.utils_dvgo import get_rays_np
-from lib.utils_misc import get_list_of_keys, green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
-from lib.utils_misc import get_device
+from lib.utils_misc import get_device, get_list_of_keys, green, white_red, green_text, yellow, yellow_text, white_blue, blue_text, red, vis_disp_colormap
 from lib.utils_OR.utils_OR_lighting import convert_lighting_axis_local_to_global_np, get_lighting_envmap_dirs_global
 from lib.utils_OR.utils_OR_cam import origin_lookat_up_to_R_t
+from lib.utils_mitsuba import create_camera
 
 from lib.utils_monosdf_scene import dump_shape_dict_to_shape_file, load_shape_dict_from_shape_file, load_monosdf_scale_offset
 
@@ -68,7 +68,7 @@ class mitsubaBase(scene2DBase):
         # self.extra_transform = None
         # self.extra_transform_inv = None
         # self.extra_transform_homo = None
-        self.if_center_offset = True # pixel centers are 0.5, 1.5, ..., H-1+0.5
+        self.if_center_offset = True # True: pixel centers are 0.5, 1.5, ..., H-1+0.5
 
         self.shape_file_path = None
         ''''
@@ -282,6 +282,13 @@ class mitsubaBase(scene2DBase):
         for _, (H, W, pose, K) in enumerate(zip(H_list, W_list, pose_list, K_list)):
             rays_o, rays_d, ray_d_center = get_rays_np(H, W, K, pose, inverse_y=(convention=='opencv'), if_center_offset=self.if_center_offset)
             cam_rays_list.append((rays_o, rays_d, ray_d_center))
+            
+        '''
+        compare with Mitsuba perspective camera:
+        
+        create rays: https://github.com/mitsuba-renderer/mitsuba3/blob/c26b48547d9b9dd35e1032c9c8bece64ed40d0d2/src/python/python/ad/integrators/common.py#L316
+        '''
+            
         return cam_rays_list
 
     def mi_sample_rays_pts(
@@ -502,11 +509,11 @@ class mitsubaBase(scene2DBase):
         pose_list = []
         origin_lookatvector_up_list = []
         for cam_param in origin_lookat_up_list:
-            origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-            (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
+            origin, lookat, up, lookatvector = np.split(cam_param.T, 4, axis=1)
+            (R, t), lookatvector_ = origin_lookat_up_to_R_t(origin, lookat, up)
             pose_list.append(np.hstack((R, t)))
             origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
-
+            
         # self.pose_list = pose_list[:sample_pose_num]
         # return
 
@@ -585,7 +592,7 @@ class mitsubaBase(scene2DBase):
 
         if if_dump:
             # Dump pose file in OpenRooms convention (cam.txt)
-            dump_cam_params_OR(pose_file_root=self.scene_rendering_path, origin_lookat_up_mtx_list=self.origin_lookat_up_list, cam_params_dict=self.CONF.cam_params_dict, extra_transform=extra_transform)
+            dump_cam_params_OR(pose_file_root=self.scene_rendering_path, origin_lookat_up_mtx_list=self.origin_lookat_up_list, origin_lookatvector_up_mtx_list=self.origin_lookatvector_up_list, cam_params_dict=self.CONF.cam_params_dict, extra_transform=extra_transform)
             
             # Dump pose file in Blender .npy files
             npy_path = self.scene_rendering_path / ('%s.npy'%self.split)
@@ -1010,6 +1017,6 @@ class mitsubaBase(scene2DBase):
         mesh_dump_root.mkdir(parents=True, exist_ok=True)
 
         for shape_idx, shape, in enumerate(mi_scene.shapes()):
-            if not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
+            if self.device == 'cuda' or not isinstance(shape, mi.llvm_ad_rgb.Mesh): continue
             shape.write_ply(str(mesh_dump_root / ('%06d.ply'%shape_idx)))
         print(blue_text('Scene shapes dumped to: %s')%str(mesh_dump_root))      

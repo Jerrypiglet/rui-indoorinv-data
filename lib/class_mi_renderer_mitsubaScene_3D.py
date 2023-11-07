@@ -81,7 +81,7 @@ class renderer_mitsubaScene_3D():
         pose_list = []
         origin_lookatvector_up_list = []
         for cam_param in origin_lookat_up_list:
-            origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+            origin, lookat, up, lookatvector = np.split(cam_param.T, 4, axis=1)
             origin = origin.flatten()
             lookat = lookat.flatten()
             up = up.flatten()

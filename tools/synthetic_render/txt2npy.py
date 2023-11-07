@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # read original [R|t]
     pose_list = []
     for i,cam_param in enumerate(cam_params):
-        origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+        origin, lookat, up, lookatvector = np.split(cam_param.T, 4, axis=1)
         origin = origin.flatten()
         lookat = lookat.flatten()
         up = up.flatten()

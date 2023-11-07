@@ -319,7 +319,7 @@ def vis_envmap(envmap, downsample_ratio: int=10, downsize_ratio_hw: int=1, downs
 #     return cam_params
 
 def normalize_v(x) -> np.ndarray:
-    return x / np.linalg.norm(x)
+    return x / (np.linalg.norm(x)+1e-6)
 
 def resize_intrinsics(K: np.ndarray, scale_factor: Tuple[float, float]) -> np.ndarray:
     """

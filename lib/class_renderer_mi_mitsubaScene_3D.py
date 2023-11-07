@@ -22,12 +22,14 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
         self, 
         mitsuba_scene, 
         modality_list, 
+        if_skip_check: bool=False,
         *args, **kwargs, 
     ):
         rendererBase.__init__(
             self, 
-            mitsuba_scene, 
-            modality_list, 
+            mitsuba_scene=mitsuba_scene, 
+            modality_list=modality_list, 
+            if_skip_check=if_skip_check, 
             *args, **kwargs
         )
 
@@ -55,7 +57,7 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
             sensor = self.get_sensor(origin, origin+lookatvector, up)
             image = mi.render(self.os.mi_scene, spp=self.spp, sensor=sensor)
             im_rendering_path = str(render_folder_path / ('%03d_0001_mi.exr'%self.os.frame_id_list[i]))
-            # im_rendering_path = str(render_folder_path / ('im_%d.rgbe'%i))
+            # im_rendering_path = str(render_folder_path / ('%03d_0001_mi_BlenderExport.exr'%self.os.frame_id_list[i]))
             print('Rendering to: %s...'%im_rendering_path)
             mi.util.write_bitmap(str(im_rendering_path), image)
             '''
@@ -72,7 +74,9 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
 
     def get_sensor(self, origin, target, up):
         from mitsuba import ScalarTransform4f as T
-        return mi.load_dict({
+        print('[Mitsuba sensor] origin', origin.flatten().tolist(), 'fov_x', np.arctan(self.os.K[0][2]/self.os.K[0][0])/np.pi*180.*2.)
+        assert (np.linalg.norm(up) - 1.) < 1e-5
+        sensor = mi.load_dict({
             'type': 'perspective',
             'fov': np.arctan(self.os.K[0][2]/self.os.K[0][0])/np.pi*180.*2.,
             'fov_axis': 'x',
@@ -95,4 +99,5 @@ class renderer_mi_mitsubaScene_3D(rendererBase):
                 'pixel_format': 'rgb',
             },
         })
-
+        
+        return sensor

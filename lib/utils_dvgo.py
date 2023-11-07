@@ -5,6 +5,34 @@ adapted from dvgo.py -> get_rays_of_a_view() -> get_rays()
 import numpy as np
 
 def get_meshgrid(H, W, if_center_offset: bool=True):
+    '''
+    Mitsuba perspective sensor test cerips: test_scripts/test_perspective_mi.py
+    
+    Ref: Mitsuba perspective camera test script: https://github.com/mitsuba-renderer/mitsuba3/blob/c26b48547d9b9dd35e1032c9c8bece64ed40d0d2/src/sensors/tests/test_perspective.py#L57C2-L57C2
+    
+    if_center_offset: 
+        default True:
+            uu
+            array([[   0.5,    1.5,    2.5, ..., 1277.5, 1278.5, 1279.5],
+                [   0.5,    1.5,    2.5, ..., 1277.5, 1278.5, 1279.5],
+                [   0.5,    1.5,    2.5, ..., 1277.5, 1278.5, 1279.5],
+                ...,
+                [   0.5,    1.5,    2.5, ..., 1277.5, 1278.5, 1279.5],
+                [   0.5,    1.5,    2.5, ..., 1277.5, 1278.5, 1279.5],
+                [   0.5,    1.5,    2.5, ..., 1277.5, 1278.5, 1279.5]],
+                dtype=float32)
+            optical center: [640, 320]
+        False:
+            uu
+            array([[   0.,    1.,    2., ..., 1277., 1278., 1279.],
+                [   0.,    1.,    2., ..., 1277., 1278., 1279.],
+                [   0.,    1.,    2., ..., 1277., 1278., 1279.],
+                ...,
+                [   0.,    1.,    2., ..., 1277., 1278., 1279.],
+                [   0.,    1.,    2., ..., 1277., 1278., 1279.],
+                [   0.,    1.,    2., ..., 1277., 1278., 1279.]], dtype=float32)
+            optical center: [639.5, 319.5]
+    '''
     if if_center_offset:
         O = 0.5
         uu, vv = np.meshgrid(np.linspace(O, W - 1 + O, W, dtype=np.float32), np.linspace(O, H - 1 + O, H, dtype=np.float32), indexing='xy')

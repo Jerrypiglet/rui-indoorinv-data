@@ -21,8 +21,8 @@ def read_cam_params_OR(camFile):
     cam_num = int(cam_data[0])
     cam_params = np.array([x.split(' ') for x in cam_data[1:]]).astype(np.float32)
     if not np.any(cam_params): return []
-    assert cam_params.shape[0] == cam_num * 3
-    cam_params = np.split(cam_params, cam_num, axis=0) # [[origin, lookat, up], ...]
+    assert cam_params.shape[0] == cam_num * 4, 'Invalid format/camera num in file: '+str(camFile)
+    cam_params = np.split(cam_params, cam_num, axis=0) # [[origin, lookat, up, lookatvector], ...]
     return cam_params
 
 def read_K_list_OR(K_list_file):
@@ -39,30 +39,33 @@ def read_K_list_OR(K_list_file):
 def convert_OR_poses_to_blender_npy(pose_list: list, export_path: Path=None):
     # read original [R|t]
     assert pose_list[0].shape == (3, 4)
-    pose_list = np.stack(pose_list, 0)
-    pose_list = torch.from_numpy(pose_list)
+    pose_list = np.stack(pose_list, 0).copy() # (N, 3, 4)
+    # pose_list = torch.from_numpy(pose_list)
 
-    pose_list = torch.cat([pose_list,torch.zeros_like(pose_list[:,:1,:])],1)
+    # pose_list = torch.cat([pose_list,torch.zeros_like(pose_list[:,:1,:])],1)
+    pose_list = np.concatenate([pose_list, np.zeros_like(pose_list[:,:1,:])],1) # (N, 4, 4)
     pose_list[:,3,3] = 1.0
 
     # convert to blender format [translation, euler angle]
     coord_conv = [0,2,1]
     blender_poses = np.zeros((len(pose_list),2,3))
-    for i,pose in enumerate(pose_list):
+    for i, pose in enumerate(pose_list):
         # print('--', pose)
-        pos = pose[:,3].clone()
+        pos = pose[:,3]
         coord_conv = [0,2,1]
         pos = pos[coord_conv]
         pos[1] = -pos[1]
         #pos = pos*scale_to_blend + trans_to_blend
-        Rs = pose[:,:3].clone()
+        Rs = pose[:,:3]
         Rs[:,1] = -Rs[:,1]
         Rs[:,2] = -Rs[:,2]
         Rs = Rs[coord_conv]
         Rs[1] = -Rs[1]
         angle = Rotation.from_matrix(Rs).as_euler('xyz',degrees=False)
-        blender_poses[i,0] = pos.numpy()
+        blender_poses[i,0] = pos
         blender_poses[i,1] = angle
+        
+        print('=====blender angle', angle)
         
     if export_path is not None:
         assert export_path.suffix == '.npy'
@@ -110,7 +113,7 @@ def dump_blender_npy_to_json(blender_poses: np.ndarray, file_path_list: list=[],
         
     return out_data
 
-def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt_list: list=[], cam_params_dict: dict={}, K_list: list=[], frame_num_all: int=-1, appendix='', extra_transform: np.ndarray=None):
+def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, origin_lookatvector_up_mtx_list: list, Rt_list: list=[], cam_params_dict: dict={}, K_list: list=[], frame_num_all: int=-1, appendix='', extra_transform: np.ndarray=None):
     if frame_num_all != -1 and len(origin_lookat_up_mtx_list) != frame_num_all:
         if_write_pose_file = input(red('pose num to write %d is less than total available poses in the scene (%d poses). Still write? [y/n]'%(len(origin_lookat_up_mtx_list), frame_num_all)))
         if if_write_pose_file in ['N', 'n']:
@@ -128,9 +131,12 @@ def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt
         with open(str(pose_file_write), 'w') as camOut:
             camOut.write('%d\n'%len(origin_lookat_up_mtx_list))
             print('Final sampled camera poses: %d'%len(origin_lookat_up_mtx_list))
-            for camPose in origin_lookat_up_mtx_list:
+            for camPose, camPose_ in zip(origin_lookat_up_mtx_list, origin_lookatvector_up_mtx_list):
                 for n in range(0, 3):
-                    camOut.write('%.3f %.3f %.3f\n'%(camPose[n, 0], camPose[n, 1], camPose[n, 2]))
+                    camOut.write('%.6f %.6f %.6f\n'%(camPose[n, 0], camPose[n, 1], camPose[n, 2]))
+                camOut.write('%.6f %.6f %.6f\n'%(camPose_[1][0][0], camPose_[1][1][0], camPose_[1][2][0]))
+                lookatvector = normalize_v((camPose[1]-camPose[0]).reshape(3,1))
+                assert np.abs(np.amax(camPose_[1].reshape(3,1) - lookatvector)) < 1e-4
         print(yellow('Pose file written to %s (%d poses).'%(pose_file_write, len(origin_lookat_up_mtx_list))))
 
         if extra_transform is not None:
@@ -142,7 +148,7 @@ def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt
                 for camPose in origin_lookat_up_mtx_list:
                     for n in range(0, 3):
                         camPose_ = (extra_transform @ camPose[n].reshape(3, 1)).flatten()
-                        camOut.write('%.3f %.3f %.3f\n'%(camPose_[0], camPose_[1], camPose_[2]))
+                        camOut.write('%.6f %.6f %.6f\n'%(camPose_[0], camPose_[1], camPose_[2]))
             print(yellow('Pose file (extra transform) written to %s (%d poses).'%(pose_file_write_extra_transform, len(origin_lookat_up_mtx_list))))
 
         if Rt_list != []:
@@ -154,7 +160,7 @@ def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt
                     Rt = np.hstack((R, t))
                     Rt = np.vstack((Rt, np.array([0., 0., 0., 1]).reshape(1, 4)))
                     for n in range(0, 4):
-                        RtOut.write('%.3f %.3f %.3f %.3f\n'%(Rt[n, 0], Rt[n, 1], Rt[n, 2], Rt[n, 3]))
+                        RtOut.write('%.6f %.6f %.6f %.6f\n'%(Rt[n, 0], Rt[n, 1], Rt[n, 2], Rt[n, 3]))
             print(yellow('Pose (Rt) file written to %s (%d poses).'%(Rt_file_write, len(Rt_list))))
         
         cam_params_dict_write = str(pose_file_root / 'cam_params_dict.txt')
@@ -169,7 +175,7 @@ def dump_cam_params_OR(pose_file_root: Path, origin_lookat_up_mtx_list: list, Rt
                 for K in K_list:
                     assert K.shape == (3, 3)
                     for n in range(0, 3):
-                        camOut.write('%.3f %.3f %.3f\n'%(K[n, 0], K[n, 1], K[n, 2]))
+                        camOut.write('%.6f %.6f %.6f\n'%(K[n, 0], K[n, 1], K[n, 2]))
             print(yellow('K_list file written to %s (%d Ks).'%(K_list_file, len(K_list))))
 
 def normalize(x):
@@ -248,14 +254,19 @@ def get_T_local_to_camopengl_np(normal):
 
     return T_local_to_camopengl
 
-def origin_lookat_up_to_R_t(origin, lookat, up):
+def origin_lookat_up_to_R_t(origin, lookat, up, lookatvector=None):
     origin = origin.flatten()
     lookat = lookat.flatten()
     up = up.flatten()
-    lookatvector = normalize_v(lookat - origin)
-    assert np.amax(np.abs(np.dot(lookatvector.flatten(), up.flatten()))) < 2e-3 # two vector should be perpendicular
+    lookatvector = lookatvector.flatten()
+    if lookatvector is None:
+        lookatvector = normalize_v(lookat - origin) # [3,]
+    else:
+        assert np.abs(np.linalg.norm(lookatvector) - 1.) < 1e-5
+    assert np.amax(np.abs(np.dot(lookatvector.flatten(), up.flatten()))) < 1e-4 # two vector should be perpendicular
     t = origin.reshape((3, 1)).astype(np.float32)
     R = np.stack((np.cross(-up, lookatvector), -up, lookatvector), -1).astype(np.float32)
+    assert np.abs(np.linalg.det(R) - 1.) < 1e-5
 
     return (R, t), lookatvector
     

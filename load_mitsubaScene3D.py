@@ -18,8 +18,8 @@ Examples:
 import sys
 from pathlib import Path
 
-# host = 'mm1'
-host = 'apple'
+host = 'r4090'
+# host = 'apple'
 
 from lib.global_vars import PATH_HOME_dict# , INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
 PATH_HOME = Path(PATH_HOME_dict[host])
@@ -107,7 +107,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-# frame_id_list = [1, 2]
+# frame_id_list = [0,1,2,3,4,5]
 
 '''
 update confs
@@ -123,7 +123,7 @@ CONF.scene_params_dict.update({
 CONF.cam_params_dict.update({
     # ==> if sample poses and render images 
     'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-    'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
+    'sample_pose_num': 20 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
     'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     })
 
@@ -133,7 +133,8 @@ CONF.mi_params_dict.update({
     })
 
 CONF.im_params_dict.update({
-    'im_H_resize': 320, 'im_W_resize': 640, 
+    'im_H_resize': 480, 'im_W_resize': 640, 
+    # 'im_H_resize': 640, 'im_W_resize': 1280, 
     })
 
 CONF.shape_params_dict.update({
@@ -158,7 +159,8 @@ scene_obj = mitsubaScene3D(
         # 'lighting_envmap', 
         # 'albedo', 'roughness', 
         # 'emission', 
-        # 'depth', 'normal', 
+        # 'depth', 
+        # 'normal', 
         # 'tsdf', 
         ], 
 )
@@ -176,12 +178,13 @@ if opt.render_2d:
             ], 
             im_params_dict=
             {
-                'im_H_load': 640, 'im_W_load': 1280, 
-                # 'im_H_load': 480, 'im_W_load': 640, 
+                # 'im_H_load': 640, 'im_W_load': 1280, 
+                'im_H_load': 480, 'im_W_load': 640, 
                 'spp': 4096, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
+            if_skip_check=True,
         )
     if opt.renderer == 'blender':
         renderer = renderer_blender_mitsubaScene_3D(
@@ -201,13 +204,15 @@ if opt.render_2d:
             # FORMAT='PNG', 
             im_params_dict=
             {
-                'im_H_load': 640, 'im_W_load': 1280, 
-                # 'im_H_load': 480, 'im_W_load': 640, 
+                # 'im_H_load': 640, 'im_W_load': 1280, 
+                'im_H_load': 480, 'im_W_load': 640, 
                 # 'spp': 32, 
-                'spp': 1024, 
+                'spp': 256, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
+            # blender_file_name='test_blender_export_reimport.blend', 
+            if_skip_check=True,
         )
     host=host, 
     renderer.render(if_force=opt.force)
@@ -270,11 +275,11 @@ if opt.export:
             if_mask_from_mi=True, 
             format='monosdf',
             modality_list = [
-                'poses', 
-                'im_hdr', 
-                'im_sdr', 
-                'im_mask', 
-                'shapes', 
+                # 'poses', 
+                # 'im_hdr', 
+                # 'im_sdr', 
+                # 'im_mask', 
+                # 'shapes', 
                 'mi_normal', 
                 'mi_depth', 
                 ], 

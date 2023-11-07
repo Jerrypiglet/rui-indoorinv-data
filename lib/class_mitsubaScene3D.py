@@ -258,19 +258,22 @@ class mitsubaScene3D(mitsubaBase):
                 '''
                 OpenRooms convention (i.e. cam.txt).
                 The camera coordinates is in OpenCV convention (right-down-forward).
-                In the file, each camera is a 3x3 matrix with each row containing origin, lookat, up). 
+                In the file, each camera is a 4x3 matrix with each row containing origin, lookat, up, lookatvector). 
                 [!!!] lookat is a **location** in 3D in front of the camera; lookat-origin is the lookat **vector**.
                 '''
                 cam_params = read_cam_params_OR(pose_file)
                 frame_id_list = list(range(len(cam_params)))
                 frame_id_list = [_ for _ in frame_id_list if _ not in self.invalid_frame_id_list]
-                assert all([cam_param.shape == (3, 3) for cam_param in cam_params])
+                assert all([cam_param.shape == (4, 3) for cam_param in cam_params])
 
                 for idx in frame_id_list:
                     cam_param = cam_params[idx]
-                    origin, lookat, up = np.split(cam_param.T, 3, axis=1)
+                    origin, lookat, up, lookatvector = np.split(cam_param.T, 4, axis=1)
+                    assert np.abs(np.linalg.norm(lookatvector) - 1.) < 1e-5
+                    assert np.abs(np.linalg.norm(up) - 1.) < 1e-5
+                    # up = up / (np.linalg.norm(up)+1e-6)
                     # assert self.extra_transform is None, 'not suported yet'
-                    (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
+                    (R, t), lookatvector_ = origin_lookat_up_to_R_t(origin, lookat, up, lookatvector=lookatvector)
                     pose_list.append(np.hstack((R, t)))
                     origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
                     

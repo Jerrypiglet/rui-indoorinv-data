@@ -13,7 +13,7 @@ Currently supported datasets include:
    - See [**README_indoor_synthetic.md**](README_indoor_synthetic.md) for details.
    - Based on [Mitsuba XML files by Benedikt Bitterli](https://benedikt-bitterli.me/resources/).
    - Scripts support: sampling poses, rendering numerous modalities, visualization and export to FIPT/Monosdf/FVP/Li22.
-
+r
 2. **real**
    - See [**README_real.md**](README_real.md) for details.
    - Captured for FIPT.

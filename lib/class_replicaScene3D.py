@@ -303,8 +303,8 @@ class replicaScene3D(mitsubaBase, scene2DBase):
 
             for idx in self.frame_id_list:
                 cam_param = cam_params[idx]
-                origin, lookat, up = np.split(cam_param.T, 3, axis=1)
-                (R, t), lookatvector = origin_lookat_up_to_R_t(origin, lookat, up)
+                origin, lookat, up, lookatvector = np.split(cam_param.T, 4, axis=1)
+                (R, t), lookatvector_ = origin_lookat_up_to_R_t(origin, lookat, up, lookatvector=lookatvector)
                 self.pose_list.append(np.hstack((R, t)))
                 self.origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))
 

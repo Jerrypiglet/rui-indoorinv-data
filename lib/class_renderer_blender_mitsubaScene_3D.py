@@ -31,12 +31,14 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         FORMAT='OPEN_EXR', 
         COLOR_DEPTH=16, 
         blender_file_name=None, 
+        if_skip_check: bool=False,
         *args, **kwargs, 
     ):
         rendererBase.__init__(
             self, 
-            mitsuba_scene, 
-            modality_list, 
+            mitsuba_scene=mitsuba_scene, 
+            modality_list=modality_list, 
+            if_skip_check=if_skip_check, 
             *args, **kwargs
         )
         # assert self.os.pose_format in ['Blender', 'json'], ''
@@ -58,7 +60,11 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         self.scene = bpy.data.scenes["Scene"]
         self.scene.render.use_motion_blur = False
         self.scene.view_layers[0].cycles.use_denoising = True
+        # self.scene.view_layers[0].cycles.use_denoising = False
         self.scene.cycles.samples = self.spp
+        
+        self.scene.cycles.denoiser = 'OPTIX'
+        self.scene.view_settings.view_transform = 'Standard'
         
         '''
         configure render engine and device
@@ -72,10 +78,12 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         cycles_device = {
             'apple': 'CPU', 
             'mm1': 'GPU', 
+            'r4090': 'GPU', 
         }[host]
         compute_device_type = {
             'apple': 'METAL', 
             'mm1': 'CUDA', 
+            'r4090': 'CUDA', 
         }[host]
         bpy.context.scene.cycles.device = cycles_device
         # for scene in bpy.data.scenes:
@@ -154,7 +162,22 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         self.scene.render.resolution_percentage = 100
 
         # self.cam = scene.objects['Camera'] # the sensor in XML has to has 'id="Camera"'
-        self.cam = bpy.context.scene.camera#scene.objects['Camera']
+        self.cam = bpy.context.scene.camera#scene.objects['Camera'] # self.cam.data.lens -> 31.17691421508789, in mm (not degrees)
+        # print camera parameters
+        w = self.scene.render.resolution_x
+        h = self.scene.render.resolution_y
+        cx = np.float32(-self.cam.data.shift_x + 0.5)
+        cy = np.float32(self.cam.data.shift_y * w / h + 0.5)
+        # self.cam.data.shift_x = 0.5
+        # self.cam.data.shift_y = -0.5 / w * h
+        
+        # Assumes square pixels:
+        # self.scene.render.pixel_aspect_x == self.scene.render.pixel_aspect_y
+        fx = np.float32(self.cam.data.sensor_width / 2. / self.cam.data.lens)
+        fx_K = self.os.K[0][2]/self.os.K[0][0] # should be the same as fx
+        
+        fov_x = np.arctan(fx)/np.pi*180.*2. # in degrees
+        print('Blender camera parameters: w %d, h %d, cx %.4f, cy %.4f; fx %.4f, fx from K %.4f, fov_x: %.4f'%(w, h, cx, cy, fx, fx_K, fov_x))
 
         obj_idx = 1
         for obj in bpy.context.scene.objects:
@@ -207,7 +230,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         if 'lighting_envmap' in self.modality_list:
             env_height, env_width, env_row, env_col = get_list_of_keys(self.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
             folder_name_appendix = '-%dx%dx%dx%d'%(env_row, env_col, env_height, env_width)
-            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix=folder_name_appendix, if_force=if_force, file_name_appendix='_mi') # _: 'im', folder_name: 'Image'
+            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix1=folder_name_appendix, if_force=if_force) # _: 'im', folder_name: 'Image'
             self.render_lighting_envmap(render_folder_path)
             return
             
@@ -223,7 +246,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         _modality_list = list(set(self.modality_list) - set(['lighting_envmap']))
         
         for modality in _modality_list:
-            folder_name, render_folder_path = self.render_modality_check(modality, if_force=if_force, file_name_appendix='_mi') # _: 'im', folder_name: 'Image'
+            folder_name, render_folder_path = self.render_modality_check(modality, if_force=if_force) # _: 'im', folder_name: 'Image'
             modal_file_output = self.tree.nodes.new(type="CompositorNodeOutputFile")
             modal_file_output.label = folder_name
             self.links.new(self.render_layers.outputs[folder_name], modal_file_output.inputs[0]) # (self.render_layers.outputs[folder_name], bpy.data.scenes['Scene'].node_tree.nodes["File Output"].inputs[0])
@@ -250,10 +273,13 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             self.cam.location = blender_poses[i, 0]
             self.cam.rotation_euler[0] = blender_poses[i, 1, 0]
             self.cam.rotation_euler[2] = blender_poses[i, 1, 2]
-            self.cam.rotation_euler[1] = 0.
-            assert self.cam.rotation_euler[1] < 1e-4, 'default camera has no roll'
-
+            self.cam.rotation_euler[1] = blender_poses[i, 1, 1]
+            # self.cam.rotation_euler[1] = 0.
+            # assert self.cam.rotation_euler[1] < 1e-4, 'default camera has no roll'
+            
             self.cam.data.type = 'PERSP'
+            
+            # import ipdb; ipdb.set_trace()
             
             for modal_file_output in self.modal_file_outputs:
                 modal_file_output.file_slots[0].path = '%03d'%frame_id + '_'
