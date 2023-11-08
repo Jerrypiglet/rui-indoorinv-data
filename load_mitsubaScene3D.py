@@ -114,7 +114,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-frame_id_list = [0,1,2,3]
+# frame_id_list = [0,1,2,3]
 
 '''
 update confs
@@ -130,7 +130,7 @@ CONF.scene_params_dict.update({
 CONF.cam_params_dict.update({
     # ==> if sample poses and render images 
     'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-    'sample_pose_num': 20 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
+    'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
     'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     })
 
@@ -160,15 +160,16 @@ scene_obj = mitsubaScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
-        # 'shapes', # objs + emitters, geometry shapes + emitter properties``
-        # 'layout', 
+        'shapes', # objs + emitters, geometry shapes + emitter properties``
+        'layout', 
         'poses', 
         
-        'im_hdr', 
-        'im_sdr', 
-        'depth', 
-        'normal', 
-        'tsdf', 
+        # 'im_hdr', 
+        # 'im_sdr', 
+        # 'depth', 
+        # 'normal', 
+        
+        # 'tsdf', 
         
         # 'albedo', 'roughness', 
         # 'emission', 
@@ -191,8 +192,8 @@ if opt.render_2d:
             {
                 # 'im_H_load': 640, 'im_W_load': 1280, 
                 'im_H_load': 320, 'im_W_load': 640, 
-                'spp': 32, # DEBUG
-                # 'spp': 4096, 
+                # 'spp': 32, # DEBUG
+                'spp': 4096, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
@@ -218,8 +219,8 @@ if opt.render_2d:
             {
                 # 'im_H_load': 640, 'im_W_load': 1280, 
                 'im_H_load': 320, 'im_W_load': 640, 
-                'spp': 32, # DEBUG
-                # 'spp': 256, 
+                # 'spp': 32, # DEBUG
+                'spp': 256, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
@@ -381,7 +382,7 @@ if opt.vis_3d_o3d:
             'layout', 
             'mi', # mitsuba sampled rays, pts
             'poses', 
-            'tsdf', 
+            # 'tsdf', 
             # 'dense_geo', # fused from 2D
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)

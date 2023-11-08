@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 np.set_printoptions(suppress=True)
 from lib.utils_io import load_img
-from lib.utils_misc import blue_text, get_list_of_keys, green, yellow, yellow_text, white_blue, red, check_list_of_tensors_size
+from lib.utils_misc import blue_text, get_list_of_keys, green, yellow, yellow_text, white_blue, magenta
 from lib.utils_io import load_img, convert_write_png
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle
 
@@ -404,7 +404,7 @@ class scene2DBase(ABC):
             self.ceiling_loc = self.xyz_max[2]
             self.floor_loc = self.xyz_min[2]
 
-        print(blue_text('[%s] DONE. load_layout'%self.parent_class_name))
+        print(blue_text('[%s] DONE. load_layout'%self.parent_class_name), magenta('++++ room height'), self.ceiling_loc-self.floor_loc)
 
         self.if_loaded_layout = True
         self.if_has_ceilling_floor = True
@@ -433,10 +433,12 @@ class scene2DBase(ABC):
             self.v_2d = floor_vertices[:, [0, 1]]
             
         vertical_values_floor = floor_vertices[:, ['x', 'y', 'z'].index(self.axis_up[0])]
-        assert len(np.unique(vertical_values_floor)) in [1, 2]
+        # assert len(np.unique(vertical_values_floor)) in [1, 2]
+        assert np.amax(vertical_values_floor) - np.amin(vertical_values_floor) < 1e-3
         self.floor_loc = np.amax(np.unique(vertical_values_floor))
         vertical_values_ceiling = ceiling_vertices[:, ['x', 'y', 'z'].index(self.axis_up[0])]
-        assert len(np.unique(vertical_values_ceiling)) in [1, 2]
+        # assert len(np.unique(vertical_values_ceiling)) in [1, 2]
+        assert np.amax(vertical_values_ceiling) - np.amin(vertical_values_ceiling) < 1e-3
         self.ceiling_loc = np.amin(np.unique(vertical_values_ceiling))
             
         # finding minimum 2D bbox (rectangle) from contour
@@ -451,7 +453,7 @@ class scene2DBase(ABC):
             # self.layout_box_3d_transformed = np.hstack((, np.vstack((np.zeros((4, 1)), np.zeros((4, 1))+room_height))))    
             self.layout_box_3d_transformed = np.hstack((layout_hull_2d_2x, np.vstack((np.zeros((4, 1))+self.floor_loc, np.zeros((4, 1))+self.ceiling_loc))))
 
-        print(blue_text('[%s] DONE. load_layout from floor and ceiling'%self.parent_class_name))
+        print(blue_text('[%s] DONE. load_layout from floor and ceiling'%self.parent_class_name), magenta('++++ room height'), self.ceiling_loc-self.floor_loc)
 
         self.if_loaded_layout = True
         self.if_has_ceilling_floor = True
