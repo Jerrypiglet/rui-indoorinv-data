@@ -7,6 +7,7 @@ import numpy as np
 np.set_printoptions(suppress=True)
 from lib.utils_io import load_img
 from lib.utils_misc import blue_text, get_list_of_keys, green, yellow, yellow_text, white_blue, magenta
+from lib.utils_misc import blue_text, get_list_of_keys, green, yellow, yellow_text, white_blue, magenta
 from lib.utils_io import load_img, convert_write_png
 from lib.utils_OR.utils_OR_mesh import minimum_bounding_rectangle
 
@@ -270,7 +271,7 @@ class scene2DBase(ABC):
         if not 'im_hdr' in self.modality_file_list_dict:
             filename = self.CONF.modality_filename_dict['im_hdr']
             self.modality_file_list_dict['im_hdr'] = [self.scene_rendering_path_list[frame_idx] / (filename%frame_id) for frame_idx, frame_id in enumerate(self.frame_id_list)]
-
+            
         if 'im_H_load_hdr' in self.CONF.im_params_dict:
             # separate H, W for loading HDR images
             expected_shape_list = [(self.CONF.im_params_dict['im_H_load_hdr'], self.CONF.im_params_dict['im_W_load_hdr'], 3,)]*self.frame_num
@@ -434,12 +435,14 @@ class scene2DBase(ABC):
             
         vertical_values_floor = floor_vertices[:, ['x', 'y', 'z'].index(self.axis_up[0])]
         # assert len(np.unique(vertical_values_floor)) in [1, 2]
-        assert np.amax(vertical_values_floor) - np.amin(vertical_values_floor) < 1e-3
-        self.floor_loc = np.amax(np.unique(vertical_values_floor))
+        vertical_values_floor = np.unique(vertical_values_floor.round(decimals=3))
+        self.floor_loc = np.amin(vertical_values_floor)
+        
         vertical_values_ceiling = ceiling_vertices[:, ['x', 'y', 'z'].index(self.axis_up[0])]
+        vertical_values_ceiling = np.unique(vertical_values_ceiling.round(decimals=3))
         # assert len(np.unique(vertical_values_ceiling)) in [1, 2]
-        assert np.amax(vertical_values_ceiling) - np.amin(vertical_values_ceiling) < 1e-3
-        self.ceiling_loc = np.amin(np.unique(vertical_values_ceiling))
+        # assert np.amax(np.unique(vertical_values_ceiling)) - np.amin(np.unique(vertical_values_ceiling)) < 1e-3
+        self.ceiling_loc = np.amin(vertical_values_ceiling)
             
         # finding minimum 2D bbox (rectangle) from contour
         self.layout_hull_2d, self.layout_hull_pts = minimum_bounding_rectangle(self.v_2d)

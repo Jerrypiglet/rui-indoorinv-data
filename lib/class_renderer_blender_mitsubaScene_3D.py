@@ -63,7 +63,9 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         # self.scene.view_layers[0].cycles.use_denoising = False
         self.scene.cycles.samples = self.spp
         
+        # https://docs.blender.org/manual/en/latest/render/color_management.html
         self.scene.view_settings.view_transform = 'Standard'
+        # self.scene.view_settings.view_transform = 'Raw'
         
         '''
         configure render engine and device
@@ -163,7 +165,10 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         self.scene.render.resolution_percentage = 100
 
         # self.cam = scene.objects['Camera'] # the sensor in XML has to has 'id="Camera"'
-        self.cam = bpy.context.scene.camera#scene.objects['Camera'] # self.cam.data.lens -> 31.17691421508789, in mm (not degrees)
+        self.cam = bpy.context.scene.camera #scene.objects['Camera'] # self.cam.data.lens -> 31.17691421508789, in mm (not degrees)
+        self.cam.data.clip_start = 0.05
+        self.cam.data.clip_end = 50.0
+        # import ipdb; ipdb.set_trace()
         # print camera parameters
         w = self.scene.render.resolution_x
         h = self.scene.render.resolution_y
@@ -186,25 +191,37 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                 obj.pass_index=obj_idx
                 obj_idx += 1
 
+        # self.scene.render.image_settings.file_format = FORMAT
         self.scene.render.image_settings.file_format = FORMAT
         self.scene.render.image_settings.color_depth = str(COLOR_DEPTH)
 
         # Set pass
-        self.scene.view_layers["ViewLayer"].use_pass_normal = True
-        self.scene.view_layers["ViewLayer"].use_pass_object_index = True
-        self.scene.view_layers["ViewLayer"].use_pass_z = True
-        self.scene.view_layers["ViewLayer"].use_pass_material_index = True
-        self.scene.view_layers["ViewLayer"].use_pass_diffuse_color = True
-        self.scene.view_layers["ViewLayer"].use_pass_emit = True
-        self.scene.view_layers["ViewLayer"].use_pass_glossy_color = True
-        self.scene.view_layers["ViewLayer"].use_pass_position = True
+        # self.scene.view_layers["ViewLayer"].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
+        # self.scene.view_layers["ViewLayer"].use_pass_object_index = True
+        # self.scene.view_layers["ViewLayer"].use_pass_z = True
+        # self.scene.view_layers["ViewLayer"].use_pass_material_index = True
+        # self.scene.view_layers["ViewLayer"].use_pass_diffuse_color = True
+        # self.scene.view_layers["ViewLayer"].use_pass_emit = True
+        # self.scene.view_layers["ViewLayer"].use_pass_glossy_color = True
+        # self.scene.view_layers["ViewLayer"].use_pass_position = True
+        
+        self.scene.view_layers[0].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
+        self.scene.view_layers[0].use_pass_object_index = True
+        self.scene.view_layers[0].use_pass_z = True
+        self.scene.view_layers[0].use_pass_material_index = True
+        self.scene.view_layers[0].use_pass_diffuse_color = True
+        self.scene.view_layers[0].use_pass_glossy_color = True
+        self.scene.view_layers[0].use_pass_emit = True
+        self.scene.view_layers[0].use_pass_position = True
 
         self.scene.use_nodes = True
 
         for aov_modal in AOV_MODALS:
             bpy.ops.scene.view_layer_add_aov()
-            self.scene.view_layers["ViewLayer"].aovs[-1].name = aov_modal
-            self.scene.view_layers["ViewLayer"].aovs[-1].type = "VALUE"
+            # self.scene.view_layers["ViewLayer"].aovs[-1].name = aov_modal
+            # self.scene.view_layers["ViewLayer"].aovs[-1].type = "VALUE"
+            self.scene.view_layers[0].aovs[-1].name = aov_modal
+            self.scene.view_layers[0].aovs[-1].type = "VALUE"
 
         # self.scene = bpy.data.scenes["Scene"]
         self.tree = self.scene.node_tree

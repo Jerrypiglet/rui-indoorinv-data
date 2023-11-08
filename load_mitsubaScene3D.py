@@ -25,8 +25,8 @@ Examples:
 import sys
 from pathlib import Path
 
-# host = 'r4090'
-host = 'apple'
+host = 'r4090'
+# host = 'apple'
 
 from lib.global_vars import PATH_HOME_dict# , INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
 PATH_HOME = Path(PATH_HOME_dict[host])
@@ -114,7 +114,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-# frame_id_list = [0,1,2,3]
+# frame_id_list = [0]
 
 '''
 update confs
@@ -164,12 +164,11 @@ scene_obj = mitsubaScene3D(
         'layout', 
         'poses', 
         
-        # 'im_hdr', 
-        # 'im_sdr', 
-        # 'depth', 
-        # 'normal', 
-        
-        # 'tsdf', 
+        'im_hdr', 
+        'im_sdr', 
+        'depth', 
+        'normal', 
+        'tsdf', 
         
         # 'albedo', 'roughness', 
         # 'emission', 
@@ -220,7 +219,7 @@ if opt.render_2d:
                 # 'im_H_load': 640, 'im_W_load': 1280, 
                 'im_H_load': 320, 'im_W_load': 640, 
                 # 'spp': 32, # DEBUG
-                'spp': 256, 
+                'spp': 64, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
