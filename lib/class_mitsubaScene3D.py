@@ -187,8 +187,16 @@ class mitsubaScene3D(mitsubaBase):
         '''
         load scene representation into Mitsuba 3
         '''
-        if self.has_shape_file:
+        # if self.has_shape_file:
+        #     self.load_mi_scene_from_shape()
+        if self.has_shape_file and not self.CONF.mi_params_dict.if_mi_scene_from_xml:
+            print(blue_text('[%s][load_mi_scene] from shape file: %s')%(str(self.__class__.__name__), self.shape_file_path))
             self.load_mi_scene_from_shape()
+            self.mi_scene_from = 'shape'
+        elif self.has_tsdf_file and self.tsdf_file_path.exists() and not self.CONF.mi_params_dict.if_mi_scene_from_xml:
+            print(blue_text('[%s][load_mi_scene] from tsdf file: %s')%(str(self.__class__.__name__), self.tsdf_file_path))
+            self.load_mi_scene_from_shape(shape_file_path=self.tsdf_file_path)
+            self.mi_scene_from = 'tsdf'
         else:
             # xml file always exists for Mitsuba scenes
             self.mi_scene = mi.load_file(str(self.xml_file_path))

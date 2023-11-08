@@ -24,6 +24,7 @@ class evaluator_scene_scene():
         self, 
         scene_object, 
         host: str='', 
+        eval_scene_from: str='shape',
     ):
         self.host = scene_object.host if host == '' else host
         self.device = {
@@ -34,6 +35,9 @@ class evaluator_scene_scene():
         mi.set_variant(mi_variant_dict[self.host])
 
         self.os = scene_object
+        
+        self.eval_scene_from = eval_scene_from
+        assert self.eval_scene_from in ['shape', 'tsdf']
 
     def sample_shapes(
         self, 
@@ -56,7 +60,7 @@ class evaluator_scene_scene():
         - shape_params
         '''
         assert self.os.if_loaded_shapes or self.os.if_loaded_tsdf, 'Shape(s)/TSDF shape not loaded! Required to evaluate properties of vertexs or faces.'
-        if self.os.if_loaded_shapes:
+        if self.os.if_loaded_shapes and self.eval_scene_from=='shape':
             _vertices_list, _faces_list, _shape_ids_list = self.os.vertices_list, self.os.faces_list, self.os.shape_ids_list
             if self.os.has_shape_file:
                 if self.os.mi_scene_from != 'shape':
@@ -64,13 +68,15 @@ class evaluator_scene_scene():
                     if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
                         self.os.process_mi_scene(if_postprocess_mi_frames=True)
                 assert self.os.mi_scene_from == 'shape'
-        elif self.os.if_loaded_tsdf:
+        elif self.os.if_loaded_tsdf and self.eval_scene_from=='tsdf':
             _vertices_list, _faces_list, _shape_ids_list = [self.os.tsdf_fused_dict['vertices']], [self.os.tsdf_fused_dict['faces'] + 1], [0] # fix all faces to be 0-indexed
             if self.os.mi_scene_from != 'tsdf':
                 self.os.load_mi_scene()
                 if self.os.CONF.mi_params_dict.get('process_mi_scene', True):
                     self.os.process_mi_scene(if_postprocess_mi_frames=True, force=True)
             # assert self.os.mi_scene_from == 'tsdf'
+        else:
+            raise NotImplementedError
         assert sample_type in ['vis_count', 't', 'rgb_hdr', 'rgb_sdr', 'face_normal', 'mi_normal', 'semseg', 'instance_seg', 'matseg']
 
         return_dict = {}

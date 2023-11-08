@@ -6,8 +6,11 @@ Works with
 Examples:
 
 - Load and export indoor_synthetic scenes to tsdf, and visualize fused RGB onto TSDF mesh:
-    - first enable 'tsdf' in modality_list;
-    > 
+    - enable 'tsdf' in modality_list; 
+    - set: sample_type='rgb_sdr'; 
+    - set: 'if_mi_scene_from_xml': False; 
+    - set: eval_scene_from='tsdf', 
+    > python load_mitsubaScene3D.py --scene kitchen_diy --eval_scene --if_add_color_from_eval
 
 - Load and export indoor_synthetic scenes train and val to MonoSDF format:
 
@@ -111,7 +114,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-frame_id_list = [0]
+frame_id_list = [0,1,2,3]
 
 '''
 update confs
@@ -127,18 +130,19 @@ CONF.scene_params_dict.update({
 CONF.cam_params_dict.update({
     # ==> if sample poses and render images 
     'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-    'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
+    'sample_pose_num': 20 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
     'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     })
 
 CONF.mi_params_dict.update({
     'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
     'if_get_segs': True, # [depend on if_sample_rays_pts=True] True: to generate segs similar to those in openroomsScene2D.load_seg()
+    # 'if_mi_scene_from_xml': False, 
     })
 
 CONF.im_params_dict.update({
-    'im_H_load': 480, 'im_W_load': 640, 
-    'im_H_resize': 480, 'im_W_resize': 640, 
+    'im_H_load': 320, 'im_W_load': 640, 
+    'im_H_resize': 320, 'im_W_resize': 640, 
     # 'im_H_resize': 640, 'im_W_resize': 1280, 
     })
 
@@ -156,14 +160,16 @@ scene_obj = mitsubaScene3D(
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
-        'shapes', # objs + emitters, geometry shapes + emitter properties``
-        'layout', 
+        # 'shapes', # objs + emitters, geometry shapes + emitter properties``
+        # 'layout', 
         'poses', 
+        
         'im_hdr', 
         'im_sdr', 
         'depth', 
         'normal', 
         'tsdf', 
+        
         # 'albedo', 'roughness', 
         # 'emission', 
         # 'lighting_envmap', 
@@ -184,9 +190,9 @@ if opt.render_2d:
             im_params_dict=
             {
                 # 'im_H_load': 640, 'im_W_load': 1280, 
-                'im_H_load': 480, 'im_W_load': 640, 
-                'spp': 4096, 
-                # 'spp': 32, 
+                'im_H_load': 320, 'im_W_load': 640, 
+                'spp': 32, # DEBUG
+                # 'spp': 4096, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
@@ -211,9 +217,9 @@ if opt.render_2d:
             im_params_dict=
             {
                 # 'im_H_load': 640, 'im_W_load': 1280, 
-                'im_H_load': 480, 'im_W_load': 640, 
-                # 'spp': 32, 
-                'spp': 256, 
+                'im_H_load': 320, 'im_W_load': 640, 
+                'spp': 32, # DEBUG
+                # 'spp': 256, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
@@ -235,6 +241,7 @@ if opt.eval_scene:
     evaluator_scene = evaluator_scene_scene(
         host=host, 
         scene_object=scene_obj, 
+        eval_scene_from='tsdf', 
     )
 
     '''
@@ -245,6 +252,7 @@ if opt.eval_scene:
         sample_type='vis_count', # ['']
         # sample_type='t', # ['']
         # sample_type='face_normal', # ['']
+        # sample_type='rgb_sdr', 
         shape_params={
         }
     )
@@ -462,7 +470,7 @@ if opt.vis_3d_o3d:
             # 'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
             # 'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
-            'if_cam_rays': True, 
+            'if_cam_rays': False, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             
