@@ -5,7 +5,9 @@ Works with
 
 Examples:
 
-Load and export indoor_synthetic scenes:
+- Load and export indoor_synthetic scenes to tsdf, and visualize fused RGB onto TSDF mesh:
+    - first enable 'tsdf' in modality_list;
+    > 
 
 - Load and export indoor_synthetic scenes train and val to MonoSDF format:
 
@@ -20,8 +22,8 @@ Load and export indoor_synthetic scenes:
 import sys
 from pathlib import Path
 
-host = 'r4090'
-# host = 'apple'
+# host = 'r4090'
+host = 'apple'
 
 from lib.global_vars import PATH_HOME_dict# , INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
 PATH_HOME = Path(PATH_HOME_dict[host])
@@ -109,7 +111,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-# frame_id_list = [0,1,2,3,4,5]
+frame_id_list = [0]
 
 '''
 update confs
@@ -135,6 +137,7 @@ CONF.mi_params_dict.update({
     })
 
 CONF.im_params_dict.update({
+    'im_H_load': 480, 'im_W_load': 640, 
     'im_H_resize': 480, 'im_W_resize': 640, 
     # 'im_H_resize': 640, 'im_W_resize': 1280, 
     })
@@ -154,16 +157,16 @@ scene_obj = mitsubaScene3D(
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
     modality_list = [
         'shapes', # objs + emitters, geometry shapes + emitter properties``
-        # 'layout', 
+        'layout', 
         'poses', 
-        # 'im_hdr', 
-        # 'im_sdr', 
-        # 'lighting_envmap', 
+        'im_hdr', 
+        'im_sdr', 
+        'depth', 
+        'normal', 
+        'tsdf', 
         # 'albedo', 'roughness', 
         # 'emission', 
-        # 'depth', 
-        # 'normal', 
-        # 'tsdf', 
+        # 'lighting_envmap', 
         ], 
 )
 
@@ -183,6 +186,7 @@ if opt.render_2d:
                 # 'im_H_load': 640, 'im_W_load': 1280, 
                 'im_H_load': 480, 'im_W_load': 640, 
                 'spp': 4096, 
+                # 'spp': 32, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
@@ -192,7 +196,7 @@ if opt.render_2d:
         renderer = renderer_blender_mitsubaScene_3D(
             scene_obj, 
             modality_list=[
-                # 'im', 
+                'im', 
                 'albedo', 
                 'roughness', 
                 'depth', 
@@ -325,18 +329,18 @@ if opt.vis_2d_plt:
         scene_obj, 
         modality_list_vis=[
             'im', 
-            # 'layout', 
-            # 'shapes', 
+            'depth', 
+            'normal', 
+            'mi_depth', 
+            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'albedo', 
             # 'roughness', 
             # 'emission', 
-            # 'depth', 
-            # 'normal', 
-            'mi_depth', 
-            'mi_normal', # compare depth & normal maps from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_depth_normals_2D.png
             # 'lighting_envmap', # renderer with mi/blender: images/demo_lighting_envmap_mitsubaScene_2D_plt.png
             # 'seg_area', 'seg_env', 'seg_obj', 
             # 'mi_seg_area', 'mi_seg_env', 'mi_seg_obj', # compare segs from mitsuba sampling VS OptixRenderer: **mitsuba does no anti-aliasing**: images/demo_mitsuba_ret_seg_2D.png
+            # 'layout', 
+            # 'shapes', 
             ], 
         frame_idx_list=[0, 1, 2, 3, 4], 
         # frame_idx_list=[0], 
@@ -369,7 +373,7 @@ if opt.vis_3d_o3d:
             'layout', 
             'mi', # mitsuba sampled rays, pts
             'poses', 
-            # 'tsdf', 
+            'tsdf', 
             # 'dense_geo', # fused from 2D
             # 'lighting_envmap', # images/demo_lighting_envmap_o3d.png; arrows in pink
             # 'emitters', # emitter PROPERTIES (e.g. SGs, half envmaps)
@@ -458,7 +462,7 @@ if opt.vis_3d_o3d:
             # 'if_ceiling': True, # [OPTIONAL] remove ceiling points to better see the furniture 
             # 'if_walls': True, # [OPTIONAL] remove wall points to better see the furniture 
 
-            'if_cam_rays': False, 
+            'if_cam_rays': True, 
             'cam_rays_if_pts': True, # if cam rays end in surface intersections; set to False to visualize rays of unit length
             'cam_rays_subsample': 10, 
             

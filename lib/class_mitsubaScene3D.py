@@ -15,7 +15,7 @@ import string
 import mitsuba as mi
 
 from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red, get_device
-from lib.utils_io import load_matrix, resize_intrinsics
+from lib.utils_io import load_matrix, resize_intrinsics, normalize_v
 from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
 
 # from .class_openroomsScene2D import openroomsScene2D
@@ -206,6 +206,8 @@ class mitsubaScene3D(mitsubaBase):
         if self.im_W_load != self.W or self.im_H_load != self.H:
             scale_factor = [t / s for t, s in zip((self.H, self.W), self.im_HW_load)]
             self.K = resize_intrinsics(self.K, scale_factor)
+            self.im_W_load = self.W
+            self.im_H_load = self.H
             
     def get_pose_num_from_file(self):
         if self.pose_format == 'OpenRooms':
@@ -273,6 +275,8 @@ class mitsubaScene3D(mitsubaBase):
                     assert np.abs(np.linalg.norm(up) - 1.) < 1e-5
                     # up = up / (np.linalg.norm(up)+1e-6)
                     # assert self.extra_transform is None, 'not suported yet'
+                    assert np.amax(np.abs(normalize_v((lookat-origin).reshape(-1)) - lookatvector.reshape(-1))) < 1e-4
+                    
                     (R, t), lookatvector_ = origin_lookat_up_to_R_t(origin, lookat, up, lookatvector=lookatvector)
                     pose_list.append(np.hstack((R, t)))
                     origin_lookatvector_up_list.append((origin.reshape((3, 1)), lookatvector.reshape((3, 1)), up.reshape((3, 1))))

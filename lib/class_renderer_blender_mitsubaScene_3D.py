@@ -63,7 +63,6 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         # self.scene.view_layers[0].cycles.use_denoising = False
         self.scene.cycles.samples = self.spp
         
-        self.scene.cycles.denoiser = 'OPTIX'
         self.scene.view_settings.view_transform = 'Standard'
         
         '''
@@ -89,6 +88,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         # for scene in bpy.data.scenes:
         #     print(scene.name)
         #     scene.cycles.device = cycles_device
+        if cycles_device == 'GPU':
+            self.scene.cycles.denoiser = 'OPTIX'
 
         bpy.context.preferences.addons["cycles"].preferences.compute_device_type = compute_device_type
         bpy.context.preferences.addons["cycles"].preferences.get_devices()
