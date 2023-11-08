@@ -608,7 +608,7 @@ class mitsubaBase(scene2DBase):
             # camera_angle_y = 2 * np.arctan(0.5 * self._H() / f_y)
             # dump_blender_npy_to_json(blender_poses=blender_poses, export_path=json_path, camera_angle_x=camera_angle_x, camera_angle_y=camera_angle_y)
             
-            print(white_blue('Dumped sampled poses (cam.txt) to') + str(self.scene_rendering_path))
+            print(white_blue('Dumped %d sampled poses (cam.txt) to'%len(self.origin_lookat_up_list)) + str(self.scene_rendering_path))
 
     def load_meta_json_pose(self, pose_file):
         assert Path(pose_file).exists(), str(pose_file)

@@ -230,7 +230,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         if 'lighting_envmap' in self.modality_list:
             env_height, env_width, env_row, env_col = get_list_of_keys(self.lighting_params_dict, ['env_height', 'env_width', 'env_row', 'env_col'], [int, int, int, int])
             folder_name_appendix = '-%dx%dx%dx%d'%(env_row, env_col, env_height, env_width)
-            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix1=folder_name_appendix, if_force=if_force) # _: 'im', folder_name: 'Image'
+            folder_name, render_folder_path = self.render_modality_check('lighting_envmap', folder_name_appendix=folder_name_appendix, if_force=if_force) # _: 'im', folder_name: 'Image'
             self.render_lighting_envmap(render_folder_path)
             return
             

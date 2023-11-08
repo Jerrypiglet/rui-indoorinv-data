@@ -5,7 +5,9 @@ Works with
 
 Examples:
 
-- Export indoor_synthetic scenes train and val to MonoSDF format:
+Load and export indoor_synthetic scenes:
+
+- Load and export indoor_synthetic scenes train and val to MonoSDF format:
 
 > python load_mitsubaScene3D.py --scene kitchen_mi --export --export_format monosdf --export_appendix _fipt --split train --vis_3d_o3d False --force           
 
@@ -123,7 +125,7 @@ CONF.scene_params_dict.update({
 CONF.cam_params_dict.update({
     # ==> if sample poses and render images 
     'if_sample_poses': opt.if_sample_poses, # True to generate camera poses following Zhengqin's method (i.e. walking along walls)
-    'sample_pose_num': 20 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
+    'sample_pose_num': 200 if 'train' in opt.split else 20, # Number of poses to sample; set to -1 if not sampling
     'sample_pose_if_vis_plt': True, # images/demo_sample_pose.png, images/demo_sample_pose_bathroom.png
     })
 
@@ -190,13 +192,13 @@ if opt.render_2d:
         renderer = renderer_blender_mitsubaScene_3D(
             scene_obj, 
             modality_list=[
-                'im', 
-                # 'albedo', 
-                # 'roughness', 
-                # 'depth', 
-                # 'normal', 
-                # 'index', 
-                # 'emission', 
+                # 'im', 
+                'albedo', 
+                'roughness', 
+                'depth', 
+                'normal', 
+                'index', 
+                'emission', 
                 # 'lighting_envmap', 
                 ], 
             host=host, 

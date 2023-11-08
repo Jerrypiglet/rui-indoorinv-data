@@ -65,7 +65,7 @@ def convert_OR_poses_to_blender_npy(pose_list: list, export_path: Path=None):
         blender_poses[i,0] = pos
         blender_poses[i,1] = angle
         
-        print('=====blender angle', angle)
+        print('=====blender angle converted from OR cam.txt poses', angle) # ideally roll (2nd entry) should be 0.
         
     if export_path is not None:
         assert export_path.suffix == '.npy'
@@ -258,10 +258,10 @@ def origin_lookat_up_to_R_t(origin, lookat, up, lookatvector=None):
     origin = origin.flatten()
     lookat = lookat.flatten()
     up = up.flatten()
-    lookatvector = lookatvector.flatten()
     if lookatvector is None:
         lookatvector = normalize_v(lookat - origin) # [3,]
     else:
+        lookatvector = lookatvector.flatten()
         assert np.abs(np.linalg.norm(lookatvector) - 1.) < 1e-5
     assert np.amax(np.abs(np.dot(lookatvector.flatten(), up.flatten()))) < 1e-4 # two vector should be perpendicular
     t = origin.reshape((3, 1)).astype(np.float32)
