@@ -62,7 +62,6 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         self.scene.view_layers[0].cycles.use_denoising = True
         # self.scene.view_layers[0].cycles.use_denoising = False
         self.scene.cycles.samples = self.spp
-        
         self.scene.view_settings.view_transform = 'Standard'
         
         '''
@@ -190,21 +189,32 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         self.scene.render.image_settings.color_depth = str(COLOR_DEPTH)
 
         # Set pass
-        self.scene.view_layers["ViewLayer"].use_pass_normal = True
-        self.scene.view_layers["ViewLayer"].use_pass_object_index = True
-        self.scene.view_layers["ViewLayer"].use_pass_z = True
-        self.scene.view_layers["ViewLayer"].use_pass_material_index = True
-        self.scene.view_layers["ViewLayer"].use_pass_diffuse_color = True
-        self.scene.view_layers["ViewLayer"].use_pass_emit = True
-        self.scene.view_layers["ViewLayer"].use_pass_glossy_color = True
-        self.scene.view_layers["ViewLayer"].use_pass_position = True
+        # self.scene.view_layers["ViewLayer"].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
+        # self.scene.view_layers["ViewLayer"].use_pass_object_index = True
+        # self.scene.view_layers["ViewLayer"].use_pass_z = True
+        # self.scene.view_layers["ViewLayer"].use_pass_material_index = True
+        # self.scene.view_layers["ViewLayer"].use_pass_diffuse_color = True
+        # self.scene.view_layers["ViewLayer"].use_pass_emit = True
+        # self.scene.view_layers["ViewLayer"].use_pass_glossy_color = True
+        # self.scene.view_layers["ViewLayer"].use_pass_position = True
+        
+        self.scene.view_layers[0].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
+        self.scene.view_layers[0].use_pass_object_index = True
+        self.scene.view_layers[0].use_pass_z = True
+        self.scene.view_layers[0].use_pass_material_index = True
+        self.scene.view_layers[0].use_pass_diffuse_color = True
+        self.scene.view_layers[0].use_pass_emit = True
+        self.scene.view_layers[0].use_pass_glossy_color = True
+        self.scene.view_layers[0].use_pass_position = True
 
         self.scene.use_nodes = True
 
         for aov_modal in AOV_MODALS:
             bpy.ops.scene.view_layer_add_aov()
-            self.scene.view_layers["ViewLayer"].aovs[-1].name = aov_modal
-            self.scene.view_layers["ViewLayer"].aovs[-1].type = "VALUE"
+            # self.scene.view_layers["ViewLayer"].aovs[-1].name = aov_modal
+            # self.scene.view_layers["ViewLayer"].aovs[-1].type = "VALUE"
+            self.scene.view_layers[0].aovs[-1].name = aov_modal
+            self.scene.view_layers[0].aovs[-1].type = "VALUE"
 
         # self.scene = bpy.data.scenes["Scene"]
         self.tree = self.scene.node_tree

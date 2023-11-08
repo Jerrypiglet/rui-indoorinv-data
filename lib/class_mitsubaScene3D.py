@@ -14,7 +14,7 @@ import string
 # Import the library using the alias "mi"
 import mitsuba as mi
 
-from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red, get_device
+from lib.utils_misc import blue_text, yellow, get_list_of_keys, white_blue, red, magenta
 from lib.utils_io import load_matrix, resize_intrinsics, normalize_v
 from lib.utils_OR.utils_OR_xml import xml_rotation_to_matrix_homo
 
@@ -189,11 +189,11 @@ class mitsubaScene3D(mitsubaBase):
         '''
         # if self.has_shape_file:
         #     self.load_mi_scene_from_shape()
-        if self.has_shape_file and not self.CONF.mi_params_dict.if_mi_scene_from_xml:
+        if self.has_shape_file and not self.CONF.mi_params_dict.get('if_mi_scene_from_xml', False):
             print(blue_text('[%s][load_mi_scene] from shape file: %s')%(str(self.__class__.__name__), self.shape_file_path))
             self.load_mi_scene_from_shape()
             self.mi_scene_from = 'shape'
-        elif self.has_tsdf_file and self.tsdf_file_path.exists() and not self.CONF.mi_params_dict.if_mi_scene_from_xml:
+        elif self.has_tsdf_file and self.tsdf_file_path.exists() and not self.CONF.mi_params_dict.get('if_mi_scene_from_xml', False):
             print(blue_text('[%s][load_mi_scene] from tsdf file: %s')%(str(self.__class__.__name__), self.tsdf_file_path))
             self.load_mi_scene_from_shape(shape_file_path=self.tsdf_file_path)
             self.mi_scene_from = 'tsdf'
@@ -639,8 +639,8 @@ class mitsubaScene3D(mitsubaBase):
 
                     # assert len(shape.findall('emitter')) == 0 # [TODO] deal with object-based emitters
                     
-                    _id = shape.get('id') if shape.get('id') is not None else filename_stem
-                    _id = _id + '_' + random_id
+                    _id_stem = shape.get('id') if shape.get('id') is not None else filename_stem
+                    _id = _id_stem + '_' + random_id
                     
                 bverts, bfaces = computeBox(vertices)
                 if shape.get('type') == 'obj':
@@ -680,8 +680,8 @@ class mitsubaScene3D(mitsubaBase):
                 self.shape_ids_list.append(_id)
                 
                 is_wall = 'wall' in _id.lower()
-                is_ceiling = 'ceiling' in _id.lower() if ceiling_id is None else _id.split('_')[0] == ceiling_id
-                is_floor = 'floor' in _id.lower() if floor_id is None else _id.split('_')[0] == floor_id
+                is_ceiling = 'ceiling' in _id.lower() if ceiling_id is None else _id_stem == ceiling_id
+                is_floor = 'floor' in _id.lower() if floor_id is None else _id_stem == floor_id
                 shape_dict = {
                     'filename': filename.get('value') if filename is not None else 'N/A', 
                     'if_in_emitter_dict': if_emitter, 
@@ -693,9 +693,12 @@ class mitsubaScene3D(mitsubaBase):
                     'is_floor': is_floor, 
                     'is_layout': is_wall or is_ceiling or is_floor,
                 }
-                if is_wall: print('++++ is_wall:', _id, shape_dict['filename'])
-                if is_floor: print('++++ is_floor:', _id, shape_dict['filename'])
-                if is_ceiling: print('++++ is_ceiling:', _id, shape_dict['filename'])
+                if is_wall: print(white_blue('++++ is_wall:'), _id, shape_dict['filename'])
+                if is_floor: 
+                    print(magenta('++++ is_floor:'), _id, shape_dict['filename'])
+                    # import ipdb; ipdb.set_trace()
+                if is_ceiling: print(magenta('++++ is_ceiling:'), _id, shape_dict['filename'])
+                # print(_id)
                 
                 if if_emitter:
                     shape_dict.update({'emitter_prop': emitter_prop})
