@@ -22,6 +22,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
     Blender Python API Documentation: https://docs.blender.org/api/current/index.html https://docs.blender.org/api/3.4/
     Intall Mitsuba addon for dumping Mitsuba scene into Blender: https://github.com/mitsuba-renderer/mitsuba-blender
         - First need to export the Mitsuba scene to **{XML file name}.blend** in Blender app: https://github.com/mitsuba-renderer/mitsuba-blender/wiki/Importing-a-Mitsuba-Scene
+        
+    API documentation: https://docs.blender.org/api/current/search.html?q=clamping&check_keywords=yes&area=default#
     '''
     def __init__(
         self, 
@@ -57,15 +59,15 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         
         bpy.ops.wm.open_mainfile(filepath=str(self.blend_file_path))
         self.scene = bpy.context.scene
-        self.scene = bpy.data.scenes["Scene"]
-        self.scene.render.use_motion_blur = False
-        self.scene.view_layers[0].cycles.use_denoising = True
-        # self.scene.view_layers[0].cycles.use_denoising = False
-        self.scene.cycles.samples = self.spp
+        # self.scene = bpy.data.scenes["Scene"]
+        bpy.context.scene.render.use_motion_blur = False
+        bpy.context.scene.view_layers[0].cycles.use_denoising = True
+        # bpy.context.scene.view_layers[0].cycles.use_denoising = False
+        bpy.context.scene.cycles.samples = self.spp
         
         # https://docs.blender.org/manual/en/latest/render/color_management.html
-        self.scene.view_settings.view_transform = 'Standard'
-        # self.scene.view_settings.view_transform = 'Raw'
+        # bpy.context.scene.view_settings.view_transform = 'Standard'
+        bpy.context.scene.view_settings.view_transform = 'Raw'
         
         '''
         configure render engine and device
@@ -74,7 +76,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         print("----------------------------------------------")
         print('setting up gpu/metal ......')
 
-        self.scene.render.engine = 'CYCLES'
+        bpy.context.scene.render.engine = 'CYCLES'
         
         cycles_device = {
             'apple': 'CPU', 
@@ -91,7 +93,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         #     print(scene.name)
         #     scene.cycles.device = cycles_device
         if cycles_device == 'GPU':
-            self.scene.cycles.denoiser = 'OPTIX'
+            bpy.context.scene.cycles.denoiser = 'OPTIX'
 
         bpy.context.preferences.addons["cycles"].preferences.compute_device_type = compute_device_type
         bpy.context.preferences.addons["cycles"].preferences.get_devices()
@@ -157,28 +159,29 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         scene
         '''
         
-        # Background
-        self.scene.render.dither_intensity = 0.0
-        self.scene.render.film_transparent = True
-        self.scene.render.resolution_x = self.im_params_dict['im_W_load']
-        self.scene.render.resolution_y = self.im_params_dict['im_H_load']
-        self.scene.render.resolution_percentage = 100
+        # Renderer
+        bpy.context.scene.render.dither_intensity = 0.0
+        # bpy.context.scene.render.film_transparent = True
+        bpy.context.scene.render.resolution_x = self.im_params_dict['im_W_load']
+        bpy.context.scene.render.resolution_y = self.im_params_dict['im_H_load']
+        bpy.context.scene.render.resolution_percentage = 100
+        bpy.context.scene.render.threads = 16
+        bpy.context.scene.render.views_format = 'MULTIVIEW'
 
         # self.cam = scene.objects['Camera'] # the sensor in XML has to has 'id="Camera"'
         self.cam = bpy.context.scene.camera #scene.objects['Camera'] # self.cam.data.lens -> 31.17691421508789, in mm (not degrees)
-        self.cam.data.clip_start = 0.05
+        self.cam.data.clip_start = 0.1
         self.cam.data.clip_end = 50.0
-        # import ipdb; ipdb.set_trace()
         # print camera parameters
-        w = self.scene.render.resolution_x
-        h = self.scene.render.resolution_y
+        w = bpy.context.scene.render.resolution_x
+        h = bpy.context.scene.render.resolution_y
         cx = np.float32(-self.cam.data.shift_x + 0.5)
         cy = np.float32(self.cam.data.shift_y * w / h + 0.5)
         # self.cam.data.shift_x = 0.5
         # self.cam.data.shift_y = -0.5 / w * h
         
         # Assumes square pixels:
-        # self.scene.render.pixel_aspect_x == self.scene.render.pixel_aspect_y
+        # bpy.context.scene.render.pixel_aspect_x == bpy.context.scene.render.pixel_aspect_y
         fx = np.float32(self.cam.data.sensor_width / 2. / self.cam.data.lens)
         fx_K = self.os.K[0][2]/self.os.K[0][0] # should be the same as fx
         
@@ -191,40 +194,40 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                 obj.pass_index=obj_idx
                 obj_idx += 1
 
-        # self.scene.render.image_settings.file_format = FORMAT
-        self.scene.render.image_settings.file_format = FORMAT
-        self.scene.render.image_settings.color_depth = str(COLOR_DEPTH)
+        # bpy.context.scene.render.image_settings.file_format = FORMAT
+        bpy.context.scene.render.image_settings.file_format = FORMAT
+        bpy.context.scene.render.image_settings.color_depth = str(COLOR_DEPTH)
 
         # Set pass
-        # self.scene.view_layers["ViewLayer"].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
-        # self.scene.view_layers["ViewLayer"].use_pass_object_index = True
-        # self.scene.view_layers["ViewLayer"].use_pass_z = True
-        # self.scene.view_layers["ViewLayer"].use_pass_material_index = True
-        # self.scene.view_layers["ViewLayer"].use_pass_diffuse_color = True
-        # self.scene.view_layers["ViewLayer"].use_pass_emit = True
-        # self.scene.view_layers["ViewLayer"].use_pass_glossy_color = True
-        # self.scene.view_layers["ViewLayer"].use_pass_position = True
+        # bpy.context.scene.view_layers["ViewLayer"].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
+        # bpy.context.scene.view_layers["ViewLayer"].use_pass_object_index = True
+        # bpy.context.scene.view_layers["ViewLayer"].use_pass_z = True
+        # bpy.context.scene.view_layers["ViewLayer"].use_pass_material_index = True
+        # bpy.context.scene.view_layers["ViewLayer"].use_pass_diffuse_color = True
+        # bpy.context.scene.view_layers["ViewLayer"].use_pass_emit = True
+        # bpy.context.scene.view_layers["ViewLayer"].use_pass_glossy_color = True
+        # bpy.context.scene.view_layers["ViewLayer"].use_pass_position = True
         
-        self.scene.view_layers[0].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
-        self.scene.view_layers[0].use_pass_object_index = True
-        self.scene.view_layers[0].use_pass_z = True
-        self.scene.view_layers[0].use_pass_material_index = True
-        self.scene.view_layers[0].use_pass_diffuse_color = True
-        self.scene.view_layers[0].use_pass_glossy_color = True
-        self.scene.view_layers[0].use_pass_emit = True
-        self.scene.view_layers[0].use_pass_position = True
+        bpy.context.scene.view_layers[0].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
+        bpy.context.scene.view_layers[0].use_pass_object_index = True
+        bpy.context.scene.view_layers[0].use_pass_z = True
+        bpy.context.scene.view_layers[0].use_pass_material_index = True
+        bpy.context.scene.view_layers[0].use_pass_diffuse_color = True
+        bpy.context.scene.view_layers[0].use_pass_glossy_color = True
+        bpy.context.scene.view_layers[0].use_pass_emit = True
+        bpy.context.scene.view_layers[0].use_pass_position = True
 
-        self.scene.use_nodes = True
+        bpy.context.scene.use_nodes = True
 
         for aov_modal in AOV_MODALS:
             bpy.ops.scene.view_layer_add_aov()
-            # self.scene.view_layers["ViewLayer"].aovs[-1].name = aov_modal
-            # self.scene.view_layers["ViewLayer"].aovs[-1].type = "VALUE"
-            self.scene.view_layers[0].aovs[-1].name = aov_modal
-            self.scene.view_layers[0].aovs[-1].type = "VALUE"
+            # bpy.context.scene.view_layers["ViewLayer"].aovs[-1].name = aov_modal
+            # bpy.context.scene.view_layers["ViewLayer"].aovs[-1].type = "VALUE"
+            bpy.context.scene.view_layers[0].aovs[-1].name = aov_modal
+            bpy.context.scene.view_layers[0].aovs[-1].type = "VALUE"
 
-        # self.scene = bpy.data.scenes["Scene"]
-        self.tree = self.scene.node_tree
+        # bpy.context.scene = bpy.data.scenes["Scene"]
+        self.tree = bpy.context.scene.node_tree
         self.links = self.tree.links
         for n in self.tree.nodes:
             self.tree.nodes.remove(n)
@@ -286,7 +289,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             # t_c2w_b = (t_c2w_b - self.os.trans_m2b) / self.os.scale_m2b # convert to Mitsuba scene scale (to match the dumped Blender scene from Mitsuba)
             frame_id = self.os.frame_id_list[i]
             im_rendering_path = str(im_rendering_folder / ('%03d_0001'%frame_id))
-            self.scene.render.filepath = str(im_rendering_path)
+            bpy.context.scene.render.filepath = str(im_rendering_path)
             
             self.cam.location = blender_poses[i, 0]
             self.cam.rotation_euler[0] = blender_poses[i, 1, 0]
@@ -304,7 +307,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             bpy.ops.render.render(write_still=True)  # render still
             
             frame_data = {
-                'file_path': self.scene.render.filepath,
+                'file_path': bpy.context.scene.render.filepath,
                 'transform_matrix': listify_matrix(self.cam.matrix_world)
             }
             out_data['frames'].append(frame_data)
@@ -330,8 +333,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         lighting_global_xyz_list, lighting_global_pts_list = self.os.get_envmap_axes() # each of (env_row, env_col, 3, 3)
         env_row, env_col = self.lighting_params_dict['env_row'], self.lighting_params_dict['env_col']
         env_height, env_width = self.lighting_params_dict['env_height'], self.lighting_params_dict['env_width']
-        self.scene.render.resolution_x = env_width
-        self.scene.render.resolution_y = env_height
+        bpy.context.scene.render.resolution_x = env_width
+        bpy.context.scene.render.resolution_y = env_height
         # [panoramic-cameras] https://docs.blender.org/manual/en/latest/render/cycles/object_settings/cameras.html#panoramic-cameras
         self.cam.data.type = 'PANO'
         # [CyclesCameraSettings]https://docs.blender.org/api/2.80/bpy.types.CyclesCameraSettings.html#bpy.types.CyclesCameraSettings
@@ -366,7 +369,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             assert lighting_global_pts.shape[0] == env_row*env_col
 
             im_rendering_path = str(render_folder_path / ('%03d'%(frame_id)))
-            self.scene.render.filepath = str(im_rendering_path)
+            bpy.context.scene.render.filepath = str(im_rendering_path)
 
             for env_idx, (xyz, pts) in tqdm(enumerate(zip(lighting_global_xyz, lighting_global_pts))):
 

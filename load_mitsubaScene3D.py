@@ -164,11 +164,7 @@ scene_obj = mitsubaScene3D(
         'layout', 
         'poses', 
         
-        'im_hdr', 
-        'im_sdr', 
-        'depth', 
-        'normal', 
-        'tsdf', 
+        'im_hdr', 'im_sdr', 'depth', 'normal', 'tsdf', 
         
         # 'albedo', 'roughness', 
         # 'emission', 
@@ -218,8 +214,8 @@ if opt.render_2d:
             {
                 # 'im_H_load': 640, 'im_W_load': 1280, 
                 'im_H_load': 320, 'im_W_load': 640, 
-                # 'spp': 32, # DEBUG
-                'spp': 64, 
+                'spp': 128, # DEBUG
+                # 'spp': 1024, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
