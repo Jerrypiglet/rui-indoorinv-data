@@ -217,7 +217,7 @@ New files generated:
 <!-- - data/indoor_synthetic/kitchen_diy/train
   - Image
     - %03d_0001.exr # HDR images (0-based index)
-    - %03d_0001.png # SDR images (gamma=2.2) -->
+    - %03d_0001.png # SDR images (gamma=2.2) -->  
 
 ```
 .

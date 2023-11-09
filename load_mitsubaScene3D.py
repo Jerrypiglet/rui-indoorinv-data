@@ -25,8 +25,8 @@ Examples:
 import sys
 from pathlib import Path
 
-host = 'r4090'
-# host = 'apple'
+# host = 'r4090'
+host = 'apple'
 
 from lib.global_vars import PATH_HOME_dict# , INV_NERF_ROOT_dict, MONOSDF_ROOT_dict, OR_RAW_ROOT_dict
 PATH_HOME = Path(PATH_HOME_dict[host])
@@ -96,7 +96,7 @@ parser.add_argument('--export_appendix', type=str, default='', help='')
 parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
 
 # === after refactorization
-parser.add_argument('--scene', type=str, default='kitchen', help='load conf file: confs/indoor_synthetic/\{opt.scene\}.conf')
+parser.add_argument('--scene', type=str, default='kitchen', help='load conf file: confs/\{DATASET\/\{opt.scene\}.conf')
 parser.add_argument('--DATASET', type=str, default='indoor_synthetic', help='load conf file: confs/\{DATASET\}')
 
 opt = parser.parse_args()
@@ -114,7 +114,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-# frame_id_list = [0]
+frame_id_list = [61, 63, 66, 77]
 
 '''
 update confs
@@ -154,22 +154,27 @@ CONF.shape_params_dict.update({
 '''
 create scene obj
 '''
+modality_list = [
+    # 'shapes', # objs + emitters, geometry shapes + emitter properties``
+    # 'layout', 
+    'poses', 
+    
+    'im_hdr', 'im_sdr', 'depth', 'normal', 'tsdf', 
+    
+    # 'albedo', 'roughness', 
+    # 'emission', 
+    # 'lighting_envmap', 
+    ]
+
+if opt.render_2d:
+    modality_list = ['poses']
+
 scene_obj = mitsubaScene3D(
     CONF = CONF, 
     if_debug_info = opt.if_debug_info, 
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
-    modality_list = [
-        'shapes', # objs + emitters, geometry shapes + emitter properties``
-        'layout', 
-        'poses', 
-        
-        'im_hdr', 'im_sdr', 'depth', 'normal', 'tsdf', 
-        
-        # 'albedo', 'roughness', 
-        # 'emission', 
-        # 'lighting_envmap', 
-        ], 
+    modality_list = modality_list,
 )
 
 '''
@@ -187,8 +192,8 @@ if opt.render_2d:
             {
                 # 'im_H_load': 640, 'im_W_load': 1280, 
                 'im_H_load': 320, 'im_W_load': 640, 
-                # 'spp': 32, # DEBUG
-                'spp': 4096, 
+                'spp': 1024, # DEBUG
+                # 'spp': 4096, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},

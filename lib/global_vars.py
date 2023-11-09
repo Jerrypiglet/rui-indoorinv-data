@@ -2,7 +2,34 @@ PATH_HOME_dict = {
     'apple': '/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data', 
     'mm1': '/home/ruizhu/Documents/Projects/rui-indoorinv-data', 
     'r4090': '/home/ruizhu/Documents/Projects/rui-indoorinv-data', 
+    'debug': '#TODO', # add the path to your project folder here
 }
+
+mi_variant_dict = {
+    'apple': 'llvm_ad_rgb', 
+    'mm1': 'cuda_ad_rgb', 
+    'r4090': 'cuda_ad_rgb', 
+    'debug': '#TODO', # add your local config here: e.g. 'cuda_ad_rgb' for CUDA devices, and 'llvm_ad_rgb' for other devices (e.g. Mac)
+}
+
+cycles_device_dict = {
+    'apple': 'CPU', 
+    'mm1': 'GPU', 
+    'r4090': 'GPU', 
+    'debug': '#TODO', # add your local Cycles renderer of Blender here: e.g. 'GPU' for CUDA devices, and 'CPU' for other devices (e.g. Mac)
+}
+
+compute_device_type_dict = {
+    'apple': 'METAL', 
+    'mm1': 'CUDA', 
+    'r4090': 'CUDA', 
+    'debug': '#TODO', # add your local compute device of Blender here: e.g. 'CUDA' for CUDA devices, and 'METAL' for Apple Silicon devices
+}
+
+'''
+optional/obsolete dicts
+'''
+
 OR_RAW_ROOT_dict = {
     'apple': '/Users/jerrypiglet/Documents/Projects/data/Openrooms_RAW', 
     'mm1': '/newfoundland2/ruizhu/siggraphasia20dataset', 
@@ -53,9 +80,3 @@ def query_host(dic: dict, host: str):
         return dic[host]
     else:
         return dic['default']
-
-mi_variant_dict = {
-    'apple': 'llvm_ad_rgb', 
-    'mm1': 'cuda_ad_rgb', 
-    'r4090': 'cuda_ad_rgb', 
-}

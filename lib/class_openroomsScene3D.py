@@ -10,7 +10,6 @@ import trimesh
 # from collections import defaultdict
 # from math import prod
 # from lib.global_vars import mi_variant_dict
-# import torch
 # Import the library using the alias "mi"
 # Set the variant of the renderer
 # from lib.global_vars import mi_variant

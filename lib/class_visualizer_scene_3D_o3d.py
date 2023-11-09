@@ -13,7 +13,6 @@ import open3d.visualization as vis
 # import trimesh
 # from sympy import Point3D, Line3D, Plane, sympify, Rational
 # from copy import deepcopy
-# import torch
 from pathlib import Path
 # import copy
 

@@ -3,7 +3,6 @@ import glob
 from tqdm import tqdm
 import numpy as np
 np.set_printoptions(suppress=True)
-import imageio
 
 from pathlib import Path
 import mitsuba as mi

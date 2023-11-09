@@ -9,6 +9,7 @@ import scipy
 import json
 
 from lib.utils_misc import get_list_of_keys, white_blue, blue_text, blue_text, red, listify_matrix
+from lib.global_vars import cycles_device_dict, compute_device_type_dict
 
 from .class_rendererBase import rendererBase
 
@@ -66,8 +67,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         bpy.context.scene.cycles.samples = self.spp
         
         # https://docs.blender.org/manual/en/latest/render/color_management.html
-        # bpy.context.scene.view_settings.view_transform = 'Standard'
-        bpy.context.scene.view_settings.view_transform = 'Raw'
+        bpy.context.scene.view_settings.view_transform = 'Standard'
+        # bpy.context.scene.view_settings.view_transform = 'Raw'
         
         '''
         configure render engine and device
@@ -78,16 +79,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
 
         bpy.context.scene.render.engine = 'CYCLES'
         
-        cycles_device = {
-            'apple': 'CPU', 
-            'mm1': 'GPU', 
-            'r4090': 'GPU', 
-        }[host]
-        compute_device_type = {
-            'apple': 'METAL', 
-            'mm1': 'CUDA', 
-            'r4090': 'CUDA', 
-        }[host]
+        cycles_device = cycles_device_dict[host]
+        compute_device_type = compute_device_type_dict[host]
         bpy.context.scene.cycles.device = cycles_device
         # for scene in bpy.data.scenes:
         #     print(scene.name)
@@ -300,11 +293,14 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             
             self.cam.data.type = 'PERSP'
             
-            # import ipdb; ipdb.set_trace()
-            
             for modal_file_output in self.modal_file_outputs:
                 modal_file_output.file_slots[0].path = '%03d'%frame_id + '_'
+                
             bpy.ops.render.render(write_still=True)  # render still
+            
+            # [Optional] Save the blend file.
+            bpy.ops.file.pack_all()
+            bpy.ops.wm.save_as_mainfile(filepath=str(self.os.scene_path / ('test_frame_%d.blend'%frame_id)))
             
             frame_data = {
                 'file_path': bpy.context.scene.render.filepath,

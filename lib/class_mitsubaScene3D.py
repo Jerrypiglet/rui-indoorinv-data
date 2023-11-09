@@ -189,11 +189,11 @@ class mitsubaScene3D(mitsubaBase):
         '''
         # if self.has_shape_file:
         #     self.load_mi_scene_from_shape()
-        if self.has_shape_file and not self.CONF.mi_params_dict.get('if_mi_scene_from_xml', False):
+        if self.has_shape_file and not self.CONF.mi_params_dict.get('if_mi_scene_from_xml', True):
             print(blue_text('[%s][load_mi_scene] from shape file: %s')%(str(self.__class__.__name__), self.shape_file_path))
             self.load_mi_scene_from_shape()
             self.mi_scene_from = 'shape'
-        elif self.has_tsdf_file and self.tsdf_file_path.exists() and not self.CONF.mi_params_dict.get('if_mi_scene_from_xml', False):
+        elif self.has_tsdf_file and self.tsdf_file_path.exists() and not self.CONF.mi_params_dict.get('if_mi_scene_from_xml', True):
             print(blue_text('[%s][load_mi_scene] from tsdf file: %s')%(str(self.__class__.__name__), self.tsdf_file_path))
             self.load_mi_scene_from_shape(shape_file_path=self.tsdf_file_path)
             self.mi_scene_from = 'tsdf'
@@ -234,10 +234,10 @@ class mitsubaScene3D(mitsubaBase):
         '''
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return
-        if not self.if_loaded_shapes: self.load_shapes()
         if not hasattr(self, 'mi_scene'): self.process_mi_scene(if_postprocess_mi_frames=False)
 
         if self.CONF.cam_params_dict.get('if_sample_poses', False):
+            if not self.if_loaded_shapes: self.load_shapes()
             if_resample = 'y'
             if hasattr(self, 'pose_list'):
                 if_resample = input(red("pose_list loaded. RESAMPLE POSE? [y/n]"))
