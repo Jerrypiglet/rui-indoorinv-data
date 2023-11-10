@@ -104,9 +104,6 @@ xml_root = Path(PATH_HOME) / CONF.data.xml_root
 frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
-# [debug] override
-# frame_id_list = [61, 63, 66, 77]
-
 '''
 update confs
 '''
@@ -131,9 +128,10 @@ CONF.mi_params_dict.update({
     })
 
 # CONF.im_params_dict.update({
-#     'im_H_load': 320, 'im_W_load': 640, 
-#     'im_H_resize': 320, 'im_W_resize': 640, 
-#     # 'im_H_resize': 640, 'im_W_resize': 1280, 
+# #     'im_H_load': 320, 'im_W_load': 640, 
+# #     'im_H_resize': 320, 'im_W_resize': 640, 
+#     'im_H_load': 640, 'im_W_load': 1280, 
+#     'im_H_resize': 640, 'im_W_resize': 1280, 
 #     })
 
 CONF.shape_params_dict.update({
@@ -144,8 +142,6 @@ CONF.shape_params_dict.update({
 '''
 create scene obj
 '''
-# if not opt.render_2d:
-#     modality_list += ['im_hdr', 'im_sdr', 'depth', 'normal', 'tsdf']
 
 scene_obj = mitsubaScene3D(
     CONF = CONF, 
@@ -182,7 +178,7 @@ if opt.renderer == 'blender':
         modality_list=[
             'im', 
             'albedo', 
-            'roughness', 
+            # 'roughness', 
             'depth', 
             'normal', 
             'index', 
@@ -238,56 +234,3 @@ scene_obj = mitsubaScene3D(
     # modality_list = ['poses', 'im_hdr', 'im_sdr'],
     modality_list = ['poses', 'im_hdr', 'im_sdr', 'tsdf'],
 )
-
-'''
-Evaluator for scene
-'''
-
-# eval_return_dict = {}
-
-# CONF.mi_params_dict.update({
-#     'if_mi_scene_from_xml': False, 
-#     })
-
-# scene_obj = mitsubaScene3D(
-#     CONF = CONF, 
-#     if_debug_info = opt.if_debug_info, 
-#     host = host, 
-#     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
-#     modality_list = ['poses', 'im_hdr', 'im_sdr', 'tsdf'],
-# )
-
-# if opt.eval_scene:
-#     evaluator_scene = evaluator_scene_scene(
-#         host=host, 
-#         scene_object=scene_obj, 
-#         eval_scene_from='tsdf', 
-#     )
-
-#     '''
-#     sample visivility to camera centers on vertices
-#     [!!!] set 'mesh_color_type': 'eval-vis_count'
-#     '''
-#     _ = evaluator_scene.sample_shapes(
-#         sample_type='vis_count', # ['']
-#         # sample_type='t', # ['']
-#         # sample_type='face_normal', # ['']
-#         # sample_type='rgb_sdr', 
-#         shape_params={
-#         }
-#     )
-#     for k, v in _.items():
-#         if k in eval_return_dict:
-#             eval_return_dict[k].update(_[k])
-#         else:
-#             eval_return_dict[k] = _[k]
-            
-#     if 'face_normals_flipped_mask' in eval_return_dict and opt.export:
-#         face_normals_flipped_mask = eval_return_dict['face_normals_flipped_mask']
-#         assert face_normals_flipped_mask.shape[0] == scene_obj.faces_list[0].shape[0]
-#         if np.sum(face_normals_flipped_mask) > 0:
-#             validate_idx = np.where(face_normals_flipped_mask)[0][0]
-#             print(validate_idx, scene_obj.faces_list[0][validate_idx])
-#             scene_obj.faces_list[0][face_normals_flipped_mask] = scene_obj.faces_list[0][face_normals_flipped_mask][:, [0, 2, 1]]
-#             print(white_magenta('[FLIPPED] %d/%d inward face normals'%(np.sum(face_normals_flipped_mask), scene_obj.faces_list[0].shape[0])))
-#             print(validate_idx, '->', scene_obj.faces_list[0][validate_idx])

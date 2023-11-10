@@ -210,12 +210,14 @@ class mitsubaScene3D(mitsubaBase):
         assert self.K.shape == (3, 3)
         self.im_W_load = int(self.K[0][2] * 2)
         self.im_H_load = int(self.K[1][2] * 2)
+        self.im_HW_load = (self.im_H_load, self.im_W_load)
 
         if self.im_W_load != self.W or self.im_H_load != self.H:
             scale_factor = [t / s for t, s in zip((self.H, self.W), self.im_HW_load)]
             self.K = resize_intrinsics(self.K, scale_factor)
             self.im_W_load = self.W
             self.im_H_load = self.H
+            
             
     def get_pose_num_from_file(self):
         if self.pose_format == 'OpenRooms':

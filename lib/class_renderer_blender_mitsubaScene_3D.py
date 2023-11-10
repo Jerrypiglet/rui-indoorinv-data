@@ -60,7 +60,6 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         
         bpy.ops.wm.open_mainfile(filepath=str(self.blend_file_path))
         self.scene = bpy.context.scene
-        # self.scene = bpy.data.scenes["Scene"]
         bpy.context.scene.render.use_motion_blur = False
         bpy.context.scene.view_layers[0].cycles.use_denoising = True
         # bpy.context.scene.view_layers[0].cycles.use_denoising = False
@@ -91,7 +90,6 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         bpy.context.preferences.addons["cycles"].preferences.get_devices()
         print('==== compute_device_type: ', white_blue(bpy.context.preferences.addons["cycles"].preferences.compute_device_type))
 
-        bpy.context.preferences.addons["cycles"].preferences.get_devices()
         for d in bpy.context.preferences.addons["cycles"].preferences.devices:
             d.use = True
             if d.type == 'CPU':
@@ -154,14 +152,19 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         # Renderer
         bpy.context.scene.render.dither_intensity = 0.0
         # bpy.context.scene.render.film_transparent = True
-        bpy.context.scene.render.resolution_x = self.im_params_dict['im_W_load']
-        bpy.context.scene.render.resolution_y = self.im_params_dict['im_H_load']
+        # bpy.context.scene.render.resolution_x = self.im_params_dict['im_W_load']
+        # bpy.context.scene.render.resolution_y = self.im_params_dict['im_H_load']
         bpy.context.scene.render.resolution_percentage = 100
         # bpy.context.scene.render.threads = 16
         bpy.context.scene.render.views_format = 'MULTIVIEW'
 
-        # self.cam = scene.objects['Camera'] # the sensor in XML has to has 'id="Camera"'
-        self.cam = bpy.context.scene.camera #scene.objects['Camera'] # self.cam.data.lens -> 31.17691421508789, in mm (not degrees)
+        # self.cam = bpy.context.scene.camera #scene.objects['Camera'] # self.cam.data.lens -> 31.17691421508789, in mm (not degrees)
+
+        # Add the main camera.
+        self.cam = bpy.data.objects.new('Camera', bpy.data.cameras.new('Camera'))
+        bpy.context.scene.collection.objects.link(self.cam)
+        bpy.context.scene.camera = self.cam
+
         self.cam.data.clip_start = 0.1
         self.cam.data.clip_end = 50.0
         # print camera parameters
@@ -185,10 +188,6 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             if obj.type in ('MESH'):
                 obj.pass_index=obj_idx
                 obj_idx += 1
-
-        # bpy.context.scene.render.image_settings.file_format = FORMAT
-        bpy.context.scene.render.image_settings.file_format = FORMAT
-        # bpy.context.scene.render.image_settings.color_depth = str(COLOR_DEPTH)
 
         # Set pass
         # bpy.context.scene.view_layers["ViewLayer"].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
@@ -247,13 +246,25 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             self.render_lighting_envmap(render_folder_path)
             return
             
-        # npy_file_path = self.os.pose_file_root / ('%s.npy'%self.os.split); assert npy_file_path.exists(), npy_file_path
-        # blender_poses = np.load(npy_file_path) # (N, 2, 3)
         from utils_OR.utils_OR_cam import convert_OR_poses_to_blender_npy
-        blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.os.pose_list)
-        assert len(blender_poses) == self.os.frame_num
+        # blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.os.pose_list)
         
-        # blender_poses = blender_poses[0:1] # DEBUG
+        '''
+        DEBUG: read poses from .blend file (objects named Camera0, Camera1, etc.)
+        '''
+        blender_poses = np.zeros((len(self.os.pose_list),2,3))
+        i = 0
+        for cam in bpy.data.objects:
+            if not cam.name.startswith('Camera'): continue # assuming cameras are labelled as Camera{id}, e.g. Camera0, Camera1, etc.
+            if cam.name == 'Camera': continue
+            pos = np.array(cam.location).flatten()
+            angles = np.array(cam.rotation_euler).flatten()
+            # blender_poses.append((pos.copy(), angles.copy()))
+            blender_poses[i,0] = pos.copy()
+            blender_poses[i,1] = angles.copy()
+            i += 1
+
+        assert len(blender_poses) == self.os.frame_num
         
         self.modal_file_outputs = []
         _modality_list = list(set(self.modality_list) - set(['lighting_envmap']))

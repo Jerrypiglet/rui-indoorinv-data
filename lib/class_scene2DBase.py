@@ -51,11 +51,12 @@ class scene2DBase(ABC):
             self.if_resize_im = (self.im_H_load, self.im_W_load) != (self.im_H_resize, self.im_W_resize) # resize modalities (exclusing lighting)
             self.H, self.W = self.im_H_resize, self.im_W_resize
             self.im_HW_load = (self.im_H_load, self.im_W_load)
-            self.im_HW_target = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
+            # self.im_HW_target = () if not self.if_resize_im else (self.im_H_resize, self.im_W_resize)
+            self.im_HW_target = (self.im_H_resize, self.im_W_resize)
         else:
             self.im_HW_load = ()
             self.im_HW_target = ()
-
+            
         # dict for estimations
         self.est = {}
 

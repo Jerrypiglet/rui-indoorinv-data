@@ -24,7 +24,10 @@ def R_t_to_origin_lookatvector_up_opencv(R, t):
     return (origin, lookatvector, up)
 
 scenes_root = Path('/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data/data/debug_scenes')
-scene_name = 'cornell_box'
+
+# scene_name = 'cornell_box'
+# scene_name = 'cornell_box_tmp'
+scene_name = 'kitchen_manual'
 
 blend_file_path = scenes_root / scene_name / 'test.blend'
 assert blend_file_path.exists(), 'blend_file_path: %s does not exist!'%blend_file_path
@@ -51,7 +54,8 @@ for cam in bpy.data.objects:
     cx, cy = 0.5, 0.5
     cx_pix, cy_pix = cx * im_W, cy * im_H
     fx_pix = cx_pix / fx
-    fy_pix = cy_pix / fx
+    # fy_pix = cy_pix / fx
+    fy_pix = fx_pix
     K = np.array([[fx_pix, 0., cx_pix], [0., fy_pix, cy_pix], [0., 0., 1.]], dtype=np.float32)
     K_list.append(K)
     
