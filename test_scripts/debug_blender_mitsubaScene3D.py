@@ -1,11 +1,13 @@
 '''
-Script to load Blender scenes, render with Blender (bpy) and fuse rendered RGB images onto a TSDF volume-bases mesh, to check multi-view consistency of the renderings.
+Script to load Blender scenes, render with Blender (bpy)/Mitsuba and fuse rendered RGB images onto a TSDF volume-bases mesh, to check multi-view consistency of the renderings.
 
-cd {PROJECT_ROOT}
+> git clone --branch add_blender_debug https://github.com/Jerrypiglet/rui-indoorinv-data.git
+> cd rui-indoorinv-data
 
 Install the dependencies via: 
+
 > install Torch (>2.0.0) following: https://pytorch.org/get-started/locally/
-> pip install -r debug_blender_requirements.txt
+> pip install -r test_scripts/debug_blender_requirements.txt
 
 Download the scene with: 
 
@@ -15,6 +17,7 @@ Download the scene with:
 > mv rui4090.ucsd.edu/mclab-data-public/test_files/test_scenes_fipt/debug_scenes/* .
 
 So that the scenes are organized as:
+
 - ./data/debug_scenes/
     - kitchen_diy/
     - cornel_box/
@@ -22,6 +25,7 @@ So that the scenes are organized as:
 Add your local path and config to lib/global_vars.py, by replacing all the #TODO entries. 
     
 Run: 
+
 > cd test_scripts
 > python debug_blender_mitsubaScene3D.py --scene kitchen_diy --renderer blender
 
@@ -36,7 +40,7 @@ Output:
 Options:
 
 - Choose a subset of frames to render/fuse, via: frame_id_list = [61, 63, 66, 77]
-- Set spp properly for Blender/Mitsuba renderings to reduce noise level (e.g. spp>=128 for Blender; spp>=512 for Mitsuba)
+- Set --spp properly for Blender/Mitsuba renderings to reduce noise level (e.g. spp>=128 for Blender; spp>=512 for Mitsuba)
 
 '''
  
