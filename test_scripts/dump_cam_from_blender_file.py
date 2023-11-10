@@ -1,7 +1,7 @@
 '''
 Convert .blender file with cameras to cam.txt and intrinsic_mitsubaScene.txt
 
-> python load_blender_file.py
+> python dump_cam_from_blender_file.py
 
 Then render with:
 

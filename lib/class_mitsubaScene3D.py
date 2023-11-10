@@ -232,7 +232,7 @@ class mitsubaScene3D(mitsubaBase):
 
     def load_poses(self):
         '''
-        pose_list: list of pose matrices (**camera-to-world** transformation), each (3, 4): [R|t] (OpenCV convention: right-down-forward)
+        pose_list: list of pose matrices (**camera-to-world** transformation: i.e. t == origin), each (3, 4): [R|t] (OpenCV convention: right-down-forward)
         '''
         self.load_intrinsics()
         if hasattr(self, 'pose_list'): return

@@ -20,7 +20,7 @@ So that the scenes are organized as:
 
 - ./data/debug_scenes/
     - kitchen_diy/
-    - cornel_box/ # export cameras from .blend file via: python test_scripts/load_blender_file.py
+    - cornel_box/ # export cameras from .blend file via: python test_scripts/dump_cam_from_blender_file.py
     
 Add your local path and config to lib/global_vars.py, by replacing all the #TODO entries. 
     

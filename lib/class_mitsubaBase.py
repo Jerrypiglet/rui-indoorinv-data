@@ -797,9 +797,10 @@ class mitsubaBase(scene2DBase):
                     depth_scale=1.0,
                     depth_trunc=10.0,
                     convert_rgb_to_intensity=False)
-                extrinsic = np.vstack((np.hstack([self.pose_list[frame_idx][:3, :3] @ T_opengl_opencv, self.pose_list[frame_idx][:3, 3:4]]), np.array([0, 0, 0, 1])))
+                
+                extrinsic = np.vstack((np.hstack([self.pose_list[frame_idx][:3, :3] @ T_opengl_opencv, self.pose_list[frame_idx][:3, 3:4]]), np.array([0, 0, 0, 1]))) # camera-to-world R | t
                 # print(f"extrinsic {extrinsic}")
-                volume.integrate(rgbd_image, intrinsic, np.linalg.inv(extrinsic))
+                volume.integrate(rgbd_image, intrinsic, np.linalg.inv(extrinsic)) # takes the inverse: world-to-camera extrinsics
                 if p == 0:
                     curr_pose = np.concatenate([
                         np.dot(extrinsic, np.array([0.0, 0.0, 0.0, 1.0]))[:3],
