@@ -20,7 +20,7 @@ So that the scenes are organized as:
 
 - ./data/debug_scenes/
     - kitchen_diy/
-    - cornel_box/
+    - cornel_box/ # export cameras from .blend file via: python test_scripts/load_blender_file.py
     
 Add your local path and config to lib/global_vars.py, by replacing all the #TODO entries. 
     
@@ -75,12 +75,16 @@ parser.add_argument('--split', type=str, default='train', help='')
 parser.add_argument('--renderer', type=str, default='blender', help='mi, blender')
 parser.add_argument('--spp', type=int, default=128, help='spp for mi/blender')
 
+# ==== Evaluators
+parser.add_argument('--if_add_color_from_eval', type=str2bool, nargs='?', const=True, default=True, help='if colorize mesh vertices with values from evaluator')
+parser.add_argument('--eval_scene', type=str2bool, nargs='?', const=True, default=False, help='eval over scene (e.g. shapes for coverage)')
+
 # debug
 parser.add_argument('--if_debug_info', type=str2bool, nargs='?', const=True, default=False, help='if show debug info')
 
 # utils
 parser.add_argument('--if_sample_poses', type=str2bool, nargs='?', const=True, default=False, help='if sample camera poses instead of loading from pose file')
-parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=False, help='if force to overwrite existing files')
+parser.add_argument('--force', type=str2bool, nargs='?', const=True, default=True, help='if force to overwrite existing files')
 
 # === after refactorization
 parser.add_argument('--DATASET', type=str, default='debug_scenes', help='load conf file: confs/\{DATASET\}')
@@ -101,7 +105,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-frame_id_list = [61, 63, 66, 77]
+# frame_id_list = [61, 63, 66, 77]
 
 '''
 update confs
@@ -126,11 +130,11 @@ CONF.mi_params_dict.update({
     # 'if_mi_scene_from_xml': False, 
     })
 
-CONF.im_params_dict.update({
-    'im_H_load': 320, 'im_W_load': 640, 
-    'im_H_resize': 320, 'im_W_resize': 640, 
-    # 'im_H_resize': 640, 'im_W_resize': 1280, 
-    })
+# CONF.im_params_dict.update({
+#     'im_H_load': 320, 'im_W_load': 640, 
+#     'im_H_resize': 320, 'im_W_resize': 640, 
+#     # 'im_H_resize': 640, 'im_W_resize': 1280, 
+#     })
 
 CONF.shape_params_dict.update({
     'if_load_obj_mesh': True, # set to False to not load meshes for objs (furniture) to save time
@@ -164,7 +168,7 @@ if opt.renderer == 'mi':
         im_params_dict=
         {
             # 'im_H_load': 640, 'im_W_load': 1280, 
-            'im_H_load': 320, 'im_W_load': 640, 
+            # 'im_H_load': 320, 'im_W_load': 640, 
             'spp': opt.spp, 
             # 'spp': 4096, # default 4096, because of lack of denosing 
         }, # override
@@ -191,15 +195,16 @@ if opt.renderer == 'blender':
         im_params_dict=
         {
             # 'im_H_load': 640, 'im_W_load': 1280, 
-            'im_H_load': 320, 'im_W_load': 640, 
+            # 'im_H_load': 320, 'im_W_load': 640, 
             'spp': opt.spp
             # 'spp': 1024, # default 1024
         }, # override
         cam_params_dict={}, 
         mi_params_dict={},
         # blender_file_name='test_blender_export_reimport.blend', 
-        if_skip_check=True,
+        # if_skip_check=False,
     )
+    
 renderer.render(if_force=opt.force)
 
 # compare HDR images from mi/blender if both are available
@@ -209,6 +214,10 @@ renderer.render(if_force=opt.force)
 fuse TSDF volume
 '''
 
+CONF.shape_params_dict.update({
+    'if_force_fuse_tsdf': True, 
+    })
+
 if opt.renderer == 'mi':
     CONF.modality_filename_dict.update({
         'im_hdr': 'Image/%03d_0001_mi.exr', 
@@ -216,13 +225,69 @@ if opt.renderer == 'mi':
     })
     CONF.shape_params_dict.update({
         'tsdf_file': 'fused_tsdf_mi.ply', 
-        'if_force_fuse_tsdf': True, 
         })
 
+'''
+Dump TSDF file
+'''
 scene_obj = mitsubaScene3D(
     CONF = CONF, 
     if_debug_info = opt.if_debug_info, 
     host = host, 
     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
+    # modality_list = ['poses', 'im_hdr', 'im_sdr'],
     modality_list = ['poses', 'im_hdr', 'im_sdr', 'tsdf'],
 )
+
+'''
+Evaluator for scene
+'''
+
+# eval_return_dict = {}
+
+# CONF.mi_params_dict.update({
+#     'if_mi_scene_from_xml': False, 
+#     })
+
+# scene_obj = mitsubaScene3D(
+#     CONF = CONF, 
+#     if_debug_info = opt.if_debug_info, 
+#     host = host, 
+#     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
+#     modality_list = ['poses', 'im_hdr', 'im_sdr', 'tsdf'],
+# )
+
+# if opt.eval_scene:
+#     evaluator_scene = evaluator_scene_scene(
+#         host=host, 
+#         scene_object=scene_obj, 
+#         eval_scene_from='tsdf', 
+#     )
+
+#     '''
+#     sample visivility to camera centers on vertices
+#     [!!!] set 'mesh_color_type': 'eval-vis_count'
+#     '''
+#     _ = evaluator_scene.sample_shapes(
+#         sample_type='vis_count', # ['']
+#         # sample_type='t', # ['']
+#         # sample_type='face_normal', # ['']
+#         # sample_type='rgb_sdr', 
+#         shape_params={
+#         }
+#     )
+#     for k, v in _.items():
+#         if k in eval_return_dict:
+#             eval_return_dict[k].update(_[k])
+#         else:
+#             eval_return_dict[k] = _[k]
+            
+#     if 'face_normals_flipped_mask' in eval_return_dict and opt.export:
+#         face_normals_flipped_mask = eval_return_dict['face_normals_flipped_mask']
+#         assert face_normals_flipped_mask.shape[0] == scene_obj.faces_list[0].shape[0]
+#         if np.sum(face_normals_flipped_mask) > 0:
+#             validate_idx = np.where(face_normals_flipped_mask)[0][0]
+#             print(validate_idx, scene_obj.faces_list[0][validate_idx])
+#             scene_obj.faces_list[0][face_normals_flipped_mask] = scene_obj.faces_list[0][face_normals_flipped_mask][:, [0, 2, 1]]
+#             print(white_magenta('[FLIPPED] %d/%d inward face normals'%(np.sum(face_normals_flipped_mask), scene_obj.faces_list[0].shape[0])))
+#             print(validate_idx, '->', scene_obj.faces_list[0][validate_idx])

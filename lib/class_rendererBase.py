@@ -118,7 +118,7 @@ class rendererBase():
                     # shutil.rmtree(str(render_folder_path), ignore_errors=True)
                     for file in files:
                         Path(file).unlink()
-                        file_png = file.parent / (file.name.replace('.exr', '.png') + '.png')
+                        file_png = Path(file).parent / (Path(file).name.replace('.exr', '.png'))
                         if file_png.exists():
                             file_png.unlink()
                     print(yellow('Files removed from %s'%str(render_folder_path)))

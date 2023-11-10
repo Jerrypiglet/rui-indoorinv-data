@@ -44,8 +44,8 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
     elif ext in ['exr']:
         assert Path(path).exists(), f"File not found: {path}"
         im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
-        # if len(im.shape) > 2:
-        #     im = im[:, :, :3]
+        if len(im.shape) > 2:
+            im = im[:, :, :3]
         if len(im.shape) == 2:
             im = im[..., np.newaxis]
     elif ext in ['hdr']:
@@ -93,6 +93,7 @@ def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if
     # Read HDR image
     if im_hdr is None:
         im_hdr = load_img(Path(hdr_image_path), ext=str(hdr_image_path).split('.')[1]) * scale
+    im_hdr = im_hdr[:, :, :3] # deal with RGBalpha images
 
     if if_mask:
         seg_path = png_image_path.replace(im_key, 'immask_')

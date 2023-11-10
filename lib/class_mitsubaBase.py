@@ -1002,7 +1002,7 @@ class mitsubaBase(scene2DBase):
             if appendix != '':
                 # debug: two prints should agree
                 (origin, lookatvector, up) = R_t_to_origin_lookatvector_up_opencv(Rt_list[0][0], Rt_list[0][1])
-                print((origin.flatten(), lookatvector.flatten(), up.flatten()))
+                print((origin.flatten(), lookatvector.flatten(), up.flatten())) 
                 print((T_@self.origin_lookatvector_up_list[0][0]).flatten(), (T_@self.origin_lookatvector_up_list[0][1]).flatten(), (T_@self.origin_lookatvector_up_list[0][2]).flatten())
             dump_cam_params_OR(
                 pose_file_root=export_folder, 

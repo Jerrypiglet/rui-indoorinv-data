@@ -114,7 +114,7 @@ frame_id_list = CONF.scene_params_dict.frame_id_list
 invalid_frame_id_list = CONF.scene_params_dict.invalid_frame_id_list
 
 # [debug] override
-frame_id_list = [61, 63, 66, 77]
+# frame_id_list = [61, 63, 66, 77]
 
 '''
 update confs
@@ -155,11 +155,11 @@ CONF.shape_params_dict.update({
 create scene obj
 '''
 modality_list = [
-    # 'shapes', # objs + emitters, geometry shapes + emitter properties``
+    'shapes', # objs + emitters, geometry shapes + emitter properties``
     # 'layout', 
     'poses', 
     
-    'im_hdr', 'im_sdr', 'depth', 'normal', 'tsdf', 
+    # 'im_hdr', 'im_sdr', 'depth', 'normal', 'tsdf', 
     
     # 'albedo', 'roughness', 
     # 'emission', 

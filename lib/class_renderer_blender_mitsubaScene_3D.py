@@ -73,8 +73,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         '''
         configure render engine and device
         '''
-        
-        print("----------------------------------------------")
+        print("---------------------------------------------- bpy.app.version_string", bpy.app.version_string)
         print('setting up gpu/metal ......')
 
         bpy.context.scene.render.engine = 'CYCLES'
@@ -158,7 +157,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         bpy.context.scene.render.resolution_x = self.im_params_dict['im_W_load']
         bpy.context.scene.render.resolution_y = self.im_params_dict['im_H_load']
         bpy.context.scene.render.resolution_percentage = 100
-        bpy.context.scene.render.threads = 16
+        # bpy.context.scene.render.threads = 16
         bpy.context.scene.render.views_format = 'MULTIVIEW'
 
         # self.cam = scene.objects['Camera'] # the sensor in XML has to has 'id="Camera"'
@@ -189,7 +188,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
 
         # bpy.context.scene.render.image_settings.file_format = FORMAT
         bpy.context.scene.render.image_settings.file_format = FORMAT
-        bpy.context.scene.render.image_settings.color_depth = str(COLOR_DEPTH)
+        # bpy.context.scene.render.image_settings.color_depth = str(COLOR_DEPTH)
 
         # Set pass
         # bpy.context.scene.view_layers["ViewLayer"].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
