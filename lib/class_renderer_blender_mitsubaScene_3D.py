@@ -89,6 +89,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         bpy.context.scene.render.views_format = 'MULTIVIEW'
         bpy.context.scene.render.image_settings.file_format = FORMAT
         bpy.context.scene.render.image_settings.color_depth = str(COLOR_DEPTH)
+        
+        self.scene_unit = bpy.context.scene.unit_settings.scale_length
 
         '''
         Configure render engine and device
@@ -324,7 +326,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         bpy.context.scene.camera = self.cam
 
         self.cam.data.clip_start = 0.1
-        self.cam.data.clip_end = 50. * 100. # [TODO] how to get the multiplier of the units?
+        self.cam.data.clip_end = 100. / self.scene_unit
         # print camera parameters
         w = bpy.context.scene.render.resolution_x
         h = bpy.context.scene.render.resolution_y
