@@ -8,7 +8,7 @@ import bpy
 import scipy
 import json
 
-from lib.utils_misc import get_list_of_keys, white_blue, blue_text, blue_text, red, listify_matrix
+from lib.utils_misc import get_list_of_keys, white_blue, blue_text, blue_text, red, listify_matrix, yellow_text
 from lib.global_vars import cycles_device_dict, compute_device_type_dict
 
 from .class_rendererBase import rendererBase
@@ -68,9 +68,18 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         # https://docs.blender.org/manual/en/latest/render/color_management.html
         bpy.context.scene.view_settings.view_transform = 'Standard'
         # bpy.context.scene.view_settings.view_transform = 'Raw'
-        
+
+        # Renderer
+        bpy.context.scene.render.dither_intensity = 0.0
+        # bpy.context.scene.render.film_transparent = True
+        # bpy.context.scene.render.resolution_x = self.im_params_dict['im_W_load']
+        # bpy.context.scene.render.resolution_y = self.im_params_dict['im_H_load']
+        bpy.context.scene.render.resolution_percentage = 100
+        # bpy.context.scene.render.threads = 16
+        bpy.context.scene.render.views_format = 'MULTIVIEW'
+
         '''
-        configure render engine and device
+        Configure render engine and device
         '''
         print("---------------------------------------------- bpy.app.version_string", bpy.app.version_string)
         print('setting up gpu/metal ......')
@@ -99,68 +108,178 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         print("----------------------------------------------")
 
         '''
-        modalities: deal with aov modalities
+        Objects: (1) assign object index (2) remove bsdf for emitters
+        '''
+        obj_idx = 1
+        for obj in bpy.context.scene.objects:
+            # (1) assign object index
+            if obj.type in ('MESH'):
+                obj.pass_index=obj_idx
+                obj_idx += 1
+                
+            # (2) remove bsdf for emitters
+            if obj.name == 'Light':
+                for obj_mat in obj.data.materials:
+                    if obj_mat.node_tree is None: # https://docs.blender.org/api/current/bpy.types.ShaderNodeTree.html
+                        continue
+                    if_has_emission = False; strength = 0.
+                    for node in obj_mat.node_tree.nodes:
+                        if isinstance(node, bpy.types.ShaderNodeEmission):
+                            assert node.outputs[0].name == 'Emission'
+                            assert node.inputs[1].name == 'Strength'
+                            strength = node.inputs[1].default_value
+                            # print(f'Strength of the emission node is: {strength}')
+                            if strength > 1e-4:
+                                if_has_emission = True
+                                break
+                    if if_has_emission:
+                        print(yellow_text('[Emitter has BSDF] obj_mat.name: %s, if_has_emission: %s, emission_strength: %.2f'%(obj_mat.name, if_has_emission, strength)))
+                        for node in obj_mat.node_tree.nodes:
+                            if 'Bsdf' in node.bl_idname:
+                                print('[Emitter has BSDF] -> removed node: %s'%node.bl_idname)
+                                obj_mat.node_tree.nodes.remove(node)
+
+        '''
+        Modalities: deal with aov modalities by going over all materials
         '''
         
         AOV_MODALS = []
         if 'roughness' in self.modality_list:
             AOV_MODALS.append('Roughness') #,'Metallic'
+        if 'invalid_mat' in self.modality_list:
+            AOV_MODALS.append('InvalidMat')
         # assigne material id
         for i, mat in enumerate(bpy.data.materials):
             mat.pass_index=(i+1)
+            
         # link aov output
-        for aov_modal in AOV_MODALS:
-            for mat in bpy.data.materials:
-                tree = mat.node_tree
-                if tree is None:
-                    continue
-                for node in tree.nodes:
-                    if 'Bsdf' not in node.bl_idname:
-                        continue
-                    if (node.bl_idname =='ShaderNodeBsdfGlossy' or node.bl_idname =='ShaderNodeBsdfGlass') and node.distribution == 'SHARP' and aov_modal=='Roughness':
-                        modal_value = 0.0
-                        buffer_node = tree.nodes.new('ShaderNodeValue')
-                        from_socket = buffer_node.outputs['Value']
-                        from_socket.default_value = modal_value
-                    elif aov_modal not in node.inputs.keys():
-                        modal_value = 0.0
-                        buffer_node = tree.nodes.new('ShaderNodeValue')
-                        from_socket = buffer_node.outputs['Value']
-                        from_socket.default_value = modal_value
-                    else:
-                        socket = node.inputs[aov_modal]
-                        if len(socket.links) == 0:
-                            if node.bl_idname == 'ShaderNodeBsdfDiffuse' and aov_modal == 'Roughness':
-                                modal_value = 1.0
-                            else:
-                                modal_value = socket.default_value
-                            buffer_node = tree.nodes.new('ShaderNodeValue')
-                            from_socket = buffer_node.outputs['Value']
-                            from_socket.default_value = modal_value
-                            tree.links.new(from_socket,socket)
-                        else:
-                            from_socket=socket.links[0].from_socket
+        # for aov_modal in AOV_MODALS:
+        #     for mat in bpy.data.materials:
+        #         tree = mat.node_tree
+        #         if tree is None:
+        #             continue
+        #         for node in tree.nodes:
+        #             if 'Bsdf' not in node.bl_idname:
+        #                 continue
+        #             if (node.bl_idname =='ShaderNodeBsdfGlossy' or node.bl_idname =='ShaderNodeBsdfGlass') and node.distribution == 'SHARP' and aov_modal=='Roughness':
+        #                 modal_value = 0.0
+        #                 buffer_node = tree.nodes.new('ShaderNodeValue')
+        #                 from_socket = buffer_node.outputs['Value']
+        #                 from_socket.default_value = modal_value
+        #             elif aov_modal not in node.inputs.keys():
+        #                 modal_value = 0.0
+        #                 buffer_node = tree.nodes.new('ShaderNodeValue')
+        #                 from_socket = buffer_node.outputs['Value']
+        #                 from_socket.default_value = modal_value
+        #             else:
+        #                 socket = node.inputs[aov_modal]
+        #                 if len(socket.links) == 0:
+        #                     if node.bl_idname == 'ShaderNodeBsdfDiffuse' and aov_modal == 'Roughness':
+        #                         modal_value = 1.0
+        #                     else:
+        #                         modal_value = socket.default_value
+        #                     buffer_node = tree.nodes.new('ShaderNodeValue')
+        #                     from_socket = buffer_node.outputs['Value']
+        #                     from_socket.default_value = modal_value
+        #                     tree.links.new(from_socket,socket)
+        #                 else:
+        #                     from_socket=socket.links[0].from_socket
 
-                    aov_node = tree.nodes.new('ShaderNodeOutputAOV')
-                    aov_node.name = aov_modal
-                    tree.links.new(from_socket,aov_node.inputs['Value'])
-
-        '''
-        scene
-        '''
+        #             aov_node = tree.nodes.new('ShaderNodeOutputAOV')
+        #             aov_node.name = aov_modal
+        #             tree.links.new(from_socket,aov_node.inputs['Value'])
         
-        # Renderer
-        bpy.context.scene.render.dither_intensity = 0.0
-        # bpy.context.scene.render.film_transparent = True
-        # bpy.context.scene.render.resolution_x = self.im_params_dict['im_W_load']
-        # bpy.context.scene.render.resolution_y = self.im_params_dict['im_H_load']
-        bpy.context.scene.render.resolution_percentage = 100
-        # bpy.context.scene.render.threads = 16
-        bpy.context.scene.render.views_format = 'MULTIVIEW'
+        # Link roughness/metallic aov output to all materials
+        # [!!!] if an emitter has bsdf node, will output the value too (despite emitters should not have bsdf values; need to remove bsdf from emitter objects)
+
+        for aov_modal in AOV_MODALS:
+            for material in bpy.data.materials:
+                if material.node_tree is None:
+                    continue
+                
+                for brdf_node in material.node_tree.nodes:
+                    if 'Bsdf' not in brdf_node.bl_idname:
+                        continue
+                    '''
+                    node
+                        bpy.data.materials['BackWallBSDF'].node_tree.nodes["Diffuse BSDF"]
+                    brdf_node.bl_idname
+                        'ShaderNodeBsdfDiffuse'
+                    '''
+                    
+                    print('>>>>>', brdf_node.bl_idname, material.name)
+                    
+                    # if (brdf_node.bl_idname =='ShaderNodeBsdfGlossy' or brdf_node.bl_idname =='ShaderNodeBsdfGlass') and brdf_node.distribution == 'SHARP' and aov_modal=='Roughness':
+                    #     modal_value = 0.0
+                    #     value_node = material.node_tree.nodes.new('ShaderNodeValue')
+                    #     from_socket = value_node.outputs['Value']
+                    #     from_socket.default_value = modal_value
+                    # elif aov_modal not in brdf_node.inputs.keys():
+                    #     assert False, 'not handled'
+                    #     modal_value = 0.0
+                    #     value_node = material.node_tree.nodes.new('ShaderNodeValue')
+                    #     from_socket = value_node.outputs['Value']
+                    #     from_socket.default_value = modal_value
+                    # else:
+                        # socket = brdf_node.inputs[aov_modal]
+                    value_node = material.node_tree.nodes.new('ShaderNodeValue')
+                    if len(brdf_node.inputs[aov_modal].links) == 0:
+                        if brdf_node.bl_idname == 'ShaderNodeBsdfDiffuse':
+                            modal_value = {
+                                'Roughness': 1.0,
+                                'Metallic': 0.0,
+                                'InvalidMat': 0.0,
+                            }.get(aov_modal, None)
+                        elif brdf_node.bl_idname == 'ShaderNodeBsdfGlossy': # ![](https://i.imgur.com/wkj1Pxt.jpg)
+                            modal_value = {
+                                'Roughness': brdf_node.inputs[aov_modal].default_value,  # [TODO] check if this is correct: https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/glossy.html
+                                'Metallic': 1.0, # [TODO] check if this is correct: https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/glossy.html
+                                'InvalidMat': 0.0,
+                            }.get(aov_modal, None)
+                        elif brdf_node.bl_idname == 'ShaderNodeBsdfGlass': # ![](https://i.imgur.com/ubBoiUs.jpg)
+                            modal_value = {
+                                'Roughness': brdf_node.inputs[aov_modal].default_value if not brdf_node.distribution == 'SHARP' else 0., # 'Sharp: Results in perfectly sharp reflections like a mirror. The Roughness value is not used.'
+                                'Metallic': brdf_node.inputs[aov_modal].default_value, # [TODO] check if this is correct: 
+                                'InvalidMat': 1.0,
+                            }.get(aov_modal, None)
+                        elif brdf_node.bl_idname == 'ShaderNodeBsdfPrincipled': # ![](https://i.imgur.com/bcDhH1s.jpg) | ![](https://i.imgur.com/x1m7K38.jpg)
+                            modal_value = {
+                                'Roughness': brdf_node.inputs[aov_modal].default_value, 
+                                'Metallic': brdf_node.inputs[aov_modal].default_value, 
+                                'InvalidMat': 0.0,
+                            }.get(aov_modal, None)
+                        else:
+                            # modal_value = brdf_node.inputs[aov_modal].default_value
+                            import ipdb; ipdb.set_trace()
+                            assert False, 'not handled'
+                            
+                        value_node.outputs[0].default_value = modal_value
+                        # should keep Roughness=0 for Diffuse BSDF because it is something else: https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/diffuse.html
+                        # material.node_tree.links.new(value_node.outputs[0], brdf_node.inputs[aov_modal])
+                    else:
+                        import ipdb; ipdb.set_trace()
+                        raise NotImplementedError
+                    
+                    if brdf_node.bl_idname not in ['ShaderNodeBsdfDiffuse', 'ShaderNodeBsdfGlossy', 'ShaderNodeBsdfPrincipled', 'ShaderNodeBsdfGlass']:
+                        print('Invalid brdf_node.bl_idname: %s; need to manually handle!'%brdf_node.bl_idname)
+                        import ipdb; ipdb.set_trace()
+                        raise NotImplementedError
+                    
+                    # Connect the roughness value to the AOV node.
+                    aov_node = material.node_tree.nodes.new('ShaderNodeOutputAOV')
+                    aov_node.name = aov_modal
+                    
+                    # aov_modal_socket = brdf_node.inputs[aov_modal].links[0].from_socket
+                    aov_modal_socket = value_node.outputs[0]
+                    
+                    material.node_tree.links.new(aov_modal_socket, aov_node.inputs['Color'])
+
 
         # self.cam = bpy.context.scene.camera #scene.objects['Camera'] # self.cam.data.lens -> 31.17691421508789, in mm (not degrees)
 
-        # Add the main camera.
+        '''
+        Add the main camera
+        '''
         self.cam = bpy.data.objects.new('Camera', bpy.data.cameras.new('Camera'))
         bpy.context.scene.collection.objects.link(self.cam)
         bpy.context.scene.camera = self.cam
@@ -183,22 +302,9 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         fov_x = np.arctan(fx)/np.pi*180.*2. # in degrees
         print('Blender camera parameters: w %d, h %d, cx %.4f, cy %.4f; fx %.4f, fx from K %.4f, fov_x: %.4f'%(w, h, cx, cy, fx, fx_K, fov_x))
 
-        obj_idx = 1
-        for obj in bpy.context.scene.objects:
-            if obj.type in ('MESH'):
-                obj.pass_index=obj_idx
-                obj_idx += 1
-
-        # Set pass
-        # bpy.context.scene.view_layers["ViewLayer"].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
-        # bpy.context.scene.view_layers["ViewLayer"].use_pass_object_index = True
-        # bpy.context.scene.view_layers["ViewLayer"].use_pass_z = True
-        # bpy.context.scene.view_layers["ViewLayer"].use_pass_material_index = True
-        # bpy.context.scene.view_layers["ViewLayer"].use_pass_diffuse_color = True
-        # bpy.context.scene.view_layers["ViewLayer"].use_pass_emit = True
-        # bpy.context.scene.view_layers["ViewLayer"].use_pass_glossy_color = True
-        # bpy.context.scene.view_layers["ViewLayer"].use_pass_position = True
-        
+        '''
+        Set pass for modalities
+        '''
         bpy.context.scene.view_layers[0].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
         bpy.context.scene.view_layers[0].use_pass_object_index = True
         bpy.context.scene.view_layers[0].use_pass_z = True
@@ -212,10 +318,9 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
 
         for aov_modal in AOV_MODALS:
             bpy.ops.scene.view_layer_add_aov()
-            # bpy.context.scene.view_layers["ViewLayer"].aovs[-1].name = aov_modal
-            # bpy.context.scene.view_layers["ViewLayer"].aovs[-1].type = "VALUE"
             bpy.context.scene.view_layers[0].aovs[-1].name = aov_modal
-            bpy.context.scene.view_layers[0].aovs[-1].type = "VALUE"
+            # bpy.context.scene.view_layers[0].aovs[-1].type = "VALUE"
+            bpy.context.scene.view_layers[0].aovs[-1].type = "COLOR"
 
         # bpy.context.scene = bpy.data.scenes["Scene"]
         self.tree = bpy.context.scene.node_tree
@@ -233,6 +338,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             'index', 
             'emission', 
             'lighting_envmap', 
+            'invalid_mat', 
         ]
 
     def render(self, if_force: bool=False):
@@ -247,12 +353,14 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             return
             
         from utils_OR.utils_OR_cam import convert_OR_poses_to_blender_npy
+        
         # blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.os.pose_list)
+        # assert len(blender_poses) == self.os.frame_num
         
         '''
         DEBUG: read poses from .blend file (objects named Camera0, Camera1, etc.)
         '''
-        blender_poses = np.zeros((len(self.os.pose_list),2,3))
+        blender_poses = np.zeros((100,2,3))
         i = 0
         for cam in bpy.data.objects:
             if not cam.name.startswith('Camera'): continue # assuming cameras are labelled as Camera{id}, e.g. Camera0, Camera1, etc.
@@ -263,8 +371,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             blender_poses[i,0] = pos.copy()
             blender_poses[i,1] = angles.copy()
             i += 1
+        blender_poses = blender_poses[:i]
 
-        assert len(blender_poses) == self.os.frame_num
         
         self.modal_file_outputs = []
         _modality_list = list(set(self.modality_list) - set(['lighting_envmap']))

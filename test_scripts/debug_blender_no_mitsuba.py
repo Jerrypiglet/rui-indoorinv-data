@@ -71,7 +71,7 @@ parser.add_argument('--compute_device_type', type=str, default='CUDA', help='CUD
 
 # === after refactorization
 parser.add_argument('--DATASET', type=str, default='debug_scenes', help='load conf file: confs/\{DATASET\}')
-parser.add_argument('--scene', type=str, default='kitchen_diy', help='load conf file: confs/\{DATASET\/\{opt.scene\}.conf')
+parser.add_argument('--scene', type=str, default='cornell_box', help='load conf file: confs/\{DATASET\/\{opt.scene\}.conf')
 
 opt = parser.parse_args()
 
@@ -102,6 +102,8 @@ for cam in bpy.data.objects:
     if not cam.name.startswith('Camera'): continue # assuming cameras are labelled as Camera{id}, e.g. Camera0, Camera1, etc.
     # https://docs.blender.org/api/current/bpy.types.Camera.html
     assert cam.data.type == 'PERSP', 'cam.data.type: %s is not PERSP!'%cam.data.type
+    
+    print('Found camera:', cam.name)
     
     fx = np.float32(cam.data.sensor_width / 2. / cam.data.lens)
     # fy = np.float32(cam.data.sensor_height / 2. / cam.data.lens)
@@ -147,6 +149,8 @@ for cam in bpy.data.objects:
     # assert np.abs(np.linalg.norm(lookatvector)) - 1. < 1e-5, 'lookatvector is not unit vector!'
     
     # origin_lookatvector_up_list.append((origin, lookatvector, up))
+    
+    # if len(blender_poses) >= 2: break
     
 print('%d poses found!'%len(pose_list))
 
@@ -226,47 +230,7 @@ _modality_folder_maping = {
 AOV_MODALS = []
 if 'roughness' in _modality_list:
     AOV_MODALS.append('Roughness') #,'Metallic'
-# assigne material id
-for i, mat in enumerate(bpy.data.materials):
-    mat.pass_index=(i+1)
-# link aov output
-for aov_modal in AOV_MODALS:
-    for mat in bpy.data.materials:
-        tree = mat.node_tree
-        if tree is None:
-            continue
-        for node in tree.nodes:
-            if 'Bsdf' not in node.bl_idname:
-                continue
-            if (node.bl_idname =='ShaderNodeBsdfGlossy' or node.bl_idname =='ShaderNodeBsdfGlass') and node.distribution == 'SHARP' and aov_modal=='Roughness':
-                modal_value = 0.0
-                buffer_node = tree.nodes.new('ShaderNodeValue')
-                from_socket = buffer_node.outputs['Value']
-                from_socket.default_value = modal_value
-            elif aov_modal not in node.inputs.keys():
-                modal_value = 0.0
-                buffer_node = tree.nodes.new('ShaderNodeValue')
-                from_socket = buffer_node.outputs['Value']
-                from_socket.default_value = modal_value
-            else:
-                socket = node.inputs[aov_modal]
-                if len(socket.links) == 0:
-                    if node.bl_idname == 'ShaderNodeBsdfDiffuse' and aov_modal == 'Roughness':
-                        modal_value = 1.0
-                    else:
-                        modal_value = socket.default_value
-                    buffer_node = tree.nodes.new('ShaderNodeValue')
-                    from_socket = buffer_node.outputs['Value']
-                    from_socket.default_value = modal_value
-                    tree.links.new(from_socket,socket)
-                else:
-                    from_socket=socket.links[0].from_socket
-
-            aov_node = tree.nodes.new('ShaderNodeOutputAOV')
-            aov_node.name = aov_modal
-            tree.links.new(from_socket,aov_node.inputs['Value'])
-
-
+    
 '''
 camera and scene parameters, AOV
 '''
@@ -296,42 +260,110 @@ bpy.context.scene.view_layers[0].use_pass_glossy_color = True
 bpy.context.scene.view_layers[0].use_pass_emit = True
 bpy.context.scene.view_layers[0].use_pass_position = True
 
-bpy.context.scene.use_nodes = True
 
 for aov_modal in AOV_MODALS:
     bpy.ops.scene.view_layer_add_aov()
     # bpy.context.scene.view_layers["ViewLayer"].aovs[-1].name = aov_modal
     # bpy.context.scene.view_layers["ViewLayer"].aovs[-1].type = "VALUE"
-    bpy.context.scene.view_layers[0].aovs[-1].name = aov_modal
-    bpy.context.scene.view_layers[0].aovs[-1].type = "VALUE"
+    bpy.context.scene.view_layers[0].active_aov.name = aov_modal
+    # bpy.context.scene.view_layers[0].active_aov.type = "VALUE"
+    bpy.context.scene.view_layers[0].active_aov.type = "COLOR"
 
 
 # bpy.context.scene = bpy.data.scenes["Scene"]
-tree = bpy.context.scene.node_tree
-for n in tree.nodes:
-    tree.nodes.remove(n)
-render_layers = tree.nodes.new('CompositorNodeRLayers')
+bpy.context.scene.use_nodes = True
+# tree = bpy.context.scene.node_tree
+# for n in tree.nodes:
+    # tree.nodes.remove(n)
+bpy.context.scene.node_tree.nodes.clear()
+render_node = bpy.context.scene.node_tree.nodes.new('CompositorNodeRLayers')
+composite_node = bpy.context.scene.node_tree.nodes.new('CompositorNodeComposite')
+bpy.context.scene.node_tree.links.new(render_node.outputs['Image'], composite_node.inputs['Image'])
+
+modal_file_outputs = []
+for modality in _modality_list:
+    modal_file_output = bpy.context.scene.node_tree.nodes.new(type="CompositorNodeOutputFile")
+    folder_name = _modality_folder_maping[modality]
+    render_folder_path = scene_path / folder_name
+    # if render_folder_path.exists():
+    #     render_folder_path.unlink()
+    render_folder_path.mkdir(exist_ok=True, parents=True)
+    modal_file_output.label = folder_name
+    bpy.context.scene.node_tree.links.new(render_node.outputs[folder_name], modal_file_output.inputs[0])
+    modal_file_output.base_path = str(render_folder_path)
+    modal_file_outputs.append(modal_file_output)
+    
+# assigne material id
+for i, material in enumerate(bpy.data.materials):
+    material.pass_index = (i+1)
+    
+    
+# link roughness/metallic aov output to all materials
+# [!!!] if an emitter has bsdf node, will output the value too (despite emitters should not have bsdf values; need to remove bsdf from emitter objects)
+
+for aov_modal in AOV_MODALS:
+    for material in bpy.data.materials:
+        if material.node_tree is None:
+            continue
+        
+        for brdf_node in material.node_tree.nodes:
+            if 'Bsdf' not in brdf_node.bl_idname:
+                continue
+            '''
+            node
+                bpy.data.materials['BackWallBSDF'].node_tree.nodes["Diffuse BSDF"]
+            brdf_node.bl_idname
+                'ShaderNodeBsdfDiffuse'
+            '''
+            
+            assert brdf_node.bl_idname in ['ShaderNodeBsdfDiffuse', 'ShaderNodeBsdfGlossy', 'ShaderNodeBsdfPrincipled'], 'Invalid brdf_node.bl_idname: %s; need to manually handle!'%brdf_node.bl_idname
+            print('>>>>>', brdf_node.bl_idname)
+            
+            if (brdf_node.bl_idname =='ShaderNodeBsdfGlossy' or brdf_node.bl_idname =='ShaderNodeBsdfGlass') and brdf_node.distribution == 'SHARP' and aov_modal=='Roughness':
+                assert False, 'not handled'
+                modal_value = 0.0
+                value_node = material.node_tree.nodes.new('ShaderNodeValue')
+                from_socket = value_node.outputs['Value']
+                from_socket.default_value = modal_value
+            elif aov_modal not in brdf_node.inputs.keys():
+                assert False, 'not handled'
+                modal_value = 0.0
+                value_node = material.node_tree.nodes.new('ShaderNodeValue')
+                from_socket = value_node.outputs['Value']
+                from_socket.default_value = modal_value
+            else:
+                # socket = brdf_node.inputs[aov_modal]
+                if len(brdf_node.inputs[aov_modal].links) == 0:
+                    if brdf_node.bl_idname == 'ShaderNodeBsdfDiffuse' and aov_modal == 'Roughness':
+                        modal_value = 1.0 # otherwise: brdf_node.inputs[aov_modal].default_value==0.
+                    elif brdf_node.bl_idname == 'ShaderNodeBsdfGlossy' and aov_modal == 'Roughness':
+                        assert modal_value > 1e-5
+                        modal_value = brdf_node.inputs[aov_modal].default_value
+                    else:
+                        modal_value = brdf_node.inputs[aov_modal].default_value
+                        
+                    value_node = material.node_tree.nodes.new('ShaderNodeValue')
+                    value_node.outputs[0].default_value = modal_value
+                    # material.node_tree.links.new(value_node.outputs[0], brdf_node.inputs[aov_modal])
+            
+            # Connect the roughness value to the AOV node.
+            aov_node = material.node_tree.nodes.new('ShaderNodeOutputAOV')
+            aov_node.name = aov_modal
+            
+            # aov_modal_socket = brdf_node.inputs[aov_modal].links[0].from_socket
+            aov_modal_socket = value_node.outputs[0]
+            
+            material.node_tree.links.new(aov_modal_socket, aov_node.inputs['Color'])
+
 
 '''
 render the scene with bpy
 '''
 
-modal_file_outputs = []
-for modality in _modality_list:
-    modal_file_output = tree.nodes.new(type="CompositorNodeOutputFile")
-    folder_name = _modality_folder_maping[modality]
-    render_folder_path = scene_path / folder_name
-    # if render_folder_path.exists():
-        # render_folder_path.unlink()
-    render_folder_path.mkdir(exist_ok=True, parents=True)
-    modal_file_output.label = folder_name
-    tree.links.new(render_layers.outputs[folder_name], modal_file_output.inputs[0])
-    modal_file_output.base_path = str(render_folder_path)
-    modal_file_outputs.append(modal_file_output)
-
 im_rendering_folder = scene_path / 'Image'
 
 for frame_idx in tqdm(range(POSE_NUM)):
+    bpy.context.view_layer.update()
     # t_c2w_b = (t_c2w_b - self.os.trans_m2b) / self.os.scale_m2b # convert to Mitsuba scene scale (to match the dumped Blender scene from Mitsuba)
     im_rendering_path = str(im_rendering_folder / ('%03d_0001'%frame_idx))
     bpy.context.scene.render.filepath = str(im_rendering_path)
