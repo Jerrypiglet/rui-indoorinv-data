@@ -8,10 +8,15 @@ import bpy
 import scipy
 import json
 
-from lib.utils_misc import get_list_of_keys, white_blue, blue_text, blue_text, red, listify_matrix, yellow_text
+from lib.utils_misc import get_list_of_keys, white_blue, blue_text, blue_text, red, listify_matrix, yellow_text, yellow
 from lib.global_vars import cycles_device_dict, compute_device_type_dict
 
 from .class_rendererBase import rendererBase
+
+'''
+TODO:
+- check why output 2 images of each pose, for the Evermotion scene;
+'''
 
 class renderer_blender_mitsubaScene_3D(rendererBase):
     '''
@@ -35,6 +40,8 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         COLOR_DEPTH=16, 
         blender_file_name=None, 
         if_skip_check: bool=False,
+        debug_if_read_pose_from_blend: bool=False, 
+        debug_if_export_blend: bool=False, 
         *args, **kwargs, 
     ):
         rendererBase.__init__(
@@ -45,6 +52,9 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             *args, **kwargs
         )
         # assert self.os.pose_format in ['Blender', 'json'], ''
+        
+        self.debug_if_read_pose_from_blend = debug_if_read_pose_from_blend
+        self.debug_if_export_blend = debug_if_export_blend
 
         self.blend_file_path = Path(str(self.os.xml_file_path).replace('.xml', '.blend')) if blender_file_name is None else self.os.scene_path / blender_file_name
         assert self.blend_file_path.exists(), 'Blender file %s does not exist! See class documentation for export instructions.'%(self.blend_file_path.name)
@@ -72,11 +82,13 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         # Renderer
         bpy.context.scene.render.dither_intensity = 0.0
         # bpy.context.scene.render.film_transparent = True
-        # bpy.context.scene.render.resolution_x = self.im_params_dict['im_W_load']
-        # bpy.context.scene.render.resolution_y = self.im_params_dict['im_H_load']
+        bpy.context.scene.render.resolution_x = self.im_params_dict['im_W_load']
+        bpy.context.scene.render.resolution_y = self.im_params_dict['im_H_load']
         bpy.context.scene.render.resolution_percentage = 100
         # bpy.context.scene.render.threads = 16
         bpy.context.scene.render.views_format = 'MULTIVIEW'
+        bpy.context.scene.render.image_settings.file_format = FORMAT
+        bpy.context.scene.render.image_settings.color_depth = str(COLOR_DEPTH)
 
         '''
         Configure render engine and device
@@ -118,7 +130,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                 obj_idx += 1
                 
             # (2) remove bsdf for emitters
-            if obj.name == 'Light':
+            if obj.type in ('MESH'):
                 for obj_mat in obj.data.materials:
                     if obj_mat.node_tree is None: # https://docs.blender.org/api/current/bpy.types.ShaderNodeTree.html
                         continue
@@ -132,12 +144,15 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                             if strength > 1e-4:
                                 if_has_emission = True
                                 break
-                    if if_has_emission:
-                        print(yellow_text('[Emitter has BSDF] obj_mat.name: %s, if_has_emission: %s, emission_strength: %.2f'%(obj_mat.name, if_has_emission, strength)))
-                        for node in obj_mat.node_tree.nodes:
-                            if 'Bsdf' in node.bl_idname:
-                                print('[Emitter has BSDF] -> removed node: %s'%node.bl_idname)
-                                obj_mat.node_tree.nodes.remove(node)
+                
+                # print(obj.name)
+                if if_has_emission:
+                    print('---node.bl_idname', node.bl_idname)
+                    for node in obj_mat.node_tree.nodes:
+                        if 'Bsdf' in node.bl_idname:
+                            print(yellow_text('[Emitter has BSDF] obj.name: %s, obj_mat.name: %s, if_has_emission: %s, emission_strength: %.2f'%(obj.name, obj_mat.name, if_has_emission, strength)))
+                            print(yellow('--> removed node: %s'%node.bl_idname))
+                            obj_mat.node_tree.nodes.remove(node)
 
         '''
         Modalities: deal with aov modalities by going over all materials
@@ -145,7 +160,9 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         
         AOV_MODALS = []
         if 'roughness' in self.modality_list:
-            AOV_MODALS.append('Roughness') #,'Metallic'
+            AOV_MODALS.append('Roughness')
+        if 'metallic' in self.modality_list:
+            AOV_MODALS.append('Metallic')
         if 'invalid_mat' in self.modality_list:
             AOV_MODALS.append('InvalidMat')
         # assigne material id
@@ -197,6 +214,11 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                 if material.node_tree is None:
                     continue
                 
+                if_mixed_shader = False
+                if any([isinstance(brdf_node, bpy.types.ShaderNodeMixShader) for brdf_node in material.node_tree.nodes]):
+                    print(yellow('Mixed shader found in material: %s'%material.name))
+                    if_mixed_shader = True
+                
                 for brdf_node in material.node_tree.nodes:
                     if 'Bsdf' not in brdf_node.bl_idname:
                         continue
@@ -207,23 +229,12 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                         'ShaderNodeBsdfDiffuse'
                     '''
                     
-                    print('>>>>>', brdf_node.bl_idname, material.name)
+                    print('>>>>> material:', brdf_node.bl_idname, material.name)
                     
-                    # if (brdf_node.bl_idname =='ShaderNodeBsdfGlossy' or brdf_node.bl_idname =='ShaderNodeBsdfGlass') and brdf_node.distribution == 'SHARP' and aov_modal=='Roughness':
-                    #     modal_value = 0.0
-                    #     value_node = material.node_tree.nodes.new('ShaderNodeValue')
-                    #     from_socket = value_node.outputs['Value']
-                    #     from_socket.default_value = modal_value
-                    # elif aov_modal not in brdf_node.inputs.keys():
-                    #     assert False, 'not handled'
-                    #     modal_value = 0.0
-                    #     value_node = material.node_tree.nodes.new('ShaderNodeValue')
-                    #     from_socket = value_node.outputs['Value']
-                    #     from_socket.default_value = modal_value
-                    # else:
-                        # socket = brdf_node.inputs[aov_modal]
                     value_node = material.node_tree.nodes.new('ShaderNodeValue')
-                    if len(brdf_node.inputs[aov_modal].links) == 0:
+                    default_value = brdf_node.inputs[aov_modal].default_value if aov_modal in brdf_node.inputs else None
+                    
+                    if aov_modal not in brdf_node.inputs or len(brdf_node.inputs[aov_modal].links) == 0:
                         if brdf_node.bl_idname == 'ShaderNodeBsdfDiffuse':
                             modal_value = {
                                 'Roughness': 1.0,
@@ -232,35 +243,63 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                             }.get(aov_modal, None)
                         elif brdf_node.bl_idname == 'ShaderNodeBsdfGlossy': # ![](https://i.imgur.com/wkj1Pxt.jpg)
                             modal_value = {
-                                'Roughness': brdf_node.inputs[aov_modal].default_value,  # [TODO] check if this is correct: https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/glossy.html
+                                'Roughness': default_value,  # [TODO] check if this is correct: https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/glossy.html
                                 'Metallic': 1.0, # [TODO] check if this is correct: https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/glossy.html
                                 'InvalidMat': 0.0,
                             }.get(aov_modal, None)
                         elif brdf_node.bl_idname == 'ShaderNodeBsdfGlass': # ![](https://i.imgur.com/ubBoiUs.jpg)
                             modal_value = {
-                                'Roughness': brdf_node.inputs[aov_modal].default_value if not brdf_node.distribution == 'SHARP' else 0., # 'Sharp: Results in perfectly sharp reflections like a mirror. The Roughness value is not used.'
-                                'Metallic': brdf_node.inputs[aov_modal].default_value, # [TODO] check if this is correct: 
+                                'Roughness': default_value if not brdf_node.distribution == 'SHARP' else 0., # 'Sharp: Results in perfectly sharp reflections like a mirror. The Roughness value is not used.'
+                                'Metallic': 0., # [TODO] check if this is correct: 
+                                'InvalidMat': 1.0,
+                            }.get(aov_modal, None)
+                        elif brdf_node.bl_idname in ['ShaderNodeBsdfTranslucent', 'ShaderNodeBsdfTransparent']: 
+                            # Translucent BSDF: https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/translucent.html
+                            # Transparent BSDF: https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/transparent.html
+                            modal_value = {
+                                'Roughness': 0., # [TODO] check if this is correct: 
+                                'Metallic': 0., # [TODO] check if this is correct: 
                                 'InvalidMat': 1.0,
                             }.get(aov_modal, None)
                         elif brdf_node.bl_idname == 'ShaderNodeBsdfPrincipled': # ![](https://i.imgur.com/bcDhH1s.jpg) | ![](https://i.imgur.com/x1m7K38.jpg)
                             modal_value = {
-                                'Roughness': brdf_node.inputs[aov_modal].default_value, 
-                                'Metallic': brdf_node.inputs[aov_modal].default_value, 
+                                'Roughness': default_value, 
+                                'Metallic': default_value, 
                                 'InvalidMat': 0.0,
                             }.get(aov_modal, None)
                         else:
-                            # modal_value = brdf_node.inputs[aov_modal].default_value
-                            import ipdb; ipdb.set_trace()
-                            assert False, 'not handled'
+                            '''
+                            [TODO] Check:
+                            - Mixed shader: ('AI55_004_02', 'Roughness', 'ShaderNodeBsdfTranslucent') # ![](https://i.imgur.com/w2M1sbQ.jpg)
+                            '''
+                            # modal_value = default_value
+                            if if_mixed_shader: # ![](https://i.imgur.com/w2M1sbQ.jpg)
+                                modal_value = {
+                                    'Roughness': 0., 
+                                    'Metallic': 0., 
+                                    'InvalidMat': 1.,
+                                }.get(aov_modal, None)
+                            else:
+                                import ipdb; ipdb.set_trace()
+                                assert False, 'not handled'
                             
+                        if modal_value is None:
+                            print(brdf_node.bl_idname, aov_modal, default_value)
+                            import ipdb; ipdb.set_trace()
                         value_node.outputs[0].default_value = modal_value
                         # should keep Roughness=0 for Diffuse BSDF because it is something else: https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/diffuse.html
                         # material.node_tree.links.new(value_node.outputs[0], brdf_node.inputs[aov_modal])
                     else:
-                        import ipdb; ipdb.set_trace()
-                        raise NotImplementedError
+                        print('[DEBUG]', material.name, aov_modal, brdf_node.bl_idname, len(brdf_node.inputs[aov_modal].links), default_value)
+                        # import ipdb; ipdb.set_trace()
+                        assert len(brdf_node.inputs[aov_modal].links) == 1
+                        modal_value = {
+                            'Roughness': default_value, 
+                            'Metallic': default_value, 
+                            'InvalidMat': 0. if brdf_node.bl_idname in ['ShaderNodeBsdfGlass'] else 1.,
+                        }.get(aov_modal, None)
                     
-                    if brdf_node.bl_idname not in ['ShaderNodeBsdfDiffuse', 'ShaderNodeBsdfGlossy', 'ShaderNodeBsdfPrincipled', 'ShaderNodeBsdfGlass']:
+                    if brdf_node.bl_idname not in ['ShaderNodeBsdfDiffuse', 'ShaderNodeBsdfGlossy', 'ShaderNodeBsdfPrincipled', 'ShaderNodeBsdfGlass', 'ShaderNodeBsdfTranslucent', 'ShaderNodeBsdfTransparent']:
                         print('Invalid brdf_node.bl_idname: %s; need to manually handle!'%brdf_node.bl_idname)
                         import ipdb; ipdb.set_trace()
                         raise NotImplementedError
@@ -285,7 +324,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         bpy.context.scene.camera = self.cam
 
         self.cam.data.clip_start = 0.1
-        self.cam.data.clip_end = 50.0
+        self.cam.data.clip_end = 50. * 100. # [TODO] how to get the multiplier of the units?
         # print camera parameters
         w = bpy.context.scene.render.resolution_x
         h = bpy.context.scene.render.resolution_y
@@ -333,12 +372,12 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
     def valid_modalities(self):
         return [
             'im', 
-            'albedo', 'roughness', 
+            'albedo', 'roughness', 'metallic', 
+            'invalid_mat', 
             'depth', 'normal', 
             'index', 
             'emission', 
             'lighting_envmap', 
-            'invalid_mat', 
         ]
 
     def render(self, if_force: bool=False):
@@ -359,23 +398,34 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         # frame_id_list = self.os.frame_id_list
         
         '''
-        DEBUG: read poses from .blend file (objects named Camera0, Camera1, etc.)
+        ====> DEBUG: read poses from .blend file (objects named Camera0, Camera1, etc., or {SCENE_NAME}_Camera0, {SCENE_NAME}_Camera1, etc.)
         '''
-        blender_poses = np.zeros((100,2,3))
-        i = 0
-        frame_id_list = []
-        for cam in bpy.data.objects:
-            if not cam.name.startswith('Camera'): continue # assuming cameras are labelled as Camera{id}, e.g. Camera0, Camera1, etc.
-            if cam.name == 'Camera': continue
-            pos = np.array(cam.location).flatten()
-            angles = np.array(cam.rotation_euler).flatten()
-            # blender_poses.append((pos.copy(), angles.copy()))
-            blender_poses[i,0] = pos.copy()
-            blender_poses[i,1] = angles.copy()
-            i += 1
-            frame_id_list.append(i)
-        blender_poses = blender_poses[:i]
+        if self.debug_if_read_pose_from_blend:
+            blender_poses = np.zeros((100,2,3))
+            i = 0
+            frame_id_list = []
+            for cam in bpy.data.objects:
+                # if not cam.name.replace(self.os.CONF.scene_params_dict.get('scene_name', '')+'_', '').startswith('Camera'): continue # assuming cameras are labelled as Camera{id}, e.g. Camera0, Camera1, etc.
+                if not cam.name.startswith('Camera'): continue # assuming cameras are labelled as Camera{id}, e.g. Camera0, Camera1, etc.
 
+                if cam.name == 'Camera': continue # skip added new camera
+                if cam.data is None: continue
+                print('--- Found camera', cam.name, type(cam))
+                assert cam.data.type == 'PERSP', 'cam.data.type: %s is not PERSP!'%cam.data.type
+                pos = np.array(cam.location).flatten()
+                angles = np.array(cam.rotation_euler).flatten()
+                print('pos', pos, 'angles', angles) # [TODO] how to read the units, and change clip accordingly?
+                # blender_poses.append((pos.copy(), angles.copy()))
+                blender_poses[i,0] = pos.copy()
+                blender_poses[i,1] = angles.copy()
+                frame_id_list.append(i)
+                i += 1
+            blender_poses = blender_poses[:i]
+            assert len(blender_poses) > 0, 'No camera found!'
+        '''
+        <====
+        '''
+        # import ipdb; ipdb.set_trace()
         
         self.modal_file_outputs = []
         _modality_list = list(set(self.modality_list) - set(['lighting_envmap']))
@@ -393,15 +443,15 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         print(blue_text('Rendering modalities for %d frames to... by Blender: %s')%(len(blender_poses), str(im_rendering_folder)))
         
         # Data to store in JSON file
-        out_data = {
-            'camera_angle_x': bpy.context.scene.camera.data.angle_x, #bpy.data.objects['Camera'].data.angle_x,
-            'camera_angle_y': bpy.context.scene.camera.data.angle_y, #bpy.data.objects['Camera'].data.angle_y,
-        }
-        out_data['frames'] = []
+        # out_data = {
+        #     'camera_angle_x': bpy.context.scene.camera.data.angle_x, #bpy.data.objects['Camera'].data.angle_x,
+        #     'camera_angle_y': bpy.context.scene.camera.data.angle_y, #bpy.data.objects['Camera'].data.angle_y,
+        # }
+        # out_data['frames'] = []
         
         for i in range(len(blender_poses)):
             # t_c2w_b = (t_c2w_b - self.os.trans_m2b) / self.os.scale_m2b # convert to Mitsuba scene scale (to match the dumped Blender scene from Mitsuba)
-            frame_id = self.os.frame_id_list[i]
+            frame_id = frame_id_list[i]
             im_rendering_path = str(im_rendering_folder / ('%03d_0001'%frame_id))
             bpy.context.scene.render.filepath = str(im_rendering_path)
             
@@ -420,18 +470,19 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             bpy.ops.render.render(write_still=True)  # render still
             
             # [Optional] Save the blend file.
-            bpy.ops.file.pack_all()
-            bpy.ops.wm.save_as_mainfile(filepath=str(self.os.scene_path / ('test_frame_%d.blend'%frame_id)))
+            if self.debug_if_export_blend:
+                bpy.ops.file.pack_all()
+                bpy.ops.wm.save_as_mainfile(filepath=str(self.os.scene_path / ('test_frame_%d.blend'%frame_id)))
             
             frame_data = {
                 'file_path': bpy.context.scene.render.filepath,
                 'transform_matrix': listify_matrix(self.cam.matrix_world)
             }
-            out_data['frames'].append(frame_data)
+            # out_data['frames'].append(frame_data)
 
         print(blue_text('render_modality. DONE.'))
         
-        self.dump_transforms_json(out_data)
+        # self.dump_transforms_json(out_data)
                 
     def dump_transforms_json(self, out_data):
         json_file_path = self.os.pose_file_root / 'transforms.json'

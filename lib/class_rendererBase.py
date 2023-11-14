@@ -56,7 +56,8 @@ class rendererBase():
             'emission': 'Emit', 
             'roughness': 'Roughness', 
             'lighting_envmap': 'LightingEnvmap', 
-            # 'Metallic'
+            'metallic': 'Metallic', 
+            'invalid_mat': 'InvalidMat',
             }
 
     @property
@@ -75,7 +76,8 @@ class rendererBase():
             # 'GlossCol',
             'emission': ['*_0001.exr', '%03d_0001.exr'], 
             'roughness': ['*_0001.exr', '%03d_0001.exr'], 
-            # 'Metallic'
+            'metallic': ['*_0001.exr', '%03d_0001.exr'], 
+            'invalid_mat': ['*_0001.exr', '%03d_0001.exr'], 
             }
 
     def check_and_sort_modalities(self, modalitiy_list):

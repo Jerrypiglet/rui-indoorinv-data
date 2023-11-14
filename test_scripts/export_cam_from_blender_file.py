@@ -1,7 +1,7 @@
 '''
 Convert .blender file with cameras to cam.txt and intrinsic_mitsubaScene.txt
 
-> python dump_cam_from_blender_file.py
+> python export_cam_from_blender_file.py
 
 Then render with:
 
@@ -23,11 +23,13 @@ def R_t_to_origin_lookatvector_up_opencv(R, t):
     up = R @ np.array([[0.], [-1.], [0.]], dtype=np.float32)
     return (origin, lookatvector, up)
 
-scenes_root = Path('/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data/data/debug_scenes')
+# scenes_root = Path('/Users/jerrypiglet/Documents/Projects/rui-indoorinv-data/data/debug_scenes')
+scenes_root = Path('/home/ruizhu/Documents/Projects/rui-indoorinv-data/data/debug_scenes')
 
 # scene_name = 'cornell_box'
 # scene_name = 'cornell_box_tmp'
-scene_name = 'kitchen_manual'
+# scene_name = 'kitchen_manual'
+scene_name = 'AI55_004'
 
 blend_file_path = scenes_root / scene_name / 'test.blend'
 assert blend_file_path.exists(), 'blend_file_path: %s does not exist!'%blend_file_path
@@ -45,8 +47,10 @@ origin_lookatvector_up_list = []
 K_list = []
 
 for cam in bpy.data.objects:
-    if not cam.name.startswith('Camera'): continue # assuming cameras are labelled as Camera{id}, e.g. Camera0, Camera1, etc.
+    if not cam.name.replace(scene_name+'_', '').startswith('Camera'): continue # assuming cameras are labelled as Camera{id}, e.g. Camera0, Camera1, etc.
     # https://docs.blender.org/api/current/bpy.types.Camera.html
+    if cam.data is None: continue
+    print('--- Found camera', cam.name, type(cam))
     assert cam.data.type == 'PERSP', 'cam.data.type: %s is not PERSP!'%cam.data.type
     
     fx = np.float32(cam.data.sensor_width / 2. / cam.data.lens)
@@ -87,6 +91,7 @@ for cam in bpy.data.objects:
     origin_lookatvector_up_list.append((origin, lookatvector, up))
     
 print('%d poses found!'%len(origin_lookatvector_up_list))
+assert len(origin_lookatvector_up_list) > 0, 'No camera found!'
 
 with open(str(pose_file_path), 'w') as camOut:
     camOut.write('%d\n'%len(origin_lookatvector_up_list))
@@ -102,5 +107,5 @@ print('Intrinsic file written to %s.'%(scenes_root / scene_name / 'intrinsic_mit
 print(K_list[0])
 
 K_list_diff = np.array(K_list) - K_list[0]
-assert np.amax(K_list_diff) < 1e-5, 'K_list_diff: %s is not all identical!'%str(K_list_diff)
+assert np.amax(K_list_diff) < 1e-5, 'K_list_diff: %s is not all identical! ONLY WROTE FIRST K as intrinsics!'%str(K_list_diff)
 

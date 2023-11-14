@@ -20,7 +20,7 @@ So that the scenes are organized as:
 
 - ./data/debug_scenes/
     - kitchen_diy/
-    - cornel_box/ # export cameras from .blend file via: python test_scripts/dump_cam_from_blender_file.py
+    - cornel_box/ # export cameras from .blend file via: python test_scripts/export_cam_from_blender_file.py
     
 Add your local path and config to lib/global_vars.py, by replacing all the #TODO entries. 
     
@@ -42,6 +42,10 @@ Options:
 - Choose a subset of frames to render/fuse, via: frame_id_list = [61, 63, 66, 77]
 - Set --spp properly for Blender/Mitsuba renderings to reduce noise level (e.g. spp>=128 for Blender; spp>=512 for Mitsuba)
 
+Demo usage:
+> python debug_blender_mitsubaScene3D.py --renderer blender --scene kitchen_manual --spp 32
+> python debug_blender_mitsubaScene3D.py --renderer blender --DATASET Evermotion --scene AI55_004 --spp 32
+
 '''
  
 import os, sys
@@ -51,7 +55,8 @@ PATH_HOME = Path(os.path.abspath(os.path.join(path, os.pardir)))
 sys.path.insert(0, str(PATH_HOME))
 
 # host = 'debug'
-host = 'apple'
+# host = 'apple'
+host = 'r4090'
 
 import numpy as np
 np.set_printoptions(suppress=True)
@@ -125,6 +130,7 @@ CONF.mi_params_dict.update({
     'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
     'if_get_segs': True, # [depend on if_sample_rays_pts=True] True: to generate segs similar to those in openroomsScene2D.load_seg()
     # 'if_mi_scene_from_xml': False, 
+    'debug_render_test_image': False, 
     })
 
 # CONF.im_params_dict.update({
@@ -183,8 +189,9 @@ if opt.renderer == 'blender':
             'normal', 
             'index', 
             'emission', 
+            'metallic', 
+            'invalid_mat', 
             # 'lighting_envmap', 
-            # 'invalid_mat', 
             ], 
         host=host, 
         FORMAT='OPEN_EXR', 
@@ -198,8 +205,10 @@ if opt.renderer == 'blender':
         }, # override
         cam_params_dict={}, 
         mi_params_dict={},
-        # blender_file_name='test_blender_export_reimport.blend', 
+        blender_file_name=CONF.scene_params_dict.get('blender_file_name', 'test.blend'), 
         # if_skip_check=False,
+        debug_if_read_pose_from_blend=True, 
+        debug_if_export_blend=False, 
     )
     
 renderer.render(if_force=opt.force)
@@ -207,31 +216,31 @@ renderer.render(if_force=opt.force)
 # compare HDR images from mi/blender if both are available
 # renderer.compare_blender_mi_Image()
 
-'''
-fuse TSDF volume
-'''
+# '''
+# fuse TSDF volume
+# '''
 
-CONF.shape_params_dict.update({
-    'if_force_fuse_tsdf': True, 
-    })
+# CONF.shape_params_dict.update({
+#     'if_force_fuse_tsdf': True, 
+#     })
 
-if opt.renderer == 'mi':
-    CONF.modality_filename_dict.update({
-        'im_hdr': 'Image/%03d_0001_mi.exr', 
-        'im_sdr': 'Image/%03d_0001_mi.png', 
-    })
-    CONF.shape_params_dict.update({
-        'tsdf_file': 'fused_tsdf_mi.ply', 
-        })
+# if opt.renderer == 'mi':
+#     CONF.modality_filename_dict.update({
+#         'im_hdr': 'Image/%03d_0001_mi.exr', 
+#         'im_sdr': 'Image/%03d_0001_mi.png', 
+#     })
+#     CONF.shape_params_dict.update({
+#         'tsdf_file': 'fused_tsdf_mi.ply', 
+#         })
 
-'''
-Dump TSDF file
-'''
-scene_obj = mitsubaScene3D(
-    CONF = CONF, 
-    if_debug_info = opt.if_debug_info, 
-    host = host, 
-    root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
-    # modality_list = ['poses', 'im_hdr', 'im_sdr'],
-    modality_list = ['poses', 'im_hdr', 'im_sdr', 'tsdf'],
-)
+# '''
+# Dump TSDF file
+# '''
+# scene_obj = mitsubaScene3D(
+#     CONF = CONF, 
+#     if_debug_info = opt.if_debug_info, 
+#     host = host, 
+#     root_path_dict = {'PATH_HOME': Path(PATH_HOME), 'dataset_root': dataset_root, 'xml_root': xml_root}, 
+#     # modality_list = ['poses', 'im_hdr', 'im_sdr'],
+#     modality_list = ['poses', 'im_hdr', 'im_sdr', 'tsdf'],
+# )

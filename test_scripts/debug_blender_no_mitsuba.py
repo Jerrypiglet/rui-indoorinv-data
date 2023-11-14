@@ -10,7 +10,7 @@ Orgalize the folder structure as:
 
 - {DATASET_ROOT}
     - debug_scenes/
-        - cornel_box/ # export cameras from .blend file via: python test_scripts/dump_cam_from_blender_file.py
+        - cornel_box/ # export cameras from .blend file via: python test_scripts/export_cam_from_blender_file.py
             - test.blend # download from https://dsc.cloud/jerrypiglet/test.blend
     
 We assume camera intrinsics have been set in .blend file, and multiple cameras are set in the scene, with names 'Camera0', 'Camera1', etc.
