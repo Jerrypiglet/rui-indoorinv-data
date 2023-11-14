@@ -356,12 +356,14 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         
         # blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.os.pose_list)
         # assert len(blender_poses) == self.os.frame_num
+        # frame_id_list = self.os.frame_id_list
         
         '''
         DEBUG: read poses from .blend file (objects named Camera0, Camera1, etc.)
         '''
         blender_poses = np.zeros((100,2,3))
         i = 0
+        frame_id_list = []
         for cam in bpy.data.objects:
             if not cam.name.startswith('Camera'): continue # assuming cameras are labelled as Camera{id}, e.g. Camera0, Camera1, etc.
             if cam.name == 'Camera': continue
@@ -371,6 +373,7 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             blender_poses[i,0] = pos.copy()
             blender_poses[i,1] = angles.copy()
             i += 1
+            frame_id_list.append(i)
         blender_poses = blender_poses[:i]
 
         
