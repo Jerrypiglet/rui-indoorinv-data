@@ -89,7 +89,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
 
     return im.astype(np.float32)
 
-def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if_mask=True, im_hdr=None):
+def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if_mask=True, im_hdr=None, if_gamma_22: bool=True):
     # Read HDR image
     if im_hdr is None:
         im_hdr = load_img(Path(hdr_image_path), ext=str(hdr_image_path).split('.')[1]) * scale
@@ -105,7 +105,10 @@ def convert_write_png(hdr_image_path, png_image_path, scale=1., im_key='im_', if
     else:
         im_hdr_scaled = im_hdr * scale
     
-    im_SDR = np.clip(im_hdr_scaled**(1.0/2.2), 0., 1.)
+    if if_gamma_22:
+        im_SDR = np.clip(im_hdr_scaled**(1.0/2.2), 0., 1.)
+    else:
+        im_SDR = np.clip(im_hdr_scaled, 0., 1.)
     # im_SDR = np.clip((im_hdr_scaled/4)**(1.0/4), 0., 1.)
     im_SDR_uint8 = (255. * im_SDR).astype(np.uint8)
     Path(png_image_path).parent.mkdir(parents=True, exist_ok=True)

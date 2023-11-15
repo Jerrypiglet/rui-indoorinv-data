@@ -48,16 +48,22 @@ class rendererBase():
             'im': 'Image', 
             'depth': 'Depth',
             'normal': 'Normal',
+            'geo_normal': 'GeoNormal',
+            'sh_normal': 'ShadingNormal',
             # 'Alpha',
-            # 'IndexOB',
             'albedo': 'DiffCol',
-            # 'GlossCol',
-            'index': 'IndexMA', 
+            'specular_color': 'GlossCol',
+            
             'emission': 'Emit', 
             'roughness': 'Roughness', 
             'lighting_envmap': 'LightingEnvmap', 
             'metallic': 'Metallic', 
             'invalid_mat': 'InvalidMat',
+            
+            'mat_index': 'IndexMA', 
+            'shape_index': 'IndexOB',
+            'uv': 'UV', 
+            'position': 'Position', 
             }
 
     @property
@@ -70,10 +76,17 @@ class rendererBase():
             'lighting_envmap': ['*_0001.exr', '%03d_0001.exr'], 
             'depth': ['*_0001.exr', '%03d_0001.exr'], 
             'normal': ['*_0001.exr', '%03d_0001.exr'], 
+            'geo_normal': ['*_0001.exr', '%03d_0001.exr'], 
+            'sh_normal': ['*_0001.exr', '%03d_0001.exr'], 
+            'uv': ['*_0001.exr', '%03d_0001.exr'], 
+            'position': ['*_0001.exr', '%03d_0001.exr'], 
+            'shape_index': ['*_0001.exr', '%03d_0001.exr'], 
             # 'Alpha',
-            'index': ['*_0001.exr', '%03d_0001.exr'], 
+            'mat_index': ['*_0001.exr', '%03d_0001.exr'], 
+            
             'albedo': ['*_0001.exr', '%03d_0001.exr'], 
-            # 'GlossCol',
+            'specular_color': ['*_0001.exr', '%03d_0001.exr'], 
+            
             'emission': ['*_0001.exr', '%03d_0001.exr'], 
             'roughness': ['*_0001.exr', '%03d_0001.exr'], 
             'metallic': ['*_0001.exr', '%03d_0001.exr'], 
@@ -91,7 +104,7 @@ class rendererBase():
         ...
 
     def render_modality_check(self, modality, folder_name_appendix='', if_force=False, file_name_appendix=''):
-        assert modality in self.modality_folder_maping
+        assert modality in self.modality_folder_maping, 'Invalid modality not found in modality_folder_maping: %s'%modality
         folder_name = self.modality_folder_maping[modality] + folder_name_appendix
         render_folder_path = self.scene_rendering_path / folder_name
         assert modality in self.modality_filename_maping, 'Invalid modality not found in modality_filename_maping: %s'%modality

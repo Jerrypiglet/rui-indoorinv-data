@@ -208,6 +208,14 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         #             aov_node.name = aov_modal
         #             tree.links.new(from_socket,aov_node.inputs['Value'])
         
+        # [DEBUG] go over all materials
+        # for material in bpy.data.materials:
+        #     if material.node_tree is None:
+        #         continue
+        #     for brdf_node in material.node_tree.nodes:
+        #         if brdf_node.bl_idname == 'ShaderNodeBsdfGlossy':
+        #             import ipdb; ipdb.set_trace()
+                    
         # Link roughness/metallic aov output to all materials
         # [!!!] if an emitter has bsdf node, will output the value too (despite emitters should not have bsdf values; need to remove bsdf from emitter objects)
 
@@ -344,7 +352,9 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
         print('Blender camera parameters: w %d, h %d, cx %.4f, cy %.4f; fx %.4f, fx from K %.4f, fov_x: %.4f'%(w, h, cx, cy, fx, fx_K, fov_x))
 
         '''
-        Set pass for modalities
+        Set pass for modalities: 
+        
+        naming see: https://docs.blender.org/api/current/bpy.types.Scene.html#bpy.types.Scene.view_layers
         '''
         bpy.context.scene.view_layers[0].use_pass_normal = True # "ViewLayer" not found: https://zhuanlan.zhihu.com/p/533843765
         bpy.context.scene.view_layers[0].use_pass_object_index = True
@@ -374,10 +384,11 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
     def valid_modalities(self):
         return [
             'im', 
-            'albedo', 'roughness', 'metallic', 
+            'albedo', 'specular_color', 
+            'roughness', 'metallic', 
             'invalid_mat', 
             'depth', 'normal', 
-            'index', 
+            'mat_index', 
             'emission', 
             'lighting_envmap', 
         ]
@@ -395,14 +406,12 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
             
         from utils_OR.utils_OR_cam import convert_OR_poses_to_blender_npy
         
-        # blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.os.pose_list)
-        # assert len(blender_poses) == self.os.frame_num
-        # frame_id_list = self.os.frame_id_list
         
         '''
-        ====> DEBUG: read poses from .blend file (objects named Camera0, Camera1, etc., or {SCENE_NAME}_Camera0, {SCENE_NAME}_Camera1, etc.)
+        Load poses from (1) Blender file / (2) dumped pose file
         '''
         if self.debug_if_read_pose_from_blend:
+            # (1) DEBUG: read poses from .blend file (objects named Camera0, Camera1, etc., or {SCENE_NAME}_Camera0, {SCENE_NAME}_Camera1, etc.)
             blender_poses = np.zeros((100,2,3))
             i = 0
             frame_id_list = []
@@ -423,11 +432,14 @@ class renderer_blender_mitsubaScene_3D(rendererBase):
                 frame_id_list.append(i)
                 i += 1
             blender_poses = blender_poses[:i]
-            assert len(blender_poses) > 0, 'No camera found!'
+        else:
+            blender_poses = convert_OR_poses_to_blender_npy(pose_list=self.os.pose_list)
+            assert len(blender_poses) == self.os.frame_num
+            frame_id_list = self.os.frame_id_list
         '''
         <====
         '''
-        # import ipdb; ipdb.set_trace()
+        assert len(blender_poses) > 0, 'No camera found!'
         
         self.modal_file_outputs = []
         _modality_list = list(set(self.modality_list) - set(['lighting_envmap']))

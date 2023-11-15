@@ -138,6 +138,8 @@ CONF.mi_params_dict.update({
     'if_sample_rays_pts': True, # True: to sample camera rays and intersection pts given input mesh and camera poses
     'if_get_segs': True, # [depend on if_sample_rays_pts=True] True: to generate segs similar to those in openroomsScene2D.load_seg()
     # 'if_mi_scene_from_xml': False, 
+    'debug_dump_mesh': False, 
+    'debug_render_test_image': False, 
     })
 
 CONF.im_params_dict.update({
@@ -187,12 +189,18 @@ if opt.render_2d:
             scene_obj, 
             modality_list=[
                 'im', # both hdr and sdr
+                # 'depth', 
+                # 'geo_normal', 'sh_normal', 
+                # 'uv',
+                # 'position', 
+                # 'shape_index', 
+                'albedo', 
             ], 
             im_params_dict=
             {
                 # 'im_H_load': 640, 'im_W_load': 1280, 
-                'im_H_load': 320, 'im_W_load': 640, 
-                'spp': 1024, # DEBUG
+                'im_H_load': 480, 'im_W_load': 640, 
+                'spp': 32, # DEBUG
                 # 'spp': 4096, 
             }, # override
             cam_params_dict={}, 
@@ -205,6 +213,7 @@ if opt.render_2d:
             modality_list=[
                 'im', 
                 'albedo', 
+                'specular_color', 
                 'roughness', 
                 'depth', 
                 'normal', 
@@ -218,14 +227,17 @@ if opt.render_2d:
             im_params_dict=
             {
                 # 'im_H_load': 640, 'im_W_load': 1280, 
-                'im_H_load': 320, 'im_W_load': 640, 
+                'im_H_load': 480, 'im_W_load': 640, 
                 'spp': 128, # DEBUG
                 # 'spp': 1024, 
             }, # override
             cam_params_dict={}, 
             mi_params_dict={},
+            # blender_file_name=CONF.scene_params_dict.get('blender_file_name', 'test.blend'), 
             # blender_file_name='test_blender_export_reimport.blend', 
             if_skip_check=True,
+            debug_if_read_pose_from_blend=False, 
+            debug_if_export_blend=False, 
         )
     host=host, 
     renderer.render(if_force=opt.force)

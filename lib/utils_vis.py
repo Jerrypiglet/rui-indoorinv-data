@@ -14,7 +14,7 @@ def _get_colors(num_colors):
         colors.append(colorsys.hls_to_rgb(hue, lightness, saturation))
     return colors
 
-def vis_index_map(index_map, num_colors=-1, colors=None):
+def vis_index_map(index_map, num_colors=-1, colors=None, file=None):
     """
     input: [H, W], np.uint8, with indexs from [0, 1, 2, 3, ...] where 0 is no object
     return: [H, W], np.float32, RGB ~ [0., 1.]
@@ -27,7 +27,7 @@ def vis_index_map(index_map, num_colors=-1, colors=None):
 
     assert isinstance(colors, dict) or isinstance(colors, list), 'colors must be a dict or a list'
         
-    index_map_vis = np.zeros((index_map.shape[0], index_map.shape[1], 3))
+    index_map_vis = np.zeros((index_map.shape[0], index_map.shape[1], 3), dtype=np.float32)
     if isinstance(colors, list):
         for color_idx, color in enumerate(colors):
             mask = index_map == color_idx
@@ -36,6 +36,11 @@ def vis_index_map(index_map, num_colors=-1, colors=None):
         for color_idx, color in colors.items():
             mask = index_map == color_idx
             index_map_vis[mask] = color
+            
+    if file is not None:
+        disp_Image = Image.fromarray((index_map_vis * 255.).astype(np.uint8))
+        disp_Image.save(file)
+        
     return index_map_vis
 
 def reindex_output_map(index_map, invalid_index):
@@ -83,11 +88,10 @@ def vis_disp_colormap(disp_array, file=None, normalize=True, min_and_scale=None,
     
     # print('+++++', np.amax(disp_array), np.amin(disp_array))
     if file is not None:
-        from PIL import Image, ImageFont, ImageDraw
         disp_Image = Image.fromarray(disp_array)
         disp_Image.save(file)
-    else:
-        return disp_array, min_and_scale
+
+    return disp_array, min_and_scale
 
 def colorize(gray, palette):
     # gray: numpy array of the label and 1*3N size list palette
