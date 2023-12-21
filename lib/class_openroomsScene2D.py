@@ -502,5 +502,3 @@ class openroomsScene2D(scene2DBase):
             self.matseg_list.append(matseg_dict)
         
         print(blue_text('[%s] DONE. load_matseg'%self.__class__.__name__))
-
-···

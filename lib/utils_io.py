@@ -35,6 +35,7 @@ def load_img(path: Path, expected_shape: tuple=(), ext: str='png', target_HW: Tu
     - if_allow_crop: if True, allow to crop the image to the target shape
     '''
     if not Path(path).exists():
+        print('File not found: %s; did you render the image?'%(str(path)))
         raise FileNotFoundError(path)
         
     assert path.suffix[1:] == ext
